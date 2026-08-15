@@ -7,7 +7,7 @@ if [[ -n "${BASH_SOURCE[0]:-}" && "${BASH_SOURCE[0]}" != "bash" ]]; then
   REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
 else
-  REPO_DIR="/opt/groupscape-web/repo"
+  REPO_DIR="/opt/groupscape-web"
   SCRIPT_NAME="pull-build-deploy.sh"
 fi
 LOCK_DIR="/tmp/groupscape_web_deploy.lock"
