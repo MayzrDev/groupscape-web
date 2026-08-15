@@ -25,4 +25,4 @@ export class Homepage extends BaseElement {
   }
 }
 
-customElements.define("homepage", Homepage);
+customElements.define("homepage-page", Homepage);
