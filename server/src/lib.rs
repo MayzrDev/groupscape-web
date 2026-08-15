@@ -8,3 +8,4 @@ pub mod models;
 pub mod unauthed;
 pub mod update_batcher;
 pub mod validators;
+pub mod vantage;

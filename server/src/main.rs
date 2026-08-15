@@ -5,6 +5,7 @@ use server::db;
 use server::models;
 use server::unauthed;
 use server::update_batcher;
+use server::vantage;
 
 use actix_cors::Cors;
 use actix_web::{http::header, middleware, web, App, HttpServer};
@@ -41,7 +42,9 @@ async fn main() -> std::io::Result<()> {
         let unauthed_scope = web::scope("/api")
             .service(unauthed::create_group)
             .service(unauthed::get_ge_prices)
-            .service(unauthed::captcha_enabled);
+            .service(unauthed::captcha_enabled)
+            .service(vantage::vantage_ping)
+            .service(vantage::homepage_stats);
         let authed_scope = web::scope("/api/group/{group_name}")
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)

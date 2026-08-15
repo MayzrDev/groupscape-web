@@ -20,6 +20,8 @@ services:
       - PG_PORT=${PG_PORT}
       - PG_DB=${PG_DB}
       - BACKEND_SECRET=${BACKEND_SECRET}
+      - VANTAGE_API_KEY=${VANTAGE_API_KEY}
+      - HOMEPAGE_API_KEY=${HOMEPAGE_API_KEY}
     restart: always
     depends_on:
       - "postgres"

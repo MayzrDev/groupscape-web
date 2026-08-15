@@ -178,6 +178,50 @@ pub async fn rename_group_member(
     Ok(())
 }
 
+pub struct HomepageStats {
+    pub active_groups: i64,
+    pub bound_characters: i64,
+    pub online_characters: i64,
+}
+
+pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiError> {
+    let active_groups: i64 = client
+        .query_one("SELECT COUNT(*) FROM groupscape.groups", &[])
+        .await?
+        .try_get(0)?;
+
+    let bound_characters: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM groupscape.members WHERE member_name != $1",
+            &[&SHARED_MEMBER],
+        )
+        .await?
+        .try_get(0)?;
+
+    // Mirrors the 60s "online" threshold used for the live online badge in the group view.
+    let online_characters: i64 = client
+        .query_one(
+            r#"
+SELECT COUNT(*) FROM groupscape.members
+WHERE member_name != $1 AND GREATEST(
+    stats_last_update, coordinates_last_update, skills_last_update,
+    quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
+    rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
+    collection_log_last_update, potion_storage_last_update
+) >= NOW() - INTERVAL '60 seconds'
+"#,
+            &[&SHARED_MEMBER],
+        )
+        .await?
+        .try_get(0)?;
+
+    Ok(HomepageStats {
+        active_groups,
+        bound_characters,
+        online_characters,
+    })
+}
+
 pub async fn is_member_in_group(
     client: &Client,
     group_id: i64,

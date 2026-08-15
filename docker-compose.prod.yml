@@ -12,6 +12,8 @@ services:
       PG_PORT: 5432
       PG_DB: ${PG_DB:-groupscape_db}
       BACKEND_SECRET: ${BACKEND_SECRET}
+      VANTAGE_API_KEY: ${VANTAGE_API_KEY:-}
+      HOMEPAGE_API_KEY: ${HOMEPAGE_API_KEY:-}
     ports:
       - "${API_PORT:-3021}:8080"
     restart: unless-stopped
