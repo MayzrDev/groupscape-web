@@ -1,66 +1,78 @@
-# GroupScape Frontend and Backend
-Website: [groupscape.mayzr.online](https://groupscape.mayzr.online)
+<p align="center">
+  <img src="site/public/logo.png" alt="GroupScape" width="72" height="72">
+</p>
 
-Source for plugin: [https://github.com/MayzrDev/groupscape-plugin](https://github.com/MayzrDev/groupscape-plugin)
+<h1 align="center">GroupScape</h1>
 
-This repo is for the frontend website and backend of the above plugin.
+<p align="center">
+  A self-hosted webapp for OSRS groups — clans, group ironmen, and friend groups.
+</p>
 
-This plugin tracks information about your group's players and sends it to a server where you and your other group members can view it. Currently it tracks:
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-BSD--2--Clause-blue.svg" alt="BSD 2-Clause License"></a>
+</p>
+
+Source for the paired RuneLite plugin: [groupscape-plugin](../groupscape-plugin)
+
+## What it does
+
+Each group member's plugin streams telemetry to a group-scoped server. This webapp turns that into a live, OSRS-themed dashboard for the group. Currently it tracks:
 
 * Inventory, equipment, bank, rune pouch, and shared bank
 * Skill XP
 * World position, viewable in an interactive map
-* HP, prayer, energy, and world as well as showing inactivity
-* Quest state - completed, finished, in progress
+* HP, prayer, energy, and world, as well as showing inactivity
+* Quest state — completed, finished, in progress
 
-# Self-hosting
+## Layout
 
-It is possible to self-host the frontend and backend rather than use [groupscape.mayzr.online](https://groupscape.mayzr.online).
+- [`server/`](server) — Rust backend
+- [`site/`](site) — frontend webapp
 
-In the plugin settings, put the URL that you are hosting the website on. Leaving it blank will default to https://groupscape.mayzr.online.
+## Self-hosting
 
-![](https://i.imgur.com/0JFD7D5.png)
+In the plugin settings, set the URL for the server you're hosting on.
 
+### With Docker
 
-## With Docker
+Prerequisites: Docker, docker-compose.
 
-Prerequisites
+Copy `docker-compose.yml`, `.env.example`, and `schema.sql` (in `server/src/sql`) onto your server. Copy the contents of `.env.example` into a new `.env` file alongside them and fill it with your secrets — the file explains what goes in each one.
 
-* Docker
-* docker-compose
+`docker-compose.yml` has a line pointing at the `schema.sql` path; update it to match where you placed the file. Then run:
 
-### With docker-compose
+```sh
+docker-compose up -d
+```
 
-Copy the `docker-compose.yml`, `.env.example`, and `schema.sql` (exists in `server/src/sql`) files onto your server.
-
-Copy the contents of `.env.example` into a new file named `.env` in the same directory and fill it with your secrets.
-
-The `.env` file explains what should go into each secret.
-
-The `docker-compose.yml` has a line that takes the path to the `schema.sql`. Make sure to update this to the relative or absolute path of the file on your server.
-
-After you have set up the `.env` file and `schema.sql` path, you can run `docker-compose up -d` and this will spin up both the frontend and backend. The backend should be available on port 5000 and the frontend on port 4000, although these can be changed in the docker-compose file.
+This spins up the frontend and backend together. The backend is available on port 5000 and the frontend on port 4000 by default (both configurable in the compose file).
 
 ### Without docker-compose (untested)
 
-If you are not using the docker-compose, then you will have to set up the Postgres database and pass secrets in using Docker environment variables. See below in the [Without Docker](#without-docker) section for how to set up the database.
-
-You can then run the following to run the image for the frontend, adding the values of the environment variables:
+Set up the Postgres database and pass secrets in as Docker environment variables, then run the images directly:
 
 ```sh
-docker run -d -e HOST_URL= mayzrdev/groupscape-frontend
+docker run -d -e HOST_URL= groupscape-frontend
 ```
-
-Same thing for the backend:
 
 ```sh
-docker run -d -e PG_USER= -e PG_PASSWORD= -e PG_HOST= -e PG_PORT=  -e PG_DB= -e BACKEND_SECRET= mayzrdev/groupscape-backend
+docker run -d -e PG_USER= -e PG_PASSWORD= -e PG_HOST= -e PG_PORT= -e PG_DB= -e BACKEND_SECRET= groupscape-backend
 ```
 
-Check `.env.example` for an explanation on what the value of each environment variable should be.
+Once running, the backend is available on port 8080 and the frontend on port 4000.
 
-Once it's running, the backend should be available on port 8080 and the frontend on port 4000.
+## Dev setup
 
-## Without Docker
+```sh
+cd server && cargo build
+```
 
-To be filled...
+```sh
+cd site && npm install && npm run dev
+```
+
+Verify before reporting a change done: `site/Dockerfile` and `server/Dockerfile` build, `npm test` / `npm run test:e2e` in `site/`, and `cargo test` in `server/`.
+
+## License
+
+[BSD 2-Clause](./LICENSE)
