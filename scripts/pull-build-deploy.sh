@@ -277,8 +277,16 @@ deploy() {
   log_info "Starting deployment"
   local DEPLOY_START=$SECONDS
 
+  # Fetch here rather than relying on check_updates() — force mode calls deploy()
+  # directly, skipping check_updates, so a stale local origin/$BRANCH would
+  # otherwise get redeployed on every forced run instead of the real remote HEAD.
+  log_info "Fetching origin/$BRANCH..."
+  if ! git fetch origin "$BRANCH" 2>&1 | timestamp >> "$GIT_LOG_FILE"; then
+    log_error "git fetch failed — check network/SSH access"
+    return 1
+  fi
+
   # Mirror the remote rather than merge — the server never carries local commits.
-  # check_updates already fetched, so origin/$BRANCH is current.
   log_info "Syncing working tree to origin/$BRANCH..."
   if ! git reset --hard "origin/$BRANCH" 2>&1 | timestamp >> "$GIT_LOG_FILE"; then
     log_error "git reset --hard origin/$BRANCH failed"
