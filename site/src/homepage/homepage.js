@@ -1,13 +1,13 @@
 import { BaseElement } from "../base-element/base-element";
 import { storage } from "../data/storage";
 
-export class MenHomepage extends BaseElement {
+export class Homepage extends BaseElement {
   constructor() {
     super();
   }
 
   html() {
-    return `{{men-homepage.html}}`;
+    return `{{homepage.html}}`;
   }
 
   connectedCallback() {
@@ -25,4 +25,4 @@ export class MenHomepage extends BaseElement {
   }
 }
 
-customElements.define("men-homepage", MenHomepage);
+customElements.define("homepage", Homepage);

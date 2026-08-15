@@ -14,15 +14,15 @@ static TEST_MUTEX: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 /// Create a connection pool for the test database.
 ///
 /// By default, reads connection parameters from `config.toml` (same file
-/// the server uses) but overrides the database name to `group_ironmen_test`.
+/// the server uses) but overrides the database name to `groupscape_test`.
 ///
 /// To use a completely custom connection string, set the `TEST_DATABASE_URL`
 /// environment variable:
 ///
-///   TEST_DATABASE_URL="postgres://postgres:password@localhost:5432/group_ironmen_test"
+///   TEST_DATABASE_URL="postgres://postgres:password@localhost:5432/groupscape_test"
 ///
 /// Integration tests require a running PostgreSQL instance with a
-/// `group_ironmen_test` database. Run them with:
+/// `groupscape_test` database. Run them with:
 ///
 ///   cargo test
 async fn create_test_pool() -> Pool {
@@ -33,7 +33,7 @@ async fn create_test_pool() -> Pool {
     } else {
         let config = Config::from_env().expect("failed to read config.toml");
         let mut pg = config.pg.clone();
-        pg.dbname = Some("group_ironmen_test".to_string());
+        pg.dbname = Some("groupscape_test".to_string());
         pg
     };
 
@@ -52,18 +52,18 @@ async fn setup_test_group(pool: &Pool) -> i64 {
 
     // Drop and recreate schema for a clean slate
     client
-        .execute("DROP SCHEMA IF EXISTS groupironman CASCADE", &[])
+        .execute("DROP SCHEMA IF EXISTS groupscape CASCADE", &[])
         .await
         .expect("failed to drop schema");
     client
-        .execute("CREATE SCHEMA IF NOT EXISTS groupironman", &[])
+        .execute("CREATE SCHEMA IF NOT EXISTS groupscape", &[])
         .await
         .expect("failed to create schema");
 
     // Create the groups table (normally created by schema.sql in production)
     client
         .execute(
-            r#"CREATE TABLE groupironman.groups(
+            r#"CREATE TABLE groupscape.groups(
                 group_id BIGSERIAL UNIQUE,
                 group_name TEXT NOT NULL,
                 group_token_hash CHAR(64) NOT NULL,
@@ -246,7 +246,7 @@ async fn test_concurrent_deposits_accumulate_correctly() {
     let client = pool.get().await.expect("failed to get client");
     client
         .execute(
-            "UPDATE groupironman.members SET bank = ARRAY[10, 5]::int4[] WHERE group_id=$1 AND member_name=$2",
+            "UPDATE groupscape.members SET bank = ARRAY[10, 5]::int4[] WHERE group_id=$1 AND member_name=$2",
             &[&group_id, &"alice"],
         )
         .await
@@ -471,7 +471,7 @@ async fn test_bank_overwrite_and_deposit_same_batch() {
     let client = pool.get().await.expect("failed to get client");
     client
         .execute(
-            "UPDATE groupironman.members SET bank = ARRAY[99, 99, 88, 88]::int4[] WHERE group_id=$1 AND member_name=$2",
+            "UPDATE groupscape.members SET bank = ARRAY[99, 99, 88, 88]::int4[] WHERE group_id=$1 AND member_name=$2",
             &[&group_id, &"alice"],
         )
         .await
@@ -628,7 +628,7 @@ async fn test_batch_exceeding_chunk_size() {
         let name = format!("extra{}", i);
         let create_stmt = client
             .prepare_cached(
-                "INSERT INTO groupironman.members (group_id, member_name) VALUES ($1, $2)",
+                "INSERT INTO groupscape.members (group_id, member_name) VALUES ($1, $2)",
             )
             .await
             .expect("failed to prepare insert");

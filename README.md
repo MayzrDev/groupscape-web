@@ -1,11 +1,11 @@
-# Group Ironmen Tracker Frontend and Backend
-Website: [groupiron.men](https://groupiron.men)
+# GroupScape Frontend and Backend
+Website: [groupscape.mayzr.online](https://groupscape.mayzr.online)
 
-Source for plugin: [https://github.com/christoabrown/group-ironmen-tracker](https://github.com/christoabrown/group-ironmen-tracker)
+Source for plugin: [https://github.com/MayzrDev/groupscape-plugin](https://github.com/MayzrDev/groupscape-plugin)
 
 This repo is for the frontend website and backend of the above plugin.
 
-This plugin tracks information about your group ironman player and sends it to a server where you and your other group members can view it. Currently it tracks:
+This plugin tracks information about your group's players and sends it to a server where you and your other group members can view it. Currently it tracks:
 
 * Inventory, equipment, bank, rune pouch, and shared bank
 * Skill XP
@@ -15,9 +15,9 @@ This plugin tracks information about your group ironman player and sends it to a
 
 # Self-hosting
 
-It is possible to self-host the frontend and backend rather than use [groupiron.men](https://groupiron.men).
+It is possible to self-host the frontend and backend rather than use [groupscape.mayzr.online](https://groupscape.mayzr.online).
 
-In the plugin settings, put the URL that you are hosting the website on. Leaving it blank will default to https://groupiron.men.
+In the plugin settings, put the URL that you are hosting the website on. Leaving it blank will default to https://groupscape.mayzr.online.
 
 ![](https://i.imgur.com/0JFD7D5.png)
 
@@ -48,13 +48,13 @@ If you are not using the docker-compose, then you will have to set up the Postgr
 You can then run the following to run the image for the frontend, adding the values of the environment variables:
 
 ```sh
-docker run -d -e HOST_URL= chrisleeeee/group-ironmen-tracker-frontend
+docker run -d -e HOST_URL= mayzrdev/groupscape-frontend
 ```
 
 Same thing for the backend:
 
 ```sh
-docker run -d -e PG_USER= -e PG_PASSWORD= -e PG_HOST= -e PG_PORT=  -e PG_DB= -e BACKEND_SECRET= chrisleeeee/group-ironmen-tracker-backend
+docker run -d -e PG_USER= -e PG_PASSWORD= -e PG_HOST= -e PG_PORT=  -e PG_DB= -e BACKEND_SECRET= mayzrdev/groupscape-backend
 ```
 
 Check `.env.example` for an explanation on what the value of each environment variable should be.

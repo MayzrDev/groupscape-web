@@ -16,7 +16,7 @@ static GE_PRICES: LazyLock<ArcSwapAny<Arc<String>>> =
 pub async fn fetch_latest_prices() -> Result<WikiGEPrices, ApiError> {
     let wiki_ge_prices = task::spawn_blocking(|| {
         ureq::get("https://prices.runescape.wiki/api/v1/osrs/latest")
-            .header("User-Agent", "Group Ironmen - Dprk#8740")
+            .header("User-Agent", "GroupScape - Dprk#8740")
             .call()
             .map_err(ApiError::UreqError)?
             .body_mut()

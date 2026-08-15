@@ -1,4 +1,4 @@
-men-homepage {
+homepage {
   display: flex;
   flex-direction: column;
   width: 100%;
@@ -8,7 +8,7 @@ men-homepage {
   color: white;
 }
 
-men-homepage social-links {
+homepage social-links {
   position: absolute;
   top: 0;
   left: 0;
@@ -16,7 +16,7 @@ men-homepage social-links {
   font-size: 1.2em;
 }
 
-.men-homepage__container {
+.homepage__container {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -25,17 +25,17 @@ men-homepage social-links {
   flex-direction: column;
 }
 
-.men-homepage__container h1 {
+.homepage__container h1 {
   text-shadow: 3px 3px var(--black);
   font-size: min(128px, 16vw);
   margin: 0;
 }
 
-.men-homepage__links {
+.homepage__links {
   margin-top: 1.5em;
   display: flex;
 }
 
-.men-homepage__links > men-link + men-link {
+.homepage__links > men-link + men-link {
   margin-left: 2em;
 }

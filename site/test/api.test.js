@@ -38,19 +38,19 @@ describe("api", () => {
     const waitForAllEventsSpy = vi.spyOn(pubsub, "waitForAllEvents").mockResolvedValue();
     const callOnIntervalSpy = vi.spyOn(utility, "callOnInterval").mockReturnValue(37);
 
-    await api.enable("gim", "token");
+    await api.enable("testgroup", "token");
 
     expect(waitForAllEventsSpy).toHaveBeenCalledWith("item-data-loaded", "quest-data-loaded");
     expect(callOnIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 1000);
     expect(api.enabled).toBe(true);
-    expect(api.groupName).toBe("gim");
+    expect(api.groupName).toBe("testgroup");
     expect(api.groupToken).toBe("token");
     expect(api.nextCheck).toBe(new Date(0).toISOString());
   });
 
   it("disable clears credentials, group caches, and polling interval", async () => {
     const clearIntervalSpy = vi.spyOn(window, "clearInterval");
-    api.groupName = "gim";
+    api.groupName = "testgroup";
     api.groupToken = "token";
     api.enabled = true;
     api.getGroupInterval = Promise.resolve(99);
@@ -69,7 +69,7 @@ describe("api", () => {
   });
 
   it("getGroupData publishes updated group data after successful fetch", async () => {
-    api.setCredentials("gim", "token");
+    api.setCredentials("testgroup", "token");
     api.nextCheck = "2026-03-30T00:00:00.000Z";
 
     const payload = [{ name: "Alice" }];
@@ -82,7 +82,7 @@ describe("api", () => {
     await api.getGroupData();
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/group/gim/get-group-data?from_time=2026-03-30T00:00:00.000Z",
+      "/api/group/testgroup/get-group-data?from_time=2026-03-30T00:00:00.000Z",
       {
         headers: { Authorization: "token" },
       },
@@ -139,7 +139,7 @@ describe("api", () => {
   });
 
   it("sends expected request shapes for member and auth helper endpoints", async () => {
-    api.setCredentials("gim", "token");
+    api.setCredentials("testgroup", "token");
 
     const response = { ok: true, json: vi.fn().mockResolvedValue({ enabled: true }) };
     globalThis.fetch.mockResolvedValue(response);
@@ -167,7 +167,7 @@ describe("api", () => {
     );
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       2,
-      "/api/group/gim/add-group-member",
+      "/api/group/testgroup/add-group-member",
       {
         body: JSON.stringify({ name: "Charlie" }),
         headers: { "Content-Type": "application/json", Authorization: "token" },
@@ -176,7 +176,7 @@ describe("api", () => {
     );
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       3,
-      "/api/group/gim/delete-group-member",
+      "/api/group/testgroup/delete-group-member",
       {
         body: JSON.stringify({ name: "Charlie" }),
         headers: { "Content-Type": "application/json", Authorization: "token" },
@@ -185,14 +185,14 @@ describe("api", () => {
     );
     expect(globalThis.fetch).toHaveBeenNthCalledWith(
       4,
-      "/api/group/gim/rename-group-member",
+      "/api/group/testgroup/rename-group-member",
       {
         body: JSON.stringify({ original_name: "Charlie", new_name: "Charlotte" }),
         headers: { "Content-Type": "application/json", Authorization: "token" },
         method: "PUT",
       },
     );
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(5, "/api/group/gim/am-i-logged-in", {
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(5, "/api/group/testgroup/am-i-logged-in", {
       headers: { Authorization: "token" },
     });
     expect(globalThis.fetch).toHaveBeenNthCalledWith(6, "/api/ge-prices");
@@ -200,11 +200,11 @@ describe("api", () => {
   });
 
   it("restart re-enables with existing credentials", async () => {
-    api.setCredentials("gim", "token");
+    api.setCredentials("testgroup", "token");
     const enableSpy = vi.spyOn(api, "enable").mockResolvedValue();
 
     await api.restart();
 
-    expect(enableSpy).toHaveBeenCalledWith("gim", "token");
+    expect(enableSpy).toHaveBeenCalledWith("testgroup", "token");
   });
 });

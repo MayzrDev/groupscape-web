@@ -1,18 +1,18 @@
 version: "3.8"
 services:
-  group-ironmen-tracker-frontend:
-    image: chrisleeeee/group-ironmen-tracker-frontend
+  groupscape-frontend:
+    image: mayzrdev/groupscape-frontend
     environment:
       - HOST_URL=${HOST_URL}
     restart: always
-    container_name: group-ironmen-tracker-frontend
+    container_name: groupscape-frontend
     ports:
       - 4000:4000 # replace this if using a docker-compatible reverse proxy like traefik
-  group-ironmen-tracker-backend:
+  groupscape-backend:
     # build:
-      # context: ./server
-      # dockerfile: Dockerfile
-    image: chrisleeeee/group-ironmen-tracker-backend
+    # context: ./server
+    # dockerfile: Dockerfile
+    image: mayzrdev/groupscape-backend
     environment:
       - PG_USER=${PG_USER}
       - PG_PASSWORD=${PG_PASSWORD}
@@ -23,13 +23,13 @@ services:
     restart: always
     depends_on:
       - "postgres"
-    container_name: group-ironmen-tracker-backend
+    container_name: groupscape-backend
     ports:
-      - 5000:8080  # replace this if using a docker-compatible reverse proxy like traefik
-  postgres:
+      - 5000:8080 # replace this if using a docker-compatible reverse proxy like traefik
+  groupscape-postgres:
     image: postgres
     restart: always
-    container_name: group-ironmen-tracker-postgres
+    container_name: groupscape-postgres
     environment:
       POSTGRES_USER: ${PG_USER}
       POSTGRES_PASSWORD: ${PG_PASSWORD}

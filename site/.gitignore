@@ -28,3 +28,9 @@ public/*.html
 public/*.map
 coverage/
 nocommit
+
+# Playwright
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/

@@ -11,9 +11,9 @@ use tokio_postgres::Row;
 
 const CURRENT_GROUP_VERSION: i32 = 2;
 pub async fn create_group(client: &mut Client, create_group: &CreateGroup) -> Result<(), ApiError> {
-    let create_group_stmt = client.prepare_cached("INSERT INTO groupironman.groups (group_name, group_token_hash, version) VALUES($1, $2, $3) RETURNING group_id").await?;
+    let create_group_stmt = client.prepare_cached("INSERT INTO groupscape.groups (group_name, group_token_hash, version) VALUES($1, $2, $3) RETURNING group_id").await?;
     let create_member_stmt = client
-        .prepare_cached("INSERT INTO groupironman.members (group_id, member_name) VALUES($1, $2)")
+        .prepare_cached("INSERT INTO groupscape.members (group_id, member_name) VALUES($1, $2)")
         .await?;
     let transaction = client.transaction().await?;
 
@@ -51,7 +51,7 @@ pub async fn add_group_member(
 ) -> Result<(), ApiError> {
     let member_count_stmt = client
         .prepare_cached(
-            "SELECT COUNT(*) FROM groupironman.members WHERE group_id=$1 AND member_name!=$2",
+            "SELECT COUNT(*) FROM groupscape.members WHERE group_id=$1 AND member_name!=$2",
         )
         .await?;
     let member_count: i64 = client
@@ -65,7 +65,7 @@ pub async fn add_group_member(
     }
 
     let create_member_stmt = client
-        .prepare_cached("INSERT INTO groupironman.members (group_id, member_name) VALUES($1, $2)")
+        .prepare_cached("INSERT INTO groupscape.members (group_id, member_name) VALUES($1, $2)")
         .await?;
     client
         .execute(&create_member_stmt, &[&group_id, &member_name])
@@ -81,7 +81,7 @@ pub async fn delete_skills_data_for_member(
 ) -> Result<(), ApiError> {
     let s = format!(
         r#"
-DELETE FROM groupironman.skills_{} WHERE member_id=$1
+DELETE FROM groupscape.skills_{} WHERE member_id=$1
 "#,
         match period {
             AggregatePeriod::Day => "day",
@@ -101,13 +101,13 @@ pub async fn delete_collection_log_data_for_member(
     transaction: &Transaction<'_>,
     member_id: i64,
 ) -> Result<(), ApiError> {
-    let a = "DELETE FROM groupironman.collection_log WHERE member_id=$1";
+    let a = "DELETE FROM groupscape.collection_log WHERE member_id=$1";
     let delete_collection_stmt = transaction.prepare_cached(a).await?;
     transaction
         .execute(&delete_collection_stmt, &[&member_id])
         .await?;
 
-    let b = "DELETE FROM groupironman.collection_log_new WHERE member_id=$1";
+    let b = "DELETE FROM groupscape.collection_log_new WHERE member_id=$1";
     let delete_new_stmt = transaction.prepare_cached(b).await?;
     transaction.execute(&delete_new_stmt, &[&member_id]).await?;
 
@@ -121,7 +121,7 @@ pub async fn get_member_id(
 ) -> Result<i64, ApiError> {
     let get_member_id_stmt = client
         .prepare_cached(
-            "SELECT member_id FROM groupironman.members WHERE group_id=$1 AND member_name=$2",
+            "SELECT member_id FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
         )
         .await?;
     let member_id: i64 = client
@@ -145,7 +145,7 @@ pub async fn delete_group_member(
     delete_collection_log_data_for_member(&transaction, member_id).await?;
 
     let stmt = transaction
-        .prepare_cached("DELETE FROM groupironman.members WHERE group_id=$1 AND member_name=$2")
+        .prepare_cached("DELETE FROM groupscape.members WHERE group_id=$1 AND member_name=$2")
         .await?;
     transaction
         .execute(&stmt, &[&group_id, &member_name])
@@ -168,7 +168,7 @@ pub async fn rename_group_member(
 ) -> Result<(), ApiError> {
     let stmt = client
         .prepare_cached(
-            "UPDATE groupironman.members SET member_name=$1 WHERE group_id=$2 AND member_name=$3",
+            "UPDATE groupscape.members SET member_name=$1 WHERE group_id=$2 AND member_name=$3",
         )
         .await?;
     client
@@ -183,7 +183,7 @@ pub async fn is_member_in_group(
     group_id: i64,
     member_name: &str,
 ) -> Result<bool, ApiError> {
-    let stmt = client.prepare_cached("SELECT COUNT(member_name) FROM groupironman.members WHERE group_id=$1 AND member_name=$2").await?;
+    let stmt = client.prepare_cached("SELECT COUNT(member_name) FROM groupscape.members WHERE group_id=$1 AND member_name=$2").await?;
     let member_count: i64 = client
         .query_one(&stmt, &[&group_id, &member_name])
         .await?
@@ -208,7 +208,7 @@ where
 pub async fn get_group(client: &Client, group_name: &str, token: &str) -> Result<i64, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT group_id FROM groupironman.groups WHERE group_token_hash=$1 AND group_name=$2",
+            "SELECT group_id FROM groupscape.groups WHERE group_token_hash=$1 AND group_name=$2",
         )
         .await?;
     let hashed_token = token_hash(token, group_name);
@@ -255,7 +255,7 @@ CASE WHEN seed_vault_last_update >= $1::TIMESTAMPTZ THEN seed_vault ELSE NULL EN
 CASE WHEN diary_vars_last_update >= $1::TIMESTAMPTZ THEN diary_vars ELSE NULL END as diary_vars,
 CASE WHEN collection_log_last_update >= $1::TIMESTAMPTZ THEN collection_log ELSE NULL END as collection_log,
 CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE NULL END as potion_storage
-FROM groupironman.members WHERE group_id=$2
+FROM groupscape.members WHERE group_id=$2
 "#,
         )
         .await?;
@@ -306,8 +306,8 @@ async fn aggregate_skills_for_period(
 ) -> Result<(), ApiError> {
     let s = format!(
         r#"
-INSERT INTO groupironman.skills_{} (member_id, time, skills)
-SELECT member_id, date_trunc('{}', skills_last_update), skills FROM groupironman.members
+INSERT INTO groupscape.skills_{} (member_id, time, skills)
+SELECT member_id, date_trunc('{}', skills_last_update), skills FROM groupscape.members
 WHERE skills_last_update IS NOT NULL AND skills IS NOT NULL AND skills_last_update >= $1
 ON CONFLICT (member_id, time)
 DO UPDATE SET skills=excluded.skills;
@@ -338,9 +338,9 @@ async fn apply_skills_retention_for_period(
 ) -> Result<(), ApiError> {
     let s = format!(
         r#"
-DELETE FROM groupironman.skills_{0}
+DELETE FROM groupscape.skills_{0}
 WHERE time < ($1::timestamptz - interval '{1}') AND (member_id, time) NOT IN (
-  SELECT member_id, max(time) FROM groupironman.skills_{0} WHERE time < ($1::timestamptz - interval '{1}') GROUP BY member_id
+  SELECT member_id, max(time) FROM groupscape.skills_{0} WHERE time < ($1::timestamptz - interval '{1}') GROUP BY member_id
 )
 "#,
         match period {
@@ -366,7 +366,7 @@ pub async fn get_last_skills_aggregation(client: &Client) -> Result<DateTime<Utc
     let last_aggregation_stmt = client
         .prepare_cached(
             r#"
-SELECT last_aggregation FROM groupironman.aggregation_info WHERE type='skills'"#,
+SELECT last_aggregation FROM groupscape.aggregation_info WHERE type='skills'"#,
         )
         .await?;
     let last_aggregation: DateTime<Utc> = client
@@ -384,7 +384,7 @@ pub async fn aggregate_skills(client: &mut Client) -> Result<(), ApiError> {
     let update_last_aggregation_stmt = transaction
         .prepare_cached(
             r#"
-UPDATE groupironman.aggregation_info SET last_aggregation=NOW() WHERE type='skills'"#,
+UPDATE groupscape.aggregation_info SET last_aggregation=NOW() WHERE type='skills'"#,
         )
         .await?;
     transaction
@@ -422,8 +422,8 @@ pub async fn get_skills_for_period(
     let s = format!(
         r#"
 SELECT member_name, time, s.skills
-FROM groupironman.skills_{} s
-INNER JOIN groupironman.members m ON m.member_id=s.member_id
+FROM groupscape.skills_{} s
+INNER JOIN groupscape.members m ON m.member_id=s.member_id
 WHERE m.group_id=$1
 "#,
         match period {
@@ -465,7 +465,7 @@ WHERE m.group_id=$1
 pub async fn has_migration_run(client: &mut Client, name: &str) -> Result<bool, ApiError> {
     let count: i64 = client
         .query_one(
-            "SELECT COUNT(*) FROM groupironman.migrations WHERE name=$1",
+            "SELECT COUNT(*) FROM groupscape.migrations WHERE name=$1",
             &[&name],
         )
         .await?
@@ -477,7 +477,7 @@ pub async fn has_migration_run(client: &mut Client, name: &str) -> Result<bool, 
 pub async fn commit_migration(transaction: &Transaction<'_>, name: &str) -> Result<(), ApiError> {
     transaction
         .execute(
-            "INSERT INTO groupironman.migrations (name, date) VALUES($1, NOW())",
+            "INSERT INTO groupscape.migrations (name, date) VALUES($1, NOW())",
             &[&name],
         )
         .await?;
@@ -491,7 +491,7 @@ async fn create_timestamp_trigger(
 ) -> Result<(), ApiError> {
     let create_fn = format!(
         r#"
-CREATE OR REPLACE FUNCTION groupironman.update_{0}_timestamp()
+CREATE OR REPLACE FUNCTION groupscape.update_{0}_timestamp()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.{0}_last_update = now();
@@ -508,10 +508,10 @@ $$ language 'plpgsql';
 DO
 $$BEGIN
   CREATE TRIGGER set_{0}_timestamp
-  BEFORE UPDATE ON groupironman.members
+  BEFORE UPDATE ON groupscape.members
   FOR EACH ROW
   WHEN (OLD.{0} IS DISTINCT FROM NEW.{0})
-  EXECUTE FUNCTION groupironman.update_{0}_timestamp();
+  EXECUTE FUNCTION groupscape.update_{0}_timestamp();
 EXCEPTION
   WHEN duplicate_object THEN
     NULL;
@@ -528,7 +528,7 @@ pub async fn update_schema(client: &mut Client) -> Result<(), ApiError> {
     client
         .execute(
             r#"
-CREATE TABLE IF NOT EXISTS groupironman.migrations (
+CREATE TABLE IF NOT EXISTS groupscape.migrations (
     name TEXT,
     date TIMESTAMPTZ
 )
@@ -542,7 +542,7 @@ CREATE TABLE IF NOT EXISTS groupironman.migrations (
         transaction
             .execute(
                 r#"
-ALTER TABLE groupironman.groups ADD COLUMN IF NOT EXISTS version INTEGER default 1
+ALTER TABLE groupscape.groups ADD COLUMN IF NOT EXISTS version INTEGER default 1
 "#,
                 &[],
             )
@@ -557,9 +557,9 @@ ALTER TABLE groupironman.groups ADD COLUMN IF NOT EXISTS version INTEGER default
         transaction
             .execute(
                 r#"
-CREATE TABLE IF NOT EXISTS groupironman.members (
+CREATE TABLE IF NOT EXISTS groupscape.members (
   member_id BIGSERIAL PRIMARY KEY,
-  group_id BIGSERIAL REFERENCES groupironman.groups(group_id),
+  group_id BIGSERIAL REFERENCES groupscape.groups(group_id),
   member_name TEXT NOT NULL,
 
   stats_last_update TIMESTAMPTZ,
@@ -598,7 +598,7 @@ CREATE TABLE IF NOT EXISTS groupironman.members (
             .await?;
 
         transaction.execute(r#"
-CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_name_idx ON groupironman.members (group_id, member_name);
+CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_name_idx ON groupscape.members (group_id, member_name);
 "#, &[]).await?;
 
         commit_migration(&transaction, "create_members_table").await?;
@@ -611,7 +611,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_name_idx ON groupironman.membe
         transaction
             .execute(
                 r#"
-ALTER TABLE groupironman.members
+ALTER TABLE groupscape.members
 ADD COLUMN IF NOT EXISTS diary_vars_last_update TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS diary_vars INTEGER[62]
 "#,
@@ -630,8 +630,8 @@ ADD COLUMN IF NOT EXISTS diary_vars INTEGER[62]
         for period in periods {
             let create_skills_aggregate = format!(
                 r#"
-CREATE TABLE IF NOT EXISTS groupironman.skills_{} (
-    member_id BIGSERIAL REFERENCES groupironman.members(member_id),
+CREATE TABLE IF NOT EXISTS groupscape.skills_{} (
+    member_id BIGSERIAL REFERENCES groupscape.members(member_id),
     time TIMESTAMPTZ,
     skills INTEGER[24],
 
@@ -646,7 +646,7 @@ CREATE TABLE IF NOT EXISTS groupironman.skills_{} (
         transaction
             .execute(
                 r#"
-CREATE TABLE IF NOT EXISTS groupironman.aggregation_info (
+CREATE TABLE IF NOT EXISTS groupscape.aggregation_info (
     type TEXT PRIMARY KEY,
     last_aggregation TIMESTAMPTZ NOT NULL DEFAULT TIMESTAMP WITH TIME ZONE 'epoch'
 );
@@ -657,7 +657,7 @@ CREATE TABLE IF NOT EXISTS groupironman.aggregation_info (
         transaction
             .execute(
                 r#"
-INSERT INTO groupironman.aggregation_info (type) VALUES ('skills')
+INSERT INTO groupscape.aggregation_info (type) VALUES ('skills')
 ON CONFLICT (type) DO NOTHING
 "#,
                 &[],
@@ -676,9 +676,9 @@ ON CONFLICT (type) DO NOTHING
         let duplicates = transaction
             .query(
                 r#"
-SELECT a.group_id, a.member_id, a.member_name FROM groupironman.members a
+SELECT a.group_id, a.member_id, a.member_name FROM groupscape.members a
 INNER JOIN (
-	SELECT group_id, lower(member_name) as member_name, COUNT(*) FROM groupironman.members
+	SELECT group_id, lower(member_name) as member_name, COUNT(*) FROM groupscape.members
 	GROUP BY group_id, lower(member_name)
 	HAVING COUNT(*) > 1
 ) b
@@ -724,7 +724,7 @@ ORDER BY GREATEST(
                     log::info!("Trying new name '{}'", new_name);
                     if transaction
                         .execute(
-                            "UPDATE groupironman.members SET member_name=$1 WHERE member_id=$2",
+                            "UPDATE groupscape.members SET member_name=$1 WHERE member_id=$2",
                             &[&new_name, &member_id],
                         )
                         .await
@@ -745,7 +745,7 @@ ORDER BY GREATEST(
             .ok();
         transaction
             .execute(
-                "ALTER TABLE groupironman.members ALTER COLUMN member_name TYPE citext",
+                "ALTER TABLE groupscape.members ALTER COLUMN member_name TYPE citext",
                 &[],
             )
             .await?;
@@ -759,7 +759,7 @@ ORDER BY GREATEST(
         transaction
             .execute(
                 r#"
-ALTER TABLE groupironman.members
+ALTER TABLE groupscape.members
 ADD COLUMN IF NOT EXISTS collection_log_last_update TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS collection_log INTEGER[]
 "#,
@@ -778,7 +778,7 @@ ADD COLUMN IF NOT EXISTS collection_log INTEGER[]
 
         // collect the data to migrate
         let rows = transaction
-            .query("SELECT member_id, items FROM groupironman.collection_log WHERE cardinality(items) > 0", &[])
+            .query("SELECT member_id, items FROM groupscape.collection_log WHERE cardinality(items) > 0", &[])
             .await
             .unwrap();
         let mut member_data: HashMap<i64, Vec<i32>> = HashMap::new();
@@ -835,7 +835,7 @@ ADD COLUMN IF NOT EXISTS collection_log INTEGER[]
             // timestamp is set to value that will return on the initial frontend request, but does not show the player as online
             let update_query = format!(
                 r#"
-UPDATE groupironman.members as a SET collection_log=b.collection_log, collection_log_last_update='epoch'::timestamptz + INTERVAL '5 days'
+UPDATE groupscape.members as a SET collection_log=b.collection_log, collection_log_last_update='epoch'::timestamptz + INTERVAL '5 days'
 FROM (VALUES {}) AS b(member_id, collection_log)
 WHERE a.member_id=b.member_id
 "#,
@@ -881,7 +881,7 @@ WHERE a.member_id=b.member_id
         transaction
             .execute(
                 r#"
-ALTER TABLE groupironman.members
+ALTER TABLE groupscape.members
 ADD COLUMN IF NOT EXISTS potion_storage_last_update TIMESTAMPTZ,
 ADD COLUMN IF NOT EXISTS potion_storage INTEGER[]
 "#,

@@ -1,5 +1,5 @@
 import "./appearance.js";
-import "./men-homepage/men-homepage.js";
+import "./homepage/homepage.js";
 import "./wrap-routes/wrap-routes.js";
 import "./data/api.js";
 import "./data/group-data.js";

@@ -6,7 +6,7 @@ const dataDir = path.resolve(__dirname, "../public/data");
 const iconsDir = path.resolve(__dirname, "../public/icons/items");
 
 const RAW_MASTER_BASE =
-  "https://raw.githubusercontent.com/christoabrown/group-ironmen/master/site/public/data";
+  "https://raw.githubusercontent.com/MayzrDev/groupscape-web/master/site/public/data";
 
 function loadJson(filename) {
   const raw = fs.readFileSync(path.join(dataDir, filename), "utf-8");

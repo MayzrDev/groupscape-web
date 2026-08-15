@@ -1,0 +1,77 @@
+services:
+  groupscape-web-backend:
+    image: groupscape-web-backend:latest
+    container_name: groupscape-web-backend
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_HOST: groupscape-web-db
+      PG_PORT: 5432
+      PG_DB: ${PG_DB:-groupscape_db}
+      BACKEND_SECRET: ${BACKEND_SECRET}
+    ports:
+      - "${API_PORT:-3021}:8080"
+    restart: unless-stopped
+    depends_on:
+      groupscape-web-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - groupscape-web
+
+  groupscape-web-frontend:
+    image: groupscape-web-frontend:latest
+    container_name: groupscape-web-frontend
+    build:
+      context: ./site
+      dockerfile: Dockerfile
+    environment:
+      HOST_URL: ${HOST_URL}
+    ports:
+      - "${WEB_PORT:-3020}:4000"
+    restart: unless-stopped
+    depends_on:
+      groupscape-web-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - groupscape-web
+
+  groupscape-web-db:
+    image: postgres:16-alpine
+    container_name: groupscape-web-db
+    environment:
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB:-groupscape_db}
+    volumes:
+      - /opt/groupscape-web/db:/var/lib/postgresql/data
+      - ./server/src/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "${DB_PORT:-3022}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -d ${PG_DB:-groupscape_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - groupscape-web
+
+networks:
+  groupscape-web:
+    driver: bridge

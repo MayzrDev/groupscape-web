@@ -253,10 +253,10 @@ mod tests {
     #[test]
     fn caches_successful_authentication_by_group_and_token_hash() {
         let cache = AuthenticationCache::new();
-        cache.insert("ironmen", "valid-token-hash".to_owned(), 42);
+        cache.insert("testgroup", "valid-token-hash".to_owned(), 42);
 
-        assert_eq!(cache.get("ironmen", "valid-token-hash"), Some(42));
-        assert_eq!(cache.get("ironmen", "other-token-hash"), None);
+        assert_eq!(cache.get("testgroup", "valid-token-hash"), Some(42));
+        assert_eq!(cache.get("testgroup", "other-token-hash"), None);
         assert_eq!(cache.get("other-group", "valid-token-hash"), None);
     }
 }

@@ -31,4 +31,4 @@ jobs:
         with:
           context: ./server
           push: true
-          tags: chrisleeeee/group-ironmen-tracker-backend:latest
+          tags: mayzrdev/groupscape-backend:latest

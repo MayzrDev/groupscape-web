@@ -334,7 +334,7 @@ fn build_values_statement(size: usize) -> String {
 
     format!(
         r#"
-UPDATE groupironman.members AS a SET
+UPDATE groupscape.members AS a SET
   stats = COALESCE(b.stats, a.stats),
   coordinates = COALESCE(b.coordinates, a.coordinates),
   skills = COALESCE(b.skills, a.skills),
@@ -477,7 +477,7 @@ async fn process_bank_side_effects(
     let select_stmt = transaction
         .prepare_cached(
             r#"SELECT a.group_id, a.member_name, a.bank
-FROM groupironman.members a
+FROM groupscape.members a
 JOIN UNNEST($1::int8[], $2::text[]) AS t(group_id, member_name)
 ON a.group_id = t.group_id AND a.member_name = t.member_name::citext
 FOR UPDATE"#,
@@ -547,7 +547,7 @@ FOR UPDATE"#,
     if !update_group_ids.is_empty() {
         let update_stmt = transaction
             .prepare_cached(
-                r#"UPDATE groupironman.members AS a
+                r#"UPDATE groupscape.members AS a
 SET bank = t.new_bank::int4[], bank_last_update = NOW()
 FROM UNNEST($1::int8[], $2::text[], $3::text[]) AS t(group_id, member_name, new_bank)
 WHERE a.group_id = t.group_id AND a.member_name = t.member_name::citext"#,
@@ -583,7 +583,7 @@ async fn process_shared_bank_updates(
 
     let stmt = transaction
         .prepare_cached(
-            r#"UPDATE groupironman.members SET bank=$1, bank_last_update=NOW()
+            r#"UPDATE groupscape.members SET bank=$1, bank_last_update=NOW()
 WHERE group_id=$2 AND member_name=$3"#,
         )
         .await?;
