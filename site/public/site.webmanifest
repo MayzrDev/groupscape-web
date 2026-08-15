@@ -1,6 +1,6 @@
 {
-    "name": "",
-    "short_name": "",
+    "name": "GroupScape",
+    "short_name": "GroupScape",
     "icons": [
         {
             "src": "/android-chrome-192x192.png",
@@ -13,7 +13,7 @@
             "type": "image/png"
         }
     ],
-    "theme_color": "#ffffff",
-    "background_color": "#ffffff",
+    "theme_color": "#171310",
+    "background_color": "#171310",
     "display": "standalone"
 }

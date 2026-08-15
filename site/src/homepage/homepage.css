@@ -25,6 +25,13 @@ homepage social-links {
   flex-direction: column;
 }
 
+.homepage__logo {
+  width: min(140px, 30vw);
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
+  margin-bottom: 0.5em;
+}
+
 .homepage__container h1 {
   text-shadow: 3px 3px var(--black);
   font-size: min(128px, 16vw);
