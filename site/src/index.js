@@ -13,6 +13,7 @@ import "./map-page/map-page.js";
 import "./side-panel/side-panel.js";
 import "./player-panel/player-panel.js";
 import "./player-stats/player-stats.js";
+import "./player-portrait/player-portrait.js";
 import "./player-inventory/player-inventory.js";
 import "./player-skills/player-skills.js";
 import "./skill-box/skill-box.js";

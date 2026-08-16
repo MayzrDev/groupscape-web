@@ -43,6 +43,10 @@ class Api {
     return `${this.baseUrl}/captcha-enabled`;
   }
 
+  get portraitUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/portrait`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -193,6 +197,18 @@ class Api {
   async getCaptchaEnabled() {
     const response = await fetch(this.captchaEnabledUrl);
     return response.json();
+  }
+
+  async getPortrait(memberName) {
+    const response = await fetch(`${this.portraitUrl}/${encodeURIComponent(memberName)}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return response.arrayBuffer();
   }
 }
 

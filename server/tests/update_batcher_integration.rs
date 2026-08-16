@@ -116,6 +116,9 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         diary_vars: None,
         collection_log_v2: None,
         potion_storage: None,
+        special_attack: None,
+        active_prayers: None,
+        rich_presence: None,
         last_updated: None,
     }
 }

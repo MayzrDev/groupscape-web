@@ -12,10 +12,10 @@ use tokio::time::{self, Duration, Instant};
 static BATCH_SIZE: usize = 5000;
 static CHUNK_SIZE: usize = 50;
 
-/// Number of columns per member update row. With 15 columns, the PostgreSQL
-/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 15 =
-/// 4369 rows when using the VALUES approach.
-const COLUMNS_PER_ROW: usize = 15;
+/// Number of columns per member update row. With 18 columns, the PostgreSQL
+/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 18 =
+/// 3641 rows when using the VALUES approach.
+const COLUMNS_PER_ROW: usize = 18;
 
 pub async fn background_worker(
     pool: Pool,
@@ -265,6 +265,15 @@ fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.potion_storage.is_some() {
         older.potion_storage = newer.potion_storage.clone();
     }
+    if newer.special_attack.is_some() {
+        older.special_attack = newer.special_attack;
+    }
+    if newer.active_prayers.is_some() {
+        older.active_prayers = newer.active_prayers.clone();
+    }
+    if newer.rich_presence.is_some() {
+        older.rich_presence = newer.rich_presence.clone();
+    }
 
     if let Some(newer_deposited) = &newer.deposited {
         match &older.deposited {
@@ -311,7 +320,7 @@ fn build_values_statement(size: usize) -> String {
         .map(|row| {
             let offset = row * COLUMNS_PER_ROW;
             format!(
-                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[])",
+                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::int4,${}::text[],${}::text)",
                 offset + 1,
                 offset + 2,
                 offset + 3,
@@ -327,6 +336,9 @@ fn build_values_statement(size: usize) -> String {
                 offset + 13,
                 offset + 14,
                 offset + 15,
+                offset + 16,
+                offset + 17,
+                offset + 18,
             )
         })
         .collect::<Vec<_>>()
@@ -347,11 +359,14 @@ UPDATE groupscape.members AS a SET
   seed_vault = COALESCE(b.seed_vault, a.seed_vault),
   diary_vars = COALESCE(b.diary_vars, a.diary_vars),
   collection_log = COALESCE(b.collection_log, a.collection_log),
-  potion_storage = COALESCE(b.potion_storage, a.potion_storage)
+  potion_storage = COALESCE(b.potion_storage, a.potion_storage),
+  special_attack = COALESCE(b.special_attack, a.special_attack),
+  active_prayers = COALESCE(b.active_prayers, a.active_prayers),
+  rich_presence = COALESCE(b.rich_presence, a.rich_presence)
 FROM (VALUES {values}) AS b(
   group_id, member_name, stats, coordinates, skills, quests, inventory,
   equipment, bank, rune_pouch, interacting, seed_vault, diary_vars, collection_log,
-  potion_storage
+  potion_storage, special_attack, active_prayers, rich_presence
 )
 WHERE a.group_id = b.group_id AND a.member_name = b.member_name::citext
 "#
@@ -417,6 +432,9 @@ async fn process_chunk(pool: &Pool, chunk: Vec<GroupMember>) -> Option<()> {
         params.push(&member_data.diary_vars);
         params.push(&member_data.collection_log_v2);
         params.push(&member_data.potion_storage);
+        params.push(&member_data.special_attack);
+        params.push(&member_data.active_prayers);
+        params.push(&member_data.rich_presence);
     }
 
     if let Err(e) = client.execute(&update_stmt, &params).await {
@@ -625,6 +643,9 @@ mod tests {
             diary_vars: None,
             collection_log_v2: None,
             potion_storage: None,
+            special_attack: None,
+            active_prayers: None,
+            rich_presence: None,
             last_updated: None,
         }
     }

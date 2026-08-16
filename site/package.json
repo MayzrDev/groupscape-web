@@ -2,6 +2,9 @@
   "name": "groupscape",
   "version": "1.0.0",
   "description": "",
+  "dependencies": {
+    "three": "^0.169.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@vitest/coverage-v8": "^1.6.1",

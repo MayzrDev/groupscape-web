@@ -5,6 +5,7 @@ use crate::models::{
     AmIInGroupRequest, GroupMember, GroupSkillData, RenameGroupMember, SHARED_MEMBER,
 };
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
+use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
 use actix_web::{delete, get, post, put, web, Error, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
@@ -86,6 +87,7 @@ pub async fn update_group_member(
     auth: Authenticated,
     group_member: web::Json<GroupMember>,
     sender: web::Data<mpsc::Sender<GroupMember>>,
+    broadcast_registry: web::Data<GroupBroadcastRegistry>,
 ) -> Result<HttpResponse, Error> {
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
@@ -189,6 +191,22 @@ pub async fn update_group_member(
         ArrayFormat::ItemPairs,
     )?;
 
+    // Publish straight to any connected party overlays before handing off to
+    // the batched DB writer - the batcher trades latency for write
+    // efficiency, but the overlay wants these updates as fast as possible.
+    if broadcast_registry.has_subscribers(auth.group_id) {
+        let envelope = WsEnvelope::VitalsUpdate {
+            payload: VitalsUpdatePayload {
+                name: group_member_inner.name.clone(),
+                vitals: websocket::to_wire_vitals(&group_member_inner),
+            },
+            ts: Utc::now(),
+        };
+        if let Ok(message) = serde_json::to_string(&envelope) {
+            broadcast_registry.publish(auth.group_id, message);
+        }
+    }
+
     match sender.send(group_member_inner).await {
         Ok(_) => Ok(HttpResponse::Ok().finish()),
         Err(_) => Ok(HttpResponse::InternalServerError().body("Failed to submit player update")),
@@ -265,4 +283,37 @@ pub async fn am_i_in_group(
 #[get("/collection-log")]
 pub async fn get_collection_log() -> Result<web::Json<HashMap<String, Vec<i32>>>, Error> {
     Ok(web::Json(HashMap::new()))
+}
+
+// Not decorated with #[post(...)] - registered manually in main.rs with its own
+// larger PayloadConfig since the global 100KB cap rejects real meshes.
+pub async fn update_portrait(
+    auth: Authenticated,
+    path: web::Path<String>,
+    body: web::Bytes,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let member_name = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let member_id = db::get_member_id(&client, auth.group_id, &member_name).await?;
+    db::upsert_member_mesh(&client, member_id, &body).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[get("/portrait/{member_name}")]
+pub async fn get_portrait(
+    auth: Authenticated,
+    path: web::Path<String>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let member_name = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let mesh = db::get_member_mesh(&client, auth.group_id, &member_name).await?;
+    match mesh {
+        Some(mesh) => Ok(HttpResponse::Ok()
+            .append_header(("Cache-Control", "private, max-age=60"))
+            .content_type("application/octet-stream")
+            .body(mesh)),
+        None => Ok(HttpResponse::NotFound().finish()),
+    }
 }

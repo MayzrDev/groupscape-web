@@ -14,9 +14,9 @@ pub struct Coordinates {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Interacting {
-    name: String,
-    scale: i32,
-    ratio: i32,
+    pub name: String,
+    pub scale: i32,
+    pub ratio: i32,
     location: Coordinates,
     #[serde(default = "default_last_updated")]
     last_updated: DateTime<Utc>,
@@ -67,6 +67,12 @@ pub struct GroupMember {
     pub collection_log_v2: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub potion_storage: Option<Vec<i32>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub special_attack: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_prayers: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rich_presence: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<DateTime<Utc>>,
 }

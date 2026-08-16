@@ -26,6 +26,12 @@ pub enum ApiError {
     IsMemberInGroupError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetSkillsDataError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetMemberColorsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpsertMemberMeshError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetMemberMeshError(tokio_postgres::error::Error),
     GroupFullError,
     UreqError(ureq::Error),
     GroupMemberValidationError(String),
@@ -56,6 +62,13 @@ impl ResponseError for ApiError {
             ApiError::GetGroupDataError(ref err) => handle_pg_error(err, "GetGroupDataError"),
             ApiError::IsMemberInGroupError(ref err) => handle_pg_error(err, "IsMemberInGroupError"),
             ApiError::GetSkillsDataError(ref err) => handle_pg_error(err, "GetSkillsDataError"),
+            ApiError::GetMemberColorsError(ref err) => {
+                handle_pg_error(err, "GetMemberColorsError")
+            }
+            ApiError::UpsertMemberMeshError(ref err) => {
+                handle_pg_error(err, "UpsertMemberMeshError")
+            }
+            ApiError::GetMemberMeshError(ref err) => handle_pg_error(err, "GetMemberMeshError"),
             ApiError::DeleteGroupMemberError(ref err) => {
                 handle_pg_error(err, "DeleteGroupMemberError")
             }

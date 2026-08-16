@@ -236,6 +236,50 @@ pub async fn is_member_in_group(
     Ok(member_count > 0)
 }
 
+pub async fn upsert_member_mesh(
+    client: &Client,
+    member_id: i64,
+    mesh: &[u8],
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.member_mesh (member_id, mesh, mesh_last_update) VALUES ($1, $2, NOW())
+ON CONFLICT (member_id) DO UPDATE SET mesh=excluded.mesh, mesh_last_update=excluded.mesh_last_update
+"#,
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&member_id, &mesh])
+        .await
+        .map_err(ApiError::UpsertMemberMeshError)?;
+    Ok(())
+}
+
+pub async fn get_member_mesh(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<Option<Vec<u8>>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT mm.mesh FROM groupscape.member_mesh mm
+INNER JOIN groupscape.members m ON m.member_id=mm.member_id
+WHERE m.group_id=$1 AND m.member_name=$2
+"#,
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::GetMemberMeshError)?;
+    match row {
+        Some(row) => Ok(Some(row.try_get("mesh")?)),
+        None => Ok(None),
+    }
+}
+
 pub fn serialize_serde<T>(value: &Option<T>) -> Result<Option<String>, ApiError>
 where
     T: Serialize,
@@ -285,7 +329,8 @@ SELECT member_name,
 GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
 quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
 rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
-collection_log_last_update, potion_storage_last_update) as last_updated,
+collection_log_last_update, potion_storage_last_update, special_attack_last_update,
+active_prayers_last_update, rich_presence_last_update) as last_updated,
 CASE WHEN stats_last_update >= $1::TIMESTAMPTZ THEN stats ELSE NULL END as stats,
 CASE WHEN coordinates_last_update >= $1::TIMESTAMPTZ THEN coordinates ELSE NULL END as coordinates,
 CASE WHEN skills_last_update >= $1::TIMESTAMPTZ THEN skills ELSE NULL END as skills,
@@ -298,7 +343,10 @@ CASE WHEN interacting_last_update >= $1::TIMESTAMPTZ THEN interacting ELSE NULL 
 CASE WHEN seed_vault_last_update >= $1::TIMESTAMPTZ THEN seed_vault ELSE NULL END as seed_vault,
 CASE WHEN diary_vars_last_update >= $1::TIMESTAMPTZ THEN diary_vars ELSE NULL END as diary_vars,
 CASE WHEN collection_log_last_update >= $1::TIMESTAMPTZ THEN collection_log ELSE NULL END as collection_log,
-CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE NULL END as potion_storage
+CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE NULL END as potion_storage,
+CASE WHEN special_attack_last_update >= $1::TIMESTAMPTZ THEN special_attack ELSE NULL END as special_attack,
+CASE WHEN active_prayers_last_update >= $1::TIMESTAMPTZ THEN active_prayers ELSE NULL END as active_prayers,
+CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence
 FROM groupscape.members WHERE group_id=$2
 "#,
         )
@@ -331,11 +379,39 @@ FROM groupscape.members WHERE group_id=$2
             deposited: Option::None,
             collection_log_v2: row.try_get("collection_log").ok(),
             potion_storage: row.try_get("potion_storage").ok(),
+            special_attack: row.try_get("special_attack").ok(),
+            active_prayers: row.try_get("active_prayers").ok(),
+            rich_presence: row.try_get("rich_presence").ok(),
         };
         result.push(group_member);
     }
 
     Ok(result)
+}
+
+/// Assigns each non-shared group member a stable display color by join order
+/// (member_id ascending), matching groupscape-old's join-order palette so the
+/// overlay's ownership stripe stays consistent across sessions.
+pub async fn get_member_color_map(
+    client: &Client,
+    group_id: i64,
+) -> Result<HashMap<String, String>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND member_name != $2 ORDER BY member_id ASC",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &SHARED_MEMBER])
+        .await
+        .map_err(ApiError::GetMemberColorsError)?;
+
+    let mut colors = HashMap::new();
+    for (index, row) in rows.into_iter().enumerate() {
+        let member_name: String = row.try_get(0)?;
+        colors.insert(member_name, crate::websocket::member_color(index));
+    }
+    Ok(colors)
 }
 
 pub enum AggregatePeriod {
@@ -936,6 +1012,50 @@ ADD COLUMN IF NOT EXISTS potion_storage INTEGER[]
         create_timestamp_trigger(&transaction, "potion_storage").await?;
 
         commit_migration(&transaction, "add_potion_storage").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_party_overlay_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members
+ADD COLUMN IF NOT EXISTS special_attack_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS special_attack INTEGER,
+ADD COLUMN IF NOT EXISTS active_prayers_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS active_prayers TEXT[],
+ADD COLUMN IF NOT EXISTS rich_presence_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS rich_presence TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        create_timestamp_trigger(&transaction, "special_attack").await?;
+        create_timestamp_trigger(&transaction, "active_prayers").await?;
+        create_timestamp_trigger(&transaction, "rich_presence").await?;
+
+        commit_migration(&transaction, "add_party_overlay_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_member_mesh_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.member_mesh (
+  member_id BIGINT PRIMARY KEY REFERENCES groupscape.members(member_id) ON DELETE CASCADE,
+  mesh BYTEA NOT NULL,
+  mesh_last_update TIMESTAMPTZ NOT NULL
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_member_mesh_table").await?;
         transaction.commit().await?;
     }
 

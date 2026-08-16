@@ -6,6 +6,7 @@ use server::models;
 use server::unauthed;
 use server::update_batcher;
 use server::vantage;
+use server::websocket;
 
 use actix_cors::Cors;
 use actix_web::{http::header, middleware, web, App, HttpServer};
@@ -37,6 +38,7 @@ async fn main() -> std::io::Result<()> {
         update_batcher::background_worker(update_batcher_pool, rx, None).await;
     });
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
+    let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
 
     HttpServer::new(move || {
         let unauthed_scope = web::scope("/api")
@@ -55,7 +57,14 @@ async fn main() -> std::io::Result<()> {
             .service(authed::am_i_logged_in)
             .service(authed::am_i_in_group)
             .service(authed::get_skill_data)
-            .service(authed::get_collection_log);
+            .service(authed::get_collection_log)
+            .service(authed::get_portrait)
+            .service(
+                web::resource("/update-portrait/{member_name}")
+                    .app_data(web::PayloadConfig::new(5_000_000))
+                    .route(web::post().to(authed::update_portrait)),
+            )
+            .service(websocket::party_overlay_ws);
         let json_config = web::JsonConfig::default().limit(100000);
         let cors = Cors::default()
             .allow_any_origin()
@@ -79,6 +88,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(pool.clone()))
             .app_data(web::Data::new(config.clone()))
             .app_data(web::Data::new(tx.clone()))
+            .app_data(broadcast_registry.clone())
             .service(authed_scope)
             .service(unauthed_scope)
     })

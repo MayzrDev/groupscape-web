@@ -26,6 +26,7 @@ arc-swap = "1.7.1"
 ureq = { version = "3", default-features = false, features = ["json", "rustls", "rustls-webpki-roots"] }
 mimalloc = "0.1.48"
 futures-util = "0.3.31"
+actix-ws = "0.3"
 
 [profile.dev]
 opt-level = 0

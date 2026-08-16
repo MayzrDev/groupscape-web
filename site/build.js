@@ -117,10 +117,13 @@ const htmlBuildPlugin = {
       if (productionMode) {
         css = cleanCSSInstance.minify(css).styles;
       }
-      htmlFile = htmlFile.replace("{{style}}", css);
+      // Use a function replacer: a string replacer interprets "$&"/"$1"/etc as special patterns,
+      // which minified output can contain incidentally (e.g. a mangled "$" identifier next to "&&"),
+      // silently corrupting the embedded output.
+      htmlFile = htmlFile.replace("{{style}}", () => css);
 
       const jsContent = await fs.promises.readFile('public/app.js', 'utf8');
-      htmlFile = htmlFile.replace("{{js}}", jsContent);
+      htmlFile = htmlFile.replace("{{js}}", () => jsContent);
 
       await fs.promises.writeFile("public/index.html", htmlFile);
     });
