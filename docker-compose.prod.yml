@@ -61,13 +61,17 @@ services:
       POSTGRES_PASSWORD: ${PG_PASSWORD}
       POSTGRES_DB: ${PG_DB:-groupscape_db}
     volumes:
-      - /opt/groupscape-web/db:/var/lib/postgresql/data
+      - /opt/groupscape/db:/var/lib/postgresql/data
       - ./server/src/sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "${DB_PORT:-3022}:5432"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -d ${PG_DB:-groupscape_db}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${PG_USER:-postgres} -d ${PG_DB:-groupscape_db}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
