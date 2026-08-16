@@ -1,13 +1,14 @@
 player-portrait {
   display: block;
-  width: 100%;
+  flex: 0 0 auto;
+  aspect-ratio: 1 / 1;
   box-sizing: border-box;
 }
 
 .player-portrait__frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
+  height: 100%;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -25,8 +26,9 @@ player-portrait {
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: 12px;
-  padding: 8px;
+  font-size: 9px;
+  line-height: 1.2;
+  padding: 3px;
   box-sizing: border-box;
 }
 

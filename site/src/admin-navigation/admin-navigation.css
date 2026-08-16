@@ -1,0 +1,44 @@
+admin-navigation {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 3px solid var(--admin-accent);
+}
+
+.admin-navigation__ribbon {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: white;
+  background: var(--admin-accent);
+  padding: 4px 10px;
+  border-radius: 3px 9px 9px 3px;
+}
+
+.admin-navigation__tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-right: auto;
+}
+
+.admin-navigation__tab {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 15px;
+  color: var(--primary-text);
+  opacity: 0.7;
+  padding: 8px 12px;
+  border-radius: 4px 4px 0 0;
+}
+
+.admin-navigation__tab:hover {
+  opacity: 0.9;
+}
+
+.admin-navigation__tab.active {
+  opacity: 1;
+  box-shadow: inset 0 -3px var(--admin-accent);
+}

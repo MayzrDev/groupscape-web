@@ -35,6 +35,11 @@ pub enum ApiError {
     GroupFullError,
     UreqError(ureq::Error),
     GroupMemberValidationError(String),
+    #[from(ignore)]
+    #[display("{_0}: {_1}")]
+    AdminDbError(String, tokio_postgres::error::Error),
+    AdminNotFoundError,
+    AdminRateLimitedError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -89,6 +94,9 @@ impl ResponseError for ApiError {
                 log::error!("Validation error: {}", reason);
                 HttpResponse::BadRequest().body(reason.clone())
             }
+            ApiError::AdminDbError(ref context, ref err) => handle_pg_error(err, context),
+            ApiError::AdminNotFoundError => HttpResponse::NotFound().finish(),
+            ApiError::AdminRateLimitedError => HttpResponse::TooManyRequests().finish(),
         }
     }
 }

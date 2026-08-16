@@ -10,6 +10,16 @@ player-panel + player-panel {
   margin-top: 12px;
 }
 
+.player-panel__header {
+  display: flex;
+  align-items: stretch;
+}
+
+.player-panel__header player-stats {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .player-panel__minibar {
   display: grid;
   grid-template-columns: repeat(6, 1fr);

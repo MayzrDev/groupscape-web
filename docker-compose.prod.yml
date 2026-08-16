@@ -14,6 +14,7 @@ services:
       BACKEND_SECRET: ${BACKEND_SECRET}
       VANTAGE_API_KEY: ${VANTAGE_API_KEY:-}
       HOMEPAGE_API_KEY: ${HOMEPAGE_API_KEY:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
     ports:
       - "${API_PORT:-3021}:8080"
     restart: unless-stopped

@@ -1,3 +1,5 @@
+use server::admin;
+use server::admin_auth_middleware::{AdminAuthenticateMiddlewareFactory, AdminLoginRateLimiter};
 use server::auth_middleware::AuthenticateMiddlewareFactory;
 use server::authed;
 use server::config::Config;
@@ -20,7 +22,17 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let config = Config::from_env().unwrap();
+    let mut config = Config::from_env().unwrap();
+    // The admin token is supplied raw via env var (never written to config.toml)
+    // and hashed once at startup, mirroring how group tokens are only ever
+    // stored/compared as hashes.
+    if let Ok(admin_token) = std::env::var("ADMIN_TOKEN") {
+        if !admin_token.is_empty() {
+            config.admin.enabled = true;
+            config.admin.token_hash = server::crypto::token_hash(&admin_token, "admin");
+        }
+    }
+    let config = config;
     let pool = config.pg.create_pool(None, NoTls).unwrap();
     env_logger::init_from_env(
         env_logger::Env::new().default_filter_or(config.logger.level.to_string()),
@@ -38,7 +50,9 @@ async fn main() -> std::io::Result<()> {
         update_batcher::background_worker(update_batcher_pool, rx, None).await;
     });
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
+    let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
+    let config_data = web::Data::new(config.clone());
 
     HttpServer::new(move || {
         let unauthed_scope = web::scope("/api")
@@ -65,6 +79,22 @@ async fn main() -> std::io::Result<()> {
                     .route(web::post().to(authed::update_portrait)),
             )
             .service(websocket::party_overlay_ws);
+        let admin_scope = web::scope("/api/admin")
+            .wrap(AdminAuthenticateMiddlewareFactory::new(
+                config_data.clone(),
+                admin_rate_limiter.clone(),
+            ))
+            .service(admin::am_i_logged_in)
+            .service(admin::list_groups)
+            .service(admin::get_group)
+            .service(admin::suspend_group)
+            .service(admin::ban_group)
+            .service(admin::unban_group)
+            .service(admin::delete_group)
+            .service(admin::list_feature_flags)
+            .service(admin::set_feature_flag)
+            .service(admin::list_audit_log)
+            .service(admin::accounts_summary);
         let json_config = web::JsonConfig::default().limit(100000);
         let cors = Cors::default()
             .allow_any_origin()
@@ -90,6 +120,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(tx.clone()))
             .app_data(broadcast_registry.clone())
             .service(authed_scope)
+            .service(admin_scope)
             .service(unauthed_scope)
     })
     .bind(("0.0.0.0", 8080))?

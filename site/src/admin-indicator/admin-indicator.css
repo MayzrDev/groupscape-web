@@ -1,0 +1,36 @@
+admin-indicator {
+  display: none;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+admin-indicator.admin-indicator--visible {
+  display: block;
+}
+
+.admin-indicator__link {
+  display: flex;
+}
+
+.admin-indicator__link a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 14px;
+  color: white;
+  text-decoration: none;
+  background: var(--admin-accent);
+  padding: 6px 12px 6px 9px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.admin-indicator__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: white;
+}

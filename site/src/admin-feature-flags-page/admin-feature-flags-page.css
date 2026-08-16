@@ -1,0 +1,102 @@
+.admin-flag-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--light-border);
+}
+
+.admin-flag-row:last-child {
+  border-bottom: none;
+}
+
+.admin-flag-row__key {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 14px;
+  min-width: 160px;
+}
+
+.admin-flag-row__desc {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+  opacity: 0.65;
+  flex: 1;
+}
+
+.admin-flags__empty {
+  padding: 12px 4px;
+  opacity: 0.6;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+}
+
+.admin-toggle {
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--light-border);
+  position: relative;
+  background: var(--darken);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.admin-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  transition: left 0.15s;
+}
+
+.admin-toggle--on {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.admin-toggle--on::after {
+  left: 20px;
+}
+
+.admin-flags__add-form {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-top: 18px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px dashed var(--light-border);
+}
+
+.admin-flags__field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+}
+
+.admin-flags__field--grow {
+  flex: 1;
+  min-width: 180px;
+}
+
+.admin-flags__field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.admin-flags__field input {
+  font: inherit;
+  padding: 8px 10px;
+  border-radius: 5px;
+  border: 1px solid var(--light-border);
+  background: var(--darken);
+  color: var(--primary-text);
+}

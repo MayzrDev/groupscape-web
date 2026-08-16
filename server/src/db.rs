@@ -1,7 +1,8 @@
 use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
-    AggregateSkillData, CreateGroup, GroupMember, GroupSkillData, MemberSkillData, SHARED_MEMBER,
+    AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData,
+    CreateGroup, GroupMember, GroupSkillData, MemberSkillData, SHARED_MEMBER,
 };
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Transaction};
@@ -1059,5 +1060,375 @@ CREATE TABLE IF NOT EXISTS groupscape.member_mesh (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_group_moderation_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.group_moderation (
+  group_id BIGINT PRIMARY KEY REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'active',
+  reason TEXT,
+  actor TEXT NOT NULL DEFAULT 'admin',
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_group_moderation_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_feature_flags_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.feature_flags (
+  flag_key TEXT PRIMARY KEY,
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  description TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_feature_flags_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_admin_audit_log_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.admin_audit_log (
+  id BIGSERIAL PRIMARY KEY,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  detail JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx ON groupscape.admin_audit_log(created_at DESC);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_admin_audit_log_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_accounts_stub_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.accounts (
+  id BIGSERIAL PRIMARY KEY,
+  email CITEXT UNIQUE,
+  disabled BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_accounts_stub_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
+}
+
+pub async fn admin_record_audit_log(
+    client: &Client,
+    action: &str,
+    target_type: Option<&str>,
+    target_id: Option<&str>,
+    detail: Option<serde_json::Value>,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.admin_audit_log (action, target_type, target_id, detail) VALUES ($1, $2, $3, $4)",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&action, &target_type, &target_id, &detail])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminRecordAuditLogError".to_string(), e))?;
+    Ok(())
+}
+
+pub async fn admin_list_groups(
+    client: &Client,
+    search: Option<&str>,
+    page: i64,
+    page_size: i64,
+) -> Result<(Vec<AdminGroupSummary>, i64), ApiError> {
+    let offset = (page.max(1) - 1) * page_size.max(1);
+    let search_pattern = search.map(|s| format!("%{}%", s));
+
+    let list_stmt = client
+        .prepare_cached(
+            r#"
+SELECT g.group_id, g.group_name, g.version,
+  (SELECT COUNT(*) FROM groupscape.members m WHERE m.group_id = g.group_id AND m.member_name != $1) AS member_count,
+  COALESCE(gm.status, 'active') AS status
+FROM groupscape.groups g
+LEFT JOIN groupscape.group_moderation gm ON gm.group_id = g.group_id
+WHERE $2::text IS NULL OR g.group_name ILIKE $2
+ORDER BY g.group_id DESC
+LIMIT $3 OFFSET $4
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(
+            &list_stmt,
+            &[&SHARED_MEMBER, &search_pattern, &page_size.max(1), &offset],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminListGroupsError".to_string(), e))?;
+
+    let groups = rows
+        .into_iter()
+        .map(|row| AdminGroupSummary {
+            group_id: row.get("group_id"),
+            group_name: row.get("group_name"),
+            version: row.get("version"),
+            member_count: row.get("member_count"),
+            status: row.get("status"),
+        })
+        .collect();
+
+    let count_stmt = client
+        .prepare_cached(
+            "SELECT COUNT(*) FROM groupscape.groups g WHERE $1::text IS NULL OR g.group_name ILIKE $1",
+        )
+        .await?;
+    let total: i64 = client
+        .query_one(&count_stmt, &[&search_pattern])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminCountGroupsError".to_string(), e))?
+        .try_get(0)?;
+
+    Ok((groups, total))
+}
+
+pub async fn admin_get_group(
+    client: &Client,
+    group_id: i64,
+) -> Result<Option<AdminGroupDetail>, ApiError> {
+    let group_stmt = client
+        .prepare_cached(
+            r#"
+SELECT g.group_id, g.group_name, g.version, COALESCE(gm.status, 'active') AS status, gm.reason
+FROM groupscape.groups g
+LEFT JOIN groupscape.group_moderation gm ON gm.group_id = g.group_id
+WHERE g.group_id = $1
+"#,
+        )
+        .await?;
+    let group_row = client
+        .query_opt(&group_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetGroupError".to_string(), e))?;
+    let Some(group_row) = group_row else {
+        return Ok(None);
+    };
+
+    let members_stmt = client
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id = $1 AND member_name != $2 ORDER BY member_name",
+        )
+        .await?;
+    let member_rows = client
+        .query(&members_stmt, &[&group_id, &SHARED_MEMBER])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetGroupMembersError".to_string(), e))?;
+    let members = member_rows.into_iter().map(|row| row.get(0)).collect();
+
+    Ok(Some(AdminGroupDetail {
+        group_id: group_row.get("group_id"),
+        group_name: group_row.get("group_name"),
+        version: group_row.get("version"),
+        status: group_row.get("status"),
+        reason: group_row.get("reason"),
+        members,
+    }))
+}
+
+pub async fn admin_set_group_moderation(
+    client: &Client,
+    group_id: i64,
+    status: &str,
+    reason: Option<&str>,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.group_moderation (group_id, status, reason, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (group_id) DO UPDATE SET status = $2, reason = $3, updated_at = now()
+"#,
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id, &status, &reason])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminSetGroupModerationError".to_string(), e))?;
+    Ok(())
+}
+
+pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<(), ApiError> {
+    let member_id_stmt = client
+        .prepare_cached("SELECT member_id FROM groupscape.members WHERE group_id = $1")
+        .await?;
+    let member_ids: Vec<i64> = client
+        .query(&member_id_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupMembersLookupError".to_string(), e))?
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect();
+
+    let transaction = client.transaction().await?;
+
+    for member_id in member_ids {
+        delete_skills_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
+        delete_skills_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
+        delete_skills_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
+        delete_collection_log_data_for_member(&transaction, member_id).await?;
+    }
+
+    let delete_members_stmt = transaction
+        .prepare_cached("DELETE FROM groupscape.members WHERE group_id = $1")
+        .await?;
+    transaction
+        .execute(&delete_members_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupMembersError".to_string(), e))?;
+
+    let delete_moderation_stmt = transaction
+        .prepare_cached("DELETE FROM groupscape.group_moderation WHERE group_id = $1")
+        .await?;
+    transaction
+        .execute(&delete_moderation_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupModerationError".to_string(), e))?;
+
+    let delete_group_stmt = transaction
+        .prepare_cached("DELETE FROM groupscape.groups WHERE group_id = $1")
+        .await?;
+    transaction
+        .execute(&delete_group_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupError".to_string(), e))?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupCommitError".to_string(), e))?;
+
+    Ok(())
+}
+
+pub async fn admin_list_feature_flags(client: &Client) -> Result<Vec<AdminFeatureFlag>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT flag_key, enabled, description FROM groupscape.feature_flags ORDER BY flag_key",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminListFeatureFlagsError".to_string(), e))?;
+    Ok(rows
+        .into_iter()
+        .map(|row| AdminFeatureFlag {
+            flag_key: row.get("flag_key"),
+            enabled: row.get("enabled"),
+            description: row.get("description"),
+        })
+        .collect())
+}
+
+pub async fn admin_set_feature_flag(
+    client: &Client,
+    flag_key: &str,
+    enabled: bool,
+    description: Option<&str>,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.feature_flags (flag_key, enabled, description, updated_at)
+VALUES ($1, $2, $3, now())
+ON CONFLICT (flag_key) DO UPDATE SET enabled = $2, description = COALESCE($3, groupscape.feature_flags.description), updated_at = now()
+"#,
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&flag_key, &enabled, &description])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminSetFeatureFlagError".to_string(), e))?;
+    Ok(())
+}
+
+pub async fn admin_list_audit_log(
+    client: &Client,
+    page: i64,
+    page_size: i64,
+) -> Result<(Vec<AdminAuditLogEntry>, i64), ApiError> {
+    let offset = (page.max(1) - 1) * page_size.max(1);
+
+    let list_stmt = client
+        .prepare_cached(
+            r#"
+SELECT id, action, target_type, target_id, detail, created_at
+FROM groupscape.admin_audit_log
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&list_stmt, &[&page_size.max(1), &offset])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminListAuditLogError".to_string(), e))?;
+    let entries = rows
+        .into_iter()
+        .map(|row| AdminAuditLogEntry {
+            id: row.get("id"),
+            action: row.get("action"),
+            target_type: row.get("target_type"),
+            target_id: row.get("target_id"),
+            detail: row.get("detail"),
+            created_at: row.get("created_at"),
+        })
+        .collect();
+
+    let total: i64 = client
+        .query_one("SELECT COUNT(*) FROM groupscape.admin_audit_log", &[])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminCountAuditLogError".to_string(), e))?
+        .try_get(0)?;
+
+    Ok((entries, total))
+}
+
+pub async fn admin_count_accounts(client: &Client) -> Result<i64, ApiError> {
+    let count: i64 = client
+        .query_one("SELECT COUNT(*) FROM groupscape.accounts", &[])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminCountAccountsError".to_string(), e))?
+        .try_get(0)?;
+    Ok(count)
 }

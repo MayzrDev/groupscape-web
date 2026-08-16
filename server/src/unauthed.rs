@@ -162,6 +162,14 @@ pub async fn create_group(
         return Ok(HttpResponse::BadRequest().body("Provided group name is not valid"));
     }
 
+    // Embed the group name in the token so the RuneLite plugin can derive it locally
+    // instead of requiring the user to enter it separately.
+    create_group_inner.token = format!(
+        "{}|{}",
+        create_group_inner.name,
+        uuid::Uuid::new_v4().hyphenated()
+    );
+
     create_group_inner
         .member_names
         .retain(|member_name| !member_name.trim().is_empty());

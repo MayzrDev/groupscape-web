@@ -111,6 +111,44 @@
       route-wrapper=".authed-section"
     ></app-route>
 
+    <app-route
+      route-path="/login"
+      route-component="admin-login-page"
+      route-outlet=".admin-login-section__outlet"
+      route-wrapper=".admin-login-section"
+    ></app-route>
+    <app-route
+      route-path="/"
+      route-component="admin-groups-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+    <app-route route-path="/groups" alias-for="/" route-wrapper=".admin-section"></app-route>
+    <app-route
+      route-path="/group-detail"
+      route-component="admin-group-detail-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+    <app-route
+      route-path="/feature-flags"
+      route-component="admin-feature-flags-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+    <app-route
+      route-path="/audit-log"
+      route-component="admin-audit-log-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+    <app-route
+      route-path="/accounts"
+      route-component="admin-accounts-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+
     <canvas-map id="background-worldmap"></canvas-map>
     <wrap-routes class="unauthed-section" route-path="">
       <template>
@@ -129,8 +167,22 @@
       </template>
     </wrap-routes>
 
+    <wrap-routes class="admin-login-section" route-path="/admin">
+      <template>
+        <main class="admin-login-section__outlet"></main>
+      </template>
+    </wrap-routes>
+
+    <wrap-routes class="admin-section" route-path="/admin">
+      <template>
+        <admin-navigation></admin-navigation>
+        <div class="admin-section__outlet"></div>
+      </template>
+    </wrap-routes>
+
     <rs-tooltip></rs-tooltip>
     <confirm-dialog class="dialog"></confirm-dialog>
+    <admin-indicator></admin-indicator>
     <script>{{js}}</script>
     <app-route route-path="*" route-redirect="/"></app-route>
   </body>

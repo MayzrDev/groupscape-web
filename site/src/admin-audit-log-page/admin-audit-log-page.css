@@ -1,0 +1,13 @@
+.admin-audit-log__detail {
+  max-width: 420px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+.admin-audit-log__empty {
+  opacity: 0.6;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  padding: 14px 10px;
+}

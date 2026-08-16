@@ -26,17 +26,35 @@ export class PlayerPortrait extends BaseElement {
     this.scene = new THREE.Scene();
 
     this.eventListener(window, "resize", this.onResize.bind(this));
+
+    // In a flex row (e.g. the roster panel header), `aspect-ratio` doesn't reliably derive
+    // width from a stretch-resolved height, so the frame can end up taller than it is wide.
+    // Correct it in JS once layout settles so the portrait always renders as a true square.
+    this.squareObserver = new ResizeObserver(() => this.enforceSquare());
+    this.squareObserver.observe(this);
+    this.enforceSquare();
+
     this.onResize();
 
     this.loadPortrait();
   }
 
   disconnectedCallback() {
+    this.squareObserver?.disconnect();
+    this.squareObserver = null;
     this.mesh?.geometry?.dispose();
     this.mesh?.material?.dispose();
     this.renderer?.dispose();
     this.renderer = null;
     super.disconnectedCallback();
+  }
+
+  enforceSquare() {
+    const height = this.offsetHeight;
+    if (height > 0 && this.offsetWidth !== height) {
+      this.style.width = `${height}px`;
+      this.onResize();
+    }
   }
 
   onResize() {

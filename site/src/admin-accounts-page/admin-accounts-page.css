@@ -1,0 +1,24 @@
+.admin-accounts {
+  text-align: center;
+  padding: 50px 20px;
+}
+
+.admin-accounts__count {
+  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 40px;
+  font-weight: 700;
+}
+
+.admin-accounts__label {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  opacity: 0.65;
+  margin-top: 4px;
+}
+
+.admin-accounts__note {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  opacity: 0.65;
+  max-width: 40ch;
+  margin: 18px auto 0;
+  font-size: 13px;
+}

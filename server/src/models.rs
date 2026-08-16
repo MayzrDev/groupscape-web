@@ -123,3 +123,98 @@ pub struct CaptchaVerifyResponse {
     // #[serde(rename = "error-codes", default)]
     // pub error_codes: std::vec::Vec<String>,
 }
+
+fn default_admin_page() -> i64 {
+    1
+}
+fn default_admin_page_size() -> i64 {
+    25
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminGroupsQuery {
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default = "default_admin_page")]
+    pub page: i64,
+    #[serde(default = "default_admin_page_size")]
+    pub page_size: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminPageQuery {
+    #[serde(default = "default_admin_page")]
+    pub page: i64,
+    #[serde(default = "default_admin_page_size")]
+    pub page_size: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminGroupSummary {
+    pub group_id: i64,
+    pub group_name: String,
+    pub version: i32,
+    pub member_count: i64,
+    pub status: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminGroupsResponse {
+    pub groups: Vec<AdminGroupSummary>,
+    pub total: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminGroupDetail {
+    pub group_id: i64,
+    pub group_name: String,
+    pub version: i32,
+    pub status: String,
+    pub reason: Option<String>,
+    pub members: Vec<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminModerationRequest {
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AdminFeatureFlag {
+    pub flag_key: String,
+    pub enabled: bool,
+    pub description: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminSetFeatureFlag {
+    pub enabled: bool,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AdminAuditLogEntry {
+    pub id: i64,
+    pub action: String,
+    pub target_type: Option<String>,
+    pub target_id: Option<String>,
+    pub detail: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+pub struct AdminAuditLogResponse {
+    pub entries: Vec<AdminAuditLogEntry>,
+    pub total: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountsSummary {
+    pub count: i64,
+}

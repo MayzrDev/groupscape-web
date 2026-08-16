@@ -26,6 +26,13 @@ pub struct CaptchaConfig {
     #[serde(skip_serializing)]
     pub secret: String,
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AdminConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub token_hash: String,
+}
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub pg: deadpool_postgres::Config,
@@ -33,6 +40,8 @@ pub struct Config {
     pub logger: LoggerConfig,
     #[serde(default = "default_captcha_config")]
     pub hcaptcha: CaptchaConfig,
+    #[serde(default = "default_admin_config")]
+    pub admin: AdminConfig,
 }
 fn default_logger_config() -> LoggerConfig {
     LoggerConfig {
@@ -44,6 +53,12 @@ fn default_captcha_config() -> CaptchaConfig {
         enabled: false,
         sitekey: "".to_string(),
         secret: "".to_string(),
+    }
+}
+fn default_admin_config() -> AdminConfig {
+    AdminConfig {
+        enabled: false,
+        token_hash: "".to_string(),
     }
 }
 impl Config {

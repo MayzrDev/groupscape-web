@@ -1,3 +1,5 @@
+pub mod admin;
+pub mod admin_auth_middleware;
 pub mod auth_middleware;
 pub mod authed;
 pub mod config;

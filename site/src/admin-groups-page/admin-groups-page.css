@@ -1,0 +1,41 @@
+.admin-groups__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.admin-group-card {
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-group-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.admin-group-card__name {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 15px;
+  word-break: break-word;
+}
+
+.admin-group-card__meta {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.admin-group-card__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
