@@ -1,13 +1,22 @@
 <div class="characters-page__container rsborder rsbackground">
   <h1 class="characters-page__title">Your characters</h1>
   <p class="characters-page__status"></p>
-  <ul class="characters-page__list"></ul>
-  <div class="characters-page__empty"></div>
-  <div class="characters-page__add">
-    <p class="characters-page__add-hint">
-      To link another character, open the GroupScape RuneLite plugin's sidebar panel while logged into
-      that character and click <strong>Link this character</strong>.
+  <div class="characters-page__grid">
+    <div class="characters-page__add-tile" tabindex="0" role="button" aria-expanded="false">
+      <span class="characters-page__add-tile-plus">+</span>
+      <span>Add a character</span>
+    </div>
+  </div>
+  <div class="characters-page__instructions" hidden>
+    <button class="characters-page__instructions-close">Close</button>
+    <p>
+      Characters are reported to GroupScape by the RuneLite plugin — there's no code to type in.
     </p>
+    <ol>
+      <li>Open the GroupScape panel in RuneLite's sidebar.</li>
+      <li>Click <strong>Link this character</strong> — it opens this site to confirm.</li>
+      <li>Confirm the link, then come back here and refresh.</li>
+    </ol>
   </div>
   <div class="characters-page__error validation-error"></div>
 </div>
