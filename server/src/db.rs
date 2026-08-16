@@ -1114,6 +1114,13 @@ CREATE TABLE IF NOT EXISTS groupscape.admin_audit_log (
   detail JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
 CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx ON groupscape.admin_audit_log(created_at DESC);
 "#,
                 &[],
