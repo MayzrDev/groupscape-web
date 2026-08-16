@@ -27,6 +27,8 @@ ureq = { version = "3", default-features = false, features = ["json", "rustls", 
 mimalloc = "0.1.48"
 futures-util = "0.3.31"
 actix-ws = "0.3"
+argon2 = "0.5.3"
+rand_core = { version = "0.6.4", features = ["getrandom"] }
 
 [profile.dev]
 opt-level = 0

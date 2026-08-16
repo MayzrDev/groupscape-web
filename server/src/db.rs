@@ -1187,7 +1187,168 @@ CREATE TABLE IF NOT EXISTS groupscape.accounts (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_account_password_hash").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS password_hash TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_account_password_hash").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_account_sessions_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.account_sessions (
+  session_id BIGSERIAL PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS account_sessions_token_hash_idx ON groupscape.account_sessions (token_hash);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_account_sessions_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
+}
+
+pub struct AccountForAuth {
+    pub id: i64,
+    pub email: String,
+    pub password_hash: Option<String>,
+    pub disabled: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<AccountForAuth> for crate::models::Account {
+    fn from(account: AccountForAuth) -> Self {
+        crate::models::Account {
+            id: account.id,
+            email: account.email,
+            created_at: account.created_at,
+        }
+    }
+}
+
+/// One account per user - `email` is a case-insensitive (citext) UNIQUE column, so a duplicate
+/// registration surfaces as a Postgres unique-violation (SQLSTATE 23505) rather than needing a
+/// separate existence check that would race with a concurrent registration of the same email.
+pub async fn create_account(
+    client: &Client,
+    email: &str,
+    password_hash: &str,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.accounts (email, password_hash) VALUES ($1, $2) RETURNING id",
+        )
+        .await?;
+    match client.query_one(&stmt, &[&email, &password_hash]).await {
+        Ok(row) => Ok(row.try_get(0)?),
+        Err(err) => {
+            if err
+                .as_db_error()
+                .is_some_and(|db_err| db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
+            {
+                Err(ApiError::EmailAlreadyRegisteredError)
+            } else {
+                Err(ApiError::CreateAccountError(err))
+            }
+        }
+    }
+}
+
+pub async fn get_account_by_email(
+    client: &Client,
+    email: &str,
+) -> Result<Option<AccountForAuth>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE email=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&email])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(AccountForAuth {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            password_hash: row.try_get("password_hash")?,
+            disabled: row.try_get("disabled")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub async fn create_account_session(
+    client: &Client,
+    account_id: i64,
+    token_hash: &str,
+    expires_at: &DateTime<Utc>,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.account_sessions (account_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id, &token_hash, expires_at])
+        .await
+        .map_err(ApiError::CreateAccountSessionError)?;
+    Ok(())
+}
+
+pub async fn get_account_by_session_token_hash(
+    client: &Client,
+    token_hash: &str,
+) -> Result<Option<crate::models::Account>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT a.id, a.email, a.created_at
+FROM groupscape.account_sessions s
+INNER JOIN groupscape.accounts a ON a.id = s.account_id
+WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.disabled = false
+"#,
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&token_hash])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(crate::models::Account {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
 }
 
 pub async fn admin_record_audit_log(

@@ -1,3 +1,5 @@
+use server::account_auth_middleware::AccountAuthenticateMiddlewareFactory;
+use server::accounts;
 use server::admin;
 use server::admin_auth_middleware::{AdminAuthenticateMiddlewareFactory, AdminLoginRateLimiter};
 use server::auth_middleware::AuthenticateMiddlewareFactory;
@@ -50,6 +52,9 @@ async fn main() -> std::io::Result<()> {
         update_batcher::background_worker(update_batcher_pool, rx, None).await;
     });
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
+    let account_auth_cache = std::sync::Arc::new(
+        server::account_auth_middleware::AccountAuthenticationCache::new(),
+    );
     let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let config_data = web::Data::new(config.clone());
@@ -61,6 +66,14 @@ async fn main() -> std::io::Result<()> {
             .service(unauthed::captcha_enabled)
             .service(vantage::vantage_ping)
             .service(vantage::homepage_stats);
+        let account_scope = web::scope("/api/account")
+            .service(accounts::register)
+            .service(accounts::login);
+        let authed_account_scope = web::scope("/api/account")
+            .wrap(AccountAuthenticateMiddlewareFactory::new(
+                account_auth_cache.clone(),
+            ))
+            .service(accounts::me);
         let authed_scope = web::scope("/api/group/{group_name}")
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)
@@ -124,6 +137,8 @@ async fn main() -> std::io::Result<()> {
             .app_data(broadcast_registry.clone())
             .service(authed_scope)
             .service(admin_scope)
+            .service(account_scope)
+            .service(authed_account_scope)
             .service(unauthed_scope)
     })
     .bind(("0.0.0.0", 8080))?

@@ -129,6 +129,29 @@ pub struct WikiGEPrices {
 }
 pub type GEPrices = std::collections::HashMap<i32, i64>;
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegisterAccount {
+    pub email: String,
+    pub password: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LoginAccount {
+    pub email: String,
+    pub password: String,
+}
+#[derive(Serialize)]
+pub struct Account {
+    pub id: i64,
+    pub email: String,
+    pub created_at: DateTime<Utc>,
+}
+#[derive(Serialize)]
+pub struct AuthenticatedAccount {
+    pub account: Account,
+    pub token: String,
+}
+#[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,
     // NOTE: unused

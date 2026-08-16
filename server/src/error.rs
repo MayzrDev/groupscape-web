@@ -42,6 +42,15 @@ pub enum ApiError {
     UreqError(ureq::Error),
     GroupMemberValidationError(String),
     #[from(ignore)]
+    CreateAccountError(tokio_postgres::error::Error),
+    EmailAlreadyRegisteredError,
+    #[from(ignore)]
+    GetAccountError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    CreateAccountSessionError(tokio_postgres::error::Error),
+    InvalidCredentialsError,
+    AccountDisabledError,
+    #[from(ignore)]
     #[display("{_0}: {_1}")]
     AdminDbError(String, tokio_postgres::error::Error),
     AdminNotFoundError,
@@ -108,6 +117,18 @@ impl ResponseError for ApiError {
             ApiError::AdminDbError(ref context, ref err) => handle_pg_error(err, context),
             ApiError::AdminNotFoundError => HttpResponse::NotFound().finish(),
             ApiError::AdminRateLimitedError => HttpResponse::TooManyRequests().finish(),
+            ApiError::CreateAccountError(ref err) => handle_pg_error(err, "CreateAccountError"),
+            ApiError::EmailAlreadyRegisteredError => {
+                HttpResponse::Conflict().body("Email already registered")
+            }
+            ApiError::GetAccountError(ref err) => handle_pg_error(err, "GetAccountError"),
+            ApiError::CreateAccountSessionError(ref err) => {
+                handle_pg_error(err, "CreateAccountSessionError")
+            }
+            ApiError::InvalidCredentialsError => {
+                HttpResponse::Unauthorized().body("Invalid email or password")
+            }
+            ApiError::AccountDisabledError => HttpResponse::Forbidden().body("Account is disabled"),
         }
     }
 }
