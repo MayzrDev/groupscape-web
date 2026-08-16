@@ -78,7 +78,7 @@ async fn test_create_and_find_account_by_email() {
         .expect("account should exist");
 
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email, "player@example.com");
+    assert_eq!(account.email.as_deref(), Some("player@example.com"));
     assert_eq!(account.password_hash.as_deref(), Some(password_hash.as_str()));
     assert!(!account.disabled);
 }
@@ -144,7 +144,7 @@ async fn test_session_token_round_trip() {
         .expect("query failed")
         .expect("session should resolve to the account");
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email, "session@example.com");
+    assert_eq!(account.email.as_deref(), Some("session@example.com"));
 
     let wrong_hash = crypto::session_token_hash("not-the-real-token");
     let missing = db::get_account_by_session_token_hash(&client, &wrong_hash)
@@ -208,4 +208,80 @@ async fn test_disabled_account_session_does_not_authenticate() {
         .await
         .expect("query failed");
     assert!(account.is_none(), "disabled account should not authenticate");
+}
+
+#[tokio::test]
+async fn test_create_and_find_account_by_discord_id() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let account_id = db::create_account_with_discord_id(&client, "111222333")
+        .await
+        .expect("failed to create discord account");
+
+    let account = db::get_account_by_discord_id(&client, "111222333")
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+
+    assert_eq!(account.id, account_id);
+    assert_eq!(account.email, None, "discord-only account has no email");
+    assert_eq!(account.password_hash, None);
+    assert!(!account.disabled);
+}
+
+#[tokio::test]
+async fn test_unknown_discord_id_returns_none() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let account = db::get_account_by_discord_id(&client, "does-not-exist")
+        .await
+        .expect("query failed");
+    assert!(account.is_none());
+}
+
+#[tokio::test]
+async fn test_discord_id_is_unique() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    db::create_account_with_discord_id(&client, "444555666")
+        .await
+        .expect("first link should succeed");
+
+    let result = db::create_account_with_discord_id(&client, "444555666").await;
+    assert!(result.is_err(), "same discord id should not link twice");
+}
+
+#[tokio::test]
+async fn test_discord_account_can_log_in_via_session_after_linking() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let account_id = db::create_account_with_discord_id(&client, "777888999")
+        .await
+        .unwrap();
+
+    let token = crypto::new_session_token();
+    let token_hash = crypto::session_token_hash(&token);
+    let expires_at = Utc::now() + Duration::days(30);
+    db::create_account_session(&client, account_id, &token_hash, &expires_at)
+        .await
+        .expect("failed to create session");
+
+    let account = db::get_account_by_session_token_hash(&client, &token_hash)
+        .await
+        .expect("query failed")
+        .expect("session should resolve to the discord account");
+    assert_eq!(account.id, account_id);
+    assert_eq!(account.email, None);
 }

@@ -1231,12 +1231,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS account_sessions_token_hash_idx ON groupscape.
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_account_discord_id").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS discord_id TEXT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_discord_id_idx ON groupscape.accounts (discord_id) WHERE discord_id IS NOT NULL;
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_account_discord_id").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
 pub struct AccountForAuth {
     pub id: i64,
-    pub email: String,
+    pub email: Option<String>,
     pub password_hash: Option<String>,
     pub disabled: bool,
     pub created_at: DateTime<Utc>,
@@ -1255,6 +1278,48 @@ impl From<AccountForAuth> for crate::models::Account {
 /// One account per user - `email` is a case-insensitive (citext) UNIQUE column, so a duplicate
 /// registration surfaces as a Postgres unique-violation (SQLSTATE 23505) rather than needing a
 /// separate existence check that would race with a concurrent registration of the same email.
+/// Creates a Discord-only account (`email`/`password_hash` both left `NULL`) - matches
+/// `groupscape-old`'s OAuth-first decision (grilled during that project's Slice 29): a Discord
+/// id with no matching account auto-creates one rather than requiring a prior email signup.
+pub async fn create_account_with_discord_id(
+    client: &Client,
+    discord_id: &str,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached("INSERT INTO groupscape.accounts (discord_id) VALUES ($1) RETURNING id")
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&discord_id])
+        .await
+        .map_err(ApiError::CreateAccountError)?;
+    Ok(row.try_get(0)?)
+}
+
+pub async fn get_account_by_discord_id(
+    client: &Client,
+    discord_id: &str,
+) -> Result<Option<AccountForAuth>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE discord_id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&discord_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(AccountForAuth {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            password_hash: row.try_get("password_hash")?,
+            disabled: row.try_get("disabled")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
 pub async fn create_account(
     client: &Client,
     email: &str,

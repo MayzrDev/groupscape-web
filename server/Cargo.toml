@@ -29,6 +29,7 @@ futures-util = "0.3.31"
 actix-ws = "0.3"
 argon2 = "0.5.3"
 rand_core = { version = "0.6.4", features = ["getrandom"] }
+urlencoding = "2.1.3"
 
 [profile.dev]
 opt-level = 0

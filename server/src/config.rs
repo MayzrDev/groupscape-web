@@ -33,6 +33,17 @@ pub struct AdminConfig {
     #[serde(default)]
     pub token_hash: String,
 }
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DiscordConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default, skip_serializing)]
+    pub client_secret: String,
+    #[serde(default)]
+    pub redirect_uri: String,
+}
 #[derive(Deserialize, Clone)]
 pub struct Config {
     pub pg: deadpool_postgres::Config,
@@ -42,6 +53,13 @@ pub struct Config {
     pub hcaptcha: CaptchaConfig,
     #[serde(default = "default_admin_config")]
     pub admin: AdminConfig,
+    #[serde(default = "default_discord_config")]
+    pub discord: DiscordConfig,
+    /// Frontend origin to send the browser back to once a Discord OAuth login completes.
+    /// Only ever set from the `WEB_ORIGIN` env var (see `main.rs`), same as `admin.token_hash`
+    /// is only ever set from `ADMIN_TOKEN` - never written to `config.toml`.
+    #[serde(default)]
+    pub web_origin: String,
 }
 fn default_logger_config() -> LoggerConfig {
     LoggerConfig {
@@ -59,6 +77,14 @@ fn default_admin_config() -> AdminConfig {
     AdminConfig {
         enabled: false,
         token_hash: "".to_string(),
+    }
+}
+fn default_discord_config() -> DiscordConfig {
+    DiscordConfig {
+        enabled: false,
+        client_id: "".to_string(),
+        client_secret: "".to_string(),
+        redirect_uri: "".to_string(),
     }
 }
 impl Config {

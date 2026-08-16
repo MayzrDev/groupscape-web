@@ -235,7 +235,7 @@ mod tests {
     fn test_account() -> Account {
         Account {
             id: 42,
-            email: "player@example.com".to_string(),
+            email: Some("player@example.com".to_string()),
             created_at: Utc::now(),
         }
     }

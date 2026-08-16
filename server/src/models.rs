@@ -140,10 +140,20 @@ pub struct LoginAccount {
     pub email: String,
     pub password: String,
 }
+/// Discord's redirect back to `/discord/callback` - not `deny_unknown_fields` since Discord
+/// controls this query string, not us.
+#[derive(Deserialize)]
+pub struct DiscordCallbackQuery {
+    #[serde(default)]
+    pub code: Option<String>,
+    #[serde(default)]
+    pub state: Option<String>,
+}
 #[derive(Serialize)]
 pub struct Account {
     pub id: i64,
-    pub email: String,
+    /// `None` for a Discord-only account that has never set an email/password.
+    pub email: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 #[derive(Serialize)]

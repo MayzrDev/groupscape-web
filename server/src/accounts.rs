@@ -1,8 +1,10 @@
 use crate::account_auth_middleware::AccountAuthenticated;
+use crate::config::Config;
 use crate::crypto;
 use crate::db;
+use crate::discord;
 use crate::error::ApiError;
-use crate::models::{Account, AuthenticatedAccount, LoginAccount, RegisterAccount};
+use crate::models::{Account, AuthenticatedAccount, DiscordCallbackQuery, LoginAccount, RegisterAccount};
 use crate::validators::{valid_email, valid_password};
 use actix_web::{get, post, web, Error, HttpResponse};
 use chrono::{Duration, Utc};
@@ -101,4 +103,75 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
         email: authenticated.email.clone(),
         created_at: authenticated.created_at,
     }))
+}
+
+/// Sends the browser to Discord's consent screen. `state` is a signed, self-verifying value
+/// (see `crypto::new_oauth_state`) rather than something stashed server-side, since this API
+/// has no session store to stash a pending-OAuth nonce in between this redirect and the
+/// callback below.
+#[get("/discord/redirect")]
+pub async fn discord_redirect(config: web::Data<Config>) -> Result<HttpResponse, Error> {
+    if !config.discord.enabled {
+        return Ok(HttpResponse::ServiceUnavailable().body("Discord login is not configured"));
+    }
+
+    let state = crypto::new_oauth_state();
+    Ok(HttpResponse::Found()
+        .append_header(("Location", discord::authorize_url(&config.discord, &state)))
+        .finish())
+}
+
+/// §8: Discord OAuth, `identify` scope only - a standalone login method ported from
+/// `groupscape-old`'s Slice 29 decision: a Discord id with no matching account auto-creates
+/// one, same as any other OAuth-first app, not link-only. Since this API is bearer-token (no
+/// browser session), the outcome is handed back to the SPA via a URL fragment on `web_origin`
+/// rather than a cookie - fragments never reach the server on the next request, so the token
+/// doesn't end up logged in server/proxy access logs.
+#[get("/discord/callback")]
+pub async fn discord_callback(
+    query: web::Query<DiscordCallbackQuery>,
+    config: web::Data<Config>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    if !config.discord.enabled {
+        return Ok(HttpResponse::ServiceUnavailable().body("Discord login is not configured"));
+    }
+
+    let redirect_to = |fragment: &str| {
+        HttpResponse::Found()
+            .append_header((
+                "Location",
+                format!("{}#{}", config.web_origin.trim_end_matches('/'), fragment),
+            ))
+            .finish()
+    };
+
+    let (Some(code), Some(state)) = (query.code.as_deref(), query.state.as_deref()) else {
+        return Ok(redirect_to("error=discord_state_mismatch"));
+    };
+    if !crypto::verify_oauth_state(state) {
+        return Ok(redirect_to("error=discord_state_mismatch"));
+    }
+
+    let discord_user = match discord::exchange_code(&config.discord, code).await {
+        Ok(user) => user,
+        Err(_) => return Ok(redirect_to("error=discord_failed")),
+    };
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
+        Some(account) => account,
+        None => {
+            db::create_account_with_discord_id(&client, &discord_user.id).await?;
+            db::get_account_by_discord_id(&client, &discord_user.id)
+                .await?
+                .ok_or(ApiError::InvalidCredentialsError)?
+        }
+    };
+    if account.disabled {
+        return Ok(redirect_to("error=account_disabled"));
+    }
+
+    let token = issue_session(&client, account.id).await?;
+    Ok(redirect_to(&format!("token={}", token)))
 }

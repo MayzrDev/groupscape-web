@@ -34,6 +34,21 @@ async fn main() -> std::io::Result<()> {
             config.admin.token_hash = server::crypto::token_hash(&admin_token, "admin");
         }
     }
+    // Discord OAuth login is optional - only enabled once all three are supplied, mirroring
+    // the admin-token pattern above. None of these ever live in config.toml.
+    if let (Ok(client_id), Ok(client_secret), Ok(redirect_uri)) = (
+        std::env::var("DISCORD_CLIENT_ID"),
+        std::env::var("DISCORD_CLIENT_SECRET"),
+        std::env::var("DISCORD_REDIRECT_URI"),
+    ) {
+        if !client_id.is_empty() && !client_secret.is_empty() && !redirect_uri.is_empty() {
+            config.discord.enabled = true;
+            config.discord.client_id = client_id;
+            config.discord.client_secret = client_secret;
+            config.discord.redirect_uri = redirect_uri;
+        }
+    }
+    config.web_origin = std::env::var("WEB_ORIGIN").unwrap_or_default();
     let config = config;
     let pool = config.pg.create_pool(None, NoTls).unwrap();
     env_logger::init_from_env(
@@ -68,7 +83,9 @@ async fn main() -> std::io::Result<()> {
             .service(vantage::homepage_stats);
         let account_scope = web::scope("/api/account")
             .service(accounts::register)
-            .service(accounts::login);
+            .service(accounts::login)
+            .service(accounts::discord_redirect)
+            .service(accounts::discord_callback);
         let authed_account_scope = web::scope("/api/account")
             .wrap(AccountAuthenticateMiddlewareFactory::new(
                 account_auth_cache.clone(),

@@ -55,6 +55,8 @@ pub enum ApiError {
     AdminDbError(String, tokio_postgres::error::Error),
     AdminNotFoundError,
     AdminRateLimitedError,
+    #[from(ignore)]
+    DiscordOAuthError(String),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -129,6 +131,10 @@ impl ResponseError for ApiError {
                 HttpResponse::Unauthorized().body("Invalid email or password")
             }
             ApiError::AccountDisabledError => HttpResponse::Forbidden().body("Account is disabled"),
+            ApiError::DiscordOAuthError(ref reason) => {
+                log::error!("DiscordOAuthError: {}", reason);
+                HttpResponse::BadGateway().body("Discord login failed")
+            }
         }
     }
 }

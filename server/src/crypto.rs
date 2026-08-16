@@ -56,6 +56,37 @@ pub fn session_token_hash(token: &str) -> String {
     token_hash(token, "account_session")
 }
 
+/// A signed, self-verifying OAuth `state` value: `nonce.expiry.signature`. No server-side
+/// storage needed to validate it on callback, which matters here because the account API is
+/// stateless bearer-token auth (no session store to stash a pending-OAuth nonce in between the
+/// redirect to Discord and the callback).
+const OAUTH_STATE_TTL_SECONDS: i64 = 600;
+
+pub fn new_oauth_state() -> String {
+    let nonce = uuid::Uuid::new_v4().hyphenated().to_string();
+    let expires_at = chrono::Utc::now().timestamp() + OAUTH_STATE_TTL_SECONDS;
+    let payload = format!("{}.{}", nonce, expires_at);
+    let sig = token_hash(&payload, "oauth_state");
+    format!("{}.{}", payload, sig)
+}
+
+pub fn verify_oauth_state(state: &str) -> bool {
+    let mut parts = state.splitn(3, '.');
+    let (Some(nonce), Some(expires_at), Some(sig)) = (parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let payload = format!("{}.{}", nonce, expires_at);
+    let expected_sig = token_hash(&payload, "oauth_state");
+    if sig != expected_sig {
+        return false;
+    }
+    match expires_at.parse::<i64>() {
+        Ok(expires_at) => chrono::Utc::now().timestamp() < expires_at,
+        Err(_) => false,
+    }
+}
+
 #[cfg(test)]
 mod password_tests {
     use super::*;
@@ -91,5 +122,49 @@ mod password_tests {
         assert_ne!(a, b);
         assert_eq!(session_token_hash(&a), session_token_hash(&a));
         assert_ne!(session_token_hash(&a), session_token_hash(&b));
+    }
+
+    #[test]
+    fn oauth_state_round_trips() {
+        let state = new_oauth_state();
+        assert!(verify_oauth_state(&state));
+    }
+
+    #[test]
+    fn oauth_states_are_unique() {
+        assert_ne!(new_oauth_state(), new_oauth_state());
+    }
+
+    #[test]
+    fn oauth_state_rejects_tampered_signature() {
+        let mut state = new_oauth_state();
+        state.push('x');
+        assert!(!verify_oauth_state(&state));
+    }
+
+    #[test]
+    fn oauth_state_rejects_tampered_expiry() {
+        let state = new_oauth_state();
+        let mut parts: Vec<&str> = state.splitn(3, '.').collect();
+        let tampered_expiry = (chrono::Utc::now().timestamp() + 999_999).to_string();
+        parts[1] = &tampered_expiry;
+        let tampered = parts.join(".");
+        assert!(!verify_oauth_state(&tampered));
+    }
+
+    #[test]
+    fn oauth_state_rejects_garbage() {
+        assert!(!verify_oauth_state("not-a-real-state"));
+        assert!(!verify_oauth_state(""));
+    }
+
+    #[test]
+    fn oauth_state_rejects_expired() {
+        let nonce = uuid::Uuid::new_v4().hyphenated().to_string();
+        let expired_at = chrono::Utc::now().timestamp() - 1;
+        let payload = format!("{}.{}", nonce, expired_at);
+        let sig = token_hash(&payload, "oauth_state");
+        let state = format!("{}.{}", payload, sig);
+        assert!(!verify_oauth_state(&state));
     }
 }
