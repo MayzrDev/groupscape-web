@@ -393,6 +393,63 @@ async fn test_character_cap_per_account() {
 }
 
 #[tokio::test]
+async fn test_list_characters_for_account_orders_oldest_first() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "lister@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let first = db::create_character(&client, account_id, "hash-first", "Zezima")
+        .await
+        .expect("failed to create character");
+    let second = db::create_character(&client, account_id, "hash-second", "Woox")
+        .await
+        .expect("failed to create character");
+
+    let characters = db::list_characters_for_account(&client, account_id)
+        .await
+        .expect("query failed");
+
+    assert_eq!(characters.len(), 2);
+    assert_eq!(characters[0].id, first.id);
+    assert_eq!(characters[1].id, second.id);
+}
+
+#[tokio::test]
+async fn test_list_characters_for_account_excludes_other_accounts() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_a = db::create_account(&client, "lister-a@example.com", &password_hash)
+        .await
+        .unwrap();
+    let account_b = db::create_account(&client, "lister-b@example.com", &password_hash)
+        .await
+        .unwrap();
+    db::create_character(&client, account_a, "hash-a", "Alt A")
+        .await
+        .expect("failed to create character");
+    db::create_character(&client, account_b, "hash-b", "Alt B")
+        .await
+        .expect("failed to create character");
+
+    let characters = db::list_characters_for_account(&client, account_a)
+        .await
+        .expect("query failed");
+
+    assert_eq!(characters.len(), 1);
+    assert_eq!(characters[0].account_hash, "hash-a");
+}
+
+#[tokio::test]
 async fn test_discord_account_can_log_in_via_session_after_linking() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;

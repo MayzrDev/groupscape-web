@@ -67,7 +67,7 @@ export class LinkPage extends BaseElement {
       const response = await accountApi.linkCharacter(this.accountHash, this.rsn);
       if (response.ok) {
         this.status.textContent = `Linked ${this.rsn} to your account.`;
-        this.actions.innerHTML = "";
+        this.actions.innerHTML = `<men-link link-href="/account/characters">View your characters</men-link>`;
       } else if (response.status === 409) {
         this.error.textContent = "That character is already linked to a different account.";
       } else if (response.status === 403) {

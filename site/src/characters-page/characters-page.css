@@ -1,0 +1,79 @@
+characters-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  height: 100%;
+  width: 100%;
+  padding: 32px 0;
+  overflow-y: auto;
+}
+
+.characters-page__container {
+  max-width: 560px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 24px 24px;
+  text-align: center;
+}
+
+.characters-page__status {
+  font-size: 1.2em;
+}
+
+.characters-page__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.characters-page__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 4px;
+  text-align: left;
+}
+
+.characters-page__item-rsn {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 15px;
+}
+
+.characters-page__item-meta {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12px;
+  opacity: 0.65;
+}
+
+.characters-page__empty {
+  opacity: 0.8;
+  font-size: 0.95em;
+}
+
+.characters-page__add {
+  width: 100%;
+  margin-top: 1.2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--light-border);
+}
+
+.characters-page__add-hint {
+  font-size: 0.85em;
+  opacity: 0.85;
+  margin: 0;
+}
+
+.characters-page__error {
+  text-align: center;
+  margin-top: 1em;
+}

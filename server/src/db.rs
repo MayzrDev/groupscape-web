@@ -1595,6 +1595,32 @@ pub async fn find_character_by_id(
     }
 }
 
+pub async fn list_characters_for_account(
+    client: &Client,
+    account_id: i64,
+) -> Result<Vec<Character>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at ASC",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    rows.into_iter()
+        .map(|row| {
+            Ok(Character {
+                id: row.try_get("character_id")?,
+                account_id: row.try_get("account_id")?,
+                account_hash: row.try_get("account_hash")?,
+                display_rsn: row.try_get("display_rsn")?,
+                bound_at: row.try_get("bound_at")?,
+            })
+        })
+        .collect()
+}
+
 pub struct CharacterGroupLink {
     pub character_id: i64,
     pub group_id: i64,

@@ -69,4 +69,30 @@ describe("accountApi", () => {
 
     expect(accountStorage.getAccountToken()).toBeNull();
   });
+
+  it("listCharacters returns unauthenticated without a stored token", async () => {
+    const response = await accountApi.listCharacters();
+
+    expect(response).toEqual({ ok: false, status: 401 });
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it("listCharacters sends the stored token", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([{ id: 1, display_rsn: "Zezima" }]),
+    });
+
+    const response = await accountApi.listCharacters();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters",
+      expect.objectContaining({
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
 });

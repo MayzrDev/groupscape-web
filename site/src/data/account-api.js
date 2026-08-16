@@ -9,6 +9,10 @@ class AccountApi {
     return `${this.baseUrl}/me`;
   }
 
+  get charactersUrl() {
+    return `${this.baseUrl}/characters`;
+  }
+
   get linkCharacterUrl() {
     return `${this.baseUrl}/characters/link`;
   }
@@ -57,6 +61,17 @@ class AccountApi {
       return { ok: false, status: 401 };
     }
     const response = await fetch(this.meUrl, {
+      headers: { Authorization: accountToken },
+    });
+    return response;
+  }
+
+  async listCharacters() {
+    const accountToken = accountStorage.getAccountToken();
+    if (!accountToken) {
+      return { ok: false, status: 401 };
+    }
+    const response = await fetch(this.charactersUrl, {
       headers: { Authorization: accountToken },
     });
     return response;

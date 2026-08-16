@@ -108,6 +108,19 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
     }))
 }
 
+/// Lists the authenticated account's linked characters, oldest-linked first — feeds the site's
+/// character management flow (`site: link-character flow`).
+#[get("/characters")]
+pub async fn list_characters(
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let characters = db::list_characters_for_account(&client, authenticated.id).await?;
+    let characters: Vec<Character> = characters.into_iter().map(Character::from).collect();
+    Ok(HttpResponse::Ok().json(characters))
+}
+
 /// account_hash -> account, ported from `groupscape-old`'s one-click link flow: the plugin
 /// hands the browser its account hash and an RSN, and the browser's already-authenticated
 /// session is the proof of which account it links to. Re-linking the same account_hash to the
