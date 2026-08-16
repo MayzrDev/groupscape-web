@@ -1,0 +1,28 @@
+link-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.link-page__container {
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 24px;
+  text-align: center;
+}
+
+.link-page__title {
+  margin-bottom: 0.5em;
+}
+
+.link-page__status {
+  font-size: 1.2em;
+}
+
+.link-page__error {
+  margin-top: 1em;
+}

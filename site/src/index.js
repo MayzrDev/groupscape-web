@@ -61,3 +61,4 @@ import "./admin-group-detail-page/admin-group-detail-page.js";
 import "./admin-feature-flags-page/admin-feature-flags-page.js";
 import "./admin-audit-log-page/admin-audit-log-page.js";
 import "./admin-accounts-page/admin-accounts-page.js";
+import "./link-page/link-page.js";
