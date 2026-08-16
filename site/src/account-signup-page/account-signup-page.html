@@ -1,0 +1,25 @@
+<div class="account-signup__container rsborder rsbackground">
+  <h1 class="account-signup__title">Create account</h1>
+  <p class="account-signup__subtitle">Link characters across groups from one GroupScape account.</p>
+  <men-input
+    class="account-signup__email"
+    input-id="signupEmail"
+    placeholder-text="you@example.com"
+    input-label="Email"
+  ></men-input>
+  <men-input
+    class="account-signup__password"
+    max-length="256"
+    input-id="signupPassword"
+    placeholder-text="At least 8 characters"
+    input-label="Password"
+    type-password
+  ></men-input>
+  <button class="account-signup__button men-button">Sign up</button>
+  <div class="account-signup__error validation-error"></div>
+  <div class="account-signup__divider">or</div>
+  <button class="account-signup__discord men-button">Continue with Discord</button>
+  <p class="account-signup__switch">
+    Already have an account? <men-link link-href="/account/login">Log in</men-link>
+  </p>
+</div>

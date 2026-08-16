@@ -13,6 +13,44 @@ class AccountApi {
     return `${this.baseUrl}/characters/link`;
   }
 
+  get registerUrl() {
+    return `${this.baseUrl}/register`;
+  }
+
+  get loginUrl() {
+    return `${this.baseUrl}/login`;
+  }
+
+  get discordRedirectUrl() {
+    return `${this.baseUrl}/discord/redirect`;
+  }
+
+  async register(email, password) {
+    const response = await fetch(this.registerUrl, {
+      body: JSON.stringify({ email, password }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (response.ok) {
+      const authenticated = await response.json();
+      accountStorage.storeAccountToken(authenticated.token);
+    }
+    return response;
+  }
+
+  async login(email, password) {
+    const response = await fetch(this.loginUrl, {
+      body: JSON.stringify({ email, password }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    if (response.ok) {
+      const authenticated = await response.json();
+      accountStorage.storeAccountToken(authenticated.token);
+    }
+    return response;
+  }
+
   async me() {
     const accountToken = accountStorage.getAccountToken();
     if (!accountToken) {

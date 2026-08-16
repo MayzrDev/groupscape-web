@@ -1,0 +1,25 @@
+<div class="account-login__container rsborder rsbackground">
+  <h1 class="account-login__title">Log in</h1>
+  <p class="account-login__subtitle">Access your GroupScape account.</p>
+  <men-input
+    class="account-login__email"
+    input-id="loginEmail"
+    placeholder-text="you@example.com"
+    input-label="Email"
+  ></men-input>
+  <men-input
+    class="account-login__password"
+    max-length="256"
+    input-id="loginPassword"
+    placeholder-text="Password"
+    input-label="Password"
+    type-password
+  ></men-input>
+  <button class="account-login__button men-button">Log in</button>
+  <div class="account-login__error validation-error"></div>
+  <div class="account-login__divider">or</div>
+  <button class="account-login__discord men-button">Continue with Discord</button>
+  <p class="account-login__switch">
+    Need an account? <men-link link-href="/account/signup">Sign up</men-link>
+  </p>
+</div>
