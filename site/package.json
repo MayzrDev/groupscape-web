@@ -1,6 +1,6 @@
 {
   "name": "groupscape",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "dependencies": {
     "three": "^0.169.0"
@@ -43,7 +43,8 @@
     "fix": "npm run lint -- --fix",
     "generate-component": "node scripts/generate-component.js",
     "prepare": "cd .. && husky install site/.husky",
-    "precommit": "npm run format:check && npm run lint"
+    "version:bump": "node scripts/bump-version.js && git add package.json",
+    "precommit": "npm run version:bump && npm run format:check && npm run lint"
   },
   "author": "Christopher Brown"
 }

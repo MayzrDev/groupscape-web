@@ -164,6 +164,8 @@ const minifyJsPlugin = {
 };
 
 function build() {
+  const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+
   require('esbuild').build({
     entryPoints: ['src/index.js'],
     bundle: true,
@@ -171,6 +173,9 @@ function build() {
     minify: false,
     format: 'esm',
     outfile: 'public/app.js',
+    define: {
+      __APP_VERSION__: JSON.stringify(version)
+    },
     plugins: [componentBuildPlugin, minifyJsPlugin, htmlBuildPlugin, buildLoggingPlugin, mapJsonPlugin]
   }).catch((error) => console.error(error));
 }

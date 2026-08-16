@@ -16,6 +16,7 @@ export class AdminNavigation extends BaseElement {
     this.subscribe("route-activated", this.handleRouteActivated.bind(this));
     const logoutButton = this.querySelector(".admin-navigation__logout");
     this.eventListener(logoutButton, "click", this.logout.bind(this));
+    this.querySelector(".admin-navigation__version").textContent = `v${__APP_VERSION__}`;
   }
 
   handleRouteActivated(route) {
