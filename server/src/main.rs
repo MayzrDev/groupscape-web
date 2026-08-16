@@ -90,7 +90,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(AccountAuthenticateMiddlewareFactory::new(
                 account_auth_cache.clone(),
             ))
-            .service(accounts::me);
+            .service(accounts::me)
+            .service(accounts::link_character);
         let authed_scope = web::scope("/api/group/{group_name}")
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)

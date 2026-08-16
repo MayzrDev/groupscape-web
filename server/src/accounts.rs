@@ -4,8 +4,11 @@ use crate::crypto;
 use crate::db;
 use crate::discord;
 use crate::error::ApiError;
-use crate::models::{Account, AuthenticatedAccount, DiscordCallbackQuery, LoginAccount, RegisterAccount};
-use crate::validators::{valid_email, valid_password};
+use crate::models::{
+    Account, AuthenticatedAccount, Character, DiscordCallbackQuery, LinkCharacter, LoginAccount,
+    RegisterAccount,
+};
+use crate::validators::{valid_email, valid_name, valid_password};
 use actix_web::{get, post, web, Error, HttpResponse};
 use chrono::{Duration, Utc};
 use deadpool_postgres::{Client, Pool};
@@ -103,6 +106,46 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
         email: authenticated.email.clone(),
         created_at: authenticated.created_at,
     }))
+}
+
+/// account_hash -> account, ported from `groupscape-old`'s one-click link flow: the plugin
+/// hands the browser its account hash and an RSN, and the browser's already-authenticated
+/// session is the proof of which account it links to. Re-linking the same account_hash to the
+/// same account is treated as an idempotent RSN refresh (the RSN can change via a name change
+/// while the underlying game account, identified by its stable hash, stays the same).
+#[post("/characters/link")]
+pub async fn link_character(
+    link_character: web::Json<LinkCharacter>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let account_hash = link_character.account_hash.trim().to_string();
+    let rsn = link_character.rsn.trim().to_string();
+    if account_hash.is_empty() {
+        return Ok(HttpResponse::BadRequest().body("account_hash must not be empty"));
+    }
+    if !valid_name(&rsn) {
+        return Ok(HttpResponse::BadRequest().body("Provided RSN is not valid"));
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let existing = db::find_character_by_account_hash(&client, &account_hash).await?;
+
+    if let Some(existing) = existing {
+        if existing.account_id != authenticated.id {
+            return Err(ApiError::CharacterLinkedToAnotherAccountError.into());
+        }
+        let refreshed = db::update_character_display_rsn(&client, existing.id, &rsn).await?;
+        return Ok(HttpResponse::Ok().json(Character::from(refreshed)));
+    }
+
+    let character_count = db::count_characters_for_account(&client, authenticated.id).await?;
+    if character_count >= db::CHARACTER_CAP_PER_ACCOUNT {
+        return Err(ApiError::CharacterCapReachedError.into());
+    }
+
+    let character = db::create_character(&client, authenticated.id, &account_hash, &rsn).await?;
+    Ok(HttpResponse::Created().json(Character::from(character)))
 }
 
 /// Sends the browser to Discord's consent screen. `state` is a signed, self-verifying value

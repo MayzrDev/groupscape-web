@@ -1254,6 +1254,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS accounts_discord_id_idx ON groupscape.accounts
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_characters_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.characters (
+  character_id BIGSERIAL PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  account_hash TEXT NOT NULL UNIQUE,
+  display_rsn TEXT NOT NULL,
+  bound_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS characters_account_id_idx ON groupscape.characters (account_id);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_characters_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -1414,6 +1443,104 @@ WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.disabled = false
         })),
         None => Ok(None),
     }
+}
+
+/// Ported from `groupscape-old`'s `characters` repository - a per-account cap keeps one
+/// account from squatting on an unbounded number of RuneScape accounts.
+pub const CHARACTER_CAP_PER_ACCOUNT: i64 = 5;
+
+pub struct Character {
+    pub id: i64,
+    pub account_id: i64,
+    pub account_hash: String,
+    pub display_rsn: String,
+    pub bound_at: DateTime<Utc>,
+}
+
+pub async fn find_character_by_account_hash(
+    client: &Client,
+    account_hash: &str,
+) -> Result<Option<Character>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE account_hash=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_hash])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    match row {
+        Some(row) => Ok(Some(Character {
+            id: row.try_get("character_id")?,
+            account_id: row.try_get("account_id")?,
+            account_hash: row.try_get("account_hash")?,
+            display_rsn: row.try_get("display_rsn")?,
+            bound_at: row.try_get("bound_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub async fn count_characters_for_account(
+    client: &Client,
+    account_id: i64,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT COUNT(*) FROM groupscape.characters WHERE account_id=$1")
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    Ok(row.try_get(0)?)
+}
+
+pub async fn create_character(
+    client: &Client,
+    account_id: i64,
+    account_hash: &str,
+    display_rsn: &str,
+) -> Result<Character, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.characters (account_id, account_hash, display_rsn) VALUES ($1, $2, $3) RETURNING character_id, account_id, account_hash, display_rsn, bound_at",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&account_id, &account_hash, &display_rsn])
+        .await
+        .map_err(ApiError::CreateCharacterError)?;
+    Ok(Character {
+        id: row.try_get("character_id")?,
+        account_id: row.try_get("account_id")?,
+        account_hash: row.try_get("account_hash")?,
+        display_rsn: row.try_get("display_rsn")?,
+        bound_at: row.try_get("bound_at")?,
+    })
+}
+
+pub async fn update_character_display_rsn(
+    client: &Client,
+    character_id: i64,
+    display_rsn: &str,
+) -> Result<Character, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.characters SET display_rsn=$1 WHERE character_id=$2 RETURNING character_id, account_id, account_hash, display_rsn, bound_at",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&display_rsn, &character_id])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    Ok(Character {
+        id: row.try_get("character_id")?,
+        account_id: row.try_get("account_id")?,
+        account_hash: row.try_get("account_hash")?,
+        display_rsn: row.try_get("display_rsn")?,
+        bound_at: row.try_get("bound_at")?,
+    })
 }
 
 pub async fn admin_record_audit_log(

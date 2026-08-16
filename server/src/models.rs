@@ -162,6 +162,29 @@ pub struct AuthenticatedAccount {
     pub token: String,
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LinkCharacter {
+    pub account_hash: String,
+    pub rsn: String,
+}
+#[derive(Serialize)]
+pub struct Character {
+    pub id: i64,
+    pub account_hash: String,
+    pub display_rsn: String,
+    pub bound_at: DateTime<Utc>,
+}
+impl From<crate::db::Character> for Character {
+    fn from(character: crate::db::Character) -> Self {
+        Character {
+            id: character.id,
+            account_hash: character.account_hash,
+            display_rsn: character.display_rsn,
+            bound_at: character.bound_at,
+        }
+    }
+}
+#[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,
     // NOTE: unused

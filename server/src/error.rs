@@ -57,6 +57,12 @@ pub enum ApiError {
     AdminRateLimitedError,
     #[from(ignore)]
     DiscordOAuthError(String),
+    #[from(ignore)]
+    CreateCharacterError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetCharacterError(tokio_postgres::error::Error),
+    CharacterLinkedToAnotherAccountError,
+    CharacterCapReachedError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -134,6 +140,13 @@ impl ResponseError for ApiError {
             ApiError::DiscordOAuthError(ref reason) => {
                 log::error!("DiscordOAuthError: {}", reason);
                 HttpResponse::BadGateway().body("Discord login failed")
+            }
+            ApiError::CreateCharacterError(ref err) => handle_pg_error(err, "CreateCharacterError"),
+            ApiError::GetCharacterError(ref err) => handle_pg_error(err, "GetCharacterError"),
+            ApiError::CharacterLinkedToAnotherAccountError => HttpResponse::Conflict()
+                .body("Character already linked to another account. Unlink it there first."),
+            ApiError::CharacterCapReachedError => {
+                HttpResponse::Forbidden().body("Character cap reached")
             }
         }
     }
