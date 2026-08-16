@@ -5,8 +5,8 @@ use crate::db;
 use crate::discord;
 use crate::error::ApiError;
 use crate::models::{
-    Account, AuthenticatedAccount, Character, DiscordCallbackQuery, LinkCharacter, LoginAccount,
-    RegisterAccount,
+    Account, AuthenticatedAccount, Character, CharacterGroupLink, DiscordCallbackQuery,
+    LinkCharacter, LinkCharacterToGroup, LoginAccount, RegisterAccount,
 };
 use crate::validators::{valid_email, valid_name, valid_password};
 use actix_web::{get, post, web, Error, HttpResponse};
@@ -146,6 +146,43 @@ pub async fn link_character(
 
     let character = db::create_character(&client, authenticated.id, &account_hash, &rsn).await?;
     Ok(HttpResponse::Created().json(Character::from(character)))
+}
+
+/// Ported from `groupscape-old`'s `character_group_links` invariant: a character (an
+/// account-linked RuneScape account) can join/own only a single group at a time. Group
+/// credentials are verified from the request body rather than the `Authorization` header
+/// since that header already carries this endpoint's account bearer token - same shape as
+/// `unauthed::create_group`, which also takes group credentials in the body.
+#[post("/characters/link-group")]
+pub async fn link_character_to_group(
+    link: web::Json<LinkCharacterToGroup>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, link.character_id).await?;
+    let character = match character {
+        Some(character) if character.account_id == authenticated.id => character,
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    };
+
+    let group_id = db::get_group(&client, &link.group_name, &link.group_token)
+        .await
+        .map_err(|_| ApiError::GroupNotFoundOrInvalidTokenError)?;
+
+    let already_linked_to_this_group = db::find_character_group_link(&client, character.id)
+        .await?
+        .is_some_and(|existing| existing.group_id == group_id);
+
+    let link = db::link_character_to_group(&client, character.id, group_id).await?;
+    let response = HttpResponse::build(if already_linked_to_this_group {
+        actix_web::http::StatusCode::OK
+    } else {
+        actix_web::http::StatusCode::CREATED
+    })
+    .json(CharacterGroupLink::from(link));
+    Ok(response)
 }
 
 /// Sends the browser to Discord's consent screen. `state` is a signed, self-verifying value

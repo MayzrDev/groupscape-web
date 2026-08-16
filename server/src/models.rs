@@ -167,6 +167,28 @@ pub struct LinkCharacter {
     pub account_hash: String,
     pub rsn: String,
 }
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LinkCharacterToGroup {
+    pub character_id: i64,
+    pub group_name: String,
+    pub group_token: String,
+}
+#[derive(Serialize)]
+pub struct CharacterGroupLink {
+    pub character_id: i64,
+    pub group_id: i64,
+    pub linked_at: DateTime<Utc>,
+}
+impl From<crate::db::CharacterGroupLink> for CharacterGroupLink {
+    fn from(link: crate::db::CharacterGroupLink) -> Self {
+        CharacterGroupLink {
+            character_id: link.character_id,
+            group_id: link.group_id,
+            linked_at: link.linked_at,
+        }
+    }
+}
 #[derive(Serialize)]
 pub struct Character {
     pub id: i64,

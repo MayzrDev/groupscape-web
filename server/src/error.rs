@@ -63,6 +63,13 @@ pub enum ApiError {
     GetCharacterError(tokio_postgres::error::Error),
     CharacterLinkedToAnotherAccountError,
     CharacterCapReachedError,
+    CharacterNotFoundError,
+    CharacterAlreadyInGroupError,
+    GroupNotFoundOrInvalidTokenError,
+    #[from(ignore)]
+    LinkCharacterToGroupError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetCharacterGroupLinkError(tokio_postgres::error::Error),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -147,6 +154,18 @@ impl ResponseError for ApiError {
                 .body("Character already linked to another account. Unlink it there first."),
             ApiError::CharacterCapReachedError => {
                 HttpResponse::Forbidden().body("Character cap reached")
+            }
+            ApiError::CharacterNotFoundError => HttpResponse::NotFound().body("Character not found"),
+            ApiError::CharacterAlreadyInGroupError => HttpResponse::Conflict()
+                .body("Character already belongs to a group. Leave that group first."),
+            ApiError::GroupNotFoundOrInvalidTokenError => {
+                HttpResponse::Unauthorized().body("Group not found or token is invalid")
+            }
+            ApiError::LinkCharacterToGroupError(ref err) => {
+                handle_pg_error(err, "LinkCharacterToGroupError")
+            }
+            ApiError::GetCharacterGroupLinkError(ref err) => {
+                handle_pg_error(err, "GetCharacterGroupLinkError")
             }
         }
     }

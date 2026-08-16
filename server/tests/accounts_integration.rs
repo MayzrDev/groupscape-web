@@ -417,3 +417,120 @@ async fn test_discord_account_can_log_in_via_session_after_linking() {
     assert_eq!(account.id, account_id);
     assert_eq!(account.email, None);
 }
+
+async fn create_test_group(client: &deadpool_postgres::Client, name: &str) -> i64 {
+    let hashed_token = server::crypto::token_hash("test-token", name);
+    let row = client
+        .query_one(
+            "INSERT INTO groupscape.groups (group_name, group_token_hash, version) VALUES ($1, $2, 2) RETURNING group_id",
+            &[&name, &hashed_token],
+        )
+        .await
+        .expect("failed to create test group");
+    row.get(0)
+}
+
+#[tokio::test]
+async fn test_link_character_to_group_creates_link() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "grouper@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-group-1", "Zezima")
+        .await
+        .unwrap();
+    let group_id = create_test_group(&client, "grouptest1").await;
+
+    let link = db::link_character_to_group(&client, character.id, group_id)
+        .await
+        .expect("linking should succeed");
+    assert_eq!(link.character_id, character.id);
+    assert_eq!(link.group_id, group_id);
+
+    let found = db::find_character_group_link(&client, character.id)
+        .await
+        .expect("query failed")
+        .expect("link should exist");
+    assert_eq!(found.group_id, group_id);
+}
+
+#[tokio::test]
+async fn test_relinking_character_to_same_group_is_idempotent() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "regrouper@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-group-2", "Zezima")
+        .await
+        .unwrap();
+    let group_id = create_test_group(&client, "grouptest2").await;
+
+    db::link_character_to_group(&client, character.id, group_id)
+        .await
+        .expect("first link should succeed");
+    let second = db::link_character_to_group(&client, character.id, group_id)
+        .await
+        .expect("re-linking to the same group should be idempotent, not an error");
+    assert_eq!(second.group_id, group_id);
+}
+
+#[tokio::test]
+async fn test_linking_character_to_different_group_is_conflict() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "doublegrouper@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-group-3", "Zezima")
+        .await
+        .unwrap();
+    let first_group_id = create_test_group(&client, "grouptest3a").await;
+    let second_group_id = create_test_group(&client, "grouptest3b").await;
+
+    db::link_character_to_group(&client, character.id, first_group_id)
+        .await
+        .expect("first link should succeed");
+    let result = db::link_character_to_group(&client, character.id, second_group_id).await;
+    assert!(matches!(result, Err(ApiError::CharacterAlreadyInGroupError)));
+
+    let still_linked = db::find_character_group_link(&client, character.id)
+        .await
+        .expect("query failed")
+        .expect("link should still exist");
+    assert_eq!(still_linked.group_id, first_group_id, "conflicting link attempt must not move the character");
+}
+
+#[tokio::test]
+async fn test_find_character_group_link_returns_none_when_unlinked() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "unlinked@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-group-4", "Zezima")
+        .await
+        .unwrap();
+
+    let found = db::find_character_group_link(&client, character.id)
+        .await
+        .expect("query failed");
+    assert!(found.is_none());
+}

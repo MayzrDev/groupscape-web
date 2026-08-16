@@ -1283,6 +1283,33 @@ CREATE INDEX IF NOT EXISTS characters_account_id_idx ON groupscape.characters (a
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_character_group_links_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.character_group_links (
+  character_id BIGINT PRIMARY KEY REFERENCES groupscape.characters(character_id) ON DELETE CASCADE,
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id),
+  linked_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS character_group_links_group_id_idx ON groupscape.character_group_links (group_id);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_character_group_links_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -1540,6 +1567,93 @@ pub async fn update_character_display_rsn(
         account_hash: row.try_get("account_hash")?,
         display_rsn: row.try_get("display_rsn")?,
         bound_at: row.try_get("bound_at")?,
+    })
+}
+
+pub async fn find_character_by_id(
+    client: &Client,
+    character_id: i64,
+) -> Result<Option<Character>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE character_id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    match row {
+        Some(row) => Ok(Some(Character {
+            id: row.try_get("character_id")?,
+            account_id: row.try_get("account_id")?,
+            account_hash: row.try_get("account_hash")?,
+            display_rsn: row.try_get("display_rsn")?,
+            bound_at: row.try_get("bound_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub struct CharacterGroupLink {
+    pub character_id: i64,
+    pub group_id: i64,
+    pub linked_at: DateTime<Utc>,
+}
+
+pub async fn find_character_group_link(
+    client: &Client,
+    character_id: i64,
+) -> Result<Option<CharacterGroupLink>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT character_id, group_id, linked_at FROM groupscape.character_group_links WHERE character_id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::GetCharacterGroupLinkError)?;
+    match row {
+        Some(row) => Ok(Some(CharacterGroupLink {
+            character_id: row.try_get("character_id")?,
+            group_id: row.try_get("group_id")?,
+            linked_at: row.try_get("linked_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+/// Enforces one-group-per-character: `character_id` is the table's primary key, so a
+/// character can hold at most one link row. Re-linking to the same group is an idempotent
+/// no-op (returns the existing row); linking to a different group is a conflict the caller
+/// must resolve by leaving the current group first - ported from `groupscape-old`'s
+/// `character_group_links` invariant (PK on `character_id`).
+pub async fn link_character_to_group(
+    client: &Client,
+    character_id: i64,
+    group_id: i64,
+) -> Result<CharacterGroupLink, ApiError> {
+    if let Some(existing) = find_character_group_link(client, character_id).await? {
+        if existing.group_id != group_id {
+            return Err(ApiError::CharacterAlreadyInGroupError);
+        }
+        return Ok(existing);
+    }
+
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.character_group_links (character_id, group_id) VALUES ($1, $2) RETURNING character_id, group_id, linked_at",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&character_id, &group_id])
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+    Ok(CharacterGroupLink {
+        character_id: row.try_get("character_id")?,
+        group_id: row.try_get("group_id")?,
+        linked_at: row.try_get("linked_at")?,
     })
 }
 
