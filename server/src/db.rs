@@ -179,6 +179,42 @@ pub async fn rename_group_member(
     Ok(())
 }
 
+pub async fn rename_group(
+    client: &Client,
+    group_id: i64,
+    new_name: &str,
+) -> Result<String, ApiError> {
+    let new_token = format!("{}|{}", new_name, uuid::Uuid::new_v4().hyphenated());
+    let hashed_token = token_hash(&new_token, new_name);
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.groups SET group_name=$1, group_token_hash=$2 WHERE group_id=$3",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&new_name, &hashed_token, &group_id])
+        .await
+        .map_err(ApiError::RenameGroupError)?;
+    Ok(new_token)
+}
+
+pub async fn reroll_group_token(
+    client: &Client,
+    group_id: i64,
+    group_name: &str,
+) -> Result<String, ApiError> {
+    let new_token = format!("{}|{}", group_name, uuid::Uuid::new_v4().hyphenated());
+    let hashed_token = token_hash(&new_token, group_name);
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.groups SET group_token_hash=$1 WHERE group_id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&hashed_token, &group_id])
+        .await
+        .map_err(ApiError::RerollGroupTokenError)?;
+    Ok(new_token)
+}
+
 pub struct HomepageStats {
     pub active_groups: i64,
     pub bound_characters: i64,

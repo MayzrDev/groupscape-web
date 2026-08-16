@@ -15,3 +15,57 @@ group-settings {
 .group-settings__members edit-member {
   margin-bottom: 1em;
 }
+
+.group-settings__credential-row {
+  margin-bottom: 1em;
+}
+
+.group-settings__credential-row h4 {
+  margin-bottom: 0.4em;
+}
+
+.group-settings__name-edit {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.group-settings__name-edit men-input {
+  flex-grow: 1;
+}
+
+.group-settings__hint {
+  margin: 0.4em 0 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.group-settings__token-value {
+  padding: 0.25em 0.5em;
+  position: relative;
+}
+
+.group-settings__token-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.5em;
+}
+
+.group-settings__danger-heading {
+  color: var(--invalid);
+}
+
+.group-settings__danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 0.75em 1em;
+}
+
+.group-settings__danger-zone p {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+}

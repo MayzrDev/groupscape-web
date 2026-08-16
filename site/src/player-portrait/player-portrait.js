@@ -6,6 +6,8 @@ import { api } from "../data/api";
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
 const FRAMING_PADDING = 1.22;
+// Full-body framing: taller than wide, matching the approved player-panel placement.
+const FRAME_ASPECT_RATIO = 3 / 5;
 
 export class PlayerPortrait extends BaseElement {
   html() {
@@ -27,12 +29,12 @@ export class PlayerPortrait extends BaseElement {
 
     this.eventListener(window, "resize", this.onResize.bind(this));
 
-    // In a flex row (e.g. the roster panel header), `aspect-ratio` doesn't reliably derive
+    // In a flex row (e.g. the player-panel header), `aspect-ratio` doesn't reliably derive
     // width from a stretch-resolved height, so the frame can end up taller than it is wide.
-    // Correct it in JS once layout settles so the portrait always renders as a true square.
-    this.squareObserver = new ResizeObserver(() => this.enforceSquare());
+    // Correct it in JS once layout settles so the portrait keeps its full-body framing.
+    this.squareObserver = new ResizeObserver(() => this.enforceAspectRatio());
     this.squareObserver.observe(this);
-    this.enforceSquare();
+    this.enforceAspectRatio();
 
     this.onResize();
 
@@ -49,10 +51,11 @@ export class PlayerPortrait extends BaseElement {
     super.disconnectedCallback();
   }
 
-  enforceSquare() {
+  enforceAspectRatio() {
     const height = this.offsetHeight;
-    if (height > 0 && this.offsetWidth !== height) {
-      this.style.width = `${height}px`;
+    const targetWidth = Math.round(height * FRAME_ASPECT_RATIO);
+    if (height > 0 && this.offsetWidth !== targetWidth) {
+      this.style.width = `${targetWidth}px`;
       this.onResize();
     }
   }

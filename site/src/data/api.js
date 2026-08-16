@@ -31,6 +31,18 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/am-i-logged-in`;
   }
 
+  get renameGroupUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/rename-group`;
+  }
+
+  get rerollGroupTokenUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/reroll-group-token`;
+  }
+
+  get deleteGroupUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/delete-group`;
+  }
+
   get gePricesUrl() {
     return `${this.baseUrl}/ge-prices`;
   }
@@ -162,6 +174,41 @@ class Api {
         Authorization: this.groupToken,
       },
       method: "PUT",
+    });
+
+    return response;
+  }
+
+  async renameGroup(newName) {
+    const response = await fetch(this.renameGroupUrl, {
+      body: JSON.stringify({ new_name: newName }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.groupToken,
+      },
+      method: "PUT",
+    });
+
+    return response;
+  }
+
+  async rerollGroupToken() {
+    const response = await fetch(this.rerollGroupTokenUrl, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+      method: "POST",
+    });
+
+    return response;
+  }
+
+  async deleteGroup() {
+    const response = await fetch(this.deleteGroupUrl, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+      method: "DELETE",
     });
 
     return response;

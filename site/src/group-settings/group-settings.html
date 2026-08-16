@@ -1,4 +1,45 @@
 <div class="rsborder rsbackground group-settings__container">
+  <h3>The group's login</h3>
+  <p>Only share these with your group. You can't recover the token, so keep it safe.</p>
+
+  <div class="group-settings__credential-row">
+    <h4>Group Name</h4>
+    <div class="group-settings__name-edit">
+      <men-input
+        class="group-settings__name-input"
+        input-id="groupSettingsName"
+        input-label="Group name"
+        input-value="${group.groupName}"
+      ></men-input>
+      <button class="group-settings__rename-button men-button small">Save</button>
+    </div>
+    <p class="group-settings__hint">Saving a new name issues a new group token below — every member re-pastes it into the plugin.</p>
+    <div class="group-settings__error validation-error"></div>
+  </div>
+
+  <div class="group-settings__credential-row">
+    <h4>Group Token</h4>
+    <div class="setup__credential rsborder-tiny rsbackground group-settings__token-value">
+      <div class="setup__credential-hide">Click to show</div>
+      ${group.groupToken}
+    </div>
+    <div class="group-settings__token-actions">
+      <button class="group-settings__copy-token-button men-button small">Copy</button>
+      <button class="group-settings__reroll-button men-button small">Reroll token</button>
+    </div>
+  </div>
+
+  <h3>Plugin setup</h3>
+  <div class="setup__config">
+    <p>
+      This app requires each group member to install a runelite plugin from the Plugin Hub in order to track player
+      information. Find it by searching "<span class="emphasize">GroupScape</span>" in the Runelite client, then paste
+      the <span class="emphasize">Group Token</span> above into the plugin's <span class="emphasize">Group Config</span>
+      section. It's all the plugin needs to link to your group.
+    </p>
+    <img src="/images/config_panel.png" />
+  </div>
+
   <h3>Member settings</h3>
   <p>These <span class="emphasize">do</span> need to match the in-game names.</p>
   <div class="group-settings__section-content group-settings__members"></div>
@@ -27,4 +68,10 @@
       <label for="style__dark">Dark</label>
     </div>
   </fieldset>
+
+  <h3 class="group-settings__danger-heading">Danger zone</h3>
+  <div class="group-settings__danger-zone rsborder-tiny">
+    <p>Permanently removes the group, its members, and all tracked history. This can't be undone.</p>
+    <button class="group-settings__delete-button men-button small">Delete group&hellip;</button>
+  </div>
 </div>

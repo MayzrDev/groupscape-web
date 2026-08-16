@@ -2,7 +2,8 @@ use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
-    AmIInGroupRequest, GroupMember, GroupSkillData, RenameGroupMember, SHARED_MEMBER,
+    AmIInGroupRequest, GroupCredentials, GroupMember, GroupSkillData, RenameGroup,
+    RenameGroupMember, SHARED_MEMBER,
 };
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
@@ -79,6 +80,47 @@ pub async fn rename_group_member(
         &rename_member.new_name,
     )
     .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[put("/rename-group")]
+pub async fn rename_group(
+    auth: Authenticated,
+    rename_group: web::Json<RenameGroup>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let new_name = rename_group.new_name.trim().to_string();
+    if !valid_name(&new_name) {
+        return Ok(HttpResponse::BadRequest().body("Provided group name is not valid"));
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let new_token = db::rename_group(&client, auth.group_id, &new_name).await?;
+    Ok(HttpResponse::Ok().json(&GroupCredentials {
+        name: new_name,
+        token: new_token,
+    }))
+}
+
+#[post("/reroll-group-token")]
+pub async fn reroll_group_token(
+    auth: Authenticated,
+    path: web::Path<String>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let group_name = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let new_token = db::reroll_group_token(&client, auth.group_id, &group_name).await?;
+    Ok(HttpResponse::Ok().json(&GroupCredentials {
+        name: group_name,
+        token: new_token,
+    }))
+}
+
+#[delete("/delete-group")]
+pub async fn delete_group(auth: Authenticated, db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::admin_delete_group(&mut client, auth.group_id).await?;
     Ok(HttpResponse::Ok().finish())
 }
 

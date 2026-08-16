@@ -23,6 +23,12 @@ pub enum ApiError {
     #[from(ignore)]
     RenameGroupMemberError(tokio_postgres::error::Error),
     #[from(ignore)]
+    RenameGroupError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    RerollGroupTokenError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeleteGroupError(tokio_postgres::error::Error),
+    #[from(ignore)]
     IsMemberInGroupError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetSkillsDataError(tokio_postgres::error::Error),
@@ -80,6 +86,11 @@ impl ResponseError for ApiError {
             ApiError::RenameGroupMemberError(ref err) => {
                 handle_pg_error(err, "RenameGroupMemberError")
             }
+            ApiError::RenameGroupError(ref err) => handle_pg_error(err, "RenameGroupError"),
+            ApiError::RerollGroupTokenError(ref err) => {
+                handle_pg_error(err, "RerollGroupTokenError")
+            }
+            ApiError::DeleteGroupError(ref err) => handle_pg_error(err, "DeleteGroupError"),
             ApiError::SerdeJsonError(ref err) => {
                 log::error!("SerdeJsonError: {}", err);
                 HttpResponse::InternalServerError().body(format!("SerdeJsonError: {}", err))

@@ -1,7 +1,7 @@
 player-portrait {
   display: block;
   flex: 0 0 auto;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 3 / 5;
   box-sizing: border-box;
 }
 

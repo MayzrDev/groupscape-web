@@ -32,6 +32,18 @@ pub struct RenameGroupMember {
     pub new_name: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RenameGroup {
+    pub new_name: String,
+}
+
+#[derive(Serialize)]
+pub struct GroupCredentials {
+    pub name: String,
+    pub token: String,
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct GroupMember {
     #[serde(skip)]
