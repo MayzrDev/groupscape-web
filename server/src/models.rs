@@ -25,6 +25,12 @@ fn default_last_updated() -> DateTime<Utc> {
     Utc::now()
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CombatAchievements {
+    pub tiers: std::collections::HashMap<String, bool>,
+    pub tasks: std::collections::HashMap<String, bool>,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupMemberName {
@@ -96,6 +102,8 @@ pub struct GroupMember {
     pub active_prayers: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rich_presence: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat_achievements: Option<CombatAchievements>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<DateTime<Utc>>,
 }

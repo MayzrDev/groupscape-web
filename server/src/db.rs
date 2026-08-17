@@ -553,7 +553,7 @@ GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
 quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
 rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
 collection_log_last_update, potion_storage_last_update, special_attack_last_update,
-active_prayers_last_update, rich_presence_last_update) as last_updated,
+active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update) as last_updated,
 CASE WHEN stats_last_update >= $1::TIMESTAMPTZ THEN stats ELSE NULL END as stats,
 CASE WHEN coordinates_last_update >= $1::TIMESTAMPTZ THEN coordinates ELSE NULL END as coordinates,
 CASE WHEN skills_last_update >= $1::TIMESTAMPTZ THEN skills ELSE NULL END as skills,
@@ -569,7 +569,8 @@ CASE WHEN collection_log_last_update >= $1::TIMESTAMPTZ THEN collection_log ELSE
 CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE NULL END as potion_storage,
 CASE WHEN special_attack_last_update >= $1::TIMESTAMPTZ THEN special_attack ELSE NULL END as special_attack,
 CASE WHEN active_prayers_last_update >= $1::TIMESTAMPTZ THEN active_prayers ELSE NULL END as active_prayers,
-CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence
+CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence,
+CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements
 FROM groupscape.members WHERE group_id=$2
 "#,
         )
@@ -606,6 +607,7 @@ FROM groupscape.members WHERE group_id=$2
             special_attack: row.try_get("special_attack").ok(),
             active_prayers: row.try_get("active_prayers").ok(),
             rich_presence: row.try_get("rich_presence").ok(),
+            combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         };
         result.push(group_member);
     }
@@ -1582,6 +1584,25 @@ CREATE TABLE IF NOT EXISTS groupscape.group_permissions (
             .await?;
 
         commit_migration(&transaction, "create_group_permissions_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_combat_achievements_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members
+ADD COLUMN IF NOT EXISTS combat_achievements_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS combat_achievements TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        create_timestamp_trigger(&transaction, "combat_achievements").await?;
+
+        commit_migration(&transaction, "add_combat_achievements_column").await?;
         transaction.commit().await?;
     }
 
