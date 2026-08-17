@@ -103,6 +103,9 @@ pub enum ApiError {
     ListActivityEventsError(tokio_postgres::error::Error),
     #[from(ignore)]
     ListSessionsError(tokio_postgres::error::Error),
+    CannotModifyGroupAdminPermissionsError,
+    AccountAuthRequiredError,
+    PermissionDeniedError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -244,6 +247,13 @@ impl ResponseError for ApiError {
                 handle_pg_error(err, "ListActivityEventsError")
             }
             ApiError::ListSessionsError(ref err) => handle_pg_error(err, "ListSessionsError"),
+            ApiError::CannotModifyGroupAdminPermissionsError => HttpResponse::Conflict()
+                .body("The group admin's permissions are implicit and cannot be changed"),
+            ApiError::AccountAuthRequiredError => HttpResponse::Unauthorized()
+                .body("This action requires a logged-in account (X-Account-Authorization)"),
+            ApiError::PermissionDeniedError => {
+                HttpResponse::Forbidden().body("You do not have permission to perform this action")
+            }
         }
     }
 }

@@ -25,6 +25,12 @@ fn default_last_updated() -> DateTime<Utc> {
     Utc::now()
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CombatAchievements {
+    pub tiers: std::collections::HashMap<String, bool>,
+    pub tasks: std::collections::HashMap<String, bool>,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupMemberName {
@@ -96,6 +102,8 @@ pub struct GroupMember {
     pub active_prayers: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rich_presence: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub combat_achievements: Option<CombatAchievements>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<DateTime<Utc>>,
     /// Discrete kill/death events piggybacked on the same heartbeat, matching
@@ -387,6 +395,28 @@ pub struct GroupPermissions {
     pub account_id: i64,
     #[serde(flatten)]
     pub flags: PermissionFlags,
+}
+
+/// [`GroupPermissions`] plus the display name the permission-management UI lists a member
+/// under - `group_permissions` only knows `account_id`, not any RSN, so this joins in the
+/// most-recently-bound character's `display_rsn` for that account. `is_admin` marks the
+/// group's implicit all-permissions holder (`flags` is still that account's real, mostly-false
+/// stored row - the site renders admins as locked/all-on rather than trusting `flags` for them).
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct GroupMemberPermissions {
+    pub account_id: i64,
+    pub display_rsn: String,
+    pub is_admin: bool,
+    #[serde(flatten)]
+    pub flags: PermissionFlags,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateGroupPermissionsRequest {
+    pub account_id: i64,
+    #[serde(flatten)]
+    pub patch: PermissionFlagsPatch,
 }
 #[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {

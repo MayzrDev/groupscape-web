@@ -2,9 +2,9 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, GameEvent, GroupMember, GroupPermissions,
-    GroupSession, GroupSkillData, MemberSkillData, PermissionFlags, PermissionFlagsPatch,
-    PermissionKey, SHARED_MEMBER,
+    AggregateSkillData, BlockedMember, CreateGroup, GameEvent, GroupMember, GroupMemberPermissions,
+    GroupPermissions, GroupSession, GroupSkillData, MemberSkillData, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -554,7 +554,7 @@ GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
 quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
 rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
 collection_log_last_update, potion_storage_last_update, special_attack_last_update,
-active_prayers_last_update, rich_presence_last_update) as last_updated,
+active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update) as last_updated,
 CASE WHEN stats_last_update >= $1::TIMESTAMPTZ THEN stats ELSE NULL END as stats,
 CASE WHEN coordinates_last_update >= $1::TIMESTAMPTZ THEN coordinates ELSE NULL END as coordinates,
 CASE WHEN skills_last_update >= $1::TIMESTAMPTZ THEN skills ELSE NULL END as skills,
@@ -570,7 +570,8 @@ CASE WHEN collection_log_last_update >= $1::TIMESTAMPTZ THEN collection_log ELSE
 CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE NULL END as potion_storage,
 CASE WHEN special_attack_last_update >= $1::TIMESTAMPTZ THEN special_attack ELSE NULL END as special_attack,
 CASE WHEN active_prayers_last_update >= $1::TIMESTAMPTZ THEN active_prayers ELSE NULL END as active_prayers,
-CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence
+CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence,
+CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements
 FROM groupscape.members WHERE group_id=$2
 "#,
         )
@@ -608,6 +609,7 @@ FROM groupscape.members WHERE group_id=$2
             active_prayers: row.try_get("active_prayers").ok(),
             rich_presence: row.try_get("rich_presence").ok(),
             events: None,
+            combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         };
         result.push(group_member);
     }
@@ -1643,6 +1645,25 @@ CREATE INDEX IF NOT EXISTS activity_events_group_occurred_idx ON groupscape.acti
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_combat_achievements_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members
+ADD COLUMN IF NOT EXISTS combat_achievements_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS combat_achievements TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        create_timestamp_trigger(&transaction, "combat_achievements").await?;
+
+        commit_migration(&transaction, "add_combat_achievements_column").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2226,15 +2247,72 @@ pub async fn list_group_permissions(
     rows.iter().map(group_permissions_from_row).collect()
 }
 
+/// One row per account currently linked into `group_id`, joined to that account's most
+/// recently bound character for a display name - feeds the permission-management UI, which
+/// needs to show *who* a toggle belongs to, not just an opaque `account_id`. `DISTINCT ON`
+/// collapses an account with multiple characters in the group down to one row (permissions are
+/// per-account, not per-character).
+pub async fn list_group_member_permissions(
+    client: &Client,
+    group_id: i64,
+) -> Result<Vec<GroupMemberPermissions>, ApiError> {
+    let admin_account_id = get_group_admin_account_id(client, group_id).await?;
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT DISTINCT ON (c.account_id) c.account_id, c.display_rsn, {GROUP_PERMISSION_COLUMNS} \
+             FROM groupscape.character_group_links cgl \
+             JOIN groupscape.characters c ON c.character_id = cgl.character_id \
+             JOIN groupscape.group_permissions gp ON gp.group_id = cgl.group_id AND gp.account_id = c.account_id \
+             WHERE cgl.group_id = $1 \
+             ORDER BY c.account_id, c.bound_at DESC"
+        ))
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupPermissionsError)?;
+    rows.iter()
+        .map(|row| {
+            let account_id: i64 = row.try_get("account_id")?;
+            Ok(GroupMemberPermissions {
+                account_id,
+                display_rsn: row.try_get("display_rsn")?,
+                is_admin: admin_account_id == Some(account_id),
+                flags: PermissionFlags {
+                    invite_members: row.try_get("invite_members")?,
+                    regenerate_group_key: row.try_get("regenerate_group_key")?,
+                    kick_members: row.try_get("kick_members")?,
+                    manage_settings: row.try_get("manage_settings")?,
+                    manage_permissions: row.try_get("manage_permissions")?,
+                    post_map_markers: row.try_get("post_map_markers")?,
+                    post_callouts: row.try_get("post_callouts")?,
+                    manage_goals: row.try_get("manage_goals")?,
+                    manage_discord: row.try_get("manage_discord")?,
+                    manage_events: row.try_get("manage_events")?,
+                },
+            })
+        })
+        .collect()
+}
+
 /// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same
 /// pattern as `admin_set_feature_flag`'s upsert. Returns `None` if the account has no
 /// permissions row for this group (not a member).
+///
+/// The group admin's permission row is never writable through this path - their all-permissions
+/// access is implicit (see [`has_group_permission`]) and not stored as toggles, so a patch
+/// here could only ever *appear* to demote them while doing nothing (`has_group_permission`
+/// would keep overriding it back to `true`). Rejecting the write up front keeps that
+/// impossibility visible to callers instead of silently no-op'ing.
 pub async fn update_group_permissions(
     client: &Client,
     group_id: i64,
     account_id: i64,
     patch: PermissionFlagsPatch,
 ) -> Result<Option<GroupPermissions>, ApiError> {
+    if get_group_admin_account_id(client, group_id).await? == Some(account_id) {
+        return Err(ApiError::CannotModifyGroupAdminPermissionsError);
+    }
     let stmt = client
         .prepare_cached(&format!(
             r#"

@@ -12,10 +12,10 @@ use tokio::time::{self, Duration, Instant};
 static BATCH_SIZE: usize = 5000;
 static CHUNK_SIZE: usize = 50;
 
-/// Number of columns per member update row. With 18 columns, the PostgreSQL
-/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 18 =
-/// 3641 rows when using the VALUES approach.
-const COLUMNS_PER_ROW: usize = 18;
+/// Number of columns per member update row. With 19 columns, the PostgreSQL
+/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 19 =
+/// 3449 rows when using the VALUES approach.
+const COLUMNS_PER_ROW: usize = 19;
 
 pub async fn background_worker(
     pool: Pool,
@@ -274,6 +274,9 @@ fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.rich_presence.is_some() {
         older.rich_presence = newer.rich_presence.clone();
     }
+    if newer.combat_achievements.is_some() {
+        older.combat_achievements = newer.combat_achievements.clone();
+    }
 
     if let Some(newer_deposited) = &newer.deposited {
         match &older.deposited {
@@ -320,7 +323,7 @@ fn build_values_statement(size: usize) -> String {
         .map(|row| {
             let offset = row * COLUMNS_PER_ROW;
             format!(
-                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::int4,${}::text[],${}::text)",
+                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::int4,${}::text[],${}::text,${}::text)",
                 offset + 1,
                 offset + 2,
                 offset + 3,
@@ -339,6 +342,7 @@ fn build_values_statement(size: usize) -> String {
                 offset + 16,
                 offset + 17,
                 offset + 18,
+                offset + 19,
             )
         })
         .collect::<Vec<_>>()
@@ -362,11 +366,12 @@ UPDATE groupscape.members AS a SET
   potion_storage = COALESCE(b.potion_storage, a.potion_storage),
   special_attack = COALESCE(b.special_attack, a.special_attack),
   active_prayers = COALESCE(b.active_prayers, a.active_prayers),
-  rich_presence = COALESCE(b.rich_presence, a.rich_presence)
+  rich_presence = COALESCE(b.rich_presence, a.rich_presence),
+  combat_achievements = COALESCE(b.combat_achievements, a.combat_achievements)
 FROM (VALUES {values}) AS b(
   group_id, member_name, stats, coordinates, skills, quests, inventory,
   equipment, bank, rune_pouch, interacting, seed_vault, diary_vars, collection_log,
-  potion_storage, special_attack, active_prayers, rich_presence
+  potion_storage, special_attack, active_prayers, rich_presence, combat_achievements
 )
 WHERE a.group_id = b.group_id AND a.member_name = b.member_name::citext
 "#
@@ -414,6 +419,10 @@ async fn process_chunk(pool: &Pool, chunk: Vec<GroupMember>) -> Option<()> {
         .iter()
         .map(|member_data| serialize_serde(&member_data.interacting).unwrap_or_default())
         .collect();
+    let combat_achievements_storage: Vec<Option<String>> = buffer
+        .iter()
+        .map(|member_data| serialize_serde(&member_data.combat_achievements).unwrap_or_default())
+        .collect();
     let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
         Vec::with_capacity(COLUMNS_PER_ROW * chunk_size);
     for (index, member_data) in buffer.iter().enumerate() {
@@ -435,6 +444,7 @@ async fn process_chunk(pool: &Pool, chunk: Vec<GroupMember>) -> Option<()> {
         params.push(&member_data.special_attack);
         params.push(&member_data.active_prayers);
         params.push(&member_data.rich_presence);
+        params.push(&combat_achievements_storage[index]);
     }
 
     if let Err(e) = client.execute(&update_stmt, &params).await {
@@ -647,6 +657,7 @@ mod tests {
             special_attack: None,
             active_prayers: None,
             rich_presence: None,
+            combat_achievements: None,
             last_updated: None,
             events: None,
         }

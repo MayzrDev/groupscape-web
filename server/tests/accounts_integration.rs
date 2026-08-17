@@ -7,6 +7,7 @@ use server::config::Config;
 use server::crypto;
 use server::db;
 use server::error::ApiError;
+use server::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 
 /// Serializes integration tests since they all share the same database
 /// and each test drops/recreates the schema.
@@ -1046,6 +1047,17 @@ async fn test_update_group_permissions_patches_only_provided_fields() {
     let mut client = pool.get().await.unwrap();
     let group_id = create_test_group(&client, "permtest2").await;
 
+    // First linked account becomes admin (whose row this test must not touch, see
+    // `test_update_group_permissions_rejects_writes_to_the_admin`); the account under test
+    // links second so it stays a plain member with real toggle-able flags.
+    create_linked_account(
+        &mut client,
+        "perm2admin@example.com",
+        "hash-perm-2admin",
+        "Zezima",
+        group_id,
+    )
+    .await;
     let account_id = create_linked_account(
         &mut client,
         "perm2@example.com",
@@ -1157,6 +1169,54 @@ async fn test_list_group_permissions_returns_every_member_in_the_group() {
 }
 
 #[tokio::test]
+async fn test_list_group_member_permissions_includes_display_rsn_and_admin_flag() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest5").await;
+
+    // First linked account becomes the group admin (see "set group admin = first user to
+    // create group").
+    let admin_account = create_linked_account(
+        &mut client,
+        "perm5admin@example.com",
+        "hash-perm-5admin",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let member_account = create_linked_account(
+        &mut client,
+        "perm5member@example.com",
+        "hash-perm-5member",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let permissions = db::list_group_member_permissions(&client, group_id)
+        .await
+        .expect("query failed");
+    assert_eq!(permissions.len(), 2);
+
+    let admin_row = permissions
+        .iter()
+        .find(|p| p.account_id == admin_account)
+        .expect("admin row missing");
+    assert_eq!(admin_row.display_rsn, "Zezima");
+    assert!(admin_row.is_admin);
+
+    let member_row = permissions
+        .iter()
+        .find(|p| p.account_id == member_account)
+        .expect("member row missing");
+    assert_eq!(member_row.display_rsn, "Woox");
+    assert!(!member_row.is_admin);
+    assert!(!member_row.flags.kick_members);
+}
+
+#[tokio::test]
 async fn test_has_group_permission_admin_is_always_true() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
@@ -1240,4 +1300,148 @@ async fn test_has_group_permission_non_admin_follows_stored_flags() {
     .await
     .expect("query failed");
     assert!(after, "the flag should now read true after being granted");
+}
+
+#[tokio::test]
+async fn test_update_group_permissions_rejects_writes_to_the_admin() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest7").await;
+
+    let admin_account_id = create_linked_account(
+        &mut client,
+        "perm7admin@example.com",
+        "hash-perm-7a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(false),
+        ..Default::default()
+    };
+    let result = db::update_group_permissions(&client, group_id, admin_account_id, patch).await;
+    assert!(matches!(
+        result,
+        Err(ApiError::CannotModifyGroupAdminPermissionsError)
+    ));
+
+    let has_permission = db::has_group_permission(
+        &client,
+        group_id,
+        admin_account_id,
+        server::models::PermissionKey::KickMembers,
+    )
+    .await
+    .expect("query failed");
+    assert!(
+        has_permission,
+        "the rejected write must not have demoted the admin's implicit access"
+    );
+}
+
+#[tokio::test]
+async fn test_require_group_permission_rejects_missing_account_header() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest7b").await;
+
+    let req = actix_web::test::TestRequest::default().to_http_request();
+    let result = require_group_permission(
+        &req,
+        &client,
+        group_id,
+        server::models::PermissionKey::ManageSettings,
+    )
+    .await;
+    assert!(matches!(result, Err(ApiError::AccountAuthRequiredError)));
+}
+
+#[tokio::test]
+async fn test_require_group_permission_rejects_permission_denied() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest8").await;
+
+    // First linked account becomes admin; second is a plain member with no flags granted.
+    create_linked_account(
+        &mut client,
+        "perm8admin@example.com",
+        "hash-perm-8a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let member_account_id = create_linked_account(
+        &mut client,
+        "perm8member@example.com",
+        "hash-perm-8b",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let token = "require-permission-test-token";
+    let token_hash = crypto::session_token_hash(token);
+    let expires_at = Utc::now() + Duration::days(30);
+    db::create_account_session(&client, member_account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    let req = actix_web::test::TestRequest::default()
+        .insert_header((ACCOUNT_AUTH_HEADER, token))
+        .to_http_request();
+    let result = require_group_permission(
+        &req,
+        &client,
+        group_id,
+        server::models::PermissionKey::ManageSettings,
+    )
+    .await;
+    assert!(matches!(result, Err(ApiError::PermissionDeniedError)));
+}
+
+#[tokio::test]
+async fn test_require_group_permission_allows_admin() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest9").await;
+
+    let admin_account_id = create_linked_account(
+        &mut client,
+        "perm9admin@example.com",
+        "hash-perm-9a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let token = "require-permission-admin-token";
+    let token_hash = crypto::session_token_hash(token);
+    let expires_at = Utc::now() + Duration::days(30);
+    db::create_account_session(&client, admin_account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    let req = actix_web::test::TestRequest::default()
+        .insert_header((ACCOUNT_AUTH_HEADER, token))
+        .to_http_request();
+    let account_id = require_group_permission(
+        &req,
+        &client,
+        group_id,
+        server::models::PermissionKey::ManageSettings,
+    )
+    .await
+    .expect("admin should always have permission");
+    assert_eq!(account_id, admin_account_id);
 }

@@ -68,9 +68,8 @@ async fn main() -> std::io::Result<()> {
         update_batcher::background_worker(update_batcher_pool, rx, None).await;
     });
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
-    let account_auth_cache = std::sync::Arc::new(
-        server::account_auth_middleware::AccountAuthenticationCache::new(),
-    );
+    let account_auth_cache =
+        std::sync::Arc::new(server::account_auth_middleware::AccountAuthenticationCache::new());
     let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let config_data = web::Data::new(config.clone());
@@ -108,7 +107,10 @@ async fn main() -> std::io::Result<()> {
             .service(authed::delete_group_member)
             .service(authed::block_group_member)
             .service(authed::unblock_group_member)
+            .service(authed::can_kick_members)
             .service(authed::get_blocked_members)
+            .service(authed::get_group_permissions)
+            .service(authed::update_group_permissions)
             .service(authed::rename_group)
             .service(authed::reroll_group_token)
             .service(authed::delete_group)
@@ -149,6 +151,7 @@ async fn main() -> std::io::Result<()> {
                 header::ACCEPT,
                 header::CONTENT_TYPE,
                 header::CONTENT_LENGTH,
+                header::HeaderName::from_static("x-account-authorization"),
             ])
             .max_age(3600);
         App::new()

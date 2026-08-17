@@ -70,6 +70,19 @@ export class GroupSettings extends BaseElement {
     }
 
     this.loadBlockedMembers();
+    this.loadPermissions();
+    this.loadCanKickMembers();
+  }
+
+  // Cached rather than checked per-member: it's one account's permission for this group, not
+  // something that varies member-to-member, and `handleUpdatedMembers` re-runs frequently as
+  // telemetry streams in.
+  async loadCanKickMembers() {
+    this.canKickMembers = await api.canKickMembers();
+    const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
+    if (mostRecentMembers) {
+      this.handleUpdatedMembers(mostRecentMembers);
+    }
   }
 
   hideNameError() {
@@ -187,6 +200,7 @@ export class GroupSettings extends BaseElement {
     for (const member of members) {
       const memberEdit = document.createElement("edit-member");
       memberEdit.member = member;
+      memberEdit.canKick = Boolean(this.canKickMembers);
       memberEdits.appendChild(memberEdit);
     }
 
@@ -232,6 +246,37 @@ export class GroupSettings extends BaseElement {
       row.appendChild(name);
       row.appendChild(unblockButton);
       list.appendChild(row);
+    }
+  }
+
+  // The permissions endpoint itself is the admin gate (server-side, requires ManagePermissions)
+  // - a 401/403 here means this account isn't the group admin, so the whole section stays
+  // hidden rather than showing controls that would just 403 on save.
+  async loadPermissions() {
+    const section = this.querySelector(".group-settings__permissions-section");
+    const response = await api.getGroupPermissions();
+    if (!response.ok) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+
+    const permissions = await response.json();
+    const container = this.querySelector(".group-settings__permissions");
+    container.innerHTML = "";
+
+    for (const permission of permissions) {
+      if (permission.is_admin) {
+        const adminRow = document.createElement("div");
+        adminRow.className = "group-settings__permissions-admin-row";
+        adminRow.innerHTML = `<span class="group-settings__permissions-admin-name">${permission.display_rsn}</span><span class="group-settings__permissions-admin-badge">Admin</span><span class="group-settings__permissions-admin-note">All permissions</span>`;
+        container.appendChild(adminRow);
+        continue;
+      }
+
+      const permissionMember = document.createElement("permission-member");
+      permissionMember.permission = permission;
+      container.appendChild(permissionMember);
     }
   }
 

@@ -33,6 +33,47 @@ describe("api", () => {
     expect(api.blockedMembersUrl).toContain("/group/iron-team/get-blocked-members");
     expect(api.amILoggedInUrl).toContain("/group/iron-team/am-i-logged-in");
     expect(api.skillDataUrl).toContain("/group/iron-team/get-skill-data");
+    expect(api.groupPermissionsUrl).toContain("/group/iron-team/get-group-permissions");
+    expect(api.updateGroupPermissionsUrl).toContain("/group/iron-team/update-group-permissions");
+    expect(api.canKickMembersUrl).toContain("/group/iron-team/can-kick-members");
+  });
+
+  it("canKickMembers resolves to whether the endpoint responded ok", async () => {
+    api.setCredentials("testgroup", "token");
+
+    globalThis.fetch.mockResolvedValueOnce({ ok: true });
+    expect(await api.canKickMembers()).toBe(true);
+    expect(globalThis.fetch).toHaveBeenLastCalledWith("/api/group/testgroup/can-kick-members", {
+      headers: { Authorization: "token" },
+    });
+
+    globalThis.fetch.mockResolvedValueOnce({ ok: false });
+    expect(await api.canKickMembers()).toBe(false);
+  });
+
+  it("sends the account auth header on permission requests when an account is logged in", async () => {
+    api.setCredentials("testgroup", "token");
+    const { accountStorage } = await import("../src/data/account-storage");
+    vi.spyOn(accountStorage, "getAccountToken").mockReturnValue("account-token");
+
+    const response = { ok: true, json: vi.fn().mockResolvedValue({ account_id: 1 }) };
+    globalThis.fetch.mockResolvedValue(response);
+
+    await api.getGroupPermissions();
+    await api.updateGroupPermissions(1, { kick_members: true });
+
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/group/testgroup/get-group-permissions", {
+      headers: { Authorization: "token", "X-Account-Authorization": "account-token" },
+    });
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(2, "/api/group/testgroup/update-group-permissions", {
+      body: JSON.stringify({ account_id: 1, kick_members: true }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "token",
+        "X-Account-Authorization": "account-token",
+      },
+      method: "PUT",
+    });
   });
 
   it("enable waits for data-load events and starts polling once", async () => {
@@ -86,7 +127,7 @@ describe("api", () => {
       "/api/group/testgroup/get-group-data?from_time=2026-03-30T00:00:00.000Z",
       {
         headers: { Authorization: "token" },
-      },
+      }
     );
     expect(updateSpy).toHaveBeenCalledWith(payload);
     expect(api.nextCheck).toBe("2026-03-30T00:00:05.000Z");
@@ -153,46 +194,30 @@ describe("api", () => {
     await api.getGePrices();
     await api.getCaptchaEnabled();
 
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      1,
-      "/api/create-group",
-      {
-        body: JSON.stringify({
-          name: "new-group",
-          member_names: ["Alice", "Bob"],
-          captcha_response: "captcha-token",
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-      },
-    );
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      2,
-      "/api/group/testgroup/delete-group-member",
-      {
-        body: JSON.stringify({ name: "Charlie" }),
-        headers: { "Content-Type": "application/json", Authorization: "token" },
-        method: "DELETE",
-      },
-    );
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      3,
-      "/api/group/testgroup/block-group-member",
-      {
-        body: JSON.stringify({ name: "Charlie" }),
-        headers: { "Content-Type": "application/json", Authorization: "token" },
-        method: "POST",
-      },
-    );
-    expect(globalThis.fetch).toHaveBeenNthCalledWith(
-      4,
-      "/api/group/testgroup/unblock-group-member",
-      {
-        body: JSON.stringify({ name: "Charlie" }),
-        headers: { "Content-Type": "application/json", Authorization: "token" },
-        method: "POST",
-      },
-    );
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/create-group", {
+      body: JSON.stringify({
+        name: "new-group",
+        member_names: ["Alice", "Bob"],
+        captcha_response: "captcha-token",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(2, "/api/group/testgroup/delete-group-member", {
+      body: JSON.stringify({ name: "Charlie" }),
+      headers: { "Content-Type": "application/json", Authorization: "token" },
+      method: "DELETE",
+    });
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(3, "/api/group/testgroup/block-group-member", {
+      body: JSON.stringify({ name: "Charlie" }),
+      headers: { "Content-Type": "application/json", Authorization: "token" },
+      method: "POST",
+    });
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(4, "/api/group/testgroup/unblock-group-member", {
+      body: JSON.stringify({ name: "Charlie" }),
+      headers: { "Content-Type": "application/json", Authorization: "token" },
+      method: "POST",
+    });
     expect(globalThis.fetch).toHaveBeenNthCalledWith(5, "/api/group/testgroup/am-i-logged-in", {
       headers: { Authorization: "token" },
     });

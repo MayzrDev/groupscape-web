@@ -2,6 +2,7 @@ import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { groupData } from "./group-data";
 import { exampleData } from "./example-data";
+import { accountStorage } from "./account-storage";
 
 class Api {
   constructor() {
@@ -9,6 +10,15 @@ class Api {
     this.createGroupUrl = `${this.baseUrl}/create-group`;
     this.exampleDataEnabled = false;
     this.enabled = false;
+  }
+
+  // Permission-gated group actions (member removal, group settings) need to identify the
+  // *account* performing them, not just the group - the shared group token proves membership
+  // in the group but carries no account identity. Undefined when no account is logged in;
+  // the server rejects those requests with 401 rather than silently no-op'ing.
+  get accountAuthHeaders() {
+    const accountToken = accountStorage.getAccountToken();
+    return accountToken ? { "X-Account-Authorization": accountToken } : {};
   }
 
   get getGroupDataUrl() {
@@ -31,8 +41,20 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-blocked-members`;
   }
 
+  get canKickMembersUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/can-kick-members`;
+  }
+
   get amILoggedInUrl() {
     return `${this.baseUrl}/group/${this.groupName}/am-i-logged-in`;
+  }
+
+  get groupPermissionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-group-permissions`;
+  }
+
+  get updateGroupPermissionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/update-group-permissions`;
   }
 
   get renameGroupUrl() {
@@ -150,6 +172,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "DELETE",
     });
@@ -163,6 +186,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -176,6 +200,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -193,12 +218,52 @@ class Api {
     return response;
   }
 
+  // The endpoint itself is the permission gate (401/403 when this account can't kick), so the
+  // site treats "ok" as "show the remove/block controls" rather than duplicating the permission
+  // check client-side.
+  async canKickMembers() {
+    const response = await fetch(this.canKickMembersUrl, {
+      headers: {
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response.ok;
+  }
+
+  async getGroupPermissions() {
+    const response = await fetch(this.groupPermissionsUrl, {
+      headers: {
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response;
+  }
+
+  async updateGroupPermissions(accountId, patch) {
+    const response = await fetch(this.updateGroupPermissionsUrl, {
+      body: JSON.stringify({ account_id: accountId, ...patch }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
+    });
+
+    return response;
+  }
+
   async renameGroup(newName) {
     const response = await fetch(this.renameGroupUrl, {
       body: JSON.stringify({ new_name: newName }),
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "PUT",
     });
@@ -210,6 +275,7 @@ class Api {
     const response = await fetch(this.rerollGroupTokenUrl, {
       headers: {
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -221,6 +287,7 @@ class Api {
     const response = await fetch(this.deleteGroupUrl, {
       headers: {
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "DELETE",
     });

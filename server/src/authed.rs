@@ -3,11 +3,13 @@ use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember,
-    GroupMemberName, GroupSession, GroupSkillData, RenameGroup, SHARED_MEMBER,
+    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, PermissionKey,
+    RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
+use crate::permissions::require_group_permission;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
-use actix_web::{delete, get, post, put, web, Error, HttpResponse};
+use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
 use serde::Deserialize;
@@ -16,6 +18,7 @@ use tokio::sync::mpsc;
 
 #[delete("/delete-group-member")]
 pub async fn delete_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMember>,
     db_pool: web::Data<Pool>,
@@ -27,12 +30,14 @@ pub async fn delete_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::delete_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[post("/block-group-member")]
 pub async fn block_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
@@ -44,18 +49,35 @@ pub async fn block_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::block_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[post("/unblock-group-member")]
 pub async fn unblock_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::unblock_group_member(&client, auth.group_id, &group_member.name).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Self-check for the site's remove/block member controls: a 401/403 here means the acting
+/// account can't call `delete-group-member`/`block-group-member`/`unblock-group-member` either,
+/// so the site hides those controls rather than showing ones that would just 403 on click.
+#[get("/can-kick-members")]
+pub async fn can_kick_members(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -71,6 +93,7 @@ pub async fn get_blocked_members(
 
 #[put("/rename-group")]
 pub async fn rename_group(
+    req: HttpRequest,
     auth: Authenticated,
     rename_group: web::Json<RenameGroup>,
     db_pool: web::Data<Pool>,
@@ -81,6 +104,7 @@ pub async fn rename_group(
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     let new_token = db::rename_group(&client, auth.group_id, &new_name).await?;
     Ok(HttpResponse::Ok().json(&GroupCredentials {
         name: new_name,
@@ -90,12 +114,20 @@ pub async fn rename_group(
 
 #[post("/reroll-group-token")]
 pub async fn reroll_group_token(
+    req: HttpRequest,
     auth: Authenticated,
     path: web::Path<String>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let group_name = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(
+        &req,
+        &client,
+        auth.group_id,
+        PermissionKey::RegenerateGroupKey,
+    )
+    .await?;
     let new_token = db::reroll_group_token(&client, auth.group_id, &group_name).await?;
     Ok(HttpResponse::Ok().json(&GroupCredentials {
         name: group_name,
@@ -104,10 +136,49 @@ pub async fn reroll_group_token(
 }
 
 #[delete("/delete-group")]
-pub async fn delete_group(auth: Authenticated, db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+pub async fn delete_group(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     db::admin_delete_group(&mut client, auth.group_id).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+/// Doubles as the client-side admin gate for the permission-management UI: only accounts
+/// holding `ManagePermissions` (by default, only the group admin, via the implicit override in
+/// `has_group_permission`) can call this at all, so the site treats a 401/403 here as "hide the
+/// section" rather than needing a separate am-I-admin check.
+#[get("/get-group-permissions")]
+pub async fn get_group_permissions(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<Vec<GroupMemberPermissions>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    let permissions = db::list_group_member_permissions(&client, auth.group_id).await?;
+    Ok(web::Json(permissions))
+}
+
+#[put("/update-group-permissions")]
+pub async fn update_group_permissions(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<UpdateGroupPermissionsRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    let body = body.into_inner();
+    let updated =
+        db::update_group_permissions(&client, auth.group_id, body.account_id, body.patch).await?;
+    match updated {
+        Some(permissions) => Ok(HttpResponse::Ok().json(permissions)),
+        None => Ok(HttpResponse::NotFound().body("Account has no permissions row in this group")),
+    }
 }
 
 #[post("/update-group-member")]
