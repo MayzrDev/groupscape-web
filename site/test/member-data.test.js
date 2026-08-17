@@ -29,6 +29,23 @@ describe("member-data", () => {
     expect(member.collectionLog[0].quantity).toBe(2);
   });
 
+  it("publishes parsed combat achievements payload on combat_achievements updates", () => {
+    const member = new MemberData("Alice");
+
+    member.update({
+      combat_achievements: {
+        tiers: { easy: true, medium: false, hard: false, elite: false, master: false, grandmaster: false },
+        tasks: { "1234": true, "5678": false },
+      },
+    });
+
+    const event = pubsub.getMostRecent("combatAchievements:Alice");
+    expect(event).toBeDefined();
+    expect(event[0]).toBe(member.combatAchievements);
+    expect(member.combatAchievements.tiers.easy).toBe(true);
+    expect(member.combatAchievements.tasks["1234"]).toBe(true);
+  });
+
   it("publishes interacting updates when payload explicitly clears interacting", () => {
     const member = new MemberData("Alice");
 

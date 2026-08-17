@@ -1,0 +1,13 @@
+<div class="combat-achievement-member__head">
+  <span class="combat-achievement-member__arrow">&#9656;</span>
+  <span class="combat-achievement-member__name">${this.member.name}</span>
+  <div class="combat-achievement-member__bars"></div>
+  <span class="combat-achievement-member__count">${this.completedTierCount()} / ${this.tiers.length}</span>
+</div>
+<div class="combat-achievement-member__body">
+  <div class="combat-achievement-member__tiers"></div>
+  <p class="combat-achievement-member__raw-note">
+    ${this.taskCount()} combat achievement tasks logged complete this session &mdash; task names aren't available
+    yet, only which tiers are fully finished.
+  </p>
+</div>
