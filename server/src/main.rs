@@ -67,9 +67,8 @@ async fn main() -> std::io::Result<()> {
         update_batcher::background_worker(update_batcher_pool, rx, None).await;
     });
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
-    let account_auth_cache = std::sync::Arc::new(
-        server::account_auth_middleware::AccountAuthenticationCache::new(),
-    );
+    let account_auth_cache =
+        std::sync::Arc::new(server::account_auth_middleware::AccountAuthenticationCache::new());
     let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let config_data = web::Data::new(config.clone());
@@ -146,6 +145,7 @@ async fn main() -> std::io::Result<()> {
                 header::ACCEPT,
                 header::CONTENT_TYPE,
                 header::CONTENT_LENGTH,
+                header::HeaderName::from_static("x-account-authorization"),
             ])
             .max_age(3600);
         App::new()

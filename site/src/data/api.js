@@ -2,6 +2,7 @@ import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { groupData } from "./group-data";
 import { exampleData } from "./example-data";
+import { accountStorage } from "./account-storage";
 
 class Api {
   constructor() {
@@ -9,6 +10,15 @@ class Api {
     this.createGroupUrl = `${this.baseUrl}/create-group`;
     this.exampleDataEnabled = false;
     this.enabled = false;
+  }
+
+  // Permission-gated group actions (member removal, group settings) need to identify the
+  // *account* performing them, not just the group - the shared group token proves membership
+  // in the group but carries no account identity. Undefined when no account is logged in;
+  // the server rejects those requests with 401 rather than silently no-op'ing.
+  get accountAuthHeaders() {
+    const accountToken = accountStorage.getAccountToken();
+    return accountToken ? { "X-Account-Authorization": accountToken } : {};
   }
 
   get getGroupDataUrl() {
@@ -150,6 +160,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "DELETE",
     });
@@ -163,6 +174,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -176,6 +188,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -199,6 +212,7 @@ class Api {
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "PUT",
     });
@@ -210,6 +224,7 @@ class Api {
     const response = await fetch(this.rerollGroupTokenUrl, {
       headers: {
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "POST",
     });
@@ -221,6 +236,7 @@ class Api {
     const response = await fetch(this.deleteGroupUrl, {
       headers: {
         Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
       },
       method: "DELETE",
     });

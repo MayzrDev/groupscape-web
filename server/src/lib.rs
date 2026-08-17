@@ -10,6 +10,7 @@ pub mod db;
 pub mod discord;
 pub mod error;
 pub mod models;
+pub mod permissions;
 pub mod unauthed;
 pub mod update_batcher;
 pub mod validators;

@@ -3,11 +3,12 @@ use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember, GroupMemberName,
-    GroupSkillData, RenameGroup, SHARED_MEMBER,
+    GroupSkillData, PermissionKey, RenameGroup, SHARED_MEMBER,
 };
+use crate::permissions::require_group_permission;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
-use actix_web::{delete, get, post, put, web, Error, HttpResponse};
+use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
 use serde::Deserialize;
@@ -16,6 +17,7 @@ use tokio::sync::mpsc;
 
 #[delete("/delete-group-member")]
 pub async fn delete_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMember>,
     db_pool: web::Data<Pool>,
@@ -27,12 +29,14 @@ pub async fn delete_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::delete_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[post("/block-group-member")]
 pub async fn block_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
@@ -44,17 +48,20 @@ pub async fn block_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::block_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
 #[post("/unblock-group-member")]
 pub async fn unblock_group_member(
+    req: HttpRequest,
     auth: Authenticated,
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::unblock_group_member(&client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -71,6 +78,7 @@ pub async fn get_blocked_members(
 
 #[put("/rename-group")]
 pub async fn rename_group(
+    req: HttpRequest,
     auth: Authenticated,
     rename_group: web::Json<RenameGroup>,
     db_pool: web::Data<Pool>,
@@ -81,6 +89,7 @@ pub async fn rename_group(
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     let new_token = db::rename_group(&client, auth.group_id, &new_name).await?;
     Ok(HttpResponse::Ok().json(&GroupCredentials {
         name: new_name,
@@ -90,12 +99,20 @@ pub async fn rename_group(
 
 #[post("/reroll-group-token")]
 pub async fn reroll_group_token(
+    req: HttpRequest,
     auth: Authenticated,
     path: web::Path<String>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let group_name = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(
+        &req,
+        &client,
+        auth.group_id,
+        PermissionKey::RegenerateGroupKey,
+    )
+    .await?;
     let new_token = db::reroll_group_token(&client, auth.group_id, &group_name).await?;
     Ok(HttpResponse::Ok().json(&GroupCredentials {
         name: group_name,
@@ -104,8 +121,13 @@ pub async fn reroll_group_token(
 }
 
 #[delete("/delete-group")]
-pub async fn delete_group(auth: Authenticated, db_pool: web::Data<Pool>) -> Result<HttpResponse, Error> {
+pub async fn delete_group(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     db::admin_delete_group(&mut client, auth.group_id).await?;
     Ok(HttpResponse::Ok().finish())
 }
