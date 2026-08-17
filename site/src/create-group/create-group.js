@@ -32,8 +32,8 @@ export class CreateGroup extends BaseElement {
         },
       ];
       this.serverError = this.querySelector(".create-group__server-error");
+      this.querySelector(".create-group__submit").style.display = "block";
 
-      this.eventListener(this.querySelector("#group-member-count"), "change", this.handleMemberCountChange.bind(this));
       this.eventListener(this.querySelector(".create-group__submit"), "click", this.createGroup.bind(this));
 
       if (this.captchaEnabled) {
@@ -56,53 +56,9 @@ export class CreateGroup extends BaseElement {
     }
   }
 
-  resetMembersSection() {
-    const membersSection = this.querySelector(".create-group__member-inputs");
-    membersSection.innerHTML = "";
-  }
-
-  get memberNameInputs() {
-    return Array.from(this.querySelectorAll(".create-group__member-inputs member-name-input"));
-  }
-
-  validateMemberNames() {
-    const inputs = this.memberNameInputs;
-
-    // NOTE: We want to loop through all of them here so all error messages display.
-    let allValid = true;
-    for (const input of inputs) {
-      if (!input.valid) allValid = false;
-    }
-    return allValid;
-  }
-
-  displayMembersSection(memberCount) {
-    this.resetMembersSection();
-    const membersSection = this.querySelector(".create-group__member-inputs");
-
-    const memberInputEls = document.createDocumentFragment();
-    for (let i = 0; i < memberCount; ++i) {
-      const memberInput = document.createElement("member-name-input");
-      memberInput.setAttribute("member-number", i + 1);
-      memberInputEls.appendChild(memberInput);
-    }
-
-    membersSection.innerHTML = "";
-    membersSection.appendChild(memberInputEls);
-    this.querySelector(".create-group__step-members").style.display = "block";
-    this.querySelector(".create-group__submit").style.display = "block";
-  }
-
-  handleMemberCountChange(evt) {
-    const target = evt.target;
-    const memberCount = parseInt(target.value);
-
-    this.displayMembersSection(memberCount);
-  }
-
   async createGroup() {
     this.serverError.innerHTML = "";
-    if (!this.groupName.valid || !this.validateMemberNames()) {
+    if (!this.groupName.valid) {
       return;
     }
 
@@ -117,18 +73,9 @@ export class CreateGroup extends BaseElement {
     }
 
     const groupName = this.groupName.value;
-    const memberInputs = this.memberNameInputs;
-
     const memberNames = [];
-    for (const input of memberInputs) {
-      memberNames.push(input.value);
-    }
 
-    for (let i = memberNames.length; i < 5; ++i) {
-      memberNames.push("");
-    }
-
-    const submitBtn = document.querySelector(".create-group__submit");
+    const submitBtn = this.querySelector(".create-group__submit");
     try {
       submitBtn.disabled = true;
       const result = await api.createGroup(groupName, memberNames, captchaResponse);

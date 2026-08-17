@@ -21,7 +21,6 @@ create-group {
   font-size: 1.5em;
 }
 
-.create-group__step-members,
 .create-group__submit {
   display: none;
 }

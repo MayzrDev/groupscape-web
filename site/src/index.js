@@ -28,7 +28,6 @@ import "./men-link/men-link.js";
 import "./setup-instructions/setup-instructions.js";
 import "./app-initializer/app-initializer.js";
 import "./group-settings/group-settings.js";
-import "./member-name-input/member-name-input.js";
 import "./men-input/men-input.js";
 import "./edit-member/edit-member.js";
 import "./loading-screen/loading-screen.js";
