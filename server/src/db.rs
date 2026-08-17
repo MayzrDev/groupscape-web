@@ -2,8 +2,9 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData,
-    BlockedMember, CreateGroup, GroupMember, GroupPermissions, GroupSkillData, MemberSkillData,
-    PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
+    BlockedMember, CreateGroup, GroupMember, GroupMemberPermissions, GroupPermissions,
+    GroupSkillData, MemberSkillData, PermissionFlags, PermissionFlagsPatch, PermissionKey,
+    SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -2187,6 +2188,54 @@ pub async fn list_group_permissions(
         .await
         .map_err(ApiError::GetGroupPermissionsError)?;
     rows.iter().map(group_permissions_from_row).collect()
+}
+
+/// One row per account currently linked into `group_id`, joined to that account's most
+/// recently bound character for a display name - feeds the permission-management UI, which
+/// needs to show *who* a toggle belongs to, not just an opaque `account_id`. `DISTINCT ON`
+/// collapses an account with multiple characters in the group down to one row (permissions are
+/// per-account, not per-character).
+pub async fn list_group_member_permissions(
+    client: &Client,
+    group_id: i64,
+) -> Result<Vec<GroupMemberPermissions>, ApiError> {
+    let admin_account_id = get_group_admin_account_id(client, group_id).await?;
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT DISTINCT ON (c.account_id) c.account_id, c.display_rsn, {GROUP_PERMISSION_COLUMNS} \
+             FROM groupscape.character_group_links cgl \
+             JOIN groupscape.characters c ON c.character_id = cgl.character_id \
+             JOIN groupscape.group_permissions gp ON gp.group_id = cgl.group_id AND gp.account_id = c.account_id \
+             WHERE cgl.group_id = $1 \
+             ORDER BY c.account_id, c.bound_at DESC"
+        ))
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupPermissionsError)?;
+    rows.iter()
+        .map(|row| {
+            let account_id: i64 = row.try_get("account_id")?;
+            Ok(GroupMemberPermissions {
+                account_id,
+                display_rsn: row.try_get("display_rsn")?,
+                is_admin: admin_account_id == Some(account_id),
+                flags: PermissionFlags {
+                    invite_members: row.try_get("invite_members")?,
+                    regenerate_group_key: row.try_get("regenerate_group_key")?,
+                    kick_members: row.try_get("kick_members")?,
+                    manage_settings: row.try_get("manage_settings")?,
+                    manage_permissions: row.try_get("manage_permissions")?,
+                    post_map_markers: row.try_get("post_map_markers")?,
+                    post_callouts: row.try_get("post_callouts")?,
+                    manage_goals: row.try_get("manage_goals")?,
+                    manage_discord: row.try_get("manage_discord")?,
+                    manage_events: row.try_get("manage_events")?,
+                },
+            })
+        })
+        .collect()
 }
 
 /// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same

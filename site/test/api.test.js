@@ -33,6 +33,33 @@ describe("api", () => {
     expect(api.blockedMembersUrl).toContain("/group/iron-team/get-blocked-members");
     expect(api.amILoggedInUrl).toContain("/group/iron-team/am-i-logged-in");
     expect(api.skillDataUrl).toContain("/group/iron-team/get-skill-data");
+    expect(api.groupPermissionsUrl).toContain("/group/iron-team/get-group-permissions");
+    expect(api.updateGroupPermissionsUrl).toContain("/group/iron-team/update-group-permissions");
+  });
+
+  it("sends the account auth header on permission requests when an account is logged in", async () => {
+    api.setCredentials("testgroup", "token");
+    const { accountStorage } = await import("../src/data/account-storage");
+    vi.spyOn(accountStorage, "getAccountToken").mockReturnValue("account-token");
+
+    const response = { ok: true, json: vi.fn().mockResolvedValue({ account_id: 1 }) };
+    globalThis.fetch.mockResolvedValue(response);
+
+    await api.getGroupPermissions();
+    await api.updateGroupPermissions(1, { kick_members: true });
+
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(1, "/api/group/testgroup/get-group-permissions", {
+      headers: { Authorization: "token", "X-Account-Authorization": "account-token" },
+    });
+    expect(globalThis.fetch).toHaveBeenNthCalledWith(2, "/api/group/testgroup/update-group-permissions", {
+      body: JSON.stringify({ account_id: 1, kick_members: true }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "token",
+        "X-Account-Authorization": "account-token",
+      },
+      method: "PUT",
+    });
   });
 
   it("enable waits for data-load events and starts polling once", async () => {

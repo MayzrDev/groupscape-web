@@ -1169,6 +1169,54 @@ async fn test_list_group_permissions_returns_every_member_in_the_group() {
 }
 
 #[tokio::test]
+async fn test_list_group_member_permissions_includes_display_rsn_and_admin_flag() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest5").await;
+
+    // First linked account becomes the group admin (see "set group admin = first user to
+    // create group").
+    let admin_account = create_linked_account(
+        &mut client,
+        "perm5admin@example.com",
+        "hash-perm-5admin",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let member_account = create_linked_account(
+        &mut client,
+        "perm5member@example.com",
+        "hash-perm-5member",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let permissions = db::list_group_member_permissions(&client, group_id)
+        .await
+        .expect("query failed");
+    assert_eq!(permissions.len(), 2);
+
+    let admin_row = permissions
+        .iter()
+        .find(|p| p.account_id == admin_account)
+        .expect("admin row missing");
+    assert_eq!(admin_row.display_rsn, "Zezima");
+    assert!(admin_row.is_admin);
+
+    let member_row = permissions
+        .iter()
+        .find(|p| p.account_id == member_account)
+        .expect("member row missing");
+    assert_eq!(member_row.display_rsn, "Woox");
+    assert!(!member_row.is_admin);
+    assert!(!member_row.flags.kick_members);
+}
+
+#[tokio::test]
 async fn test_has_group_permission_admin_is_always_true() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;

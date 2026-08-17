@@ -321,6 +321,28 @@ pub struct GroupPermissions {
     #[serde(flatten)]
     pub flags: PermissionFlags,
 }
+
+/// [`GroupPermissions`] plus the display name the permission-management UI lists a member
+/// under - `group_permissions` only knows `account_id`, not any RSN, so this joins in the
+/// most-recently-bound character's `display_rsn` for that account. `is_admin` marks the
+/// group's implicit all-permissions holder (`flags` is still that account's real, mostly-false
+/// stored row - the site renders admins as locked/all-on rather than trusting `flags` for them).
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct GroupMemberPermissions {
+    pub account_id: i64,
+    pub display_rsn: String,
+    pub is_admin: bool,
+    #[serde(flatten)]
+    pub flags: PermissionFlags,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateGroupPermissionsRequest {
+    pub account_id: i64,
+    #[serde(flatten)]
+    pub patch: PermissionFlagsPatch,
+}
 #[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,

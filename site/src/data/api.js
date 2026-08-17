@@ -45,6 +45,14 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/am-i-logged-in`;
   }
 
+  get groupPermissionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-group-permissions`;
+  }
+
+  get updateGroupPermissionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/update-group-permissions`;
+  }
+
   get renameGroupUrl() {
     return `${this.baseUrl}/group/${this.groupName}/rename-group`;
   }
@@ -201,6 +209,31 @@ class Api {
       headers: {
         Authorization: this.groupToken,
       },
+    });
+
+    return response;
+  }
+
+  async getGroupPermissions() {
+    const response = await fetch(this.groupPermissionsUrl, {
+      headers: {
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response;
+  }
+
+  async updateGroupPermissions(accountId, patch) {
+    const response = await fetch(this.updateGroupPermissionsUrl, {
+      body: JSON.stringify({ account_id: accountId, ...patch }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
     });
 
     return response;

@@ -3,7 +3,8 @@ use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember, GroupMemberName,
-    GroupSkillData, PermissionKey, RenameGroup, SHARED_MEMBER,
+    GroupMemberPermissions, GroupSkillData, PermissionKey, RenameGroup,
+    UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
 use crate::permissions::require_group_permission;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
@@ -130,6 +131,40 @@ pub async fn delete_group(
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     db::admin_delete_group(&mut client, auth.group_id).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+/// Doubles as the client-side admin gate for the permission-management UI: only accounts
+/// holding `ManagePermissions` (by default, only the group admin, via the implicit override in
+/// `has_group_permission`) can call this at all, so the site treats a 401/403 here as "hide the
+/// section" rather than needing a separate am-I-admin check.
+#[get("/get-group-permissions")]
+pub async fn get_group_permissions(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<Vec<GroupMemberPermissions>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    let permissions = db::list_group_member_permissions(&client, auth.group_id).await?;
+    Ok(web::Json(permissions))
+}
+
+#[put("/update-group-permissions")]
+pub async fn update_group_permissions(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<UpdateGroupPermissionsRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    let body = body.into_inner();
+    let updated =
+        db::update_group_permissions(&client, auth.group_id, body.account_id, body.patch).await?;
+    match updated {
+        Some(permissions) => Ok(HttpResponse::Ok().json(permissions)),
+        None => Ok(HttpResponse::NotFound().body("Account has no permissions row in this group")),
+    }
 }
 
 #[post("/update-group-member")]
