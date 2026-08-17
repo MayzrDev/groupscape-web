@@ -71,6 +71,18 @@ export class GroupSettings extends BaseElement {
 
     this.loadBlockedMembers();
     this.loadPermissions();
+    this.loadCanKickMembers();
+  }
+
+  // Cached rather than checked per-member: it's one account's permission for this group, not
+  // something that varies member-to-member, and `handleUpdatedMembers` re-runs frequently as
+  // telemetry streams in.
+  async loadCanKickMembers() {
+    this.canKickMembers = await api.canKickMembers();
+    const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
+    if (mostRecentMembers) {
+      this.handleUpdatedMembers(mostRecentMembers);
+    }
   }
 
   hideNameError() {
@@ -188,6 +200,7 @@ export class GroupSettings extends BaseElement {
     for (const member of members) {
       const memberEdit = document.createElement("edit-member");
       memberEdit.member = member;
+      memberEdit.canKick = Boolean(this.canKickMembers);
       memberEdits.appendChild(memberEdit);
     }
 

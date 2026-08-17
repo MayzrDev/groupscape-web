@@ -21,8 +21,8 @@ export class EditMember extends BaseElement {
     const removeButton = this.querySelector(".edit-member__remove");
     const blockButton = this.querySelector(".edit-member__block");
 
-    this.eventListener(removeButton, "click", this.confirmRemove.bind(this));
-    this.eventListener(blockButton, "click", this.confirmBlock.bind(this));
+    if (removeButton) this.eventListener(removeButton, "click", this.confirmRemove.bind(this));
+    if (blockButton) this.eventListener(blockButton, "click", this.confirmBlock.bind(this));
   }
 
   disconnectedCallback() {

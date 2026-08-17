@@ -67,6 +67,20 @@ pub async fn unblock_group_member(
     Ok(HttpResponse::Ok().finish())
 }
 
+/// Self-check for the site's remove/block member controls: a 401/403 here means the acting
+/// account can't call `delete-group-member`/`block-group-member`/`unblock-group-member` either,
+/// so the site hides those controls rather than showing ones that would just 403 on click.
+#[get("/can-kick-members")]
+pub async fn can_kick_members(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
 #[get("/get-blocked-members")]
 pub async fn get_blocked_members(
     auth: Authenticated,

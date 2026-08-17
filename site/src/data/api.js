@@ -41,6 +41,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-blocked-members`;
   }
 
+  get canKickMembersUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/can-kick-members`;
+  }
+
   get amILoggedInUrl() {
     return `${this.baseUrl}/group/${this.groupName}/am-i-logged-in`;
   }
@@ -212,6 +216,20 @@ class Api {
     });
 
     return response;
+  }
+
+  // The endpoint itself is the permission gate (401/403 when this account can't kick), so the
+  // site treats "ok" as "show the remove/block controls" rather than duplicating the permission
+  // check client-side.
+  async canKickMembers() {
+    const response = await fetch(this.canKickMembersUrl, {
+      headers: {
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response.ok;
   }
 
   async getGroupPermissions() {
