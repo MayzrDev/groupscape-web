@@ -648,6 +648,7 @@ mod tests {
             active_prayers: None,
             rich_presence: None,
             last_updated: None,
+            events: None,
         }
     }
 

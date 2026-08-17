@@ -2,8 +2,8 @@ use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
-    AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember, GroupMemberName,
-    GroupSkillData, RenameGroup, SHARED_MEMBER,
+    ActivityEvent, AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember,
+    GroupMemberName, GroupSession, GroupSkillData, RenameGroup, SHARED_MEMBER,
 };
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
@@ -249,6 +249,27 @@ pub async fn update_group_member(
         ArrayFormat::ItemPairs,
     )?;
 
+    // Discrete kill/death events are written straight through (not routed via the batcher,
+    // which only knows latest-value-wins upserts) before the vitals fields hand off to it.
+    // `.take()` since the batcher's `GroupMember` merge/dedupe logic has no notion of this
+    // field and shouldn't carry it along.
+    if let Some(events) = group_member_inner.events.take() {
+        if !events.is_empty() {
+            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+            let session_id = db::ensure_open_session(&client, auth.group_id).await?;
+            for event in &events {
+                db::insert_activity_event(
+                    &client,
+                    auth.group_id,
+                    session_id,
+                    &group_member_inner.name,
+                    event,
+                )
+                .await?;
+            }
+        }
+    }
+
     // Publish straight to any connected party overlays before handing off to
     // the batched DB writer - the batcher trades latency for write
     // efficiency, but the overlay wants these updates as fast as possible.
@@ -286,6 +307,60 @@ pub async fn get_group_data(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let group_members = db::get_group_data(&client, auth.group_id, &from_time).await?;
     Ok(web::Json(group_members))
+}
+
+fn default_activity_limit() -> i64 {
+    30
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetActivityEventsQuery {
+    #[serde(default)]
+    pub member_name: Option<String>,
+    #[serde(default)]
+    pub event_type: Option<String>,
+    #[serde(default)]
+    pub before: Option<DateTime<Utc>>,
+    #[serde(default = "default_activity_limit")]
+    pub limit: i64,
+}
+#[get("/get-activity-events")]
+pub async fn get_activity_events(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetActivityEventsQuery>,
+) -> Result<web::Json<Vec<ActivityEvent>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let events = db::list_activity_events(
+        &client,
+        auth.group_id,
+        query.member_name.as_deref(),
+        query.event_type.as_deref(),
+        query.before,
+        query.limit,
+    )
+    .await?;
+    Ok(web::Json(events))
+}
+
+fn default_sessions_limit() -> i64 {
+    20
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetSessionsQuery {
+    #[serde(default = "default_sessions_limit")]
+    pub limit: i64,
+}
+#[get("/get-sessions")]
+pub async fn get_sessions(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetSessionsQuery>,
+) -> Result<web::Json<Vec<GroupSession>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let sessions = db::list_sessions(&client, auth.group_id, query.limit).await?;
+    Ok(web::Json(sessions))
 }
 
 #[derive(Deserialize)]

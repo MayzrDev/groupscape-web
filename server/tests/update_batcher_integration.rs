@@ -121,6 +121,7 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         active_prayers: None,
         rich_presence: None,
         last_updated: None,
+        events: None,
     }
 }
 

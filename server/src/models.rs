@@ -98,6 +98,81 @@ pub struct GroupMember {
     pub rich_presence: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<DateTime<Utc>>,
+    /// Discrete kill/death events piggybacked on the same heartbeat, matching
+    /// `groupscape-old`'s "ride the tick" ingestion pattern rather than a separate endpoint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub events: Option<Vec<GameEvent>>,
+}
+
+/// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
+/// `PendingKill.toMap()` output verbatim (`itemId`/`quantity`).
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct LootItem {
+    pub item_id: i32,
+    pub quantity: i32,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct KillEvent {
+    pub npc_id: i32,
+    pub npc_name: String,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+    /// Absent when the plugin's best-effort loot correlation (`onLoot`) never matched a
+    /// pending kill before the next drain - the kill still ships without loot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub loot: Option<Vec<LootItem>>,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DeathEvent {
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+    /// Best-effort, from `Actor.getInteracting()` at time of death - never a guaranteed
+    /// "killed by" fact, so this is `None` rather than defaulted to any placeholder.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub killer_name: Option<String>,
+}
+
+/// Discriminated on the plugin's own `"type"` field ("kill"/"death"), matching
+/// `KillLootDeathEvents`' transport shape field-for-field.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum GameEvent {
+    Kill(KillEvent),
+    Death(DeathEvent),
+}
+impl GameEvent {
+    pub fn event_type(&self) -> &'static str {
+        match self {
+            GameEvent::Kill(_) => "kill",
+            GameEvent::Death(_) => "death",
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ActivityEvent {
+    pub id: i64,
+    pub session_id: i64,
+    pub member_name: String,
+    pub event_type: String,
+    pub occurred_at: DateTime<Utc>,
+    pub payload: serde_json::Value,
+}
+
+#[derive(Serialize)]
+pub struct GroupSession {
+    pub id: i64,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
 }
 #[derive(Serialize)]
 pub struct AggregateSkillData {

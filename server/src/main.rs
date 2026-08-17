@@ -60,6 +60,7 @@ async fn main() -> std::io::Result<()> {
 
     unauthed::start_ge_updater();
     unauthed::start_skills_aggregator(pool.clone());
+    unauthed::start_session_idle_closer(pool.clone());
 
     let update_batcher_pool = config.pg.create_pool(None, NoTls).unwrap();
     let (tx, rx) = mpsc::channel::<models::GroupMember>(10000);
@@ -102,6 +103,8 @@ async fn main() -> std::io::Result<()> {
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)
             .service(authed::get_group_data)
+            .service(authed::get_activity_events)
+            .service(authed::get_sessions)
             .service(authed::delete_group_member)
             .service(authed::block_group_member)
             .service(authed::unblock_group_member)
