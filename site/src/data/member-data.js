@@ -41,6 +41,13 @@ const parsedFieldMappings = [
     updatedAttribute: "diaries",
   },
   {
+    sourceKey: "combat_achievements",
+    targetKey: "combatAchievements",
+    parser: (value) => value,
+    publishKey: "combatAchievements",
+    updatedAttribute: "combatAchievements",
+  },
+  {
     sourceKey: "collection_log_v2",
     targetKey: "collectionLog",
     parser: Item.parseItemData,

@@ -1,0 +1,14 @@
+combat-achievements-page {
+  display: flex;
+}
+
+.combat-achievements-page__container {
+  padding: 8px 12px;
+  max-width: 700px;
+  width: 100%;
+}
+
+.combat-achievements-page__hint {
+  opacity: 0.75;
+  margin-top: 0;
+}
