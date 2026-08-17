@@ -1,5 +1,6 @@
 <div class="player-panel__header">
-  <player-portrait player-name="${this.playerName}"></player-portrait>
+  ${this.portraitMode === "bust" ? `<player-portrait mode="bust" player-name="${this.playerName}"></player-portrait>` :
+  ""}
   <player-stats player-name="${this.playerName}"></player-stats>
 </div>
 <div class="player-panel__minibar">
@@ -23,3 +24,9 @@
   </button>
 </div>
 <div class="player-panel__content"></div>
+${ this.portraitMode === "full" ? `<player-portrait
+  mode="full"
+  player-name="${this.playerName}"
+  class="player-panel__portrait-full"
+></player-portrait
+>` : "" }

@@ -13,11 +13,17 @@ player-panel + player-panel {
 .player-panel__header {
   display: flex;
   align-items: stretch;
+  gap: 6px;
 }
 
 .player-panel__header player-stats {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.player-panel__portrait-full {
+  display: block;
+  margin-top: 8px;
 }
 
 .player-panel__minibar {

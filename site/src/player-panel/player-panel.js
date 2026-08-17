@@ -12,6 +12,8 @@ export class PlayerPanel extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
+    // /panels shows the full-body portrait below the card instead of beside the vitals.
+    this.portraitMode = document.body.classList.contains("panels-page") ? "full" : "bust";
     this.render();
     this.contentArea = this.querySelector(".player-panel__content");
     this.eventListener(this.querySelector(".player-panel__minibar"), "click", this.handleMiniBarClick.bind(this));

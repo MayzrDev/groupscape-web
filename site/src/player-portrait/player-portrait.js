@@ -6,8 +6,11 @@ import { api } from "../data/api";
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
 const FRAMING_PADDING = 1.22;
-// Full-body framing: taller than wide, matching the approved player-panel placement.
-const FRAME_ASPECT_RATIO = 3 / 5;
+// Bust framing: small headshot placed beside the vitals everywhere else. Full-body framing
+// (3:5, used only on /panels) is set purely in CSS since it has no camera-fit math of its own.
+const BUST_FRAME_ASPECT_RATIO = 0.82;
+// Fraction of the model's total height treated as "head and shoulders" for the bust crop.
+const BUST_HEIGHT_FRACTION = 0.32;
 
 export class PlayerPortrait extends BaseElement {
   html() {
@@ -17,6 +20,8 @@ export class PlayerPortrait extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
+    this.mode = this.getAttribute("mode") === "full" ? "full" : "bust";
+    this.setAttribute("mode", this.mode);
     this.render();
 
     this.frame = this.querySelector(".player-portrait__frame");
@@ -31,12 +36,12 @@ export class PlayerPortrait extends BaseElement {
 
     // In a flex row (e.g. the player-panel header), `aspect-ratio` doesn't reliably derive
     // width from a stretch-resolved height, so the frame can end up taller than it is wide.
-    // Correct it in JS once layout settles so the portrait keeps its full-body framing.
-    this.squareObserver = new ResizeObserver(() => this.enforceAspectRatio());
+    // Correct it in JS once layout settles so the bust portrait keeps its framing. The full-body
+    // portrait (/panels) is a block element sized by its own width, so CSS `aspect-ratio` alone
+    // is reliable there and this override is skipped.
+    this.squareObserver = new ResizeObserver(() => this.onLayoutChange());
     this.squareObserver.observe(this);
-    this.enforceAspectRatio();
-
-    this.onResize();
+    this.onLayoutChange();
 
     this.loadPortrait();
   }
@@ -51,13 +56,21 @@ export class PlayerPortrait extends BaseElement {
     super.disconnectedCallback();
   }
 
-  enforceAspectRatio() {
-    const height = this.offsetHeight;
-    const targetWidth = Math.round(height * FRAME_ASPECT_RATIO);
-    if (height > 0 && this.offsetWidth !== targetWidth) {
-      this.style.width = `${targetWidth}px`;
+  onLayoutChange() {
+    if (this.mode === "bust") {
+      this.enforceAspectRatio();
+    } else {
       this.onResize();
     }
+  }
+
+  enforceAspectRatio() {
+    const height = this.offsetHeight;
+    const targetWidth = Math.round(height * BUST_FRAME_ASPECT_RATIO);
+    if (height > 0 && this.offsetWidth !== targetWidth) {
+      this.style.width = `${targetWidth}px`;
+    }
+    this.onResize();
   }
 
   onResize() {
@@ -95,12 +108,17 @@ export class PlayerPortrait extends BaseElement {
     geometry.scale(1, -1, -1);
     geometry.center();
     geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
 
     const material = new THREE.MeshBasicMaterial({ vertexColors: true });
     this.mesh = new THREE.Mesh(geometry, material);
     this.scene.add(this.mesh);
 
-    this.fitCameraToGeometry(geometry);
+    if (this.mode === "bust") {
+      this.fitCameraToBust(geometry);
+    } else {
+      this.fitCameraToGeometry(geometry);
+    }
   }
 
   fitCameraToGeometry(geometry) {
@@ -108,6 +126,23 @@ export class PlayerPortrait extends BaseElement {
     if (!sphere || sphere.radius <= 0) return;
     const distance = PlayerPortrait.fitCameraDistance(sphere.radius, this.camera.fov);
     this.camera.position.set(0, 0, distance);
+    this.camera.lookAt(0, 0, 0);
+    this.camera.updateProjectionMatrix();
+  }
+
+  // Frames just the head and shoulders: the top BUST_HEIGHT_FRACTION slice of the model's
+  // (already-centered) bounding box, reusing the same vertical-FOV distance formula as the
+  // full-body fit.
+  fitCameraToBust(geometry) {
+    const box = geometry.boundingBox;
+    if (!box) return;
+    const totalHeight = box.max.y - box.min.y;
+    if (totalHeight <= 0) return;
+    const bustRadius = (totalHeight * BUST_HEIGHT_FRACTION) / 2;
+    const centerY = box.max.y - bustRadius;
+    const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov);
+    this.camera.position.set(0, centerY, distance);
+    this.camera.lookAt(0, centerY, 0);
     this.camera.updateProjectionMatrix();
   }
 

@@ -1,8 +1,16 @@
 player-portrait {
   display: block;
-  flex: 0 0 auto;
-  aspect-ratio: 3 / 5;
   box-sizing: border-box;
+}
+
+player-portrait[mode="bust"] {
+  flex: 0 0 auto;
+  aspect-ratio: 0.82;
+}
+
+player-portrait[mode="full"] {
+  width: 100%;
+  aspect-ratio: 3 / 5;
 }
 
 .player-portrait__frame {
