@@ -75,6 +75,97 @@ pub async fn add_group_member(
     Ok(())
 }
 
+/// Resolves the canonical member row for a plugin-submitted `account_hash`, ported from
+/// `groupscape-old`'s telemetry-ingestion pattern (`account_hash` is the persistent identity,
+/// `display_rsn`/`member_name` is just a mutable label kept in sync with it) and adapted to this
+/// schema's separate `members` table (`characters.display_rsn` is the source of truth; `members`
+/// gains its own `account_hash` column so a row survives an in-game name change instead of being
+/// orphaned under the old name).
+///
+/// Lookup order:
+/// 1. A member row already tagged with this `account_hash` in this group - rename it in place if
+///    `display_rsn` has since changed.
+/// 2. A pre-existing untagged row matching `display_rsn` by name (e.g. typed in at group setup
+///    before this character was linked) - claim it by tagging its `account_hash`.
+/// 3. Neither exists - insert a new row, subject to the same 5-member cap as `add_group_member`.
+///
+/// Returns the member name the caller should use for this update (== `display_rsn`).
+pub async fn ensure_member_for_linked_character(
+    client: &Client,
+    group_id: i64,
+    account_hash: &str,
+    display_rsn: &str,
+) -> Result<String, ApiError> {
+    let by_hash_stmt = client
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND account_hash=$2",
+        )
+        .await?;
+    if let Some(row) = client
+        .query_opt(&by_hash_stmt, &[&group_id, &account_hash])
+        .await
+        .map_err(ApiError::AddMemberError)?
+    {
+        let existing_name: String = row.try_get("member_name")?;
+        if existing_name == display_rsn {
+            return Ok(existing_name);
+        }
+        let rename_stmt = client
+            .prepare_cached(
+                "UPDATE groupscape.members SET member_name=$1 WHERE group_id=$2 AND account_hash=$3",
+            )
+            .await?;
+        return match client
+            .execute(&rename_stmt, &[&display_rsn, &group_id, &account_hash])
+            .await
+        {
+            Ok(_) => Ok(display_rsn.to_string()),
+            // member_name collision with an unrelated row (e.g. a stale untagged member still
+            // squatting on the new name) - keep serving the old name rather than failing the
+            // telemetry update outright.
+            Err(_) => Ok(existing_name),
+        };
+    }
+
+    let claim_stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.members SET account_hash=$1 WHERE group_id=$2 AND member_name=$3 AND account_hash IS NULL",
+        )
+        .await?;
+    let claimed = client
+        .execute(&claim_stmt, &[&account_hash, &group_id, &display_rsn])
+        .await
+        .map_err(ApiError::AddMemberError)?;
+    if claimed > 0 {
+        return Ok(display_rsn.to_string());
+    }
+
+    let member_count_stmt = client
+        .prepare_cached(
+            "SELECT COUNT(*) FROM groupscape.members WHERE group_id=$1 AND member_name!=$2",
+        )
+        .await?;
+    let member_count: i64 = client
+        .query_one(&member_count_stmt, &[&group_id, &SHARED_MEMBER])
+        .await?
+        .try_get(0)
+        .map_err(ApiError::AddMemberError)?;
+    if member_count >= 5 {
+        return Err(ApiError::GroupFullError);
+    }
+
+    let create_member_stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.members (group_id, member_name, account_hash) VALUES($1, $2, $3)",
+        )
+        .await?;
+    client
+        .execute(&create_member_stmt, &[&group_id, &display_rsn, &account_hash])
+        .await
+        .map_err(ApiError::AddMemberError)?;
+    Ok(display_rsn.to_string())
+}
+
 pub async fn delete_skills_data_for_member(
     transaction: &Transaction<'_>,
     period: AggregatePeriod,
@@ -400,6 +491,7 @@ FROM groupscape.members WHERE group_id=$2
         let group_member = GroupMember {
             group_id: Some(group_id),
             name: member_name,
+            account_hash: None,
             last_updated,
             stats: row.try_get("stats").ok(),
             coordinates: row.try_get("coordinates").ok(),
@@ -1323,6 +1415,29 @@ ADD COLUMN IF NOT EXISTS admin_account_id BIGINT REFERENCES groupscape.accounts(
             .await?;
 
         commit_migration(&transaction, "add_groups_admin_account_id").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_members_account_hash_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members ADD COLUMN IF NOT EXISTS account_hash TEXT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_account_hash_idx ON groupscape.members (group_id, account_hash) WHERE account_hash IS NOT NULL
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_members_account_hash_column").await?;
         transaction.commit().await?;
     }
 

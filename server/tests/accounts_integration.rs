@@ -850,3 +850,122 @@ async fn test_delete_account_cascades_characters_and_sessions() {
         .expect("query failed");
     assert!(session.is_none(), "session should be cascade-deleted with the account");
 }
+
+async fn get_member_names(client: &deadpool_postgres::Client, group_id: i64) -> Vec<String> {
+    let rows = client
+        .query(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND member_name != '@SHARED' ORDER BY member_name",
+            &[&group_id],
+        )
+        .await
+        .expect("query failed");
+    rows.into_iter().map(|row| row.get(0)).collect()
+}
+
+#[tokio::test]
+async fn test_ensure_member_for_linked_character_creates_row_when_none_exists() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "rsngroup1").await;
+
+    let name = db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-1", "Zezima")
+        .await
+        .expect("should create a member row");
+    assert_eq!(name, "Zezima");
+    assert_eq!(get_member_names(&client, group_id).await, vec!["Zezima"]);
+}
+
+#[tokio::test]
+async fn test_ensure_member_for_linked_character_claims_pre_existing_typed_row() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "rsngroup2").await;
+
+    db::add_group_member(&client, group_id, "Zezima")
+        .await
+        .expect("failed to add typed-in member");
+
+    let name = db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-2", "Zezima")
+        .await
+        .expect("should claim the existing row");
+    assert_eq!(name, "Zezima");
+    assert_eq!(get_member_names(&client, group_id).await, vec!["Zezima"]);
+
+    // Claiming is idempotent - calling again with the same hash finds it via the hash lookup,
+    // not the (now-tagged) name-claim path, and still resolves to the same row.
+    let name_again =
+        db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-2", "Zezima")
+            .await
+            .expect("should resolve the already-claimed row");
+    assert_eq!(name_again, "Zezima");
+    assert_eq!(get_member_names(&client, group_id).await, vec!["Zezima"]);
+}
+
+#[tokio::test]
+async fn test_ensure_member_for_linked_character_renames_on_display_rsn_change() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "rsngroup3").await;
+
+    db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-3", "OldName")
+        .await
+        .expect("should create a member row");
+
+    let renamed =
+        db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-3", "NewName")
+            .await
+            .expect("should rename in place");
+    assert_eq!(renamed, "NewName");
+    assert_eq!(get_member_names(&client, group_id).await, vec!["NewName"]);
+}
+
+#[tokio::test]
+async fn test_ensure_member_for_linked_character_respects_group_cap() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "rsngroup4").await;
+
+    for i in 0..5 {
+        db::ensure_member_for_linked_character(
+            &client,
+            group_id,
+            &format!("rsn-hash-cap-{i}"),
+            &format!("Member{i}"),
+        )
+        .await
+        .expect("should create a member row under the cap");
+    }
+
+    let result =
+        db::ensure_member_for_linked_character(&client, group_id, "rsn-hash-cap-6", "Member6")
+            .await;
+    assert!(matches!(result, Err(ApiError::GroupFullError)));
+}
+
+#[tokio::test]
+async fn test_ensure_member_for_linked_character_scoped_per_group() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_a = create_test_group(&client, "rsngroup5a").await;
+    let group_b = create_test_group(&client, "rsngroup5b").await;
+
+    db::ensure_member_for_linked_character(&client, group_a, "rsn-hash-5", "Zezima")
+        .await
+        .expect("should create in group a");
+    db::ensure_member_for_linked_character(&client, group_b, "rsn-hash-5", "Zezima")
+        .await
+        .expect("same account_hash in a different group should not conflict");
+
+    assert_eq!(get_member_names(&client, group_a).await, vec!["Zezima"]);
+    assert_eq!(get_member_names(&client, group_b).await, vec!["Zezima"]);
+}

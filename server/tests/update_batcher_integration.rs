@@ -101,6 +101,7 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
     GroupMember {
         group_id,
         name: name.to_string(),
+        account_hash: None,
         stats: None,
         coordinates: None,
         skills: None,
