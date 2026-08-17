@@ -93,6 +93,7 @@ pub enum ApiError {
     GetGroupPermissionsError(tokio_postgres::error::Error),
     #[from(ignore)]
     UpdateGroupPermissionsError(tokio_postgres::error::Error),
+    CannotModifyGroupAdminPermissionsError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -221,6 +222,8 @@ impl ResponseError for ApiError {
             ApiError::UpdateGroupPermissionsError(ref err) => {
                 handle_pg_error(err, "UpdateGroupPermissionsError")
             }
+            ApiError::CannotModifyGroupAdminPermissionsError => HttpResponse::Conflict()
+                .body("The group admin's permissions are implicit and cannot be changed"),
         }
     }
 }

@@ -1046,6 +1046,17 @@ async fn test_update_group_permissions_patches_only_provided_fields() {
     let mut client = pool.get().await.unwrap();
     let group_id = create_test_group(&client, "permtest2").await;
 
+    // First linked account becomes admin (whose row this test must not touch, see
+    // `test_update_group_permissions_rejects_writes_to_the_admin`); the account under test
+    // links second so it stays a plain member with real toggle-able flags.
+    create_linked_account(
+        &mut client,
+        "perm2admin@example.com",
+        "hash-perm-2admin",
+        "Zezima",
+        group_id,
+    )
+    .await;
     let account_id = create_linked_account(
         &mut client,
         "perm2@example.com",
@@ -1240,4 +1251,45 @@ async fn test_has_group_permission_non_admin_follows_stored_flags() {
     .await
     .expect("query failed");
     assert!(after, "the flag should now read true after being granted");
+}
+
+#[tokio::test]
+async fn test_update_group_permissions_rejects_writes_to_the_admin() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest7").await;
+
+    let admin_account_id = create_linked_account(
+        &mut client,
+        "perm7admin@example.com",
+        "hash-perm-7a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(false),
+        ..Default::default()
+    };
+    let result = db::update_group_permissions(&client, group_id, admin_account_id, patch).await;
+    assert!(matches!(
+        result,
+        Err(ApiError::CannotModifyGroupAdminPermissionsError)
+    ));
+
+    let has_permission = db::has_group_permission(
+        &client,
+        group_id,
+        admin_account_id,
+        server::models::PermissionKey::KickMembers,
+    )
+    .await
+    .expect("query failed");
+    assert!(
+        has_permission,
+        "the rejected write must not have demoted the admin's implicit access"
+    );
 }

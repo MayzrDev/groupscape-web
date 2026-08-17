@@ -2171,12 +2171,21 @@ pub async fn list_group_permissions(
 /// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same
 /// pattern as `admin_set_feature_flag`'s upsert. Returns `None` if the account has no
 /// permissions row for this group (not a member).
+///
+/// The group admin's permission row is never writable through this path - their all-permissions
+/// access is implicit (see [`has_group_permission`]) and not stored as toggles, so a patch
+/// here could only ever *appear* to demote them while doing nothing (`has_group_permission`
+/// would keep overriding it back to `true`). Rejecting the write up front keeps that
+/// impossibility visible to callers instead of silently no-op'ing.
 pub async fn update_group_permissions(
     client: &Client,
     group_id: i64,
     account_id: i64,
     patch: PermissionFlagsPatch,
 ) -> Result<Option<GroupPermissions>, ApiError> {
+    if get_group_admin_account_id(client, group_id).await? == Some(account_id) {
+        return Err(ApiError::CannotModifyGroupAdminPermissionsError);
+    }
     let stmt = client
         .prepare_cached(&format!(
             r#"
