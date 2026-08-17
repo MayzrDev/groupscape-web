@@ -89,6 +89,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/portrait`;
   }
 
+  get activityEventsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-activity-events`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -339,6 +343,24 @@ class Api {
 
   async getCaptchaEnabled() {
     const response = await fetch(this.captchaEnabledUrl);
+    return response.json();
+  }
+
+  async getActivityEvents({ memberName, eventType, before, limit } = {}) {
+    const query = new URLSearchParams();
+    if (memberName) query.set("member_name", memberName);
+    if (eventType) query.set("event_type", eventType);
+    if (before) query.set("before", before);
+    if (limit) query.set("limit", limit);
+
+    const response = await fetch(`${this.activityEventsUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return [];
+    }
     return response.json();
   }
 
