@@ -525,11 +525,14 @@ pub async fn get_collection_log() -> Result<web::Json<HashMap<String, Vec<i32>>>
 // larger PayloadConfig since the global 100KB cap rejects real meshes.
 pub async fn update_portrait(
     auth: Authenticated,
-    path: web::Path<String>,
+    // Two dynamic segments are live here: {group_name} from the outer scope plus
+    // {member_name} from this route. Path<String> only tolerates a single segment
+    // and 404s ("wrong number of parameters: 2 expected 1") otherwise.
+    path: web::Path<(String, String)>,
     body: web::Bytes,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let member_name = path.into_inner();
+    let (_group_name, member_name) = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let member_id = db::get_member_id(&client, auth.group_id, &member_name).await?;
     db::upsert_member_mesh(&client, member_id, &body).await?;
@@ -539,10 +542,10 @@ pub async fn update_portrait(
 #[get("/portrait/{member_name}")]
 pub async fn get_portrait(
     auth: Authenticated,
-    path: web::Path<String>,
+    path: web::Path<(String, String)>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let member_name = path.into_inner();
+    let (_group_name, member_name) = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let mesh = db::get_member_mesh(&client, auth.group_id, &member_name).await?;
     match mesh {
