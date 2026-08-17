@@ -10,6 +10,7 @@ import { pubsub } from "../data/pubsub";
 export class GroupSettings extends BaseElement {
   constructor() {
     super();
+    this.canKick = false;
   }
 
   /* eslint-disable no-unused-vars */

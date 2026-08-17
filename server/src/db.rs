@@ -2357,22 +2357,31 @@ RETURNING group_id, account_id, {GROUP_PERMISSION_COLUMNS}
 
 /// Owner is an implicit all-permissions holder, not a toggle-holder (ported from
 /// `groupscape-old`'s `hasPermission`, §6) - `account_id` matching `groups.admin_account_id`
-/// short-circuits to `true` before any flag is consulted. A member with no permissions row
+/// short-circuits to all-true before any flag is consulted. A member with no permissions row
 /// (never linked into the group) falls back to [`PermissionFlags::default`], i.e. every flag
 /// off.
+pub async fn get_effective_permission_flags(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+) -> Result<PermissionFlags, ApiError> {
+    if get_group_admin_account_id(client, group_id).await? == Some(account_id) {
+        return Ok(PermissionFlags::all_true());
+    }
+    let flags = get_group_permissions(client, group_id, account_id)
+        .await?
+        .map(|permissions| permissions.flags)
+        .unwrap_or_default();
+    Ok(flags)
+}
+
 pub async fn has_group_permission(
     client: &Client,
     group_id: i64,
     account_id: i64,
     key: PermissionKey,
 ) -> Result<bool, ApiError> {
-    if get_group_admin_account_id(client, group_id).await? == Some(account_id) {
-        return Ok(true);
-    }
-    let flags = get_group_permissions(client, group_id, account_id)
-        .await?
-        .map(|permissions| permissions.flags)
-        .unwrap_or_default();
+    let flags = get_effective_permission_flags(client, group_id, account_id).await?;
     Ok(flags.get(key))
 }
 

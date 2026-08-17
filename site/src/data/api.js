@@ -53,6 +53,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-group-permissions`;
   }
 
+  get myPermissionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-my-permissions`;
+  }
+
   get updateGroupPermissionsUrl() {
     return `${this.baseUrl}/group/${this.groupName}/update-group-permissions`;
   }
@@ -234,6 +238,17 @@ class Api {
 
   async getGroupPermissions() {
     const response = await fetch(this.groupPermissionsUrl, {
+      headers: {
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response;
+  }
+
+  async getMyPermissions() {
+    const response = await fetch(this.myPermissionsUrl, {
       headers: {
         Authorization: this.groupToken,
         ...this.accountAuthHeaders,

@@ -1,12 +1,13 @@
 use crate::auth_middleware::Authenticated;
+use crate::crypto::session_token_hash;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember,
-    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, PermissionKey,
-    RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
+    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, PermissionFlags,
+    PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
-use crate::permissions::require_group_permission;
+use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
@@ -161,6 +162,37 @@ pub async fn get_group_permissions(
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
     let permissions = db::list_group_member_permissions(&client, auth.group_id).await?;
     Ok(web::Json(permissions))
+}
+
+/// The caller's own effective flags (admin override folded in), keyed off whatever account
+/// `X-Account-Authorization` resolves to - unlike `get_group_permissions` this isn't gated by
+/// `ManagePermissions`, since every member needs to know their own capabilities to decide which
+/// controls to show (e.g. the remove-member button). No/invalid account header or no
+/// permissions row all fall back to [`PermissionFlags::default`] (every flag off) rather than
+/// erroring, so a logged-out browser just sees nothing gated.
+#[get("/get-my-permissions")]
+pub async fn get_my_permissions(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<PermissionFlags>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let account = match req
+        .headers()
+        .get(ACCOUNT_AUTH_HEADER)
+        .and_then(|value| value.to_str().ok())
+    {
+        Some(token) => db::get_account_by_session_token_hash(&client, &session_token_hash(token)).await?,
+        None => None,
+    };
+
+    let flags = match account {
+        Some(account) => db::get_effective_permission_flags(&client, auth.group_id, account.id).await?,
+        None => PermissionFlags::default(),
+    };
+
+    Ok(web::Json(flags))
 }
 
 #[put("/update-group-permissions")]

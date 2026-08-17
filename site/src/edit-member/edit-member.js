@@ -7,6 +7,19 @@ import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 export class EditMember extends BaseElement {
   constructor() {
     super();
+    this._canKick = false;
+  }
+
+  // Set by group-settings once it knows the acting account's effective permissions - defaults
+  // to false so a member without kick permission never sees the buttons flash into view before
+  // the permission check resolves.
+  set canKick(value) {
+    this._canKick = value;
+    this.updateButtonsVisibility();
+  }
+
+  get canKick() {
+    return this._canKick;
   }
 
   html() {
@@ -23,6 +36,14 @@ export class EditMember extends BaseElement {
 
     if (removeButton) this.eventListener(removeButton, "click", this.confirmRemove.bind(this));
     if (blockButton) this.eventListener(blockButton, "click", this.confirmBlock.bind(this));
+    this.updateButtonsVisibility();
+  }
+
+  updateButtonsVisibility() {
+    const buttons = this.querySelector(".edit-member__buttons");
+    if (buttons) {
+      buttons.style.display = this._canKick ? "" : "none";
+    }
   }
 
   disconnectedCallback() {
