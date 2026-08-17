@@ -2,8 +2,9 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData,
-    CreateGroup, GroupMember, GroupSkillData, MemberSkillData, SHARED_MEMBER,
+    BlockedMember, CreateGroup, GroupMember, GroupSkillData, MemberSkillData, SHARED_MEMBER,
 };
+use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Transaction};
 use serde::{de::DeserializeOwned, Serialize};
@@ -161,21 +162,111 @@ pub async fn delete_group_member(
     Ok(())
 }
 
-pub async fn rename_group_member(
+pub async fn is_member_blocked(
     client: &Client,
     group_id: i64,
-    original_name: &str,
-    new_name: &str,
-) -> Result<(), ApiError> {
+    member_name: &str,
+) -> Result<bool, ApiError> {
     let stmt = client
         .prepare_cached(
-            "UPDATE groupscape.members SET member_name=$1 WHERE group_id=$2 AND member_name=$3",
+            "SELECT 1 FROM groupscape.blocked_members WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::IsMemberBlockedError)?;
+    Ok(row.is_some())
+}
+
+/// Auto-provisions a member the first time their telemetry arrives - there's no manual
+/// "add member" step anymore, so joining the group happens implicitly on first update.
+/// A previously-removed member rejoins the same way, since removal fully deletes their row.
+/// A blocked member is rejected here instead, before any data is written or broadcast.
+pub async fn ensure_group_member(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<(), ApiError> {
+    if is_member_blocked(client, group_id, member_name).await? {
+        return Err(ApiError::MemberBlockedError);
+    }
+
+    if is_member_in_group(client, group_id, member_name).await? {
+        return Ok(());
+    }
+
+    if !valid_name(member_name) {
+        return Err(ApiError::GroupMemberValidationError(format!(
+            "Member name {} is not valid",
+            member_name
+        )));
+    }
+
+    add_group_member(client, group_id, member_name).await
+}
+
+pub async fn get_blocked_members(
+    client: &Client,
+    group_id: i64,
+) -> Result<Vec<BlockedMember>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT member_name, blocked_at FROM groupscape.blocked_members WHERE group_id=$1 ORDER BY blocked_at DESC",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetBlockedMembersError)?;
+    rows.iter()
+        .map(|row| {
+            Ok(BlockedMember {
+                member_name: row.try_get("member_name")?,
+                blocked_at: row.try_get("blocked_at")?,
+            })
+        })
+        .collect()
+}
+
+/// Blocks a member: wipes their tracked data the same way Remove does (if they're
+/// currently in the group) and records the block so future telemetry under that name is
+/// rejected until unblocked.
+pub async fn block_group_member(
+    client: &mut Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<(), ApiError> {
+    if is_member_in_group(client, group_id, member_name).await? {
+        delete_group_member(client, group_id, member_name).await?;
+    }
+
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.blocked_members (group_id, member_name) VALUES ($1, $2) ON CONFLICT (group_id, member_name) DO NOTHING",
         )
         .await?;
     client
-        .execute(&stmt, &[&new_name, &group_id, &original_name])
+        .execute(&stmt, &[&group_id, &member_name])
         .await
-        .map_err(ApiError::RenameGroupMemberError)?;
+        .map_err(ApiError::BlockGroupMemberError)?;
+    Ok(())
+}
+
+pub async fn unblock_group_member(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "DELETE FROM groupscape.blocked_members WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::UnblockGroupMemberError)?;
     Ok(())
 }
 
@@ -1307,6 +1398,26 @@ CREATE INDEX IF NOT EXISTS character_group_links_group_id_idx ON groupscape.char
             .await?;
 
         commit_migration(&transaction, "create_character_group_links_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_blocked_members_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.blocked_members (
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  member_name CITEXT NOT NULL,
+  blocked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, member_name)
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_blocked_members_table").await?;
         transaction.commit().await?;
     }
 

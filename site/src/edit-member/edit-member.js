@@ -17,25 +17,30 @@ export class EditMember extends BaseElement {
     super.connectedCallback();
     this.render();
 
-    this.input = this.querySelector("member-name-input");
     this.error = this.querySelector(".edit-member__error");
-    const renameButton = this.querySelector(".edit-member__rename");
     const removeButton = this.querySelector(".edit-member__remove");
-    const addButton = this.querySelector(".edit-member__add");
+    const blockButton = this.querySelector(".edit-member__block");
 
-    if (renameButton) {
-      this.eventListener(renameButton, "click", this.renameMember.bind(this));
-    }
-    if (removeButton) {
-      this.eventListener(removeButton, "click", this.removeMember.bind(this));
-    }
-    if (addButton) {
-      this.eventListener(addButton, "click", this.addMember.bind(this));
-    }
+    this.eventListener(removeButton, "click", this.confirmRemove.bind(this));
+    this.eventListener(blockButton, "click", this.confirmBlock.bind(this));
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+  }
+
+  lastSeenText() {
+    if (!this.member.lastUpdated) return "Never seen";
+    if (!this.member.inactive) return "Online now";
+
+    const seconds = Math.floor((Date.now() - this.member.lastUpdated.getTime()) / 1000);
+    if (seconds < 60) return "Last seen moments ago";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `Last seen ${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `Last seen ${hours} hour${hours === 1 ? "" : "s"} ago`;
+    const days = Math.floor(hours / 24);
+    return `Last seen ${days} day${days === 1 ? "" : "s"} ago`;
   }
 
   hideError() {
@@ -46,76 +51,58 @@ export class EditMember extends BaseElement {
     this.error.innerHTML = message;
   }
 
-  async renameMember() {
+  confirmRemove() {
     this.hideError();
-    if (!this.input.valid) return;
-    const originalName = this.member.name;
-    const newName = this.input.value;
+    confirmDialogManager.confirm({
+      headline: `Remove ${this.member.name}?`,
+      body: "All player data will be lost. They'll rejoin automatically the next time their plugin sends data with the group token.",
+      yesCallback: this.removeMember.bind(this),
+      noCallback: () => {},
+    });
+  }
 
-    if (originalName === newName) {
-      this.showError("New name is the same as the old name");
-      return;
-    }
-
+  async removeMember() {
     try {
       loadingScreenManager.showLoadingScreen();
-      const result = await api.renameMember(originalName, newName);
+      const result = await api.removeMember(this.member.name);
       if (result.ok) {
         await api.restart();
         await pubsub.waitUntilNextEvent("get-group-data", false);
       } else {
         const message = await result.text();
-        this.showError(`Failed to rename member ${message}`);
+        this.showError(`Failed to remove member ${message}`);
       }
     } catch (error) {
-      this.showError(`Failed to rename member ${error}`);
+      this.showError(`Failed to remove member ${error}`);
     } finally {
       loadingScreenManager.hideLoadingScreen();
     }
   }
 
-  removeMember() {
+  confirmBlock() {
     this.hideError();
     confirmDialogManager.confirm({
-      headline: `Delete ${this.member.name}?`,
-      body: "All player data will be lost and cannot be recovered.",
-      yesCallback: async () => {
-        try {
-          loadingScreenManager.showLoadingScreen();
-          const result = await api.removeMember(this.member.name);
-          if (result.ok) {
-            await api.restart();
-            await pubsub.waitUntilNextEvent("get-group-data", false);
-          } else {
-            const message = await result.text();
-            this.showError(`Failed to remove member ${message}`);
-          }
-        } catch (error) {
-          this.showError(`Failed to remove member ${error}`);
-        } finally {
-          loadingScreenManager.hideLoadingScreen();
-        }
-      },
+      headline: `Block ${this.member.name}?`,
+      body: "All player data will be lost and they won't be able to rejoin until you unblock them.",
+      yesCallback: this.blockMember.bind(this),
       noCallback: () => {},
     });
   }
 
-  async addMember() {
-    this.hideError();
-    if (!this.input.valid) return;
-
+  async blockMember() {
     try {
       loadingScreenManager.showLoadingScreen();
-      const result = await api.addMember(this.input.value);
+      const result = await api.blockMember(this.member.name);
       if (result.ok) {
         await api.restart();
         await pubsub.waitUntilNextEvent("get-group-data", false);
+        pubsub.publish("blocked-members-changed");
       } else {
         const message = await result.text();
-        this.showError(`Failed to add member ${message}`);
+        this.showError(`Failed to block member ${message}`);
       }
     } catch (error) {
-      this.showError(`Failed to add member ${error}`);
+      this.showError(`Failed to block member ${error}`);
     } finally {
       loadingScreenManager.hideLoadingScreen();
     }

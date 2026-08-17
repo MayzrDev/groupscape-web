@@ -26,6 +26,7 @@ export class GroupSettings extends BaseElement {
     this.render();
     this.bindElements();
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
+    this.subscribe("blocked-members-changed", this.loadBlockedMembers.bind(this));
   }
 
   disconnectedCallback() {
@@ -60,10 +61,15 @@ export class GroupSettings extends BaseElement {
     const deleteButton = this.querySelector(".group-settings__delete-button");
     this.eventListener(deleteButton, "click", this.confirmDeleteGroup.bind(this));
 
+    const blockedToggle = this.querySelector(".group-settings__blocked-toggle");
+    this.eventListener(blockedToggle, "click", this.toggleBlockedList.bind(this));
+
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
       this.handleUpdatedMembers(mostRecentMembers);
     }
+
+    this.loadBlockedMembers();
   }
 
   hideNameError() {
@@ -178,24 +184,65 @@ export class GroupSettings extends BaseElement {
   handleUpdatedMembers(members) {
     members = members.filter((member) => member.name !== "@SHARED");
     let memberEdits = document.createDocumentFragment();
-    for (let i = 0; i < members.length; ++i) {
-      const member = members[i];
+    for (const member of members) {
       const memberEdit = document.createElement("edit-member");
       memberEdit.member = member;
-      memberEdit.memberNumber = i + 1;
-
       memberEdits.appendChild(memberEdit);
-    }
-
-    if (members.length < 5) {
-      const addMember = document.createElement("edit-member");
-      addMember.memberNumber = members.length + 1;
-      memberEdits.appendChild(addMember);
     }
 
     const memberSection = this.querySelector(".group-settings__members");
     memberSection.innerHTML = "";
     memberSection.appendChild(memberEdits);
+
+    const openSlots = 5 - members.length;
+    const openSlotsText = this.querySelector(".group-settings__open-slots");
+    openSlotsText.textContent =
+      openSlots > 0
+        ? `${openSlots} open slot${openSlots === 1 ? "" : "s"} — anyone with your group token can join`
+        : "";
+  }
+
+  toggleBlockedList() {
+    this.querySelector(".group-settings__blocked-list").classList.toggle("group-settings__blocked-list--open");
+    this.querySelector(".group-settings__blocked-arrow").classList.toggle("group-settings__blocked-arrow--open");
+  }
+
+  async loadBlockedMembers() {
+    const response = await api.getBlockedMembers();
+    const blockedMembers = response.ok ? await response.json() : [];
+
+    const countLabel = this.querySelector(".group-settings__blocked-count");
+    countLabel.textContent = blockedMembers.length > 0 ? `${blockedMembers.length} blocked` : "None blocked";
+
+    const list = this.querySelector(".group-settings__blocked-list");
+    list.innerHTML = "";
+    for (const blockedMember of blockedMembers) {
+      const row = document.createElement("div");
+      row.className = "group-settings__blocked-row";
+
+      const name = document.createElement("span");
+      name.className = "group-settings__blocked-name";
+      name.textContent = blockedMember.member_name;
+
+      const unblockButton = document.createElement("button");
+      unblockButton.className = "men-button small";
+      unblockButton.textContent = "Unblock";
+      unblockButton.addEventListener("click", () => this.unblockMember(blockedMember.member_name));
+
+      row.appendChild(name);
+      row.appendChild(unblockButton);
+      list.appendChild(row);
+    }
+  }
+
+  async unblockMember(memberName) {
+    try {
+      loadingScreenManager.showLoadingScreen();
+      await api.unblockMember(memberName);
+      await this.loadBlockedMembers();
+    } finally {
+      loadingScreenManager.hideLoadingScreen();
+    }
   }
 }
 

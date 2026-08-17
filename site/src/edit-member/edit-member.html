@@ -1,12 +1,13 @@
-<member-name-input input-value="${this.member?.name || ''}" member-number="${this.memberNumber}"></member-name-input>
-
-<div class="edit-member__buttons">
-  ${this.member ? `
-  <button class="edit-member__rename men-button small">Rename</button>
-  <button class="edit-member__remove men-button small">Remove</button>
-  ` : `
-  <button class="edit-member__add men-button small">Add member</button>
-  ` }
+<div class="edit-member__row">
+  <span class="edit-member__status ${this.member.inactive ? "edit-member__status--offline" : ""}"></span>
+  <div class="edit-member__info">
+    <div class="edit-member__name">${this.member.name}</div>
+    <div class="edit-member__meta">${this.lastSeenText()}</div>
+  </div>
+  <div class="edit-member__buttons">
+    <button class="edit-member__remove men-button small">Remove</button>
+    <button class="edit-member__block men-button small">Block</button>
+  </div>
 </div>
 
 <div class="edit-member__error validation-error"></div>

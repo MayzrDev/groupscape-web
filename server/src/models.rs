@@ -27,9 +27,14 @@ fn default_last_updated() -> DateTime<Utc> {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RenameGroupMember {
-    pub original_name: String,
-    pub new_name: String,
+pub struct GroupMemberName {
+    pub name: String,
+}
+
+#[derive(Serialize)]
+pub struct BlockedMember {
+    pub member_name: String,
+    pub blocked_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]

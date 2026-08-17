@@ -69,3 +69,69 @@ group-settings {
   flex: 1;
   min-width: 200px;
 }
+
+.group-settings__open-slots {
+  font-size: 0.85em;
+  opacity: 0.7;
+  margin: 0 0 1em 1em;
+}
+
+.group-settings__blocked-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0.5em;
+}
+
+.group-settings__blocked-toggle h4 {
+  font-weight: normal;
+}
+
+.group-settings__blocked-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-settings__blocked-count {
+  color: var(--invalid);
+  font-size: 0.85em;
+}
+
+.group-settings__blocked-arrow {
+  font-size: 0.7em;
+  opacity: 0.7;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+
+.group-settings__blocked-arrow--open {
+  transform: rotate(90deg);
+}
+
+.group-settings__blocked-list {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 1em;
+  margin-bottom: 1em;
+}
+
+.group-settings__blocked-list--open {
+  display: flex;
+}
+
+.group-settings__blocked-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+}
+
+.group-settings__blocked-name {
+  color: var(--invalid);
+  text-decoration: line-through;
+}

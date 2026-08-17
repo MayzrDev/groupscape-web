@@ -21,9 +21,16 @@ pub enum ApiError {
     #[from(ignore)]
     DeleteGroupMemberError(tokio_postgres::error::Error),
     #[from(ignore)]
-    RenameGroupMemberError(tokio_postgres::error::Error),
-    #[from(ignore)]
     RenameGroupError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    IsMemberBlockedError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    BlockGroupMemberError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UnblockGroupMemberError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetBlockedMembersError(tokio_postgres::error::Error),
+    MemberBlockedError,
     #[from(ignore)]
     RerollGroupTokenError(tokio_postgres::error::Error),
     #[from(ignore)]
@@ -107,10 +114,22 @@ impl ResponseError for ApiError {
             ApiError::DeleteGroupMemberError(ref err) => {
                 handle_pg_error(err, "DeleteGroupMemberError")
             }
-            ApiError::RenameGroupMemberError(ref err) => {
-                handle_pg_error(err, "RenameGroupMemberError")
-            }
             ApiError::RenameGroupError(ref err) => handle_pg_error(err, "RenameGroupError"),
+            ApiError::IsMemberBlockedError(ref err) => {
+                handle_pg_error(err, "IsMemberBlockedError")
+            }
+            ApiError::BlockGroupMemberError(ref err) => {
+                handle_pg_error(err, "BlockGroupMemberError")
+            }
+            ApiError::UnblockGroupMemberError(ref err) => {
+                handle_pg_error(err, "UnblockGroupMemberError")
+            }
+            ApiError::GetBlockedMembersError(ref err) => {
+                handle_pg_error(err, "GetBlockedMembersError")
+            }
+            ApiError::MemberBlockedError => {
+                HttpResponse::Forbidden().body("This player has been blocked from the group")
+            }
             ApiError::RerollGroupTokenError(ref err) => {
                 handle_pg_error(err, "RerollGroupTokenError")
             }

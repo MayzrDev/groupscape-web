@@ -2,8 +2,8 @@ use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
-    AmIInGroupRequest, GroupCredentials, GroupMember, GroupSkillData, RenameGroup,
-    RenameGroupMember, SHARED_MEMBER,
+    AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember, GroupMemberName,
+    GroupSkillData, RenameGroup, SHARED_MEMBER,
 };
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
@@ -13,28 +13,6 @@ use deadpool_postgres::{Client, Pool};
 use serde::Deserialize;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
-
-#[post("/add-group-member")]
-pub async fn add_group_member(
-    auth: Authenticated,
-    group_member: web::Json<GroupMember>,
-    db_pool: web::Data<Pool>,
-) -> Result<HttpResponse, Error> {
-    if group_member.name.eq(SHARED_MEMBER) {
-        return Ok(
-            HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
-        );
-    }
-
-    if !valid_name(&group_member.name) {
-        return Ok(HttpResponse::BadRequest()
-            .body(format!("Member name {} is not valid", group_member.name)));
-    }
-
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    db::add_group_member(&client, auth.group_id, &group_member.name).await?;
-    Ok(HttpResponse::Created().finish())
-}
 
 #[delete("/delete-group-member")]
 pub async fn delete_group_member(
@@ -53,34 +31,42 @@ pub async fn delete_group_member(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[put("/rename-group-member")]
-pub async fn rename_group_member(
+#[post("/block-group-member")]
+pub async fn block_group_member(
     auth: Authenticated,
-    rename_member: web::Json<RenameGroupMember>,
+    group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    if rename_member.original_name.eq(SHARED_MEMBER) || rename_member.new_name.eq(SHARED_MEMBER) {
+    if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
             HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
         );
     }
 
-    if !valid_name(&rename_member.new_name) {
-        return Ok(HttpResponse::BadRequest().body(format!(
-            "Member name {} is not valid",
-            rename_member.new_name
-        )));
-    }
-
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    db::rename_group_member(
-        &client,
-        auth.group_id,
-        &rename_member.original_name,
-        &rename_member.new_name,
-    )
-    .await?;
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::block_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/unblock-group-member")]
+pub async fn unblock_group_member(
+    auth: Authenticated,
+    group_member: web::Json<GroupMemberName>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::unblock_group_member(&client, auth.group_id, &group_member.name).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[get("/get-blocked-members")]
+pub async fn get_blocked_members(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<Vec<BlockedMember>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let blocked_members = db::get_blocked_members(&client, auth.group_id).await?;
+    Ok(web::Json(blocked_members))
 }
 
 #[put("/rename-group")]
@@ -130,12 +116,19 @@ pub async fn update_group_member(
     group_member: web::Json<GroupMember>,
     sender: web::Data<mpsc::Sender<GroupMember>>,
     broadcast_registry: web::Data<GroupBroadcastRegistry>,
+    db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
             HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
         );
     }
+
+    // No manual "add member" step - the group roster is provisioned lazily from
+    // telemetry itself. This also enforces the block list and the 5-member cap on
+    // brand-new names before anything gets written or broadcast.
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::ensure_group_member(&client, auth.group_id, &group_member.name).await?;
 
     let mut group_member_inner: GroupMember = group_member.into_inner();
     group_member_inner.group_id = Some(auth.group_id);

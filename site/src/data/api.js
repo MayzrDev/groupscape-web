@@ -15,16 +15,20 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-group-data`;
   }
 
-  get addMemberUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/add-group-member`;
-  }
-
   get deleteMemberUrl() {
     return `${this.baseUrl}/group/${this.groupName}/delete-group-member`;
   }
 
-  get renameMemberUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/rename-group-member`;
+  get blockMemberUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/block-group-member`;
+  }
+
+  get unblockMemberUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/unblock-group-member`;
+  }
+
+  get blockedMembersUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-blocked-members`;
   }
 
   get amILoggedInUrl() {
@@ -140,19 +144,6 @@ class Api {
     return response;
   }
 
-  async addMember(memberName) {
-    const response = await fetch(this.addMemberUrl, {
-      body: JSON.stringify({ name: memberName }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: this.groupToken,
-      },
-      method: "POST",
-    });
-
-    return response;
-  }
-
   async removeMember(memberName) {
     const response = await fetch(this.deleteMemberUrl, {
       body: JSON.stringify({ name: memberName }),
@@ -166,14 +157,37 @@ class Api {
     return response;
   }
 
-  async renameMember(originalName, newName) {
-    const response = await fetch(this.renameMemberUrl, {
-      body: JSON.stringify({ original_name: originalName, new_name: newName }),
+  async blockMember(memberName) {
+    const response = await fetch(this.blockMemberUrl, {
+      body: JSON.stringify({ name: memberName }),
       headers: {
         "Content-Type": "application/json",
         Authorization: this.groupToken,
       },
-      method: "PUT",
+      method: "POST",
+    });
+
+    return response;
+  }
+
+  async unblockMember(memberName) {
+    const response = await fetch(this.unblockMemberUrl, {
+      body: JSON.stringify({ name: memberName }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.groupToken,
+      },
+      method: "POST",
+    });
+
+    return response;
+  }
+
+  async getBlockedMembers() {
+    const response = await fetch(this.blockedMembersUrl, {
+      headers: {
+        Authorization: this.groupToken,
+      },
     });
 
     return response;
