@@ -450,6 +450,60 @@ async fn test_list_characters_for_account_excludes_other_accounts() {
 }
 
 #[tokio::test]
+async fn test_delete_character_removes_it() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "unlinker@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-unlink-1", "Zezima")
+        .await
+        .expect("failed to create character");
+
+    db::delete_character(&client, character.id)
+        .await
+        .expect("delete should succeed");
+
+    let found = db::find_character_by_id(&client, character.id)
+        .await
+        .expect("query failed");
+    assert!(found.is_none());
+}
+
+#[tokio::test]
+async fn test_delete_character_cascades_group_link() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "unlinker-grouped@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-unlink-2", "Zezima")
+        .await
+        .expect("failed to create character");
+    let group_id = create_test_group(&client, "unlinktest1").await;
+    db::link_character_to_group(&client, character.id, group_id)
+        .await
+        .expect("linking should succeed");
+
+    db::delete_character(&client, character.id)
+        .await
+        .expect("delete should succeed");
+
+    let link = db::find_character_group_link(&client, character.id)
+        .await
+        .expect("query failed");
+    assert!(link.is_none());
+}
+
+#[tokio::test]
 async fn test_discord_account_can_log_in_via_session_after_linking() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;

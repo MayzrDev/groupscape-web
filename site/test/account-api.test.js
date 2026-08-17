@@ -96,6 +96,22 @@ describe("accountApi", () => {
     expect(response.ok).toBe(true);
   });
 
+  it("unlinkCharacter sends the stored token to the character's url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.unlinkCharacter(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
   it("exposes account settings urls", () => {
     expect(accountApi.emailUrl).toBe("/api/account/email");
     expect(accountApi.passwordUrl).toBe("/api/account/password");

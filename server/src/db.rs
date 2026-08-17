@@ -1701,6 +1701,21 @@ pub async fn list_characters_for_account(
         .collect()
 }
 
+/// Unlinks a character from its account. `character_group_links` references `character_id`
+/// with `ON DELETE CASCADE`, so this also drops any group membership the character held -
+/// unlike `groupscape-old`, which lacked that cascade and had to delete the link row itself
+/// first.
+pub async fn delete_character(client: &Client, character_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.characters WHERE character_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::DeleteCharacterError)?;
+    Ok(())
+}
+
 pub struct CharacterGroupLink {
     pub character_id: i64,
     pub group_id: i64,

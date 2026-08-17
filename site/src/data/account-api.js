@@ -17,6 +17,10 @@ class AccountApi {
     return `${this.baseUrl}/characters/link`;
   }
 
+  characterUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}`;
+  }
+
   get registerUrl() {
     return `${this.baseUrl}/register`;
   }
@@ -98,6 +102,15 @@ class AccountApi {
         Authorization: accountToken,
       },
       method: "POST",
+    });
+    return response;
+  }
+
+  async unlinkCharacter(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.characterUrl(characterId), {
+      headers: { Authorization: accountToken },
+      method: "DELETE",
     });
     return response;
   }

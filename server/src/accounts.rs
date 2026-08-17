@@ -197,6 +197,28 @@ pub async fn list_characters(
     Ok(HttpResponse::Ok().json(characters))
 }
 
+/// Unlinks a character from the authenticated account. `db::delete_character` relies on
+/// `character_group_links`' `ON DELETE CASCADE` to also drop any group membership - no
+/// separate unlink-from-group step needed, unlike `groupscape-old`.
+#[delete("/characters/{character_id}")]
+pub async fn unlink_character(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    match character {
+        Some(character) if character.account_id == authenticated.id => {}
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    }
+
+    db::delete_character(&client, character_id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 /// account_hash -> account, ported from `groupscape-old`'s one-click link flow: the plugin
 /// hands the browser its account hash and an RSN, and the browser's already-authenticated
 /// session is the proof of which account it links to. Re-linking the same account_hash to the

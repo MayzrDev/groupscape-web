@@ -61,6 +61,8 @@ pub enum ApiError {
     CreateCharacterError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetCharacterError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeleteCharacterError(tokio_postgres::error::Error),
     CharacterLinkedToAnotherAccountError,
     CharacterCapReachedError,
     CharacterNotFoundError,
@@ -158,6 +160,7 @@ impl ResponseError for ApiError {
             }
             ApiError::CreateCharacterError(ref err) => handle_pg_error(err, "CreateCharacterError"),
             ApiError::GetCharacterError(ref err) => handle_pg_error(err, "GetCharacterError"),
+            ApiError::DeleteCharacterError(ref err) => handle_pg_error(err, "DeleteCharacterError"),
             ApiError::CharacterLinkedToAnotherAccountError => HttpResponse::Conflict()
                 .body("Character already linked to another account. Unlink it there first."),
             ApiError::CharacterCapReachedError => {
