@@ -103,6 +103,35 @@ pub fn start_skills_aggregator(db_pool: Pool) {
     });
 }
 
+/// Mirrors `groupscape-old`'s `closeIdleSessions` recurring job: closes any session that's
+/// gone 15 minutes without a heartbeat from its group. Runs far more often than that window
+/// (every minute) so a session closes promptly after it actually goes idle.
+pub fn start_session_idle_closer(db_pool: Pool) {
+    task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(60));
+        let idle_after = chrono::Duration::minutes(15);
+
+        loop {
+            interval.tick().await;
+
+            match db_pool.get().await {
+                Ok(client) => match db::close_idle_sessions(&client, idle_after).await {
+                    Ok(closed) if closed > 0 => {
+                        log::info!("Closed {} idle session(s)", closed);
+                    }
+                    Ok(_) => (),
+                    Err(err) => {
+                        log::error!("Failed to close idle sessions: {}", err);
+                    }
+                },
+                Err(err) => {
+                    log::error!("Failed to get db client: {}", err);
+                }
+            }
+        }
+    });
+}
+
 #[get("/ge-prices")]
 pub async fn get_ge_prices() -> Result<HttpResponse, Error> {
     let ge_prices_opt = GE_PRICES.load();

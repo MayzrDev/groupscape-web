@@ -93,6 +93,16 @@ pub enum ApiError {
     GetGroupPermissionsError(tokio_postgres::error::Error),
     #[from(ignore)]
     UpdateGroupPermissionsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    EnsureOpenSessionError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    CloseIdleSessionsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    InsertActivityEventError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ListActivityEventsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ListSessionsError(tokio_postgres::error::Error),
     CannotModifyGroupAdminPermissionsError,
     AccountAuthRequiredError,
     PermissionDeniedError,
@@ -224,6 +234,19 @@ impl ResponseError for ApiError {
             ApiError::UpdateGroupPermissionsError(ref err) => {
                 handle_pg_error(err, "UpdateGroupPermissionsError")
             }
+            ApiError::EnsureOpenSessionError(ref err) => {
+                handle_pg_error(err, "EnsureOpenSessionError")
+            }
+            ApiError::CloseIdleSessionsError(ref err) => {
+                handle_pg_error(err, "CloseIdleSessionsError")
+            }
+            ApiError::InsertActivityEventError(ref err) => {
+                handle_pg_error(err, "InsertActivityEventError")
+            }
+            ApiError::ListActivityEventsError(ref err) => {
+                handle_pg_error(err, "ListActivityEventsError")
+            }
+            ApiError::ListSessionsError(ref err) => handle_pg_error(err, "ListSessionsError"),
             ApiError::CannotModifyGroupAdminPermissionsError => HttpResponse::Conflict()
                 .body("The group admin's permissions are implicit and cannot be changed"),
             ApiError::AccountAuthRequiredError => HttpResponse::Unauthorized()

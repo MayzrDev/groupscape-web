@@ -659,6 +659,7 @@ mod tests {
             rich_presence: None,
             combat_achievements: None,
             last_updated: None,
+            events: None,
         }
     }
 

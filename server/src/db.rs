@@ -1,10 +1,10 @@
 use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
-    AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData,
-    BlockedMember, CreateGroup, GroupMember, GroupMemberPermissions, GroupPermissions,
-    GroupSkillData, MemberSkillData, PermissionFlags, PermissionFlagsPatch, PermissionKey,
-    SHARED_MEMBER,
+    ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
+    AggregateSkillData, BlockedMember, CreateGroup, GameEvent, GroupMember, GroupMemberPermissions,
+    GroupPermissions, GroupSession, GroupSkillData, MemberSkillData, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -608,6 +608,7 @@ FROM groupscape.members WHERE group_id=$2
             special_attack: row.try_get("special_attack").ok(),
             active_prayers: row.try_get("active_prayers").ok(),
             rich_presence: row.try_get("rich_presence").ok(),
+            events: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         };
         result.push(group_member);
@@ -1588,6 +1589,62 @@ CREATE TABLE IF NOT EXISTS groupscape.group_permissions (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_sessions_and_activity_events_tables").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.sessions (
+  session_id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ended_at TIMESTAMPTZ
+);
+"#,
+                &[],
+            )
+            .await?;
+        // Partial unique index (rather than a plain UNIQUE(group_id)) is what makes
+        // `ensure_open_session`'s ON CONFLICT upsert atomic while still allowing a group to
+        // accumulate many *closed* sessions over time.
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS sessions_one_open_per_group_idx ON groupscape.sessions (group_id) WHERE ended_at IS NULL
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.activity_events (
+  event_id BIGSERIAL PRIMARY KEY,
+  session_id BIGINT NOT NULL REFERENCES groupscape.sessions(session_id) ON DELETE CASCADE,
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  member_name CITEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  payload JSONB NOT NULL
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS activity_events_group_occurred_idx ON groupscape.activity_events (group_id, occurred_at DESC)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_sessions_and_activity_events_tables").await?;
+        transaction.commit().await?;
+    }
+
     if !has_migration_run(client, "add_combat_achievements_column").await? {
         let transaction = client.transaction().await?;
         transaction
@@ -2317,6 +2374,156 @@ pub async fn has_group_permission(
         .map(|permissions| permissions.flags)
         .unwrap_or_default();
     Ok(flags.get(key))
+}
+
+/// Find-or-create-and-refresh the group's currently open session in one atomic upsert (the
+/// partial unique index on `(group_id) WHERE ended_at IS NULL` is what makes this race-safe
+/// under concurrent heartbeats from multiple group members) - mirrors `groupscape-old`'s
+/// `ensureOpenSession`, called on every heartbeat that carries at least one event.
+pub async fn ensure_open_session(client: &Client, group_id: i64) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.sessions (group_id) VALUES ($1)
+ON CONFLICT (group_id) WHERE ended_at IS NULL
+DO UPDATE SET last_seen_at = now()
+RETURNING session_id
+"#,
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::EnsureOpenSessionError)?;
+    Ok(row.try_get("session_id")?)
+}
+
+/// Closes every session that's gone quiet for `idle_after`, stamping `ended_at` with the
+/// session's own `last_seen_at` (the time of its last heartbeat) rather than "now" - mirrors
+/// `groupscape-old`'s `closeIdleSessions` recurring job. Global sweep, not scoped to one
+/// group, since it's meant to run periodically across every group.
+pub async fn close_idle_sessions(
+    client: &Client,
+    idle_after: chrono::Duration,
+) -> Result<u64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.sessions SET ended_at = last_seen_at WHERE ended_at IS NULL AND last_seen_at < $1",
+        )
+        .await?;
+    let cutoff = Utc::now() - idle_after;
+    let rows_affected = client
+        .execute(&stmt, &[&cutoff])
+        .await
+        .map_err(ApiError::CloseIdleSessionsError)?;
+    Ok(rows_affected)
+}
+
+/// Stores one discrete kill/death event. Scoped by `member_name` (the roster identity used
+/// throughout this server) rather than `groupscape-old`'s `actor_character_ids` co-attribution
+/// array - this server doesn't track other members' live world/position with enough recency to
+/// attribute a kill to more than the reporting member, so multi-actor credit is left for a
+/// follow-up rather than modeled here.
+pub async fn insert_activity_event(
+    client: &Client,
+    group_id: i64,
+    session_id: i64,
+    member_name: &str,
+    event: &GameEvent,
+) -> Result<(), ApiError> {
+    let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .await?;
+    client
+        .execute(
+            &stmt,
+            &[
+                &session_id,
+                &group_id,
+                &member_name,
+                &event.event_type(),
+                &payload,
+            ],
+        )
+        .await
+        .map_err(ApiError::InsertActivityEventError)?;
+    Ok(())
+}
+
+fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {
+    Ok(ActivityEvent {
+        id: row.try_get("event_id")?,
+        session_id: row.try_get("session_id")?,
+        member_name: row.try_get("member_name")?,
+        event_type: row.try_get("event_type")?,
+        occurred_at: row.try_get("occurred_at")?,
+        payload: row.try_get("payload")?,
+    })
+}
+
+/// Paginated, newest-first activity feed for a group, optionally filtered by member and/or
+/// event type, with a `before` cursor (mirrors `groupscape-old`'s `GET /groups/:id/activity`).
+#[allow(clippy::too_many_arguments)]
+pub async fn list_activity_events(
+    client: &Client,
+    group_id: i64,
+    member_name: Option<&str>,
+    event_type: Option<&str>,
+    before: Option<DateTime<Utc>>,
+    limit: i64,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND ($2::text IS NULL OR member_name = $2)
+  AND ($3::text IS NULL OR event_type = $3)
+  AND ($4::timestamptz IS NULL OR occurred_at < $4)
+ORDER BY occurred_at DESC
+LIMIT $5
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(
+            &stmt,
+            &[&group_id, &member_name, &event_type, &before, &limit.clamp(1, 200)],
+        )
+        .await
+        .map_err(ApiError::ListActivityEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
+fn group_session_from_row(row: &Row) -> Result<GroupSession, ApiError> {
+    Ok(GroupSession {
+        id: row.try_get("session_id")?,
+        started_at: row.try_get("started_at")?,
+        ended_at: row.try_get("ended_at")?,
+    })
+}
+
+/// Newest-first session list for a group (open session, if any, sorts first since it has no
+/// `ended_at`... actually ordered by `started_at DESC` so it's always first regardless).
+pub async fn list_sessions(
+    client: &Client,
+    group_id: i64,
+    limit: i64,
+) -> Result<Vec<GroupSession>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT session_id, started_at, ended_at FROM groupscape.sessions WHERE group_id=$1 ORDER BY started_at DESC LIMIT $2",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &limit.clamp(1, 200)])
+        .await
+        .map_err(ApiError::ListSessionsError)?;
+    rows.iter().map(group_session_from_row).collect()
 }
 
 pub async fn admin_record_audit_log(
