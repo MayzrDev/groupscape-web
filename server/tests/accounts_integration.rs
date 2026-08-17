@@ -1217,6 +1217,84 @@ async fn test_list_group_member_permissions_includes_display_rsn_and_admin_flag(
 }
 
 #[tokio::test]
+async fn test_get_effective_permission_flags_admin_returns_all_true() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest4a").await;
+
+    let admin_account_id = create_linked_account(
+        &mut client,
+        "perm4aadmin@example.com",
+        "hash-perm-4aa",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let flags = db::get_effective_permission_flags(&client, group_id, admin_account_id)
+        .await
+        .expect("query failed");
+    assert_eq!(
+        flags,
+        server::models::PermissionFlags::all_true(),
+        "the admin's effective flags must read as every permission on, even though the stored row is still all-false"
+    );
+}
+
+#[tokio::test]
+async fn test_get_effective_permission_flags_non_admin_returns_stored_flags() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest4b").await;
+
+    create_linked_account(
+        &mut client,
+        "perm4badmin@example.com",
+        "hash-perm-4ba",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let member_account_id = create_linked_account(
+        &mut client,
+        "perm4bmember@example.com",
+        "hash-perm-4bb",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let before = db::get_effective_permission_flags(&client, group_id, member_account_id)
+        .await
+        .expect("query failed");
+    assert_eq!(
+        before,
+        server::models::PermissionFlags::default(),
+        "a non-admin member's effective flags default to every permission off"
+    );
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(true),
+        ..Default::default()
+    };
+    db::update_group_permissions(&client, group_id, member_account_id, patch)
+        .await
+        .expect("query failed");
+
+    let after = db::get_effective_permission_flags(&client, group_id, member_account_id)
+        .await
+        .expect("query failed");
+    assert!(
+        after.kick_members,
+        "the granted flag should be reflected in the effective flags"
+    );
+}
+
+#[tokio::test]
 async fn test_has_group_permission_admin_is_always_true() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;

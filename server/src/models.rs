@@ -255,6 +255,21 @@ pub struct PermissionFlags {
     pub manage_events: bool,
 }
 impl PermissionFlags {
+    pub fn all_true() -> Self {
+        PermissionFlags {
+            invite_members: true,
+            regenerate_group_key: true,
+            kick_members: true,
+            manage_settings: true,
+            manage_permissions: true,
+            post_map_markers: true,
+            post_callouts: true,
+            manage_goals: true,
+            manage_discord: true,
+            manage_events: true,
+        }
+    }
+
     pub fn get(&self, key: PermissionKey) -> bool {
         match key {
             PermissionKey::InviteMembers => self.invite_members,

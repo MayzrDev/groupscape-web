@@ -106,6 +106,7 @@ async fn main() -> std::io::Result<()> {
             .service(authed::unblock_group_member)
             .service(authed::get_blocked_members)
             .service(authed::get_group_permissions)
+            .service(authed::get_my_permissions)
             .service(authed::update_group_permissions)
             .service(authed::rename_group)
             .service(authed::reroll_group_token)

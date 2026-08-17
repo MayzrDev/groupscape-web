@@ -10,6 +10,7 @@ import { pubsub } from "../data/pubsub";
 export class GroupSettings extends BaseElement {
   constructor() {
     super();
+    this.canKick = false;
   }
 
   /* eslint-disable no-unused-vars */
@@ -71,6 +72,20 @@ export class GroupSettings extends BaseElement {
 
     this.loadBlockedMembers();
     this.loadPermissions();
+    this.loadMyPermissions();
+  }
+
+  // Fetched once per connect (not re-fetched on rename/reroll re-renders, since neither
+  // changes the acting account's permissions) and pushed into every currently-rendered
+  // edit-member so the remove/block buttons only show for an admin or a kick-permitted member.
+  async loadMyPermissions() {
+    const response = await api.getMyPermissions();
+    const permissions = response.ok ? await response.json() : {};
+    this.canKick = !!permissions.kick_members;
+
+    for (const memberEdit of this.querySelectorAll("edit-member")) {
+      memberEdit.canKick = this.canKick;
+    }
   }
 
   hideNameError() {
@@ -188,6 +203,7 @@ export class GroupSettings extends BaseElement {
     for (const member of members) {
       const memberEdit = document.createElement("edit-member");
       memberEdit.member = member;
+      memberEdit.canKick = this.canKick;
       memberEdits.appendChild(memberEdit);
     }
 

@@ -35,6 +35,22 @@ describe("api", () => {
     expect(api.skillDataUrl).toContain("/group/iron-team/get-skill-data");
     expect(api.groupPermissionsUrl).toContain("/group/iron-team/get-group-permissions");
     expect(api.updateGroupPermissionsUrl).toContain("/group/iron-team/update-group-permissions");
+    expect(api.myPermissionsUrl).toContain("/group/iron-team/get-my-permissions");
+  });
+
+  it("sends the account auth header on getMyPermissions when an account is logged in", async () => {
+    api.setCredentials("testgroup", "token");
+    const { accountStorage } = await import("../src/data/account-storage");
+    vi.spyOn(accountStorage, "getAccountToken").mockReturnValue("account-token");
+
+    const response = { ok: true, json: vi.fn().mockResolvedValue({ kick_members: true }) };
+    globalThis.fetch.mockResolvedValue(response);
+
+    await api.getMyPermissions();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/group/testgroup/get-my-permissions", {
+      headers: { Authorization: "token", "X-Account-Authorization": "account-token" },
+    });
   });
 
   it("sends the account auth header on permission requests when an account is logged in", async () => {
