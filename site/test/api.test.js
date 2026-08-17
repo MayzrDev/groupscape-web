@@ -36,6 +36,31 @@ describe("api", () => {
     expect(api.groupPermissionsUrl).toContain("/group/iron-team/get-group-permissions");
     expect(api.updateGroupPermissionsUrl).toContain("/group/iron-team/update-group-permissions");
     expect(api.canKickMembersUrl).toContain("/group/iron-team/can-kick-members");
+    expect(api.activityEventsUrl).toContain("/group/iron-team/get-activity-events");
+  });
+
+  it("getActivityEvents builds the query string from provided filters and returns the parsed events", async () => {
+    api.setCredentials("iron-team", "secret-token");
+
+    const events = [{ id: 1, event_type: "kill" }];
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(events) });
+
+    const result = await api.getActivityEvents({ memberName: "Zezima", eventType: "kill", before: "2026-01-01T00:00:00Z", limit: 10 });
+
+    expect(result).toEqual(events);
+    const [url, options] = globalThis.fetch.mock.calls[0];
+    expect(url).toContain("/group/iron-team/get-activity-events?");
+    expect(url).toContain("member_name=Zezima");
+    expect(url).toContain("event_type=kill");
+    expect(url).toContain("limit=10");
+    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
+  });
+
+  it("getActivityEvents returns an empty array when the request fails", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: false });
+
+    expect(await api.getActivityEvents()).toEqual([]);
   });
 
   it("canKickMembers resolves to whether the endpoint responded ok", async () => {
