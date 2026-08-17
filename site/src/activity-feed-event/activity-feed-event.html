@@ -1,0 +1,12 @@
+<div class="activity-feed-event__badge activity-feed-event__badge--${this.event.event_type}">
+  ${this.isKill ? "Kill" : this.isDeath ? "Death" : this.event.event_type}
+</div>
+<div class="activity-feed-event__body">
+  <div class="activity-feed-event__line">${this.descriptionHtml()}</div>
+  ${this.loot.length > 0 ? `
+  <div class="activity-feed-event__loot">
+    ${this.loot.map((item) => `<item-box item-id="${item.item_id}" item-quantity="${item.quantity}" no-tooltip></item-box>`).join("")}
+  </div>
+  ` : ""}
+</div>
+<span class="activity-feed-event__time" title="${this.occurredAt.toLocaleString()}">${this.relativeTime}</span>

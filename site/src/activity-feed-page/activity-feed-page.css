@@ -1,0 +1,121 @@
+activity-feed-page {
+  display: flex;
+}
+
+.activity-feed-page__container {
+  display: flex;
+  max-width: 760px;
+  width: 100%;
+  min-height: 300px;
+}
+
+.activity-feed-page__rail {
+  width: 170px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--light-border);
+  padding: 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.activity-feed-page__rail-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--primary-text);
+  font-size: 0.85em;
+}
+
+.activity-feed-page__rail-btn:hover {
+  background: var(--elevated);
+}
+
+.activity-feed-page__rail-btn--active {
+  background: var(--elevated);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.activity-feed-page__rail-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-feed-page__rail-count {
+  font-size: 0.85em;
+  opacity: 0.65;
+}
+
+.activity-feed-page__main {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px 14px;
+}
+
+.activity-feed-page__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.activity-feed-page__type-filters {
+  display: flex;
+  gap: 6px;
+}
+
+.activity-feed-page__type-chip {
+  font-size: 0.78em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--light-border);
+  background: transparent;
+  color: var(--primary-text);
+  opacity: 0.75;
+  cursor: pointer;
+}
+
+.activity-feed-page__type-chip--active {
+  border-color: var(--orange);
+  color: var(--orange);
+  opacity: 1;
+}
+
+.activity-feed-page__list {
+  margin-top: 6px;
+}
+
+.activity-feed-page__empty {
+  display: none;
+  opacity: 0.65;
+  font-size: 0.88em;
+}
+
+.activity-feed-page__empty--visible {
+  display: block;
+}
+
+@media only screen and (max-width: 600px) {
+  .activity-feed-page__container {
+    flex-direction: column;
+  }
+
+  .activity-feed-page__rail {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: none;
+    border-bottom: 1px solid var(--light-border);
+  }
+}
