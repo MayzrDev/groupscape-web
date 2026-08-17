@@ -29,6 +29,18 @@ class AccountApi {
     return `${this.baseUrl}/discord/redirect`;
   }
 
+  get emailUrl() {
+    return `${this.baseUrl}/email`;
+  }
+
+  get passwordUrl() {
+    return `${this.baseUrl}/password`;
+  }
+
+  get deleteAccountUrl() {
+    return this.baseUrl;
+  }
+
   async register(email, password) {
     const response = await fetch(this.registerUrl, {
       body: JSON.stringify({ email, password }),
@@ -87,6 +99,44 @@ class AccountApi {
       },
       method: "POST",
     });
+    return response;
+  }
+
+  async updateEmail(email) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.emailUrl, {
+      body: JSON.stringify({ email }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "PUT",
+    });
+    return response;
+  }
+
+  async changePassword(currentPassword, newPassword) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.passwordUrl, {
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "PUT",
+    });
+    return response;
+  }
+
+  async deleteAccount() {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.deleteAccountUrl, {
+      headers: { Authorization: accountToken },
+      method: "DELETE",
+    });
+    if (response.ok) {
+      accountStorage.clearAccountToken();
+    }
     return response;
   }
 }

@@ -1,0 +1,112 @@
+account-page {
+  display: block;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px 8px 60px;
+}
+
+.account-page__status {
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
+.account-page__card {
+  padding: 16px 20px 20px;
+  margin-bottom: 16px;
+}
+
+.account-page__card h3 {
+  margin: 0 0 4px;
+}
+
+.account-page__hint {
+  margin: 0 0 14px;
+  font-size: 0.82em;
+  opacity: 0.75;
+}
+
+.account-page__profile-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.account-page__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #5b4b32, #241d13 78%);
+  border: 1px solid var(--light-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 1.2em;
+  color: var(--orange);
+  flex-shrink: 0;
+}
+
+.account-page__email-display {
+  font-size: 1.1em;
+}
+
+.account-page__since {
+  font-size: 0.8em;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+.account-page__field-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.account-page__field-row men-input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.account-page__field-row men-input + men-input {
+  padding-top: 0;
+}
+
+.status-msg {
+  font-size: 0.82em;
+  min-height: 1.2em;
+  margin-top: 6px;
+}
+
+.status-msg.ok {
+  color: var(--green);
+}
+
+.account-page__characters-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-page__characters-link p {
+  margin: 0;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.account-page__danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-color: rgba(238, 13, 13, 0.35) !important;
+}
+
+.account-page__danger-zone p {
+  margin: 0;
+  flex: 1;
+  min-width: 200px;
+}

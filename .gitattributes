@@ -1,0 +1,17 @@
+# Normalize line endings to LF in the repo and on checkout, regardless of a
+# developer's local core.autocrlf - this repo's tooling (prettier, cargo fmt)
+# expects LF and a Windows checkout with core.autocrlf=true otherwise produces
+# CRLF working-tree files that fail every format check, even on files nobody
+# touched.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.otf binary

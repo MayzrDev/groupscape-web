@@ -12,9 +12,9 @@ function initials(rsn) {
 /**
  * Lists every character linked to the signed-in account as a grid of tiles, with an inline
  * "add a character" tile that expands the plugin-linking instructions in place — no separate
- * page or modal needed for a flow this short. Reached directly (there's no account dashboard
- * yet — see `site: account page`) so it does its own session check rather than relying on a
- * route wrapper, matching `link-page`.
+ * page or modal needed for a flow this short. Reached directly or via the account dashboard's
+ * "Linked characters" card (`/account`), so it does its own session check rather than relying
+ * on a route wrapper, matching `link-page`.
  *
  * Character tiles show initials in place of a portrait — the live 3D character render is a
  * separate, unbuilt feature (no plugin capture, no renderer yet), so this page doesn't reserve

@@ -18,6 +18,13 @@ characters-page {
   text-align: center;
 }
 
+.characters-page__account-link {
+  align-self: flex-start;
+  font-size: 0.8em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
 .characters-page__status {
   font-size: 1.2em;
 }
