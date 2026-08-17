@@ -270,7 +270,7 @@ pub async fn link_character_to_group(
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
     let character = db::find_character_by_id(&client, link.character_id).await?;
     let character = match character {
@@ -286,7 +286,8 @@ pub async fn link_character_to_group(
         .await?
         .is_some_and(|existing| existing.group_id == group_id);
 
-    let link = db::link_character_to_group(&client, character.id, group_id).await?;
+    let link =
+        db::link_character_to_group(&mut client, character.id, authenticated.id, group_id).await?;
     let response = HttpResponse::build(if already_linked_to_this_group {
         actix_web::http::StatusCode::OK
     } else {

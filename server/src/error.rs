@@ -73,6 +73,8 @@ pub enum ApiError {
     #[from(ignore)]
     GetCharacterGroupLinkError(tokio_postgres::error::Error),
     #[from(ignore)]
+    GetGroupAdminError(tokio_postgres::error::Error),
+    #[from(ignore)]
     UpdateAccountEmailError(tokio_postgres::error::Error),
     #[from(ignore)]
     UpdateAccountPasswordError(tokio_postgres::error::Error),
@@ -178,6 +180,7 @@ impl ResponseError for ApiError {
             ApiError::GetCharacterGroupLinkError(ref err) => {
                 handle_pg_error(err, "GetCharacterGroupLinkError")
             }
+            ApiError::GetGroupAdminError(ref err) => handle_pg_error(err, "GetGroupAdminError"),
             ApiError::UpdateAccountEmailError(ref err) => {
                 handle_pg_error(err, "UpdateAccountEmailError")
             }

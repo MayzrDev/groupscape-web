@@ -1310,6 +1310,22 @@ CREATE INDEX IF NOT EXISTS character_group_links_group_id_idx ON groupscape.char
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_groups_admin_account_id").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS admin_account_id BIGINT REFERENCES groupscape.accounts(id)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_admin_account_id").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -1750,9 +1766,18 @@ pub async fn find_character_group_link(
 /// no-op (returns the existing row); linking to a different group is a conflict the caller
 /// must resolve by leaving the current group first - ported from `groupscape-old`'s
 /// `character_group_links` invariant (PK on `character_id`).
+///
+/// The account that owns the first character ever linked into a group becomes that group's
+/// admin (`groups.admin_account_id`, set once via `WHERE admin_account_id IS NULL` and left
+/// alone afterward). `groupscape-old` sets `owner_account_id` at group *creation* instead,
+/// since its `create_group` route already requires a logged-in account; this codebase's
+/// `unauthed::create_group` predates accounts and stays fully anonymous (ported as-is, out of
+/// this ticket's scope), so linking - the only point an authenticated account ever meets a
+/// group - is where "first user" is actually observable.
 pub async fn link_character_to_group(
-    client: &Client,
+    client: &mut Client,
     character_id: i64,
+    account_id: i64,
     group_id: i64,
 ) -> Result<CharacterGroupLink, ApiError> {
     if let Some(existing) = find_character_group_link(client, character_id).await? {
@@ -1762,20 +1787,58 @@ pub async fn link_character_to_group(
         return Ok(existing);
     }
 
-    let stmt = client
+    let transaction = client.transaction().await?;
+
+    let insert_stmt = transaction
         .prepare_cached(
             "INSERT INTO groupscape.character_group_links (character_id, group_id) VALUES ($1, $2) RETURNING character_id, group_id, linked_at",
         )
         .await?;
-    let row = client
-        .query_one(&stmt, &[&character_id, &group_id])
+    let row = transaction
+        .query_one(&insert_stmt, &[&character_id, &group_id])
         .await
         .map_err(ApiError::LinkCharacterToGroupError)?;
+
+    let admin_stmt = transaction
+        .prepare_cached(
+            "UPDATE groupscape.groups SET admin_account_id=$1 WHERE group_id=$2 AND admin_account_id IS NULL",
+        )
+        .await?;
+    transaction
+        .execute(&admin_stmt, &[&account_id, &group_id])
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+
     Ok(CharacterGroupLink {
         character_id: row.try_get("character_id")?,
         group_id: row.try_get("group_id")?,
         linked_at: row.try_get("linked_at")?,
     })
+}
+
+/// The account of the first character ever linked into `group_id`, or `None` for a group
+/// nobody with an account has joined yet. Feeds "admin has all permissions by default"
+/// (the permission model this ticket unblocks).
+pub async fn get_group_admin_account_id(
+    client: &Client,
+    group_id: i64,
+) -> Result<Option<i64>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT admin_account_id FROM groupscape.groups WHERE group_id=$1")
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupAdminError)?;
+    match row {
+        Some(row) => Ok(row.try_get("admin_account_id")?),
+        None => Ok(None),
+    }
 }
 
 pub async fn admin_record_audit_log(
