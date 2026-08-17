@@ -163,6 +163,17 @@ pub struct AuthenticatedAccount {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct UpdateAccountEmail {
+    pub email: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChangeAccountPassword {
+    pub current_password: String,
+    pub new_password: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LinkCharacter {
     pub account_hash: String,
     pub rsn: String,

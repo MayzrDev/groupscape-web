@@ -1426,6 +1426,86 @@ pub async fn get_account_by_email(
     }
 }
 
+pub async fn get_account_by_id(
+    client: &Client,
+    account_id: i64,
+) -> Result<Option<AccountForAuth>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(AccountForAuth {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            password_hash: row.try_get("password_hash")?,
+            disabled: row.try_get("disabled")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+/// `email` is `citext UNIQUE`, so a duplicate update surfaces as a unique-violation same as
+/// `create_account` above.
+pub async fn update_account_email(
+    client: &Client,
+    account_id: i64,
+    email: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET email=$1 WHERE id=$2")
+        .await?;
+    match client.execute(&stmt, &[&email, &account_id]).await {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if err
+                .as_db_error()
+                .is_some_and(|db_err| db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
+            {
+                Err(ApiError::EmailAlreadyRegisteredError)
+            } else {
+                Err(ApiError::UpdateAccountEmailError(err))
+            }
+        }
+    }
+}
+
+pub async fn update_account_password(
+    client: &Client,
+    account_id: i64,
+    password_hash: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET password_hash=$1 WHERE id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&password_hash, &account_id])
+        .await
+        .map_err(ApiError::UpdateAccountPasswordError)?;
+    Ok(())
+}
+
+/// Hard delete - `characters` (`ON DELETE CASCADE` from `accounts`), `character_group_links`
+/// (cascades again from `characters`), and `account_sessions` (`ON DELETE CASCADE` from
+/// `accounts`) all clean up via existing FK constraints, so a single row delete is enough.
+/// Groups themselves are untouched: group ownership isn't tracked against accounts yet.
+pub async fn delete_account(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.accounts WHERE id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::DeleteAccountError)?;
+    Ok(())
+}
+
 pub async fn create_account_session(
     client: &Client,
     account_id: i64,

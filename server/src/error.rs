@@ -70,6 +70,14 @@ pub enum ApiError {
     LinkCharacterToGroupError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetCharacterGroupLinkError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateAccountEmailError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateAccountPasswordError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeleteAccountError(tokio_postgres::error::Error),
+    AccountHasNoPasswordSetError,
+    IncorrectCurrentPasswordError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -166,6 +174,19 @@ impl ResponseError for ApiError {
             }
             ApiError::GetCharacterGroupLinkError(ref err) => {
                 handle_pg_error(err, "GetCharacterGroupLinkError")
+            }
+            ApiError::UpdateAccountEmailError(ref err) => {
+                handle_pg_error(err, "UpdateAccountEmailError")
+            }
+            ApiError::UpdateAccountPasswordError(ref err) => {
+                handle_pg_error(err, "UpdateAccountPasswordError")
+            }
+            ApiError::DeleteAccountError(ref err) => handle_pg_error(err, "DeleteAccountError"),
+            ApiError::AccountHasNoPasswordSetError => {
+                HttpResponse::BadRequest().body("This account has no password set")
+            }
+            ApiError::IncorrectCurrentPasswordError => {
+                HttpResponse::Unauthorized().body("Current password is incorrect")
             }
         }
     }

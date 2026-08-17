@@ -91,6 +91,9 @@ async fn main() -> std::io::Result<()> {
                 account_auth_cache.clone(),
             ))
             .service(accounts::me)
+            .service(accounts::update_email)
+            .service(accounts::change_password)
+            .service(accounts::delete_account)
             .service(accounts::list_characters)
             .service(accounts::link_character)
             .service(accounts::link_character_to_group);

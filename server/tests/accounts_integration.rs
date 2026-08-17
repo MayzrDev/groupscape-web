@@ -591,3 +591,141 @@ async fn test_find_character_group_link_returns_none_when_unlinked() {
         .expect("query failed");
     assert!(found.is_none());
 }
+
+#[tokio::test]
+async fn test_get_account_by_id() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "by-id@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert_eq!(account.id, account_id);
+    assert_eq!(account.email.as_deref(), Some("by-id@example.com"));
+
+    let missing = db::get_account_by_id(&client, account_id + 999)
+        .await
+        .expect("query failed");
+    assert!(missing.is_none());
+}
+
+#[tokio::test]
+async fn test_update_account_email() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "old@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    db::update_account_email(&client, account_id, "new@example.com")
+        .await
+        .expect("failed to update email");
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert_eq!(account.email.as_deref(), Some("new@example.com"));
+}
+
+#[tokio::test]
+async fn test_update_account_email_rejects_duplicate() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    db::create_account(&client, "taken@example.com", &password_hash)
+        .await
+        .unwrap();
+    let account_id = db::create_account(&client, "mine@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let result = db::update_account_email(&client, account_id, "taken@example.com").await;
+    assert!(matches!(result, Err(ApiError::EmailAlreadyRegisteredError)));
+}
+
+#[tokio::test]
+async fn test_update_account_password() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("original-password").unwrap();
+    let account_id = db::create_account(&client, "changer@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let new_hash = crypto::hash_password("brand-new-password").unwrap();
+    db::update_account_password(&client, account_id, &new_hash)
+        .await
+        .expect("failed to update password");
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert!(crypto::verify_password(
+        "brand-new-password",
+        account.password_hash.as_deref().unwrap()
+    ));
+    assert!(!crypto::verify_password(
+        "original-password",
+        account.password_hash.as_deref().unwrap()
+    ));
+}
+
+#[tokio::test]
+async fn test_delete_account_cascades_characters_and_sessions() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "deleteme@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-delete-1", "Zezima")
+        .await
+        .unwrap();
+    let token_hash = crypto::session_token_hash("delete-account-session-token");
+    let expires_at = Utc::now() + Duration::days(1);
+    db::create_account_session(&client, account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    db::delete_account(&client, account_id)
+        .await
+        .expect("failed to delete account");
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed");
+    assert!(account.is_none());
+
+    let character = db::find_character_by_id(&client, character.id)
+        .await
+        .expect("query failed");
+    assert!(character.is_none(), "character should be cascade-deleted with the account");
+
+    let session = db::get_account_by_session_token_hash(&client, &token_hash)
+        .await
+        .expect("query failed");
+    assert!(session.is_none(), "session should be cascade-deleted with the account");
+}
