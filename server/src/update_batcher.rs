@@ -628,6 +628,7 @@ mod tests {
         GroupMember {
             group_id,
             name: name.to_string(),
+            account_hash: None,
             stats: None,
             coordinates: None,
             skills: None,

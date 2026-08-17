@@ -133,6 +133,29 @@ pub async fn update_group_member(
     let mut group_member_inner: GroupMember = group_member.into_inner();
     group_member_inner.group_id = Some(auth.group_id);
 
+    // Derive the canonical member name from the plugin-submitted account_hash rather than
+    // trusting the client-supplied name, when the character is linked (account created,
+    // character linked, and linked to this specific group). Legacy plugin builds and
+    // characters that aren't linked yet fall back to matching an existing member row by name,
+    // so group setup can still take a typed RSN in the meantime.
+    if let Some(account_hash) = group_member_inner.account_hash.clone() {
+        let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+        if let Some(character) = db::find_character_by_account_hash(&client, &account_hash).await? {
+            let linked_to_this_group = db::find_character_group_link(&client, character.id)
+                .await?
+                .is_some_and(|link| link.group_id == auth.group_id);
+            if linked_to_this_group {
+                group_member_inner.name = db::ensure_member_for_linked_character(
+                    &client,
+                    auth.group_id,
+                    &account_hash,
+                    &character.display_rsn,
+                )
+                .await?;
+            }
+        }
+    }
+
     validate_member_prop_length("stats", &group_member_inner.stats, 7, 7, ArrayFormat::Flat)?;
     validate_member_prop_length(
         "coordinates",

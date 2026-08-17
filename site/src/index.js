@@ -65,3 +65,4 @@ import "./link-page/link-page.js";
 import "./account-login-page/account-login-page.js";
 import "./account-signup-page/account-signup-page.js";
 import "./characters-page/characters-page.js";
+import "./account-page/account-page.js";

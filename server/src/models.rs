@@ -54,6 +54,12 @@ pub struct GroupMember {
     #[serde(skip)]
     pub group_id: Option<i64>,
     pub name: String,
+    /// Plugin-submitted `client.getAccountHash()`, used to derive `name` server-side from the
+    /// linked character's `display_rsn` instead of requiring it to be typed at group setup.
+    /// `None` for legacy plugin builds or unlinked characters, which fall back to matching an
+    /// existing member row by name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_hash: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stats: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -165,6 +171,17 @@ pub struct Account {
 pub struct AuthenticatedAccount {
     pub account: Account,
     pub token: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateAccountEmail {
+    pub email: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChangeAccountPassword {
+    pub current_password: String,
+    pub new_password: String,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

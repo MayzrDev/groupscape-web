@@ -17,6 +17,10 @@ class AccountApi {
     return `${this.baseUrl}/characters/link`;
   }
 
+  characterUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}`;
+  }
+
   get registerUrl() {
     return `${this.baseUrl}/register`;
   }
@@ -27,6 +31,18 @@ class AccountApi {
 
   get discordRedirectUrl() {
     return `${this.baseUrl}/discord/redirect`;
+  }
+
+  get emailUrl() {
+    return `${this.baseUrl}/email`;
+  }
+
+  get passwordUrl() {
+    return `${this.baseUrl}/password`;
+  }
+
+  get deleteAccountUrl() {
+    return this.baseUrl;
   }
 
   async register(email, password) {
@@ -87,6 +103,53 @@ class AccountApi {
       },
       method: "POST",
     });
+    return response;
+  }
+
+  async unlinkCharacter(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.characterUrl(characterId), {
+      headers: { Authorization: accountToken },
+      method: "DELETE",
+    });
+    return response;
+  }
+
+  async updateEmail(email) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.emailUrl, {
+      body: JSON.stringify({ email }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "PUT",
+    });
+    return response;
+  }
+
+  async changePassword(currentPassword, newPassword) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.passwordUrl, {
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "PUT",
+    });
+    return response;
+  }
+
+  async deleteAccount() {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.deleteAccountUrl, {
+      headers: { Authorization: accountToken },
+      method: "DELETE",
+    });
+    if (response.ok) {
+      accountStorage.clearAccountToken();
+    }
     return response;
   }
 }

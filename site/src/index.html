@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
     <title>GroupScape</title>
@@ -102,6 +102,12 @@
       route-outlet=".unauthed-section__outlet"
       route-wrapper=".unauthed-section"
     ></app-route>
+    <app-route
+      route-path="/account"
+      route-component="account-page"
+      route-outlet=".unauthed-section__outlet"
+      route-wrapper=".unauthed-section"
+    ></app-route>
 
     <app-route
       route-path="/"
@@ -127,7 +133,7 @@
       route-component="skills-graphs"
       route-outlet=".authed-section__outlet"
       route-wrapper=".authed-section"
-      ></app-route>
+    ></app-route>
     <app-route
       route-path="/panels"
       route-component="panels-page"

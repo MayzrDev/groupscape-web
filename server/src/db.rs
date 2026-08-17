@@ -76,6 +76,97 @@ pub async fn add_group_member(
     Ok(())
 }
 
+/// Resolves the canonical member row for a plugin-submitted `account_hash`, ported from
+/// `groupscape-old`'s telemetry-ingestion pattern (`account_hash` is the persistent identity,
+/// `display_rsn`/`member_name` is just a mutable label kept in sync with it) and adapted to this
+/// schema's separate `members` table (`characters.display_rsn` is the source of truth; `members`
+/// gains its own `account_hash` column so a row survives an in-game name change instead of being
+/// orphaned under the old name).
+///
+/// Lookup order:
+/// 1. A member row already tagged with this `account_hash` in this group - rename it in place if
+///    `display_rsn` has since changed.
+/// 2. A pre-existing untagged row matching `display_rsn` by name (e.g. typed in at group setup
+///    before this character was linked) - claim it by tagging its `account_hash`.
+/// 3. Neither exists - insert a new row, subject to the same 5-member cap as `add_group_member`.
+///
+/// Returns the member name the caller should use for this update (== `display_rsn`).
+pub async fn ensure_member_for_linked_character(
+    client: &Client,
+    group_id: i64,
+    account_hash: &str,
+    display_rsn: &str,
+) -> Result<String, ApiError> {
+    let by_hash_stmt = client
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND account_hash=$2",
+        )
+        .await?;
+    if let Some(row) = client
+        .query_opt(&by_hash_stmt, &[&group_id, &account_hash])
+        .await
+        .map_err(ApiError::AddMemberError)?
+    {
+        let existing_name: String = row.try_get("member_name")?;
+        if existing_name == display_rsn {
+            return Ok(existing_name);
+        }
+        let rename_stmt = client
+            .prepare_cached(
+                "UPDATE groupscape.members SET member_name=$1 WHERE group_id=$2 AND account_hash=$3",
+            )
+            .await?;
+        return match client
+            .execute(&rename_stmt, &[&display_rsn, &group_id, &account_hash])
+            .await
+        {
+            Ok(_) => Ok(display_rsn.to_string()),
+            // member_name collision with an unrelated row (e.g. a stale untagged member still
+            // squatting on the new name) - keep serving the old name rather than failing the
+            // telemetry update outright.
+            Err(_) => Ok(existing_name),
+        };
+    }
+
+    let claim_stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.members SET account_hash=$1 WHERE group_id=$2 AND member_name=$3 AND account_hash IS NULL",
+        )
+        .await?;
+    let claimed = client
+        .execute(&claim_stmt, &[&account_hash, &group_id, &display_rsn])
+        .await
+        .map_err(ApiError::AddMemberError)?;
+    if claimed > 0 {
+        return Ok(display_rsn.to_string());
+    }
+
+    let member_count_stmt = client
+        .prepare_cached(
+            "SELECT COUNT(*) FROM groupscape.members WHERE group_id=$1 AND member_name!=$2",
+        )
+        .await?;
+    let member_count: i64 = client
+        .query_one(&member_count_stmt, &[&group_id, &SHARED_MEMBER])
+        .await?
+        .try_get(0)
+        .map_err(ApiError::AddMemberError)?;
+    if member_count >= 5 {
+        return Err(ApiError::GroupFullError);
+    }
+
+    let create_member_stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.members (group_id, member_name, account_hash) VALUES($1, $2, $3)",
+        )
+        .await?;
+    client
+        .execute(&create_member_stmt, &[&group_id, &display_rsn, &account_hash])
+        .await
+        .map_err(ApiError::AddMemberError)?;
+    Ok(display_rsn.to_string())
+}
+
 pub async fn delete_skills_data_for_member(
     transaction: &Transaction<'_>,
     period: AggregatePeriod,
@@ -491,6 +582,7 @@ FROM groupscape.members WHERE group_id=$2
         let group_member = GroupMember {
             group_id: Some(group_id),
             name: member_name,
+            account_hash: None,
             last_updated,
             stats: row.try_get("stats").ok(),
             coordinates: row.try_get("coordinates").ok(),
@@ -1421,6 +1513,45 @@ CREATE TABLE IF NOT EXISTS groupscape.blocked_members (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_groups_admin_account_id").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS admin_account_id BIGINT REFERENCES groupscape.accounts(id)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_admin_account_id").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_members_account_hash_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members ADD COLUMN IF NOT EXISTS account_hash TEXT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_account_hash_idx ON groupscape.members (group_id, account_hash) WHERE account_hash IS NOT NULL
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_members_account_hash_column").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -1535,6 +1666,86 @@ pub async fn get_account_by_email(
         })),
         None => Ok(None),
     }
+}
+
+pub async fn get_account_by_id(
+    client: &Client,
+    account_id: i64,
+) -> Result<Option<AccountForAuth>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(AccountForAuth {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            password_hash: row.try_get("password_hash")?,
+            disabled: row.try_get("disabled")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+/// `email` is `citext UNIQUE`, so a duplicate update surfaces as a unique-violation same as
+/// `create_account` above.
+pub async fn update_account_email(
+    client: &Client,
+    account_id: i64,
+    email: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET email=$1 WHERE id=$2")
+        .await?;
+    match client.execute(&stmt, &[&email, &account_id]).await {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            if err
+                .as_db_error()
+                .is_some_and(|db_err| db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
+            {
+                Err(ApiError::EmailAlreadyRegisteredError)
+            } else {
+                Err(ApiError::UpdateAccountEmailError(err))
+            }
+        }
+    }
+}
+
+pub async fn update_account_password(
+    client: &Client,
+    account_id: i64,
+    password_hash: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET password_hash=$1 WHERE id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&password_hash, &account_id])
+        .await
+        .map_err(ApiError::UpdateAccountPasswordError)?;
+    Ok(())
+}
+
+/// Hard delete - `characters` (`ON DELETE CASCADE` from `accounts`), `character_group_links`
+/// (cascades again from `characters`), and `account_sessions` (`ON DELETE CASCADE` from
+/// `accounts`) all clean up via existing FK constraints, so a single row delete is enough.
+/// Groups themselves are untouched: group ownership isn't tracked against accounts yet.
+pub async fn delete_account(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.accounts WHERE id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::DeleteAccountError)?;
+    Ok(())
 }
 
 pub async fn create_account_session(
@@ -1732,6 +1943,21 @@ pub async fn list_characters_for_account(
         .collect()
 }
 
+/// Unlinks a character from its account. `character_group_links` references `character_id`
+/// with `ON DELETE CASCADE`, so this also drops any group membership the character held -
+/// unlike `groupscape-old`, which lacked that cascade and had to delete the link row itself
+/// first.
+pub async fn delete_character(client: &Client, character_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.characters WHERE character_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::DeleteCharacterError)?;
+    Ok(())
+}
+
 pub struct CharacterGroupLink {
     pub character_id: i64,
     pub group_id: i64,
@@ -1766,9 +1992,18 @@ pub async fn find_character_group_link(
 /// no-op (returns the existing row); linking to a different group is a conflict the caller
 /// must resolve by leaving the current group first - ported from `groupscape-old`'s
 /// `character_group_links` invariant (PK on `character_id`).
+///
+/// The account that owns the first character ever linked into a group becomes that group's
+/// admin (`groups.admin_account_id`, set once via `WHERE admin_account_id IS NULL` and left
+/// alone afterward). `groupscape-old` sets `owner_account_id` at group *creation* instead,
+/// since its `create_group` route already requires a logged-in account; this codebase's
+/// `unauthed::create_group` predates accounts and stays fully anonymous (ported as-is, out of
+/// this ticket's scope), so linking - the only point an authenticated account ever meets a
+/// group - is where "first user" is actually observable.
 pub async fn link_character_to_group(
-    client: &Client,
+    client: &mut Client,
     character_id: i64,
+    account_id: i64,
     group_id: i64,
 ) -> Result<CharacterGroupLink, ApiError> {
     if let Some(existing) = find_character_group_link(client, character_id).await? {
@@ -1778,20 +2013,58 @@ pub async fn link_character_to_group(
         return Ok(existing);
     }
 
-    let stmt = client
+    let transaction = client.transaction().await?;
+
+    let insert_stmt = transaction
         .prepare_cached(
             "INSERT INTO groupscape.character_group_links (character_id, group_id) VALUES ($1, $2) RETURNING character_id, group_id, linked_at",
         )
         .await?;
-    let row = client
-        .query_one(&stmt, &[&character_id, &group_id])
+    let row = transaction
+        .query_one(&insert_stmt, &[&character_id, &group_id])
         .await
         .map_err(ApiError::LinkCharacterToGroupError)?;
+
+    let admin_stmt = transaction
+        .prepare_cached(
+            "UPDATE groupscape.groups SET admin_account_id=$1 WHERE group_id=$2 AND admin_account_id IS NULL",
+        )
+        .await?;
+    transaction
+        .execute(&admin_stmt, &[&account_id, &group_id])
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+
     Ok(CharacterGroupLink {
         character_id: row.try_get("character_id")?,
         group_id: row.try_get("group_id")?,
         linked_at: row.try_get("linked_at")?,
     })
+}
+
+/// The account of the first character ever linked into `group_id`, or `None` for a group
+/// nobody with an account has joined yet. Feeds "admin has all permissions by default"
+/// (the permission model this ticket unblocks).
+pub async fn get_group_admin_account_id(
+    client: &Client,
+    group_id: i64,
+) -> Result<Option<i64>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT admin_account_id FROM groupscape.groups WHERE group_id=$1")
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupAdminError)?;
+    match row {
+        Some(row) => Ok(row.try_get("admin_account_id")?),
+        None => Ok(None),
+    }
 }
 
 pub async fn admin_record_audit_log(

@@ -68,6 +68,8 @@ pub enum ApiError {
     CreateCharacterError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetCharacterError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeleteCharacterError(tokio_postgres::error::Error),
     CharacterLinkedToAnotherAccountError,
     CharacterCapReachedError,
     CharacterNotFoundError,
@@ -77,6 +79,16 @@ pub enum ApiError {
     LinkCharacterToGroupError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetCharacterGroupLinkError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetGroupAdminError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateAccountEmailError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateAccountPasswordError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeleteAccountError(tokio_postgres::error::Error),
+    AccountHasNoPasswordSetError,
+    IncorrectCurrentPasswordError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -169,6 +181,7 @@ impl ResponseError for ApiError {
             }
             ApiError::CreateCharacterError(ref err) => handle_pg_error(err, "CreateCharacterError"),
             ApiError::GetCharacterError(ref err) => handle_pg_error(err, "GetCharacterError"),
+            ApiError::DeleteCharacterError(ref err) => handle_pg_error(err, "DeleteCharacterError"),
             ApiError::CharacterLinkedToAnotherAccountError => HttpResponse::Conflict()
                 .body("Character already linked to another account. Unlink it there first."),
             ApiError::CharacterCapReachedError => {
@@ -185,6 +198,20 @@ impl ResponseError for ApiError {
             }
             ApiError::GetCharacterGroupLinkError(ref err) => {
                 handle_pg_error(err, "GetCharacterGroupLinkError")
+            }
+            ApiError::GetGroupAdminError(ref err) => handle_pg_error(err, "GetGroupAdminError"),
+            ApiError::UpdateAccountEmailError(ref err) => {
+                handle_pg_error(err, "UpdateAccountEmailError")
+            }
+            ApiError::UpdateAccountPasswordError(ref err) => {
+                handle_pg_error(err, "UpdateAccountPasswordError")
+            }
+            ApiError::DeleteAccountError(ref err) => handle_pg_error(err, "DeleteAccountError"),
+            ApiError::AccountHasNoPasswordSetError => {
+                HttpResponse::BadRequest().body("This account has no password set")
+            }
+            ApiError::IncorrectCurrentPasswordError => {
+                HttpResponse::Unauthorized().body("Current password is incorrect")
             }
         }
     }

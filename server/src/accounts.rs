@@ -5,11 +5,12 @@ use crate::db;
 use crate::discord;
 use crate::error::ApiError;
 use crate::models::{
-    Account, AuthenticatedAccount, Character, CharacterGroupLink, DiscordCallbackQuery,
-    LinkCharacter, LinkCharacterToGroup, LoginAccount, RegisterAccount,
+    Account, AuthenticatedAccount, ChangeAccountPassword, Character, CharacterGroupLink,
+    DiscordCallbackQuery, LinkCharacter, LinkCharacterToGroup, LoginAccount, RegisterAccount,
+    UpdateAccountEmail,
 };
 use crate::validators::{valid_email, valid_name, valid_password};
-use actix_web::{get, post, web, Error, HttpResponse};
+use actix_web::{delete, get, post, put, web, Error, HttpResponse};
 use chrono::{Duration, Utc};
 use deadpool_postgres::{Client, Pool};
 
@@ -108,6 +109,81 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
     }))
 }
 
+/// No password re-entry required - the bearer session token is already this API's proof of
+/// identity for every other account mutation (linking characters, etc.), so email is no
+/// different. Uniqueness is enforced the same way as `register`: a duplicate surfaces as a
+/// Postgres unique-violation via `db::update_account_email`.
+#[put("/email")]
+pub async fn update_email(
+    body: web::Json<UpdateAccountEmail>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let email = body.email.trim().to_string();
+    if !valid_email(&email) {
+        return Ok(HttpResponse::BadRequest().body("Provided email is not valid"));
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    match db::update_account_email(&client, authenticated.id, &email).await {
+        Ok(()) => {}
+        Err(ApiError::EmailAlreadyRegisteredError) => {
+            return Ok(HttpResponse::Conflict().body("Email already registered"));
+        }
+        Err(err) => return Err(err.into()),
+    }
+
+    Ok(HttpResponse::Ok().json(Account {
+        id: authenticated.id,
+        email: Some(email),
+        created_at: authenticated.created_at,
+    }))
+}
+
+/// Requires the current password, same as `groupscape-old`'s change-password flow - a
+/// Discord-only account (no `password_hash` set) can't use this route to set an initial
+/// password, it can only change one that already exists.
+#[put("/password")]
+pub async fn change_password(
+    body: web::Json<ChangeAccountPassword>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    if !valid_password(&body.new_password) {
+        return Ok(HttpResponse::BadRequest().body("Password must be between 8 and 256 characters"));
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account = db::get_account_by_id(&client, authenticated.id)
+        .await?
+        .ok_or(ApiError::InvalidCredentialsError)?;
+    let Some(password_hash) = account.password_hash.as_deref() else {
+        return Err(ApiError::AccountHasNoPasswordSetError.into());
+    };
+    if !crypto::verify_password(&body.current_password, password_hash) {
+        return Err(ApiError::IncorrectCurrentPasswordError.into());
+    }
+
+    let new_password_hash =
+        crypto::hash_password(&body.new_password).map_err(|_| ApiError::InvalidCredentialsError)?;
+    db::update_account_password(&client, authenticated.id, &new_password_hash).await?;
+
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// Hard delete, matching `groupscape-old`. No password re-confirmation - same bearer-token
+/// trust level as every other account mutation on this API. Session/character/link cleanup
+/// happens via `ON DELETE CASCADE` in `db::delete_account`.
+#[delete("")]
+pub async fn delete_account(
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::delete_account(&client, authenticated.id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
 /// Lists the authenticated account's linked characters, oldest-linked first — feeds the site's
 /// character management flow (`site: link-character flow`).
 #[get("/characters")]
@@ -119,6 +195,28 @@ pub async fn list_characters(
     let characters = db::list_characters_for_account(&client, authenticated.id).await?;
     let characters: Vec<Character> = characters.into_iter().map(Character::from).collect();
     Ok(HttpResponse::Ok().json(characters))
+}
+
+/// Unlinks a character from the authenticated account. `db::delete_character` relies on
+/// `character_group_links`' `ON DELETE CASCADE` to also drop any group membership - no
+/// separate unlink-from-group step needed, unlike `groupscape-old`.
+#[delete("/characters/{character_id}")]
+pub async fn unlink_character(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    match character {
+        Some(character) if character.account_id == authenticated.id => {}
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    }
+
+    db::delete_character(&client, character_id).await?;
+    Ok(HttpResponse::NoContent().finish())
 }
 
 /// account_hash -> account, ported from `groupscape-old`'s one-click link flow: the plugin
@@ -172,7 +270,7 @@ pub async fn link_character_to_group(
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
     let character = db::find_character_by_id(&client, link.character_id).await?;
     let character = match character {
@@ -188,7 +286,8 @@ pub async fn link_character_to_group(
         .await?
         .is_some_and(|existing| existing.group_id == group_id);
 
-    let link = db::link_character_to_group(&client, character.id, group_id).await?;
+    let link =
+        db::link_character_to_group(&mut client, character.id, authenticated.id, group_id).await?;
     let response = HttpResponse::build(if already_linked_to_this_group {
         actix_web::http::StatusCode::OK
     } else {

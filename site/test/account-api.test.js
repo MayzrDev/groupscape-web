@@ -95,4 +95,90 @@ describe("accountApi", () => {
     );
     expect(response.ok).toBe(true);
   });
+
+  it("unlinkCharacter sends the stored token to the character's url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.unlinkCharacter(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("exposes account settings urls", () => {
+    expect(accountApi.emailUrl).toBe("/api/account/email");
+    expect(accountApi.passwordUrl).toBe("/api/account/password");
+    expect(accountApi.deleteAccountUrl).toBe("/api/account");
+  });
+
+  it("updateEmail sends the stored token and new email", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ id: 1, email: "new@b.com" }),
+    });
+
+    const response = await accountApi.updateEmail("new@b.com");
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/email",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ email: "new@b.com" }),
+        headers: { "Content-Type": "application/json", Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("changePassword sends the stored token and both passwords", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.changePassword("oldpassword", "newpassword123");
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/password",
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ current_password: "oldpassword", new_password: "newpassword123" }),
+        headers: { "Content-Type": "application/json", Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("deleteAccount clears the stored token on success", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.deleteAccount();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+    expect(accountStorage.getAccountToken()).toBeNull();
+  });
+
+  it("deleteAccount keeps the stored token on failure", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: false, status: 401 });
+
+    await accountApi.deleteAccount();
+
+    expect(accountStorage.getAccountToken()).toBe("session-token");
+  });
 });
