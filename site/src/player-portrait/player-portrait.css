@@ -4,8 +4,11 @@ player-portrait {
 }
 
 player-portrait[mode="bust"] {
-  flex: 0 0 auto;
-  aspect-ratio: 0.82;
+  /* Fixed width, not derived from the row's stretched height: an aspect-ratio box with no
+     intrinsic size otherwise races the flex stretch algorithm and can balloon to fill the row,
+     squeezing player-stats to nothing. Height simply stretches to match player-stats naturally. */
+  flex: 0 0 44px;
+  width: 44px;
 }
 
 player-portrait[mode="full"] {
