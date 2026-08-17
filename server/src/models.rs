@@ -228,6 +228,91 @@ impl From<crate::db::Character> for Character {
         }
     }
 }
+
+/// Per-member permission toggles, ported from `groupscape-old`'s `PermissionKey`
+/// (`repositories/memberships.ts`). All keys default `false` for a new member (§6) - the
+/// group admin's implicit all-permissions override lives outside this struct, computed from
+/// `groups.admin_account_id` (see the "group admin has all permissions by default" ticket).
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PermissionFlags {
+    pub invite_members: bool,
+    pub regenerate_group_key: bool,
+    pub kick_members: bool,
+    pub manage_settings: bool,
+    pub manage_permissions: bool,
+    pub post_map_markers: bool,
+    pub post_callouts: bool,
+    pub manage_goals: bool,
+    pub manage_discord: bool,
+    pub manage_events: bool,
+}
+impl PermissionFlags {
+    pub fn get(&self, key: PermissionKey) -> bool {
+        match key {
+            PermissionKey::InviteMembers => self.invite_members,
+            PermissionKey::RegenerateGroupKey => self.regenerate_group_key,
+            PermissionKey::KickMembers => self.kick_members,
+            PermissionKey::ManageSettings => self.manage_settings,
+            PermissionKey::ManagePermissions => self.manage_permissions,
+            PermissionKey::PostMapMarkers => self.post_map_markers,
+            PermissionKey::PostCallouts => self.post_callouts,
+            PermissionKey::ManageGoals => self.manage_goals,
+            PermissionKey::ManageDiscord => self.manage_discord,
+            PermissionKey::ManageEvents => self.manage_events,
+        }
+    }
+}
+
+/// One key per `PermissionFlags` toggle - lets callers reference a permission by name (e.g.
+/// enforcement middleware) instead of reaching into the struct field directly.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PermissionKey {
+    InviteMembers,
+    RegenerateGroupKey,
+    KickMembers,
+    ManageSettings,
+    ManagePermissions,
+    PostMapMarkers,
+    PostCallouts,
+    ManageGoals,
+    ManageDiscord,
+    ManageEvents,
+}
+
+/// Partial update over [`PermissionFlags`] - `None` per field leaves the stored value
+/// untouched, same "only touch what's provided" shape as [`AdminSetFeatureFlag`].
+#[derive(Deserialize, Clone, Copy, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PermissionFlagsPatch {
+    #[serde(default)]
+    pub invite_members: Option<bool>,
+    #[serde(default)]
+    pub regenerate_group_key: Option<bool>,
+    #[serde(default)]
+    pub kick_members: Option<bool>,
+    #[serde(default)]
+    pub manage_settings: Option<bool>,
+    #[serde(default)]
+    pub manage_permissions: Option<bool>,
+    #[serde(default)]
+    pub post_map_markers: Option<bool>,
+    #[serde(default)]
+    pub post_callouts: Option<bool>,
+    #[serde(default)]
+    pub manage_goals: Option<bool>,
+    #[serde(default)]
+    pub manage_discord: Option<bool>,
+    #[serde(default)]
+    pub manage_events: Option<bool>,
+}
+
+#[derive(Serialize, Clone, Copy, Debug, PartialEq)]
+pub struct GroupPermissions {
+    pub group_id: i64,
+    pub account_id: i64,
+    #[serde(flatten)]
+    pub flags: PermissionFlags,
+}
 #[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,

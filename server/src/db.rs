@@ -2,7 +2,8 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData,
-    BlockedMember, CreateGroup, GroupMember, GroupSkillData, MemberSkillData, SHARED_MEMBER,
+    BlockedMember, CreateGroup, GroupMember, GroupPermissions, GroupSkillData, MemberSkillData,
+    PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -161,7 +162,10 @@ pub async fn ensure_member_for_linked_character(
         )
         .await?;
     client
-        .execute(&create_member_stmt, &[&group_id, &display_rsn, &account_hash])
+        .execute(
+            &create_member_stmt,
+            &[&group_id, &display_rsn, &account_hash],
+        )
         .await
         .map_err(ApiError::AddMemberError)?;
     Ok(display_rsn.to_string())
@@ -1552,6 +1556,35 @@ CREATE UNIQUE INDEX IF NOT EXISTS members_groupid_account_hash_idx ON groupscape
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_group_permissions_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.group_permissions (
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  invite_members BOOLEAN NOT NULL DEFAULT false,
+  regenerate_group_key BOOLEAN NOT NULL DEFAULT false,
+  kick_members BOOLEAN NOT NULL DEFAULT false,
+  manage_settings BOOLEAN NOT NULL DEFAULT false,
+  manage_permissions BOOLEAN NOT NULL DEFAULT false,
+  post_map_markers BOOLEAN NOT NULL DEFAULT false,
+  post_callouts BOOLEAN NOT NULL DEFAULT false,
+  manage_goals BOOLEAN NOT NULL DEFAULT false,
+  manage_discord BOOLEAN NOT NULL DEFAULT false,
+  manage_events BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (group_id, account_id)
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_group_permissions_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -1631,10 +1664,9 @@ pub async fn create_account(
     match client.query_one(&stmt, &[&email, &password_hash]).await {
         Ok(row) => Ok(row.try_get(0)?),
         Err(err) => {
-            if err
-                .as_db_error()
-                .is_some_and(|db_err| db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
-            {
+            if err.as_db_error().is_some_and(|db_err| {
+                db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
+            }) {
                 Err(ApiError::EmailAlreadyRegisteredError)
             } else {
                 Err(ApiError::CreateAccountError(err))
@@ -1706,10 +1738,9 @@ pub async fn update_account_email(
     match client.execute(&stmt, &[&email, &account_id]).await {
         Ok(_) => Ok(()),
         Err(err) => {
-            if err
-                .as_db_error()
-                .is_some_and(|db_err| db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION)
-            {
+            if err.as_db_error().is_some_and(|db_err| {
+                db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
+            }) {
                 Err(ApiError::EmailAlreadyRegisteredError)
             } else {
                 Err(ApiError::UpdateAccountEmailError(err))
@@ -2035,6 +2066,19 @@ pub async fn link_character_to_group(
         .await
         .map_err(ApiError::LinkCharacterToGroupError)?;
 
+    // New member default: every flag off (ported from `groupscape-old`'s `createMembership`,
+    // §6) - the group admin's implicit all-permissions is computed from
+    // `groups.admin_account_id` at read time, not stored as a row here.
+    let permissions_stmt = transaction
+        .prepare_cached(
+            "INSERT INTO groupscape.group_permissions (group_id, account_id) VALUES ($1, $2) ON CONFLICT (group_id, account_id) DO NOTHING",
+        )
+        .await?;
+    transaction
+        .execute(&permissions_stmt, &[&group_id, &account_id])
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+
     transaction
         .commit()
         .await
@@ -2065,6 +2109,135 @@ pub async fn get_group_admin_account_id(
         Some(row) => Ok(row.try_get("admin_account_id")?),
         None => Ok(None),
     }
+}
+
+const GROUP_PERMISSION_COLUMNS: &str = "invite_members, regenerate_group_key, kick_members, manage_settings, manage_permissions, post_map_markers, post_callouts, manage_goals, manage_discord, manage_events";
+
+fn group_permissions_from_row(row: &tokio_postgres::Row) -> Result<GroupPermissions, ApiError> {
+    Ok(GroupPermissions {
+        group_id: row.try_get("group_id")?,
+        account_id: row.try_get("account_id")?,
+        flags: PermissionFlags {
+            invite_members: row.try_get("invite_members")?,
+            regenerate_group_key: row.try_get("regenerate_group_key")?,
+            kick_members: row.try_get("kick_members")?,
+            manage_settings: row.try_get("manage_settings")?,
+            manage_permissions: row.try_get("manage_permissions")?,
+            post_map_markers: row.try_get("post_map_markers")?,
+            post_callouts: row.try_get("post_callouts")?,
+            manage_goals: row.try_get("manage_goals")?,
+            manage_discord: row.try_get("manage_discord")?,
+            manage_events: row.try_get("manage_events")?,
+        },
+    })
+}
+
+/// `None` when the account has no permissions row for this group (never joined via
+/// `link_character_to_group`) - callers that need a default-false view for a group member
+/// should treat that the same as [`PermissionFlags::default`].
+pub async fn get_group_permissions(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+) -> Result<Option<GroupPermissions>, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT group_id, account_id, {GROUP_PERMISSION_COLUMNS} FROM groupscape.group_permissions WHERE group_id=$1 AND account_id=$2"
+        ))
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id, &account_id])
+        .await
+        .map_err(ApiError::GetGroupPermissionsError)?;
+    row.as_ref().map(group_permissions_from_row).transpose()
+}
+
+pub async fn list_group_permissions(
+    client: &Client,
+    group_id: i64,
+) -> Result<Vec<GroupPermissions>, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT group_id, account_id, {GROUP_PERMISSION_COLUMNS} FROM groupscape.group_permissions WHERE group_id=$1"
+        ))
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupPermissionsError)?;
+    rows.iter().map(group_permissions_from_row).collect()
+}
+
+/// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same
+/// pattern as `admin_set_feature_flag`'s upsert. Returns `None` if the account has no
+/// permissions row for this group (not a member).
+pub async fn update_group_permissions(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+    patch: PermissionFlagsPatch,
+) -> Result<Option<GroupPermissions>, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            r#"
+UPDATE groupscape.group_permissions SET
+  invite_members = COALESCE($3, invite_members),
+  regenerate_group_key = COALESCE($4, regenerate_group_key),
+  kick_members = COALESCE($5, kick_members),
+  manage_settings = COALESCE($6, manage_settings),
+  manage_permissions = COALESCE($7, manage_permissions),
+  post_map_markers = COALESCE($8, post_map_markers),
+  post_callouts = COALESCE($9, post_callouts),
+  manage_goals = COALESCE($10, manage_goals),
+  manage_discord = COALESCE($11, manage_discord),
+  manage_events = COALESCE($12, manage_events)
+WHERE group_id=$1 AND account_id=$2
+RETURNING group_id, account_id, {GROUP_PERMISSION_COLUMNS}
+"#
+        ))
+        .await?;
+    let row = client
+        .query_opt(
+            &stmt,
+            &[
+                &group_id,
+                &account_id,
+                &patch.invite_members,
+                &patch.regenerate_group_key,
+                &patch.kick_members,
+                &patch.manage_settings,
+                &patch.manage_permissions,
+                &patch.post_map_markers,
+                &patch.post_callouts,
+                &patch.manage_goals,
+                &patch.manage_discord,
+                &patch.manage_events,
+            ],
+        )
+        .await
+        .map_err(ApiError::UpdateGroupPermissionsError)?;
+    row.as_ref().map(group_permissions_from_row).transpose()
+}
+
+/// Owner is an implicit all-permissions holder, not a toggle-holder (ported from
+/// `groupscape-old`'s `hasPermission`, §6) - `account_id` matching `groups.admin_account_id`
+/// short-circuits to `true` before any flag is consulted. A member with no permissions row
+/// (never linked into the group) falls back to [`PermissionFlags::default`], i.e. every flag
+/// off.
+pub async fn has_group_permission(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+    key: PermissionKey,
+) -> Result<bool, ApiError> {
+    if get_group_admin_account_id(client, group_id).await? == Some(account_id) {
+        return Ok(true);
+    }
+    let flags = get_group_permissions(client, group_id, account_id)
+        .await?
+        .map(|permissions| permissions.flags)
+        .unwrap_or_default();
+    Ok(flags.get(key))
 }
 
 pub async fn admin_record_audit_log(

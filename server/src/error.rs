@@ -89,6 +89,10 @@ pub enum ApiError {
     DeleteAccountError(tokio_postgres::error::Error),
     AccountHasNoPasswordSetError,
     IncorrectCurrentPasswordError,
+    #[from(ignore)]
+    GetGroupPermissionsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateGroupPermissionsError(tokio_postgres::error::Error),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -116,9 +120,7 @@ impl ResponseError for ApiError {
             ApiError::GetGroupDataError(ref err) => handle_pg_error(err, "GetGroupDataError"),
             ApiError::IsMemberInGroupError(ref err) => handle_pg_error(err, "IsMemberInGroupError"),
             ApiError::GetSkillsDataError(ref err) => handle_pg_error(err, "GetSkillsDataError"),
-            ApiError::GetMemberColorsError(ref err) => {
-                handle_pg_error(err, "GetMemberColorsError")
-            }
+            ApiError::GetMemberColorsError(ref err) => handle_pg_error(err, "GetMemberColorsError"),
             ApiError::UpsertMemberMeshError(ref err) => {
                 handle_pg_error(err, "UpsertMemberMeshError")
             }
@@ -127,9 +129,7 @@ impl ResponseError for ApiError {
                 handle_pg_error(err, "DeleteGroupMemberError")
             }
             ApiError::RenameGroupError(ref err) => handle_pg_error(err, "RenameGroupError"),
-            ApiError::IsMemberBlockedError(ref err) => {
-                handle_pg_error(err, "IsMemberBlockedError")
-            }
+            ApiError::IsMemberBlockedError(ref err) => handle_pg_error(err, "IsMemberBlockedError"),
             ApiError::BlockGroupMemberError(ref err) => {
                 handle_pg_error(err, "BlockGroupMemberError")
             }
@@ -187,7 +187,9 @@ impl ResponseError for ApiError {
             ApiError::CharacterCapReachedError => {
                 HttpResponse::Forbidden().body("Character cap reached")
             }
-            ApiError::CharacterNotFoundError => HttpResponse::NotFound().body("Character not found"),
+            ApiError::CharacterNotFoundError => {
+                HttpResponse::NotFound().body("Character not found")
+            }
             ApiError::CharacterAlreadyInGroupError => HttpResponse::Conflict()
                 .body("Character already belongs to a group. Leave that group first."),
             ApiError::GroupNotFoundOrInvalidTokenError => {
@@ -212,6 +214,12 @@ impl ResponseError for ApiError {
             }
             ApiError::IncorrectCurrentPasswordError => {
                 HttpResponse::Unauthorized().body("Current password is incorrect")
+            }
+            ApiError::GetGroupPermissionsError(ref err) => {
+                handle_pg_error(err, "GetGroupPermissionsError")
+            }
+            ApiError::UpdateGroupPermissionsError(ref err) => {
+                handle_pg_error(err, "UpdateGroupPermissionsError")
             }
         }
     }

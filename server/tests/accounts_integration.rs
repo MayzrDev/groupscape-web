@@ -28,7 +28,8 @@ async fn create_test_pool() -> Pool {
         recycling_method: RecyclingMethod::Fast,
     });
 
-    cfg.create_pool(None, NoTls).expect("failed to create test pool")
+    cfg.create_pool(None, NoTls)
+        .expect("failed to create test pool")
 }
 
 /// Fresh schema, migrated by the server's own `db::update_schema`.
@@ -79,7 +80,10 @@ async fn test_create_and_find_account_by_email() {
 
     assert_eq!(account.id, account_id);
     assert_eq!(account.email.as_deref(), Some("player@example.com"));
-    assert_eq!(account.password_hash.as_deref(), Some(password_hash.as_str()));
+    assert_eq!(
+        account.password_hash.as_deref(),
+        Some(password_hash.as_str())
+    );
     assert!(!account.disabled);
 }
 
@@ -207,7 +211,10 @@ async fn test_disabled_account_session_does_not_authenticate() {
     let account = db::get_account_by_session_token_hash(&client, &token_hash)
         .await
         .expect("query failed");
-    assert!(account.is_none(), "disabled account should not authenticate");
+    assert!(
+        account.is_none(),
+        "disabled account should not authenticate"
+    );
 }
 
 #[tokio::test]
@@ -630,25 +637,28 @@ async fn test_second_account_joining_a_group_does_not_take_over_admin() {
     let first_account_id = db::create_account(&client, "firstjoiner@example.com", &password_hash)
         .await
         .unwrap();
-    let second_account_id =
-        db::create_account(&client, "secondjoiner@example.com", &password_hash)
-            .await
-            .unwrap();
+    let second_account_id = db::create_account(&client, "secondjoiner@example.com", &password_hash)
+        .await
+        .unwrap();
     let first_character = db::create_character(&client, first_account_id, "hash-admin-1", "Zezima")
         .await
         .unwrap();
-    let second_character =
-        db::create_character(&client, second_account_id, "hash-admin-2", "Woox")
-            .await
-            .unwrap();
+    let second_character = db::create_character(&client, second_account_id, "hash-admin-2", "Woox")
+        .await
+        .unwrap();
     let group_id = create_test_group(&client, "admintest1").await;
 
     db::link_character_to_group(&mut client, first_character.id, first_account_id, group_id)
         .await
         .expect("first join should succeed");
-    db::link_character_to_group(&mut client, second_character.id, second_account_id, group_id)
-        .await
-        .expect("second join should succeed");
+    db::link_character_to_group(
+        &mut client,
+        second_character.id,
+        second_account_id,
+        group_id,
+    )
+    .await
+    .expect("second join should succeed");
 
     let admin = db::get_group_admin_account_id(&client, group_id)
         .await
@@ -681,15 +691,20 @@ async fn test_linking_character_to_different_group_is_conflict() {
         .await
         .expect("first link should succeed");
     let result =
-        db::link_character_to_group(&mut client, character.id, account_id, second_group_id)
-            .await;
-    assert!(matches!(result, Err(ApiError::CharacterAlreadyInGroupError)));
+        db::link_character_to_group(&mut client, character.id, account_id, second_group_id).await;
+    assert!(matches!(
+        result,
+        Err(ApiError::CharacterAlreadyInGroupError)
+    ));
 
     let still_linked = db::find_character_group_link(&client, character.id)
         .await
         .expect("query failed")
         .expect("link should still exist");
-    assert_eq!(still_linked.group_id, first_group_id, "conflicting link attempt must not move the character");
+    assert_eq!(
+        still_linked.group_id, first_group_id,
+        "conflicting link attempt must not move the character"
+    );
 }
 
 #[tokio::test]
@@ -843,12 +858,18 @@ async fn test_delete_account_cascades_characters_and_sessions() {
     let character = db::find_character_by_id(&client, character.id)
         .await
         .expect("query failed");
-    assert!(character.is_none(), "character should be cascade-deleted with the account");
+    assert!(
+        character.is_none(),
+        "character should be cascade-deleted with the account"
+    );
 
     let session = db::get_account_by_session_token_hash(&client, &token_hash)
         .await
         .expect("query failed");
-    assert!(session.is_none(), "session should be cascade-deleted with the account");
+    assert!(
+        session.is_none(),
+        "session should be cascade-deleted with the account"
+    );
 }
 
 async fn get_member_names(client: &deadpool_postgres::Client, group_id: i64) -> Vec<String> {
@@ -968,4 +989,255 @@ async fn test_ensure_member_for_linked_character_scoped_per_group() {
 
     assert_eq!(get_member_names(&client, group_a).await, vec!["Zezima"]);
     assert_eq!(get_member_names(&client, group_b).await, vec!["Zezima"]);
+}
+
+async fn create_linked_account(
+    client: &mut deadpool_postgres::Client,
+    email: &str,
+    account_hash: &str,
+    rsn: &str,
+    group_id: i64,
+) -> i64 {
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(client, email, &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(client, account_id, account_hash, rsn)
+        .await
+        .unwrap();
+    db::link_character_to_group(client, character.id, account_id, group_id)
+        .await
+        .expect("linking should succeed");
+    account_id
+}
+
+#[tokio::test]
+async fn test_linking_a_character_creates_default_all_false_permissions() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest1").await;
+
+    let account_id = create_linked_account(
+        &mut client,
+        "perm1@example.com",
+        "hash-perm-1",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let permissions = db::get_group_permissions(&client, group_id, account_id)
+        .await
+        .expect("query failed")
+        .expect("permissions row should exist after linking");
+    assert_eq!(
+        permissions.flags,
+        server::models::PermissionFlags::default()
+    );
+}
+
+#[tokio::test]
+async fn test_update_group_permissions_patches_only_provided_fields() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest2").await;
+
+    let account_id = create_linked_account(
+        &mut client,
+        "perm2@example.com",
+        "hash-perm-2",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(true),
+        manage_settings: Some(true),
+        ..Default::default()
+    };
+    let updated = db::update_group_permissions(&client, group_id, account_id, patch)
+        .await
+        .expect("query failed")
+        .expect("permissions row should exist");
+    assert!(updated.flags.kick_members);
+    assert!(updated.flags.manage_settings);
+    assert!(
+        !updated.flags.invite_members,
+        "untouched fields should stay false"
+    );
+
+    let second_patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(false),
+        ..Default::default()
+    };
+    let second_update = db::update_group_permissions(&client, group_id, account_id, second_patch)
+        .await
+        .expect("query failed")
+        .expect("permissions row should exist");
+    assert!(!second_update.flags.kick_members);
+    assert!(
+        second_update.flags.manage_settings,
+        "a later partial patch must not clobber fields it didn't mention"
+    );
+}
+
+#[tokio::test]
+async fn test_update_group_permissions_returns_none_for_non_member() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest3").await;
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "perm3@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(true),
+        ..Default::default()
+    };
+    let result = db::update_group_permissions(&client, group_id, account_id, patch)
+        .await
+        .expect("query failed");
+    assert!(
+        result.is_none(),
+        "an account with no membership row has nothing to patch"
+    );
+}
+
+#[tokio::test]
+async fn test_list_group_permissions_returns_every_member_in_the_group() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest4").await;
+    let other_group_id = create_test_group(&client, "permtest4-other").await;
+
+    let account_a = create_linked_account(
+        &mut client,
+        "perm4a@example.com",
+        "hash-perm-4a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let account_b = create_linked_account(
+        &mut client,
+        "perm4b@example.com",
+        "hash-perm-4b",
+        "Woox",
+        group_id,
+    )
+    .await;
+    create_linked_account(
+        &mut client,
+        "perm4c@example.com",
+        "hash-perm-4c",
+        "Elsewhere",
+        other_group_id,
+    )
+    .await;
+
+    let permissions = db::list_group_permissions(&client, group_id)
+        .await
+        .expect("query failed");
+    let mut account_ids: Vec<i64> = permissions.iter().map(|p| p.account_id).collect();
+    account_ids.sort();
+    let mut expected = vec![account_a, account_b];
+    expected.sort();
+    assert_eq!(account_ids, expected);
+}
+
+#[tokio::test]
+async fn test_has_group_permission_admin_is_always_true() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest5").await;
+
+    let admin_account_id = create_linked_account(
+        &mut client,
+        "perm5admin@example.com",
+        "hash-perm-5a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+
+    let has_permission = db::has_group_permission(
+        &client,
+        group_id,
+        admin_account_id,
+        server::models::PermissionKey::ManagePermissions,
+    )
+    .await
+    .expect("query failed");
+    assert!(
+        has_permission,
+        "the group admin has every permission implicitly, regardless of stored flags"
+    );
+}
+
+#[tokio::test]
+async fn test_has_group_permission_non_admin_follows_stored_flags() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "permtest6").await;
+
+    // First linked account becomes admin.
+    create_linked_account(
+        &mut client,
+        "perm6admin@example.com",
+        "hash-perm-6a",
+        "Zezima",
+        group_id,
+    )
+    .await;
+    let member_account_id = create_linked_account(
+        &mut client,
+        "perm6member@example.com",
+        "hash-perm-6b",
+        "Woox",
+        group_id,
+    )
+    .await;
+
+    let before = db::has_group_permission(
+        &client,
+        group_id,
+        member_account_id,
+        server::models::PermissionKey::KickMembers,
+    )
+    .await
+    .expect("query failed");
+    assert!(!before, "a non-admin member defaults to every flag off");
+
+    let patch = server::models::PermissionFlagsPatch {
+        kick_members: Some(true),
+        ..Default::default()
+    };
+    db::update_group_permissions(&client, group_id, member_account_id, patch)
+        .await
+        .expect("query failed");
+
+    let after = db::has_group_permission(
+        &client,
+        group_id,
+        member_account_id,
+        server::models::PermissionKey::KickMembers,
+    )
+    .await
+    .expect("query failed");
+    assert!(after, "the flag should now read true after being granted");
 }
