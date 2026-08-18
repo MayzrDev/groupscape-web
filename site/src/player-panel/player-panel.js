@@ -12,8 +12,27 @@ export class PlayerPanel extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
-    // /panels shows the full-body portrait below the card instead of beside the vitals.
-    this.portraitMode = document.body.classList.contains("panels-page") ? "full" : "bust";
+    this.portraitMode = "bust";
+    // side-panel (and its player-panel children) lives outside the route outlet and is never
+    // remounted on navigation, so switching in/out of /panels has to be observed reactively
+    // rather than checked once here. If /panels is already active this synchronously flips
+    // portraitMode to "full" before the fallback render below runs.
+    this.subscribe("panels-page-active", this.handlePanelsPageActive.bind(this));
+    if (!this.contentArea) {
+      this.renderPanel();
+    }
+  }
+
+  handlePanelsPageActive(isPanelsPage) {
+    const mode = isPanelsPage ? "full" : "bust";
+    if (mode === this.portraitMode) return;
+    this.portraitMode = mode;
+    this.activeComponent = null;
+    this.classList.remove("expanded");
+    this.renderPanel();
+  }
+
+  renderPanel() {
     this.render();
     this.contentArea = this.querySelector(".player-panel__content");
     this.eventListener(this.querySelector(".player-panel__minibar"), "click", this.handleMiniBarClick.bind(this));
