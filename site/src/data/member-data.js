@@ -56,6 +56,13 @@ const parsedFieldMappings = [
     publishValueKey: "collectionLog",
     updatedAttribute: "collection_log_v2",
   },
+  {
+    sourceKey: "rich_presence",
+    targetKey: "richPresence",
+    parser: (value) => value,
+    publishKey: "richPresence",
+    updatedAttribute: "richPresence",
+  },
 ];
 
 const itemFieldMappings = [

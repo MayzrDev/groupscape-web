@@ -7,6 +7,7 @@ export class PlayerStats extends BaseElement {
     this.prayer = { current: 1, max: 1 };
     this.energy = { current: 1, max: 1 };
     this.world = 301;
+    this.presenceStaleTimeout = 30 * 1000;
   }
 
   html() {
@@ -22,14 +23,27 @@ export class PlayerStats extends BaseElement {
     this.hitpointsBar = this.querySelector(".player-stats__hitpoints-bar");
     this.prayerBar = this.querySelector(".player-stats__prayer-bar");
     this.energyBar = this.querySelector(".player-stats__energy-bar");
+    this.presenceEl = this.querySelector(".player-stats__presence");
 
     this.subscribe(`stats:${this.playerName}`, this.handleUpdatedStats.bind(this));
     this.subscribe(`inactive:${this.playerName}`, this.handleWentInactive.bind(this));
     this.subscribe(`active:${this.playerName}`, this.handleWentActive.bind(this));
+    this.subscribe(`richPresence:${this.playerName}`, this.handleRichPresence.bind(this));
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    window.clearTimeout(this.presenceHideTimeout);
+  }
+
+  handleRichPresence(text) {
+    if (!text) return;
+    window.clearTimeout(this.presenceHideTimeout);
+    this.presenceEl.textContent = text;
+    this.presenceEl.classList.add("player-stats__presence--visible");
+    this.presenceHideTimeout = window.setTimeout(() => {
+      this.presenceEl.classList.remove("player-stats__presence--visible");
+    }, this.presenceStaleTimeout);
   }
 
   handleUpdatedStats(stats, member) {

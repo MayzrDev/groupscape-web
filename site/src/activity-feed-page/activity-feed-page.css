@@ -92,6 +92,16 @@ activity-feed-page {
   opacity: 1;
 }
 
+.activity-feed-page__type-chip--dialogue.activity-feed-page__type-chip--active {
+  border-color: #4d9fff;
+  color: #4d9fff;
+}
+
+.activity-feed-page__type-chip--object_interaction.activity-feed-page__type-chip--active {
+  border-color: #b58cff;
+  color: #b58cff;
+}
+
 .activity-feed-page__list {
   margin-top: 6px;
 }

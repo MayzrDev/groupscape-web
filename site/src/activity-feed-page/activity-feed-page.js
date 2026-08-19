@@ -7,6 +7,8 @@ const EVENT_TYPES = [
   [null, "All"],
   ["kill", "Kills"],
   ["death", "Deaths"],
+  ["dialogue", "Dialogue"],
+  ["object_interaction", "Interactions"],
 ];
 
 const FETCH_LIMIT = 100;
@@ -99,6 +101,7 @@ export class ActivityFeedPage extends BaseElement {
     for (const [type, label] of EVENT_TYPES) {
       const chip = document.createElement("button");
       chip.className = "activity-feed-page__type-chip";
+      if (type) chip.classList.add(`activity-feed-page__type-chip--${type}`);
       chip.classList.toggle("activity-feed-page__type-chip--active", this.selectedType === type);
       chip.textContent = label;
       this.eventListener(chip, "click", () => {
