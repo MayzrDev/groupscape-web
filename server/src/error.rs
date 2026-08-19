@@ -103,6 +103,8 @@ pub enum ApiError {
     ListActivityEventsError(tokio_postgres::error::Error),
     #[from(ignore)]
     ListSessionsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ListKillEventsError(tokio_postgres::error::Error),
     CannotModifyGroupAdminPermissionsError,
     AccountAuthRequiredError,
     PermissionDeniedError,
@@ -254,6 +256,7 @@ impl ResponseError for ApiError {
                 handle_pg_error(err, "ListActivityEventsError")
             }
             ApiError::ListSessionsError(ref err) => handle_pg_error(err, "ListSessionsError"),
+            ApiError::ListKillEventsError(ref err) => handle_pg_error(err, "ListKillEventsError"),
             ApiError::CannotModifyGroupAdminPermissionsError => HttpResponse::Conflict()
                 .body("The group admin's permissions are implicit and cannot be changed"),
             ApiError::AccountAuthRequiredError => HttpResponse::Unauthorized()

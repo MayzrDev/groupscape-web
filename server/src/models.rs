@@ -272,6 +272,40 @@ pub struct ActivityEvent {
     pub payload: serde_json::Value,
 }
 
+/// One aggregated (member, npc, item) row for the loot summary endpoint - a query-time pivot
+/// over `kill` activity events, mirroring `groupscape-old`'s `LootSummaryRow`.
+#[derive(Serialize)]
+pub struct LootSummaryRow {
+    pub member_name: String,
+    pub npc_name: String,
+    pub item_id: i32,
+    pub item_name: Option<String>,
+    pub quantity: i32,
+    pub unit_value: Option<i64>,
+    pub total_value: i64,
+    pub rarity: Option<String>,
+    pub is_unique: bool,
+}
+
+#[derive(Serialize)]
+pub struct LootSplitParticipant {
+    pub member_name: String,
+    pub kill_count: i64,
+    pub loot_value: i64,
+}
+
+/// This server has no multi-actor kill co-attribution (each kill event belongs to exactly one
+/// reporting member), so unlike `groupscape-old`'s split, participants here are every member who
+/// reported a kill in the range, not a per-kill actor list.
+#[derive(Serialize)]
+pub struct LootSplitResult {
+    pub total_value: i64,
+    pub kill_count: i64,
+    pub participants: Vec<LootSplitParticipant>,
+    pub per_person_gp: i64,
+    pub remainder_gp: i64,
+}
+
 #[derive(Serialize)]
 pub struct GroupSession {
     pub id: i64,

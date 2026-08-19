@@ -122,6 +122,8 @@ async fn main() -> std::io::Result<()> {
             .service(authed::get_group_data)
             .service(authed::get_activity_events)
             .service(authed::get_sessions)
+            .service(authed::get_loot_summary)
+            .service(authed::get_loot_split)
             .service(authed::delete_group_member)
             .service(authed::block_group_member)
             .service(authed::unblock_group_member)

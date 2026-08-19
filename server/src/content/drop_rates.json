@@ -1,0 +1,5775 @@
+{
+  "vorkath": {
+    "383": {
+      "name": "Raw shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "391": {
+      "name": "Manta ray",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "536": {
+      "name": "Dragon bones",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "824": {
+      "name": "Rune dart tip",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1303": {
+      "name": "Rune longsword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1305": {
+      "name": "Dragon longsword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1377": {
+      "name": "Dragon battleaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1601": {
+      "name": "Diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1987": {
+      "name": "Grapes",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4087": {
+      "name": "Dragon platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4585": {
+      "name": "Dragon plateskirt",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5313": {
+      "name": "Willow seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5314": {
+      "name": "Maple seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5317": {
+      "name": "Spirit seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9189": {
+      "name": "Sapphire bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9190": {
+      "name": "Emerald bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9191": {
+      "name": "Ruby bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9192": {
+      "name": "Diamond bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9193": {
+      "name": "Dragonstone bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9194": {
+      "name": "Onyx bolt tips",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "11237": {
+      "name": "Dragon arrowtips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11286": {
+      "name": "Draconic visage",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "21486": {
+      "name": "Teak seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "21488": {
+      "name": "Mahogany seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "21880": {
+      "name": "Wrath rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "21907": {
+      "name": "Vorkath's head",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21992": {
+      "name": "Vorki",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22006": {
+      "name": "Skeletal visage",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22106": {
+      "name": "Jar of decay",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22111": {
+      "name": "Dragonbone necklace",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22118": {
+      "name": "Wrath talisman",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "22869": {
+      "name": "Celastrus seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22871": {
+      "name": "Redwood tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22877": {
+      "name": "Dragonfruit tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "30900": {
+      "name": "Shark lure",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "zulrah": {
+    "267": {
+      "name": "Dwarf weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "269": {
+      "name": "Torstol",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "383": {
+      "name": "Raw shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "391": {
+      "name": "Manta ray",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "536": {
+      "name": "Dragon bones",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1939": {
+      "name": "Swamp tar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1987": {
+      "name": "Grapes",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2361": {
+      "name": "Adamantite bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2998": {
+      "name": "Toadflax",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3000": {
+      "name": "Snapdragon",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3204": {
+      "name": "Dragon halberd",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5290": {
+      "name": "Calquat tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5296": {
+      "name": "Toadflax seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5303": {
+      "name": "Dwarf weed seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5317": {
+      "name": "Spirit seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5974": {
+      "name": "Coconut",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6332": {
+      "name": "Mahogany logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6571": {
+      "name": "Uncut onyx",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "9193": {
+      "name": "Dragonstone bolt tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "12921": {
+      "name": "Pet snakeling",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "12922": {
+      "name": "Tanzanite fang",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "12927": {
+      "name": "Serpentine visage",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "12932": {
+      "name": "Magic fang",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "12934": {
+      "name": "Zulrah's scales",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "12936": {
+      "name": "Jar of swamp",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "13200": {
+      "name": "Tanzanite mutagen",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "13201": {
+      "name": "Magma mutagen",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "30900": {
+      "name": "Shark lure",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "cerberus": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "245": {
+      "name": "Wine of zamorak",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "536": {
+      "name": "Dragon bones",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "569": {
+      "name": "Fire orb",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "592": {
+      "name": "Ashes",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1113": {
+      "name": "Rune chainbody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1127": {
+      "name": "Rune platebody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1163": {
+      "name": "Rune full helm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1275": {
+      "name": "Rune pickaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1359": {
+      "name": "Rune axe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1724": {
+      "name": "Unholy symbol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2503": {
+      "name": "Black d'hide body",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3053": {
+      "name": "Lava battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3202": {
+      "name": "Rune halberd",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9381": {
+      "name": "Runite bolts (unf)",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "13227": {
+      "name": "Eternal crystal",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13229": {
+      "name": "Pegasian crystal",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13231": {
+      "name": "Primordial crystal",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13233": {
+      "name": "Smouldering stone",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13245": {
+      "name": "Jar of souls",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "13247": {
+      "name": "Hellpuppy",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "13249": {
+      "name": "Key master teleport",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "general_graardor": {
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11812": {
+      "name": "Bandos hilt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11818": {
+      "name": "Godsword shard 1",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11820": {
+      "name": "Godsword shard 2",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11822": {
+      "name": "Godsword shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11832": {
+      "name": "Bandos chestplate",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11834": {
+      "name": "Bandos tassets",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11836": {
+      "name": "Bandos boots",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12650": {
+      "name": "Pet general graardor",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "kril_tsutsaroth": {
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11787": {
+      "name": "Steam battlestaff",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11791": {
+      "name": "Staff of the dead",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11816": {
+      "name": "Zamorak hilt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11818": {
+      "name": "Godsword shard 1",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11820": {
+      "name": "Godsword shard 2",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11822": {
+      "name": "Godsword shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11824": {
+      "name": "Zamorakian spear",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12652": {
+      "name": "Pet k'ril tsutsaroth",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "commander_zilyana": {
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "11785": {
+      "name": "Armadyl crossbow",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11814": {
+      "name": "Saradomin hilt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11818": {
+      "name": "Godsword shard 1",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11820": {
+      "name": "Godsword shard 2",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11822": {
+      "name": "Godsword shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11838": {
+      "name": "Saradomin sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12651": {
+      "name": "Pet zilyana",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "13256": {
+      "name": "Saradomin's light",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "kreearra": {
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "989": {
+      "name": "Crystal key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11810": {
+      "name": "Armadyl hilt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11818": {
+      "name": "Godsword shard 1",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11820": {
+      "name": "Godsword shard 2",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11822": {
+      "name": "Godsword shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11826": {
+      "name": "Armadyl helmet",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11828": {
+      "name": "Armadyl chestplate",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11830": {
+      "name": "Armadyl chainskirt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12649": {
+      "name": "Pet kree'arra",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "alchemical_hydra": {
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "211": {
+      "name": "Grimy avantoe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "215": {
+      "name": "Grimy cadantine",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "989": {
+      "name": "Crystal key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1079": {
+      "name": "Rune platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1093": {
+      "name": "Rune plateskirt",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1127": {
+      "name": "Rune platebody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1305": {
+      "name": "Dragon longsword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1377": {
+      "name": "Dragon battleaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2485": {
+      "name": "Grimy lantadyme",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4111": {
+      "name": "Mystic robe top (light)",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4113": {
+      "name": "Mystic robe bottom (light)",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5313": {
+      "name": "Willow seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5314": {
+      "name": "Maple seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5317": {
+      "name": "Spirit seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "9244": {
+      "name": "Dragonstone bolts (e)",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9245": {
+      "name": "Onyx bolts (e)",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "20849": {
+      "name": "Dragon thrownaxe",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "21486": {
+      "name": "Teak seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "21488": {
+      "name": "Mahogany seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "22746": {
+      "name": "Ikkle hydra",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22804": {
+      "name": "Dragon knife",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22869": {
+      "name": "Celastrus seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22871": {
+      "name": "Redwood tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22877": {
+      "name": "Dragonfruit tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22966": {
+      "name": "Hydra's claw",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "22969": {
+      "name": "Hydra's heart",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22971": {
+      "name": "Hydra's fang",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22973": {
+      "name": "Hydra's eye",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22983": {
+      "name": "Hydra leather",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22988": {
+      "name": "Hydra tail",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "23064": {
+      "name": "Jar of chemicals",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23077": {
+      "name": "Alchemical hydra heads",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "king_black_dragon": {
+    "385": {
+      "name": "Shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "554": {
+      "name": "Fire rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1199": {
+      "name": "Adamant kiteshield",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2361": {
+      "name": "Adamantite bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "7980": {
+      "name": "Kbd heads",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "9431": {
+      "name": "Runite limbs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11232": {
+      "name": "Dragon dart tip",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11237": {
+      "name": "Dragon arrowtips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11286": {
+      "name": "Draconic visage",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12653": {
+      "name": "Prince black dragon",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "19582": {
+      "name": "Dragon javelin tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "giant_mole": {
+    "385": {
+      "name": "Shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "413": {
+      "name": "Oyster pearls",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "440": {
+      "name": "Iron ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1147": {
+      "name": "Rune med helm",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1355": {
+      "name": "Mithril axe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1369": {
+      "name": "Mithril battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2359": {
+      "name": "Mithril bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "12646": {
+      "name": "Baby mole",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "33382": {
+      "name": "Immaculate mole skin",
+      "rarity": "uncommon",
+      "isUnique": true
+    }
+  },
+  "kalphite_queen": {
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "888": {
+      "name": "Mithril arrow",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1113": {
+      "name": "Rune chainbody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1783": {
+      "name": "Bucket of sand",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1987": {
+      "name": "Grapes",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2501": {
+      "name": "Red d'hide body",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3053": {
+      "name": "Lava battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3140": {
+      "name": "Dragon chainbody",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5940": {
+      "name": "Weapon poison(++)",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6016": {
+      "name": "Cactus spine",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "7981": {
+      "name": "Kq head",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12654": {
+      "name": "Kalphite princess",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "12885": {
+      "name": "Jar of sand",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "the_nex": {
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "26231": {
+      "name": "Nihil shard",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "26235": {
+      "name": "Zaryte vambraces",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "26348": {
+      "name": "Nexling",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "26370": {
+      "name": "Ancient hilt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "26372": {
+      "name": "Nihil horn",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "26392": {
+      "name": "Blood essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "the_theatre_of_blood": {
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "209": {
+      "name": "Grimy irit leaf",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "211": {
+      "name": "Grimy avantoe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "215": {
+      "name": "Grimy cadantine",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "245": {
+      "name": "Wine of zamorak",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "449": {
+      "name": "Adamantite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1113": {
+      "name": "Rune chainbody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1127": {
+      "name": "Rune platebody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1775": {
+      "name": "Molten glass",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1939": {
+      "name": "Swamp tar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2485": {
+      "name": "Grimy lantadyme",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3138": {
+      "name": "Potato cactus",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "21488": {
+      "name": "Mahogany seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "25742": {
+      "name": "Holy ornament kit",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "25744": {
+      "name": "Sanguine ornament kit",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25746": {
+      "name": "Sanguine dust",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25749": {
+      "name": "Lil' zik",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "the_chambers_of_xeric": {
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "209": {
+      "name": "Grimy irit leaf",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "211": {
+      "name": "Grimy avantoe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "215": {
+      "name": "Grimy cadantine",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "447": {
+      "name": "Mithril ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "449": {
+      "name": "Adamantite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "566": {
+      "name": "Soul rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2485": {
+      "name": "Grimy lantadyme",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "8780": {
+      "name": "Teak plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "8782": {
+      "name": "Mahogany plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11212": {
+      "name": "Dragon arrow",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "13391": {
+      "name": "Lizardman fang",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "13421": {
+      "name": "Saltpetre",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "13573": {
+      "name": "Dynamite",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "20997": {
+      "name": "Twisted bow",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21003": {
+      "name": "Elder maul",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21027": {
+      "name": "Dark relic",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21043": {
+      "name": "Kodai insignia",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21047": {
+      "name": "Torn prayer scroll",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "22382": {
+      "name": "Olmlet",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "22386": {
+      "name": "Metamorphic dust",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24670": {
+      "name": "Twisted ancestral colour kit",
+      "rarity": "uncommon",
+      "isUnique": true
+    }
+  },
+  "wintertodt": {
+    "6739": {
+      "name": "Dragon axe",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "20704": {
+      "name": "Pyromancer garb",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "20706": {
+      "name": "Pyromancer robe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "20708": {
+      "name": "Pyromancer hood",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "20710": {
+      "name": "Pyromancer boots",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "20712": {
+      "name": "Warm gloves",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "20718": {
+      "name": "Burnt page",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "20720": {
+      "name": "Bruma torch",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24484": {
+      "name": "Phoenix",
+      "rarity": "very_rare",
+      "isUnique": true
+    }
+  },
+  "tempoross": {
+    "313": {
+      "name": "Fishing bait",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "314": {
+      "name": "Feather",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "401": {
+      "name": "Seaweed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1539": {
+      "name": "Steel nails",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "8778": {
+      "name": "Oak plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "21028": {
+      "name": "Dragon harpoon",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "25559": {
+      "name": "Big harpoonfish",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "25578": {
+      "name": "Soaked page",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25580": {
+      "name": "Tackle box",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25584": {
+      "name": "Fish barrel",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25602": {
+      "name": "Tiny tempor",
+      "rarity": "very_rare",
+      "isUnique": true
+    }
+  },
+  "tombs_of_amascut": {
+    "383": {
+      "name": "Raw shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "389": {
+      "name": "Raw manta ray",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "566": {
+      "name": "Soul rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1601": {
+      "name": "Diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1603": {
+      "name": "Ruby",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1605": {
+      "name": "Emerald",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1607": {
+      "name": "Sapphire",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2357": {
+      "name": "Gold bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3138": {
+      "name": "Potato cactus",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5296": {
+      "name": "Toadflax seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5935": {
+      "name": "Coconut milk",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6016": {
+      "name": "Cactus spine",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6332": {
+      "name": "Mahogany logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11232": {
+      "name": "Dragon dart tip",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "26392": {
+      "name": "Blood essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "27272": {
+      "name": "Lily of the sands",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "27283": {
+      "name": "Breach of the scarab",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "27285": {
+      "name": "Eye of the corruptor",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "27289": {
+      "name": "Jewel of the sun",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "27293": {
+      "name": "Cache of runes",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "30893": {
+      "name": "Jewel of amascut",
+      "rarity": "uncommon",
+      "isUnique": true
+    }
+  },
+  "kraken": {
+    "311": {
+      "name": "Harpoon",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "383": {
+      "name": "Raw shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "401": {
+      "name": "Seaweed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "403": {
+      "name": "Edible seaweed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "567": {
+      "name": "Unpowered orb",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "686": {
+      "name": "Rusty sword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "989": {
+      "name": "Crystal key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1303": {
+      "name": "Rune longsword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1347": {
+      "name": "Rune warhammer",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1403": {
+      "name": "Mystic water staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1601": {
+      "name": "Diamond",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1645": {
+      "name": "Dragonstone ring",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1925": {
+      "name": "Bucket",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4091": {
+      "name": "Mystic robe top",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4093": {
+      "name": "Mystic robe bottom",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4695": {
+      "name": "Mist rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7114": {
+      "name": "Pirate boots",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7944": {
+      "name": "Raw monkfish",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "8778": {
+      "name": "Oak plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "12004": {
+      "name": "Kraken tentacle",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12007": {
+      "name": "Jar of dirt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12655": {
+      "name": "Pet kraken",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "abyssal_sire": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "215": {
+      "name": "Grimy cadantine",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "564": {
+      "name": "Cosmic rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "566": {
+      "name": "Soul rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "575": {
+      "name": "Earth orb",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1127": {
+      "name": "Rune platebody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1163": {
+      "name": "Rune full helm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1397": {
+      "name": "Air battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1405": {
+      "name": "Mystic air staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1438": {
+      "name": "Air talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1440": {
+      "name": "Earth talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1442": {
+      "name": "Fire talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1444": {
+      "name": "Water talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1446": {
+      "name": "Body talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1448": {
+      "name": "Mind talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1452": {
+      "name": "Chaos talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1454": {
+      "name": "Cosmic talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1937": {
+      "name": "Jug of water",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2485": {
+      "name": "Grimy lantadyme",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3054": {
+      "name": "Mystic lava staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5313": {
+      "name": "Willow seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5314": {
+      "name": "Maple seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5317": {
+      "name": "Spirit seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5521": {
+      "name": "Binding necklace",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9194": {
+      "name": "Onyx bolt tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "13273": {
+      "name": "Unsired",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "21486": {
+      "name": "Teak seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "21488": {
+      "name": "Mahogany seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "22869": {
+      "name": "Celastrus seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22871": {
+      "name": "Redwood tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22877": {
+      "name": "Dragonfruit tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "30771": {
+      "name": "Aether catalyst",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "thermonuclear_smoke_devil": {
+    "383": {
+      "name": "Raw shark",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "444": {
+      "name": "Gold ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "590": {
+      "name": "Tinderbox",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "989": {
+      "name": "Crystal key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1113": {
+      "name": "Rune chainbody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1333": {
+      "name": "Rune scimitar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1401": {
+      "name": "Mystic fire staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1405": {
+      "name": "Mystic air staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1442": {
+      "name": "Fire talisman",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1601": {
+      "name": "Diamond",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1645": {
+      "name": "Dragonstone ring",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1775": {
+      "name": "Molten glass",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1885": {
+      "name": "Ugthanki kebab",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1987": {
+      "name": "Grapes",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2359": {
+      "name": "Mithril bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2501": {
+      "name": "Red d'hide body",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3140": {
+      "name": "Dragon chainbody",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4587": {
+      "name": "Dragon scimitar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4675": {
+      "name": "Ancient staff",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "7060": {
+      "name": "Tuna potato",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9194": {
+      "name": "Onyx bolt tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9735": {
+      "name": "Goat horn",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11998": {
+      "name": "Smoke battlestaff",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "12002": {
+      "name": "Occult necklace",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "22663": {
+      "name": "Pet smoke devil",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "25524": {
+      "name": "Jar of smoke",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "30900": {
+      "name": "Shark lure",
+      "rarity": "rare",
+      "isUnique": false
+    }
+  },
+  "vetion": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "225": {
+      "name": "Limpwurt root",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "245": {
+      "name": "Wine of zamorak",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "536": {
+      "name": "Dragon bones",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "811": {
+      "name": "Rune dart",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "868": {
+      "name": "Rune knife",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1163": {
+      "name": "Rune full helm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1401": {
+      "name": "Mystic fire staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1403": {
+      "name": "Mystic water staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1631": {
+      "name": "Uncut dragonstone",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2970": {
+      "name": "Mort myre fungus",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4091": {
+      "name": "Mystic robe top",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4093": {
+      "name": "Mystic robe bottom",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6034": {
+      "name": "Supercompost",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6806": {
+      "name": "Skeleton champion scroll",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "8778": {
+      "name": "Oak plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11936": {
+      "name": "Dark crab",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "12601": {
+      "name": "Ring of the gods",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13179": {
+      "name": "Vet'ion jr.",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "21257": {
+      "name": "Slayer's enchantment",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23490": {
+      "name": "Larran's key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24251": {
+      "name": "Wilderness crabs teleport",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24592": {
+      "name": "Blighted anglerfish",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "27673": {
+      "name": "Skull of vet'ion",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "27684": {
+      "name": "Voidwaker blade",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "callisto": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "225": {
+      "name": "Limpwurt root",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "536": {
+      "name": "Dragon bones",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "566": {
+      "name": "Soul rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1127": {
+      "name": "Rune platebody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1407": {
+      "name": "Mystic earth staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1631": {
+      "name": "Uncut dragonstone",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1749": {
+      "name": "Red dragonhide",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4091": {
+      "name": "Mystic robe top",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4093": {
+      "name": "Mystic robe bottom",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5974": {
+      "name": "Coconut",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6034": {
+      "name": "Supercompost",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11936": {
+      "name": "Dark crab",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "12603": {
+      "name": "Tyrannical ring",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13178": {
+      "name": "Callisto cub",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "21257": {
+      "name": "Slayer's enchantment",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23490": {
+      "name": "Larran's key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24251": {
+      "name": "Wilderness crabs teleport",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24592": {
+      "name": "Blighted anglerfish",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "27667": {
+      "name": "Claws of callisto",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "27681": {
+      "name": "Voidwaker hilt",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "venenatis": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "223": {
+      "name": "Red spiders' eggs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "225": {
+      "name": "Limpwurt root",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "237": {
+      "name": "Unicorn horn",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "811": {
+      "name": "Rune dart",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "868": {
+      "name": "Rune knife",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1079": {
+      "name": "Rune platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1215": {
+      "name": "Dragon dagger",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1391": {
+      "name": "Battlestaff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1405": {
+      "name": "Mystic air staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1513": {
+      "name": "Magic logs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1631": {
+      "name": "Uncut dragonstone",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "6034": {
+      "name": "Supercompost",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "9194": {
+      "name": "Onyx bolt tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "9243": {
+      "name": "Diamond bolts (e)",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "10976": {
+      "name": "Long bone",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "10977": {
+      "name": "Curved bone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11936": {
+      "name": "Dark crab",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "12605": {
+      "name": "Treasonous ring",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13177": {
+      "name": "Venenatis spiderling",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "21257": {
+      "name": "Slayer's enchantment",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23490": {
+      "name": "Larran's key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24251": {
+      "name": "Wilderness crabs teleport",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24592": {
+      "name": "Blighted anglerfish",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "27670": {
+      "name": "Fangs of venenatis",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "27687": {
+      "name": "Voidwaker gem",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "chaos_elemental": {
+    "207": {
+      "name": "Grimy ranarr weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "211": {
+      "name": "Grimy avantoe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "811": {
+      "name": "Rune dart",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1079": {
+      "name": "Rune platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1093": {
+      "name": "Rune plateskirt",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1163": {
+      "name": "Rune full helm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1215": {
+      "name": "Dragon dagger",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1401": {
+      "name": "Mystic fire staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1403": {
+      "name": "Mystic water staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1405": {
+      "name": "Mystic air staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1407": {
+      "name": "Mystic earth staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2361": {
+      "name": "Adamantite bar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4087": {
+      "name": "Dragon platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4585": {
+      "name": "Dragon plateskirt",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "8782": {
+      "name": "Mahogany plank",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11920": {
+      "name": "Dragon pickaxe",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11995": {
+      "name": "Pet chaos elemental",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "21257": {
+      "name": "Slayer's enchantment",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23490": {
+      "name": "Larran's key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24251": {
+      "name": "Wilderness crabs teleport",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24592": {
+      "name": "Blighted anglerfish",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24595": {
+      "name": "Blighted karambwan",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24607": {
+      "name": "Blighted ancient ice sack",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "scorpia": {
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "219": {
+      "name": "Grimy torstol",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1079": {
+      "name": "Rune platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1113": {
+      "name": "Rune chainbody",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1275": {
+      "name": "Rune pickaxe",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1333": {
+      "name": "Rune scimitar",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1347": {
+      "name": "Rune warhammer",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1407": {
+      "name": "Mystic earth staff",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3051": {
+      "name": "Grimy snapdragon",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4091": {
+      "name": "Mystic robe top",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4093": {
+      "name": "Mystic robe bottom",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "4587": {
+      "name": "Dragon scimitar",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "7158": {
+      "name": "Dragon 2h sword",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "9194": {
+      "name": "Onyx bolt tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "11930": {
+      "name": "Odium shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "11933": {
+      "name": "Malediction shard 3",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "13181": {
+      "name": "Scorpia's offspring",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "19582": {
+      "name": "Dragon javelin tips",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "21257": {
+      "name": "Slayer's enchantment",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23490": {
+      "name": "Larran's key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24251": {
+      "name": "Wilderness crabs teleport",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24592": {
+      "name": "Blighted anglerfish",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  },
+  "barrows": {
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4859": {
+      "name": "Ahrim's hood",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4865": {
+      "name": "Ahrim's staff",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4871": {
+      "name": "Ahrim's robetop",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4877": {
+      "name": "Ahrim's robeskirt",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4883": {
+      "name": "Dharok's helm",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4889": {
+      "name": "Dharok's greataxe",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4895": {
+      "name": "Dharok's platebody",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4901": {
+      "name": "Dharok's platelegs",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4907": {
+      "name": "Guthan's helm",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4913": {
+      "name": "Guthan's warspear",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4919": {
+      "name": "Guthan's platebody",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4925": {
+      "name": "Guthan's chainskirt",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4931": {
+      "name": "Karil's coif",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4937": {
+      "name": "Karil's crossbow",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4943": {
+      "name": "Karil's leathertop",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4949": {
+      "name": "Karil's leatherskirt",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4955": {
+      "name": "Torag's helm",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4961": {
+      "name": "Torag's hammers",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4967": {
+      "name": "Torag's platebody",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4973": {
+      "name": "Torag's platelegs",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4979": {
+      "name": "Verac's helm",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4985": {
+      "name": "Verac's flail",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4991": {
+      "name": "Verac's brassard",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "4997": {
+      "name": "Verac's plateskirt",
+      "rarity": "very_rare",
+      "isUnique": true
+    }
+  },
+  "zalcano": {
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "564": {
+      "name": "Cosmic rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "565": {
+      "name": "Blood rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "566": {
+      "name": "Soul rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "6571": {
+      "name": "Uncut onyx",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "23760": {
+      "name": "Smolcano",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "23908": {
+      "name": "Zalcano shard",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "23953": {
+      "name": "Crystal tool seed",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "nightmare_of_ashihama": {
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "24417": {
+      "name": "Inquisitor's mace",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24419": {
+      "name": "Inquisitor's great helm",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24420": {
+      "name": "Inquisitor's hauberk",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24421": {
+      "name": "Inquisitor's plateskirt",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24422": {
+      "name": "Nightmare staff",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24495": {
+      "name": "Jar of dreams",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "24511": {
+      "name": "Harmonised orb",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24514": {
+      "name": "Volatile orb",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "24517": {
+      "name": "Eldritch orb",
+      "rarity": "rare",
+      "isUnique": true
+    },
+    "25836": {
+      "name": "Little nightmare",
+      "rarity": "rare",
+      "isUnique": true
+    }
+  },
+  "phantom_muspah": {
+    "2": {
+      "name": "Steel cannonball",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "213": {
+      "name": "Grimy kwuarm",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "215": {
+      "name": "Grimy cadantine",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "217": {
+      "name": "Grimy dwarf weed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "225": {
+      "name": "Limpwurt root",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "383": {
+      "name": "Raw shark",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "391": {
+      "name": "Manta ray",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "442": {
+      "name": "Silver ore",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "451": {
+      "name": "Runite ore",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "453": {
+      "name": "Coal",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "554": {
+      "name": "Fire rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "560": {
+      "name": "Death rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "561": {
+      "name": "Nature rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "562": {
+      "name": "Chaos rune",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "563": {
+      "name": "Law rune",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "829": {
+      "name": "Adamant javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "830": {
+      "name": "Rune javelin",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "886": {
+      "name": "Steel arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "892": {
+      "name": "Rune arrow",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "985": {
+      "name": "Tooth half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "987": {
+      "name": "Loop half of key",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "995": {
+      "name": "Coins",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1079": {
+      "name": "Rune platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "1149": {
+      "name": "Dragon med helm",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1185": {
+      "name": "Rune sq shield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1201": {
+      "name": "Rune kiteshield",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1289": {
+      "name": "Rune sword",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "1319": {
+      "name": "Rune 2h sword",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1373": {
+      "name": "Rune battleaxe",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1462": {
+      "name": "Nature talisman",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1615": {
+      "name": "Dragonstone",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1617": {
+      "name": "Uncut diamond",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1619": {
+      "name": "Uncut ruby",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1621": {
+      "name": "Uncut emerald",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "1623": {
+      "name": "Uncut sapphire",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2363": {
+      "name": "Runite bar",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2366": {
+      "name": "Shield left half",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "2485": {
+      "name": "Grimy lantadyme",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "2503": {
+      "name": "Black d'hide body",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3049": {
+      "name": "Grimy toadflax",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "3175": {
+      "name": "Rune spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "3176": {
+      "name": "Dragon spear",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "4087": {
+      "name": "Dragon platelegs",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "4585": {
+      "name": "Dragon plateskirt",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "5288": {
+      "name": "Papaya tree seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5289": {
+      "name": "Palm tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5295": {
+      "name": "Ranarr seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5300": {
+      "name": "Snapdragon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5304": {
+      "name": "Torstol seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5313": {
+      "name": "Willow seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5314": {
+      "name": "Maple seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5315": {
+      "name": "Yew seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "5316": {
+      "name": "Magic seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5317": {
+      "name": "Spirit seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "5321": {
+      "name": "Watermelon seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "7936": {
+      "name": "Pure essence",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "21486": {
+      "name": "Teak seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "21488": {
+      "name": "Mahogany seed",
+      "rarity": "rare",
+      "isUnique": false
+    },
+    "22869": {
+      "name": "Celastrus seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22871": {
+      "name": "Redwood tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "22877": {
+      "name": "Dragonfruit tree seed",
+      "rarity": "very_rare",
+      "isUnique": false
+    },
+    "23083": {
+      "name": "Brimstone key",
+      "rarity": "uncommon",
+      "isUnique": false
+    },
+    "27590": {
+      "name": "Muphin",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
+    "27614": {
+      "name": "Venator shard",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "27627": {
+      "name": "Ancient icon",
+      "rarity": "uncommon",
+      "isUnique": true
+    },
+    "30900": {
+      "name": "Shark lure",
+      "rarity": "uncommon",
+      "isUnique": false
+    }
+  }
+}

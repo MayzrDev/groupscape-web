@@ -2,14 +2,17 @@ use crate::auth_middleware::Authenticated;
 use crate::config::Config;
 use crate::crypto::session_token_hash;
 use crate::db;
+use crate::drop_rates;
 use crate::error::ApiError;
 use crate::models::{
-    ActivityEvent, AmIInGroupRequest, BlockedMember, GroupCredentials, GroupMember,
-    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, PermissionFlags,
-    PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
+    ActivityEvent, AmIInGroupRequest, BlockedMember, GameEvent, GroupCredentials, GroupMember,
+    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, LootSplitParticipant,
+    LootSplitResult, LootSummaryRow, PermissionFlags, PermissionKey, RenameGroup,
+    UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::push;
+use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
@@ -161,7 +164,13 @@ pub async fn get_group_permissions(
     db_pool: web::Data<Pool>,
 ) -> Result<web::Json<Vec<GroupMemberPermissions>>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    require_group_permission(
+        &req,
+        &client,
+        auth.group_id,
+        PermissionKey::ManagePermissions,
+    )
+    .await?;
     let permissions = db::list_group_member_permissions(&client, auth.group_id).await?;
     Ok(web::Json(permissions))
 }
@@ -185,12 +194,16 @@ pub async fn get_my_permissions(
         .get(ACCOUNT_AUTH_HEADER)
         .and_then(|value| value.to_str().ok())
     {
-        Some(token) => db::get_account_by_session_token_hash(&client, &session_token_hash(token)).await?,
+        Some(token) => {
+            db::get_account_by_session_token_hash(&client, &session_token_hash(token)).await?
+        }
         None => None,
     };
 
     let flags = match account {
-        Some(account) => db::get_effective_permission_flags(&client, auth.group_id, account.id).await?,
+        Some(account) => {
+            db::get_effective_permission_flags(&client, auth.group_id, account.id).await?
+        }
         None => PermissionFlags::default(),
     };
 
@@ -205,7 +218,13 @@ pub async fn update_group_permissions(
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManagePermissions).await?;
+    require_group_permission(
+        &req,
+        &client,
+        auth.group_id,
+        PermissionKey::ManagePermissions,
+    )
+    .await?;
     let body = body.into_inner();
     let updated =
         db::update_group_permissions(&client, auth.group_id, body.account_id, body.patch).await?;
@@ -523,6 +542,157 @@ pub async fn get_sessions(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let sessions = db::list_sessions(&client, auth.group_id, query.limit).await?;
     Ok(web::Json(sessions))
+}
+
+fn default_loot_sort() -> String {
+    "value".to_string()
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetLootSummaryQuery {
+    #[serde(default)]
+    pub member_name: Option<String>,
+    #[serde(default = "default_loot_sort")]
+    pub sort: String,
+}
+/// Query-time pivot over `kill` activity events into per-(member, npc, item) rows, joining GE
+/// value (in-process price cache, no live wiki refetch) and rarity/uniqueness (curated
+/// `drop_rates` table) at read time - mirrors `groupscape-old`'s `GET /loot-summary`, adapted
+/// to this server's flat `npc_name` (no `contentKey` slug exists here).
+#[get("/get-loot-summary")]
+pub async fn get_loot_summary(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetLootSummaryQuery>,
+) -> Result<web::Json<Vec<LootSummaryRow>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let events = db::list_kill_events(
+        &client,
+        auth.group_id,
+        query.member_name.as_deref(),
+        None,
+        None,
+    )
+    .await?;
+    let ge_prices = get_ge_prices_map();
+
+    let mut rows: HashMap<(String, String, i32), LootSummaryRow> = HashMap::new();
+    for event in &events {
+        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        let Some(loot) = kill.loot else {
+            continue;
+        };
+        for item in loot {
+            let key = (
+                event.member_name.clone(),
+                kill.npc_name.clone(),
+                item.item_id,
+            );
+            let unit_value = ge_prices.get(&item.item_id).copied();
+            let drop = drop_rates::lookup(&kill.npc_name, item.item_id);
+            let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
+                member_name: event.member_name.clone(),
+                npc_name: kill.npc_name.clone(),
+                item_id: item.item_id,
+                item_name: drop.map(|d| d.name.clone()),
+                quantity: 0,
+                unit_value,
+                total_value: 0,
+                rarity: drop.map(|d| d.rarity.clone()),
+                is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
+            });
+            row.quantity += item.quantity;
+            row.total_value += unit_value.unwrap_or(0) * item.quantity as i64;
+        }
+    }
+
+    let mut result: Vec<LootSummaryRow> = rows.into_values().collect();
+    match query.sort.as_str() {
+        "rarity" => result.sort_by(|a, b| {
+            let rank_a = drop_rates::rarity_rank(a.rarity.as_deref().unwrap_or(""));
+            let rank_b = drop_rates::rarity_rank(b.rarity.as_deref().unwrap_or(""));
+            rank_b.cmp(&rank_a).then(b.total_value.cmp(&a.total_value))
+        }),
+        _ => result.sort_by(|a, b| b.total_value.cmp(&a.total_value)),
+    }
+    Ok(web::Json(result))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetLootSplitQuery {
+    #[serde(default)]
+    pub since: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub until: Option<DateTime<Utc>>,
+}
+/// Total loot GP over `[since, until]` split evenly across every member who reported a kill in
+/// that range. Unlike `groupscape-old`'s split (which credits a per-kill `actor_character_ids`
+/// list), this server has no multi-actor kill co-attribution, so "participants" here is the set
+/// of reporting members rather than a raid roster.
+#[get("/get-loot-split")]
+pub async fn get_loot_split(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetLootSplitQuery>,
+) -> Result<web::Json<LootSplitResult>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let events =
+        db::list_kill_events(&client, auth.group_id, None, query.since, query.until).await?;
+    let ge_prices = get_ge_prices_map();
+
+    let mut per_member: HashMap<String, (i64, i64)> = HashMap::new();
+    let mut total_value: i64 = 0;
+    let kill_count = events.len() as i64;
+    for event in &events {
+        let entry = per_member
+            .entry(event.member_name.clone())
+            .or_insert((0, 0));
+        entry.0 += 1;
+        if let Ok(GameEvent::Kill(kill)) =
+            serde_json::from_value::<GameEvent>(event.payload.clone())
+        {
+            if let Some(loot) = kill.loot {
+                for item in loot {
+                    let value =
+                        ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
+                    entry.1 += value;
+                    total_value += value;
+                }
+            }
+        }
+    }
+
+    let mut participants: Vec<LootSplitParticipant> = per_member
+        .into_iter()
+        .map(|(member_name, (kills, loot_value))| LootSplitParticipant {
+            member_name,
+            kill_count: kills,
+            loot_value,
+        })
+        .collect();
+    participants.sort_by(|a, b| a.member_name.cmp(&b.member_name));
+
+    let participant_count = participants.len() as i64;
+    let (per_person_gp, remainder_gp) = if participant_count > 0 {
+        (
+            total_value / participant_count,
+            total_value % participant_count,
+        )
+    } else {
+        (0, 0)
+    };
+
+    Ok(web::Json(LootSplitResult {
+        total_value,
+        kill_count,
+        participants,
+        per_person_gp,
+        remainder_gp,
+    }))
 }
 
 #[derive(Deserialize)]
