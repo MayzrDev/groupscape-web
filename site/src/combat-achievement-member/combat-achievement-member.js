@@ -1,13 +1,5 @@
 import { BaseElement } from "../base-element/base-element";
-
-export const COMBAT_ACHIEVEMENT_TIERS = [
-  ["easy", "Easy"],
-  ["medium", "Medium"],
-  ["hard", "Hard"],
-  ["elite", "Elite"],
-  ["master", "Master"],
-  ["grandmaster", "Grandmaster"],
-];
+import { COMBAT_ACHIEVEMENT_TIERS } from "../data/combat-achievement";
 
 export class CombatAchievementMember extends BaseElement {
   constructor() {
