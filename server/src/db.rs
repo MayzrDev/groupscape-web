@@ -2,9 +2,9 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, GameEvent, GroupMember, GroupMemberPermissions,
-    GroupPermissions, GroupSession, GroupSkillData, MemberSkillData, PermissionFlags,
-    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
+    AggregateSkillData, BlockedMember, CreateGroup, DialogueEvent, GameEvent, GroupMember,
+    GroupMemberPermissions, GroupPermissions, GroupSession, GroupSkillData, MemberSkillData,
+    ObjectInteractionEvent, PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -609,6 +609,8 @@ FROM groupscape.members WHERE group_id=$2
             active_prayers: row.try_get("active_prayers").ok(),
             rich_presence: row.try_get("rich_presence").ok(),
             events: None,
+            interactions: None,
+            object_interactions: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         };
         result.push(group_member);
@@ -2428,6 +2430,34 @@ pub async fn close_idle_sessions(
     Ok(rows_affected)
 }
 
+/// Shared insert behind [`insert_activity_event`]/[`insert_dialogue_event`]/
+/// [`insert_object_interaction_event`] - `groupscape.activity_events`' `(event_type, payload)`
+/// columns are already generic enough to hold any discrete event kind, so NPC
+/// dialogue/object-interaction events reuse this table and its `GET /get-activity-events`
+/// endpoint rather than getting a dedicated table.
+async fn insert_activity_event_payload(
+    client: &Client,
+    group_id: i64,
+    session_id: i64,
+    member_name: &str,
+    event_type: &str,
+    payload: serde_json::Value,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload) VALUES ($1, $2, $3, $4, $5)",
+        )
+        .await?;
+    client
+        .execute(
+            &stmt,
+            &[&session_id, &group_id, &member_name, &event_type, &payload],
+        )
+        .await
+        .map_err(ApiError::InsertActivityEventError)?;
+    Ok(())
+}
+
 /// Stores one discrete kill/death event. Scoped by `member_name` (the roster identity used
 /// throughout this server) rather than `groupscape-old`'s `actor_character_ids` co-attribution
 /// array - this server doesn't track other members' live world/position with enough recency to
@@ -2441,25 +2471,48 @@ pub async fn insert_activity_event(
     event: &GameEvent,
 ) -> Result<(), ApiError> {
     let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
-    let stmt = client
-        .prepare_cached(
-            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload) VALUES ($1, $2, $3, $4, $5)",
-        )
-        .await?;
-    client
-        .execute(
-            &stmt,
-            &[
-                &session_id,
-                &group_id,
-                &member_name,
-                &event.event_type(),
-                &payload,
-            ],
-        )
+    insert_activity_event_payload(
+        client,
+        group_id,
+        session_id,
+        member_name,
+        event.event_type(),
+        payload,
+    )
+    .await
+}
+
+/// Stores one NPC dialogue event from the plugin's "interactions" upload key.
+pub async fn insert_dialogue_event(
+    client: &Client,
+    group_id: i64,
+    session_id: i64,
+    member_name: &str,
+    event: &DialogueEvent,
+) -> Result<(), ApiError> {
+    let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
+    insert_activity_event_payload(client, group_id, session_id, member_name, "dialogue", payload)
         .await
-        .map_err(ApiError::InsertActivityEventError)?;
-    Ok(())
+}
+
+/// Stores one object-interaction event from the plugin's "object_interactions" upload key.
+pub async fn insert_object_interaction_event(
+    client: &Client,
+    group_id: i64,
+    session_id: i64,
+    member_name: &str,
+    event: &ObjectInteractionEvent,
+) -> Result<(), ApiError> {
+    let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
+    insert_activity_event_payload(
+        client,
+        group_id,
+        session_id,
+        member_name,
+        "object_interaction",
+        payload,
+    )
+    .await
 }
 
 fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {

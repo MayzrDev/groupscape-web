@@ -5,7 +5,7 @@ use tokio_postgres::NoTls;
 
 use server::config::Config;
 use server::db;
-use server::models::{DeathEvent, GameEvent, KillEvent, LootItem};
+use server::models::{DeathEvent, DialogueEvent, GameEvent, KillEvent, LootItem, ObjectInteractionEvent};
 
 /// Serializes integration tests since they all share the same database
 /// and each test drops/recreates the schema.
@@ -276,4 +276,66 @@ async fn test_kill_event_without_loot_round_trips() {
         .unwrap();
     assert_eq!(events.len(), 1);
     assert!(events[0].payload.get("loot").is_none());
+}
+
+#[tokio::test]
+async fn test_insert_dialogue_event_round_trips() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "activitytest5").await;
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    let dialogue = DialogueEvent {
+        event_type: "dialogue".to_string(),
+        npc_id: 941,
+        npc_name: "Hans".to_string(),
+        combat_level: 0,
+        world_x: 3222,
+        world_y: 3218,
+        plane: 0,
+        world: 301,
+    };
+    db::insert_dialogue_event(&client, group_id, session_id, "Zezima", &dialogue)
+        .await
+        .expect("insert should succeed");
+
+    let events = db::list_activity_events(&client, group_id, None, None, None, 30)
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, "dialogue");
+    assert_eq!(events[0].member_name, "Zezima");
+    assert_eq!(events[0].payload["npcName"], serde_json::json!("Hans"));
+}
+
+#[tokio::test]
+async fn test_insert_object_interaction_event_round_trips() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "activitytest6").await;
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    let object_interaction = ObjectInteractionEvent {
+        object_id: 409,
+        object_name: Some("Bank booth".to_string()),
+        action: Some("Bank".to_string()),
+        world_x: 3185,
+        world_y: 3437,
+        plane: 0,
+        world: 301,
+    };
+    db::insert_object_interaction_event(&client, group_id, session_id, "Zezima", &object_interaction)
+        .await
+        .expect("insert should succeed");
+
+    let events = db::list_activity_events(&client, group_id, None, None, None, 30)
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].event_type, "object_interaction");
+    assert_eq!(events[0].payload["objectName"], serde_json::json!("Bank booth"));
 }

@@ -373,6 +373,42 @@ pub async fn update_group_member(
         }
     }
 
+    // NPC dialogue/object-interaction events ride the same heartbeat under their own
+    // "interactions"/"object_interactions" keys (see `DialogueEvent`/`ObjectInteractionEvent`),
+    // stored into the same generic `activity_events` table as kill/death.
+    if let Some(interactions) = group_member_inner.interactions.take() {
+        if !interactions.is_empty() {
+            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+            let session_id = db::ensure_open_session(&client, auth.group_id).await?;
+            for event in &interactions {
+                db::insert_dialogue_event(
+                    &client,
+                    auth.group_id,
+                    session_id,
+                    &group_member_inner.name,
+                    event,
+                )
+                .await?;
+            }
+        }
+    }
+    if let Some(object_interactions) = group_member_inner.object_interactions.take() {
+        if !object_interactions.is_empty() {
+            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+            let session_id = db::ensure_open_session(&client, auth.group_id).await?;
+            for event in &object_interactions {
+                db::insert_object_interaction_event(
+                    &client,
+                    auth.group_id,
+                    session_id,
+                    &group_member_inner.name,
+                    event,
+                )
+                .await?;
+            }
+        }
+    }
+
     // Publish straight to any connected party overlays before handing off to
     // the batched DB writer - the batcher trades latency for write
     // efficiency, but the overlay wants these updates as fast as possible.
