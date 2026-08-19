@@ -106,6 +106,13 @@ pub enum ApiError {
     CannotModifyGroupAdminPermissionsError,
     AccountAuthRequiredError,
     PermissionDeniedError,
+    #[from(ignore)]
+    UpsertPushSubscriptionError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DeletePushSubscriptionError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ListPushSubscriptionsError(tokio_postgres::error::Error),
+    PushNotConfiguredError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -253,6 +260,18 @@ impl ResponseError for ApiError {
                 .body("This action requires a logged-in account (X-Account-Authorization)"),
             ApiError::PermissionDeniedError => {
                 HttpResponse::Forbidden().body("You do not have permission to perform this action")
+            }
+            ApiError::UpsertPushSubscriptionError(ref err) => {
+                handle_pg_error(err, "UpsertPushSubscriptionError")
+            }
+            ApiError::DeletePushSubscriptionError(ref err) => {
+                handle_pg_error(err, "DeletePushSubscriptionError")
+            }
+            ApiError::ListPushSubscriptionsError(ref err) => {
+                handle_pg_error(err, "ListPushSubscriptionsError")
+            }
+            ApiError::PushNotConfiguredError => {
+                HttpResponse::ServiceUnavailable().body("Web push is not configured on this server")
             }
         }
     }

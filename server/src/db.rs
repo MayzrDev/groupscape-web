@@ -611,6 +611,7 @@ FROM groupscape.members WHERE group_id=$2
             events: None,
             interactions: None,
             object_interactions: None,
+            alerts: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         };
         result.push(group_member);
@@ -1666,6 +1667,36 @@ ADD COLUMN IF NOT EXISTS combat_achievements TEXT
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_push_subscriptions_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.push_subscriptions (
+  subscription_id BIGSERIAL PRIMARY KEY,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS push_subscriptions_account_id_idx ON groupscape.push_subscriptions (account_id)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_push_subscriptions_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2068,6 +2099,106 @@ pub async fn delete_character(client: &Client, character_id: i64) -> Result<(), 
         .await
         .map_err(ApiError::DeleteCharacterError)?;
     Ok(())
+}
+
+pub struct PushSubscription {
+    pub id: i64,
+    pub account_id: i64,
+    pub endpoint: String,
+    pub p256dh: String,
+    pub auth: String,
+}
+
+/// Upserts on `endpoint` conflict, matching `groupscape-old`'s design: re-subscribing the same
+/// endpoint (e.g. the browser rotated its keys) replaces the stored keys in place rather than
+/// erroring or accumulating duplicates. Per-device, not per-account-singleton - one account can
+/// hold many rows, one per browser/device it subscribed from.
+pub async fn upsert_push_subscription(
+    client: &Client,
+    account_id: i64,
+    endpoint: &str,
+    p256dh: &str,
+    auth: &str,
+) -> Result<PushSubscription, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.push_subscriptions (account_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, $4)
+             ON CONFLICT (endpoint) DO UPDATE SET account_id=EXCLUDED.account_id, p256dh=EXCLUDED.p256dh, auth=EXCLUDED.auth
+             RETURNING subscription_id, account_id, endpoint, p256dh, auth",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&account_id, &endpoint, &p256dh, &auth])
+        .await
+        .map_err(ApiError::UpsertPushSubscriptionError)?;
+    Ok(PushSubscription {
+        id: row.try_get("subscription_id")?,
+        account_id: row.try_get("account_id")?,
+        endpoint: row.try_get("endpoint")?,
+        p256dh: row.try_get("p256dh")?,
+        auth: row.try_get("auth")?,
+    })
+}
+
+/// Ownership-scoped: only removes the row if it belongs to `account_id`, mirroring
+/// `unlink_character`'s ownership check on the caller side without a separate lookup query.
+pub async fn delete_push_subscription(
+    client: &Client,
+    account_id: i64,
+    endpoint: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "DELETE FROM groupscape.push_subscriptions WHERE account_id=$1 AND endpoint=$2",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id, &endpoint])
+        .await
+        .map_err(ApiError::DeletePushSubscriptionError)?;
+    Ok(())
+}
+
+/// No account_id scoping - a `410 Gone`/`404 Not Found` response from the push service means the
+/// endpoint itself is dead, regardless of which account currently owns the row.
+pub async fn delete_push_subscription_by_endpoint(
+    client: &Client,
+    endpoint: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.push_subscriptions WHERE endpoint=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&endpoint])
+        .await
+        .map_err(ApiError::DeletePushSubscriptionError)?;
+    Ok(())
+}
+
+pub async fn list_push_subscriptions_for_account(
+    client: &Client,
+    account_id: i64,
+) -> Result<Vec<PushSubscription>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT subscription_id, account_id, endpoint, p256dh, auth FROM groupscape.push_subscriptions WHERE account_id=$1",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::ListPushSubscriptionsError)?;
+    rows.into_iter()
+        .map(|row| {
+            Ok(PushSubscription {
+                id: row.try_get("subscription_id")?,
+                account_id: row.try_get("account_id")?,
+                endpoint: row.try_get("endpoint")?,
+                p256dh: row.try_get("p256dh")?,
+                auth: row.try_get("auth")?,
+            })
+        })
+        .collect()
 }
 
 pub struct CharacterGroupLink {

@@ -119,6 +119,10 @@ pub struct GroupMember {
     /// under its own "object_interactions" upload key.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub object_interactions: Option<Vec<ObjectInteractionEvent>>,
+    /// Low-HP/wilderness-entry alert events from the plugin's `AlertEvents` accumulator, under
+    /// its own "alerts" upload key. Consumed once to trigger a web push, never stored.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alerts: Option<Vec<AlertEvent>>,
 }
 
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
@@ -205,6 +209,53 @@ pub struct ObjectInteractionEvent {
     pub object_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<String>,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+}
+
+/// Discriminated on the plugin's own `"type"` field ("low_hp"/"wilderness_entry"), matching
+/// `AlertEvents`' transport shape field-for-field (`groupscape-plugin`'s "alerts" upload key).
+/// Unlike [`GameEvent`], these never land in `activity_events` - they're consumed once, straight
+/// off the heartbeat, to trigger a web push and are not stored.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AlertEvent {
+    LowHp(LowHpAlert),
+    WildernessEntry(WildernessEntryAlert),
+}
+impl AlertEvent {
+    /// Push notification title/body, mirroring `groupscape-old`'s alert-push copy.
+    pub fn push_title_and_body(&self) -> (&'static str, String) {
+        match self {
+            AlertEvent::LowHp(alert) => (
+                "Low HP",
+                format!("{}/{} HP remaining", alert.current_hp, alert.max_hp),
+            ),
+            AlertEvent::WildernessEntry(alert) => (
+                "Wilderness entry",
+                format!("Entered level {} wilderness", alert.wilderness_level),
+            ),
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LowHpAlert {
+    pub current_hp: i32,
+    pub max_hp: i32,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WildernessEntryAlert {
+    pub wilderness_level: i32,
     pub world_x: i32,
     pub world_y: i32,
     pub plane: i32,
@@ -323,6 +374,25 @@ pub struct LinkCharacterToGroup {
     pub character_id: i64,
     pub group_name: String,
     pub group_token: String,
+}
+/// Mirrors the browser's `PushSubscriptionJSON` shape verbatim so the site can forward its
+/// `pushManager.subscribe()` result straight through without reshaping it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SubscribePush {
+    pub endpoint: String,
+    pub keys: PushSubscriptionKeys,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PushSubscriptionKeys {
+    pub p256dh: String,
+    pub auth: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UnsubscribePush {
+    pub endpoint: String,
 }
 #[derive(Serialize)]
 pub struct CharacterGroupLink {

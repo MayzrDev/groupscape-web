@@ -1,4 +1,5 @@
 use crate::auth_middleware::Authenticated;
+use crate::config::Config;
 use crate::crypto::session_token_hash;
 use crate::db;
 use crate::error::ApiError;
@@ -8,6 +9,7 @@ use crate::models::{
     PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
+use crate::push;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
@@ -220,6 +222,7 @@ pub async fn update_group_member(
     sender: web::Data<mpsc::Sender<GroupMember>>,
     broadcast_registry: web::Data<GroupBroadcastRegistry>,
     db_pool: web::Data<Pool>,
+    config: web::Data<Config>,
 ) -> Result<HttpResponse, Error> {
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
@@ -241,9 +244,13 @@ pub async fn update_group_member(
     // character linked, and linked to this specific group). Legacy plugin builds and
     // characters that aren't linked yet fall back to matching an existing member row by name,
     // so group setup can still take a typed RSN in the meantime.
+    // Also resolves the account a low-HP/wilderness alert (below) should push to - a character
+    // can carry alerts once linked to an account even before it's linked to this specific group.
+    let mut linked_account_id: Option<i64> = None;
     if let Some(account_hash) = group_member_inner.account_hash.clone() {
         let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
         if let Some(character) = db::find_character_by_account_hash(&client, &account_hash).await? {
+            linked_account_id = Some(character.account_id);
             let linked_to_this_group = db::find_character_group_link(&client, character.id)
                 .await?
                 .is_some_and(|link| link.group_id == auth.group_id);
@@ -405,6 +412,22 @@ pub async fn update_group_member(
                     event,
                 )
                 .await?;
+            }
+        }
+    }
+
+    // Low-HP/wilderness-entry alerts are consumed once to trigger a web push (never stored,
+    // unlike `events`/`interactions`/`object_interactions` above) - a no-op if the character
+    // isn't account-linked yet or push isn't configured on this server.
+    if let Some(alerts) = group_member_inner.alerts.take() {
+        if let Some(account_id) = linked_account_id {
+            for alert in alerts {
+                push::dispatch_alert_push(
+                    config.push.clone(),
+                    db_pool.get_ref().clone(),
+                    account_id,
+                    alert,
+                );
             }
         }
     }

@@ -7,6 +7,7 @@ use server::authed;
 use server::config::Config;
 use server::db;
 use server::models;
+use server::push;
 use server::unauthed;
 use server::update_batcher;
 use server::vantage;
@@ -48,6 +49,20 @@ async fn main() -> std::io::Result<()> {
             config.discord.redirect_uri = redirect_uri;
         }
     }
+    // Web push is optional - only enabled once all three VAPID vars are supplied, mirroring
+    // the Discord-OAuth pattern above. None of these ever live in config.toml.
+    if let (Ok(vapid_public_key), Ok(vapid_private_key), Ok(vapid_subject)) = (
+        std::env::var("VAPID_PUBLIC_KEY"),
+        std::env::var("VAPID_PRIVATE_KEY"),
+        std::env::var("VAPID_SUBJECT"),
+    ) {
+        if !vapid_public_key.is_empty() && !vapid_private_key.is_empty() && !vapid_subject.is_empty() {
+            config.push.enabled = true;
+            config.push.vapid_public_key = vapid_public_key;
+            config.push.vapid_private_key = vapid_private_key;
+            config.push.vapid_subject = vapid_subject;
+        }
+    }
     config.web_origin = std::env::var("WEB_ORIGIN").unwrap_or_default();
     let config = config;
     let pool = config.pg.create_pool(None, NoTls).unwrap();
@@ -85,7 +100,8 @@ async fn main() -> std::io::Result<()> {
             .service(accounts::register)
             .service(accounts::login)
             .service(accounts::discord_redirect)
-            .service(accounts::discord_callback);
+            .service(accounts::discord_callback)
+            .service(push::vapid_public_key);
         let authed_account_scope = web::scope("/api/account")
             .wrap(AccountAuthenticateMiddlewareFactory::new(
                 account_auth_cache.clone(),
@@ -97,7 +113,9 @@ async fn main() -> std::io::Result<()> {
             .service(accounts::list_characters)
             .service(accounts::link_character)
             .service(accounts::unlink_character)
-            .service(accounts::link_character_to_group);
+            .service(accounts::link_character_to_group)
+            .service(push::subscribe)
+            .service(push::unsubscribe);
         let authed_scope = web::scope("/api/group/{group_name}")
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)

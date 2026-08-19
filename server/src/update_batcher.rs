@@ -662,6 +662,7 @@ mod tests {
             events: None,
             interactions: None,
             object_interactions: None,
+            alerts: None,
         }
     }
 

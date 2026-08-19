@@ -125,6 +125,7 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         events: None,
         interactions: None,
         object_interactions: None,
+        alerts: None,
     }
 }
 
