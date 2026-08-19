@@ -46,6 +46,17 @@ describe("member-data", () => {
     expect(member.combatAchievements.tasks["1234"]).toBe(true);
   });
 
+  it("publishes rich presence text on rich_presence updates", () => {
+    const member = new MemberData("Alice");
+
+    member.update({ rich_presence: "Talking to Reldo" });
+
+    const event = pubsub.getMostRecent("richPresence:Alice");
+    expect(event).toBeDefined();
+    expect(event[0]).toBe("Talking to Reldo");
+    expect(member.richPresence).toBe("Talking to Reldo");
+  });
+
   it("publishes interacting updates when payload explicitly clears interacting", () => {
     const member = new MemberData("Alice");
 
