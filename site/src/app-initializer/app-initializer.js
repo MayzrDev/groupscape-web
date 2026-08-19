@@ -7,6 +7,7 @@ import { pubsub } from "../data/pubsub";
 import { loadingScreenManager } from "../loading-screen/loading-screen-manager";
 import { exampleData } from "../data/example-data";
 import { AchievementDiary } from "../data/diaries";
+import { toastSource } from "../data/toast-source";
 
 export class AppInitializer extends BaseElement {
   constructor() {
@@ -29,6 +30,7 @@ export class AppInitializer extends BaseElement {
 
   cleanup() {
     api.disable();
+    toastSource.disable();
     // Unpublish everything to prevent any data leaking over into another session
     pubsub.unpublishAll();
     exampleData.disable();
@@ -65,6 +67,7 @@ export class AppInitializer extends BaseElement {
     const firstDataEvent = pubsub.waitUntilNextEvent("get-group-data", false);
     await api.enable(group.groupName, group.groupToken);
     await firstDataEvent;
+    toastSource.enable();
   }
 }
 

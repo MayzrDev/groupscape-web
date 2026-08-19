@@ -1,0 +1,130 @@
+toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 900;
+  pointer-events: none;
+}
+
+.toast-stack__list {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+@media only screen and (max-width: 600px) {
+  toast-stack {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+  }
+
+  .toast-stack__list {
+    align-items: stretch;
+  }
+}
+
+.toast-stack__toast {
+  --toast-color: var(--orange);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 240px;
+  max-width: 320px;
+  padding: 10px 12px;
+  border-radius: 3px;
+  background: #171310;
+  border: 1px solid var(--light-border);
+  border-left: 3px solid var(--toast-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  font-size: 12.5px;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: toast-stack-enter 180ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-stack__toast {
+    animation: none;
+  }
+}
+
+.toast-stack__toast--leaving {
+  animation: toast-stack-leave 350ms ease-in forwards;
+}
+
+.toast-stack__toast--kill {
+  --toast-color: var(--green);
+}
+
+.toast-stack__toast--death {
+  --toast-color: var(--red);
+}
+
+.toast-stack__toast--quest {
+  --toast-color: #c9962b;
+}
+
+.toast-stack__toast--combat-achievement {
+  --toast-color: #c084fc;
+}
+
+.toast-stack__toast--level-up {
+  --toast-color: var(--orange);
+}
+
+.toast-stack__icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  background: color-mix(in srgb, var(--toast-color) 20%, transparent);
+  color: var(--toast-color);
+}
+
+.toast-stack__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-stack__title {
+  font-weight: 700;
+  color: var(--primary-text);
+}
+
+.toast-stack__title .toast-stack__subject {
+  color: var(--toast-color);
+}
+
+.toast-stack__meta {
+  font-size: 11px;
+  opacity: 0.65;
+  margin-top: 2px;
+}
+
+@keyframes toast-stack-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-stack-leave {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
