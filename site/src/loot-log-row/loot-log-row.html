@@ -1,0 +1,13 @@
+<item-box item-id="${this.row.item_id}" item-quantity="${this.row.quantity}" no-tooltip></item-box>
+<div class="loot-log-row__info">
+  <div class="loot-log-row__name">
+    ${this.itemName}
+    ${this.row.is_unique ? `<span class="loot-log-row__unique-tag">Unique</span>` : ""}
+  </div>
+  <div class="loot-log-row__meta">from ${this.row.npc_name} · dropped by ${this.row.member_name}</div>
+</div>
+${this.rarityLabel ? `<span class="loot-log-row__rarity-badge">${this.rarityLabel}</span>` : ""}
+<div class="loot-log-row__value">
+  <div class="loot-log-row__gp">${this.formattedValue}</div>
+  <div class="loot-log-row__qty">×${this.row.quantity}</div>
+</div>

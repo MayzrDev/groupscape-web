@@ -1,0 +1,102 @@
+loot-log-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: var(--darken);
+  border-left: 4px solid var(--rarity-common);
+}
+
+loot-log-row[data-rarity="uncommon"] {
+  border-left-color: var(--rarity-uncommon);
+}
+
+loot-log-row[data-rarity="rare"] {
+  border-left-color: var(--rarity-rare);
+}
+
+loot-log-row[data-rarity="very_rare"] {
+  border-left-color: var(--rarity-very-rare);
+}
+
+loot-log-row[data-unique="true"] {
+  border-left-color: var(--rarity-unique);
+  box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35), 0 0 12px rgba(255, 215, 0, 0.25);
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.08), var(--darken));
+}
+
+.loot-log-row__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.loot-log-row__name {
+  font-size: 0.9em;
+}
+
+.loot-log-row__unique-tag {
+  color: var(--rarity-unique);
+  font-size: 0.6em;
+  margin-left: 6px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.loot-log-row__meta {
+  font-size: 0.75em;
+  opacity: 0.65;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.loot-log-row__rarity-badge {
+  font-size: 0.68em;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  text-shadow: none;
+  flex-shrink: 0;
+  background: rgba(154, 154, 154, 0.18);
+  color: var(--rarity-common);
+}
+
+loot-log-row[data-rarity="uncommon"] .loot-log-row__rarity-badge {
+  background: rgba(76, 175, 80, 0.18);
+  color: var(--rarity-uncommon);
+}
+
+loot-log-row[data-rarity="rare"] .loot-log-row__rarity-badge {
+  background: rgba(59, 130, 246, 0.18);
+  color: var(--rarity-rare);
+}
+
+loot-log-row[data-rarity="very_rare"] .loot-log-row__rarity-badge {
+  background: rgba(168, 85, 247, 0.18);
+  color: var(--rarity-very-rare);
+}
+
+.loot-log-row__value {
+  text-align: right;
+  min-width: 90px;
+  flex-shrink: 0;
+  font-family: ui-sans-serif, Arial, sans-serif;
+}
+
+.loot-log-row__gp {
+  color: var(--yellow);
+  font-weight: 700;
+  font-size: 0.85em;
+}
+
+.loot-log-row__qty {
+  font-size: 0.72em;
+  opacity: 0.6;
+}

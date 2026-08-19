@@ -93,6 +93,14 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-activity-events`;
   }
 
+  get lootSummaryUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-loot-summary`;
+  }
+
+  get lootSplitUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-loot-split`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -360,6 +368,38 @@ class Api {
     });
     if (!response.ok) {
       return [];
+    }
+    return response.json();
+  }
+
+  async getLootSummary({ memberName, sort } = {}) {
+    const query = new URLSearchParams();
+    if (memberName) query.set("member_name", memberName);
+    if (sort) query.set("sort", sort);
+
+    const response = await fetch(`${this.lootSummaryUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return [];
+    }
+    return response.json();
+  }
+
+  async getLootSplit({ since, until } = {}) {
+    const query = new URLSearchParams();
+    if (since) query.set("since", since);
+    if (until) query.set("until", until);
+
+    const response = await fetch(`${this.lootSplitUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return null;
     }
     return response.json();
   }

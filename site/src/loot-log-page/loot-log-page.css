@@ -1,0 +1,94 @@
+loot-log-page {
+  display: flex;
+  justify-content: center;
+}
+
+.loot-log-page__container {
+  max-width: 760px;
+  width: 100%;
+  min-height: 300px;
+  padding: 14px 16px 18px;
+  box-sizing: border-box;
+}
+
+.loot-log-page__split-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  font-family: ui-sans-serif, Arial, sans-serif;
+}
+
+.loot-log-page__split-card {
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 8px;
+  padding: 8px 16px;
+  flex: 1;
+  min-width: 110px;
+}
+
+.loot-log-page__split-n {
+  font-size: 1.25em;
+  font-weight: 700;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+  text-shadow: none;
+}
+
+.loot-log-page__split-l {
+  font-size: 0.68em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+}
+
+.loot-log-page__participants {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 0.78em;
+}
+
+.loot-log-page__participant-chip {
+  background: var(--darken);
+  border: 1px solid var(--light-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  text-shadow: none;
+}
+
+.loot-log-page__participant-chip b {
+  color: var(--green);
+}
+
+.loot-log-page__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.loot-log-page__toolbar-label {
+  font-size: 0.7em;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  opacity: 0.7;
+  margin-right: -2px;
+}
+
+.loot-log-page__list {
+  margin-top: 4px;
+}
+
+.loot-log-page__empty {
+  display: none;
+  opacity: 0.65;
+  font-size: 0.88em;
+}
+
+.loot-log-page__empty--visible {
+  display: block;
+}
