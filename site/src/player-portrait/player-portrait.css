@@ -16,6 +16,15 @@ player-portrait[mode="full"] {
   aspect-ratio: 3 / 5;
 }
 
+player-portrait[mode="full"] .player-portrait__frame {
+  cursor: grab;
+  touch-action: none;
+}
+
+player-portrait[mode="full"] .player-portrait__frame:active {
+  cursor: grabbing;
+}
+
 .player-portrait__frame {
   position: relative;
   width: 100%;
