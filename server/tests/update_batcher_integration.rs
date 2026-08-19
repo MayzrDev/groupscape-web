@@ -123,6 +123,8 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         combat_achievements: None,
         last_updated: None,
         events: None,
+        interactions: None,
+        object_interactions: None,
     }
 }
 

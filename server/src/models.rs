@@ -110,6 +110,15 @@ pub struct GroupMember {
     /// `groupscape-old`'s "ride the tick" ingestion pattern rather than a separate endpoint.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub events: Option<Vec<GameEvent>>,
+    /// NPC dialogue events from the plugin's `InteractionEvents` accumulator, under its own
+    /// "interactions" upload key (kept separate from `events` and `object_interactions` -
+    /// the plugin never merges these event streams).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interactions: Option<Vec<DialogueEvent>>,
+    /// Object-interaction events from the plugin's `ObjectInteractionEvents` accumulator,
+    /// under its own "object_interactions" upload key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_interactions: Option<Vec<ObjectInteractionEvent>>,
 }
 
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
@@ -164,6 +173,42 @@ impl GameEvent {
             GameEvent::Death(_) => "death",
         }
     }
+}
+
+/// One NPC dialogue event, field names matching `InteractionEvents.onDialogue`'s transport
+/// shape verbatim (`groupscape-plugin`'s "interactions" upload key). The plugin always sends
+/// `"type": "dialogue"` even though it's the only shape on this key today - kept as a plain
+/// field rather than an enum tag like [`GameEvent`] since there's nothing to discriminate yet.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct DialogueEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub npc_id: i32,
+    pub npc_name: String,
+    pub combat_level: i32,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+}
+
+/// One object-interaction event, field names matching
+/// `ObjectInteractionEvents.onObjectInteraction`'s transport shape verbatim
+/// (`groupscape-plugin`'s "object_interactions" upload key). Unlike [`DialogueEvent`], the
+/// plugin never tags these with a "type" field.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ObjectInteractionEvent {
+    pub object_id: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub object_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
 }
 
 #[derive(Serialize)]

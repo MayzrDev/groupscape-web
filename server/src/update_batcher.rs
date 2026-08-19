@@ -660,6 +660,8 @@ mod tests {
             combat_achievements: None,
             last_updated: None,
             events: None,
+            interactions: None,
+            object_interactions: None,
         }
     }
 
