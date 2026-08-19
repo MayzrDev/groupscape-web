@@ -132,6 +132,13 @@ pub fn start_session_idle_closer(db_pool: Pool) {
     });
 }
 
+/// Parses the same cached GE-price snapshot `GET /ge-prices` serves as raw JSON into a map,
+/// for server-side joins (e.g. loot summary/split value calculations) instead of re-fetching.
+pub fn get_ge_prices_map() -> GEPrices {
+    let ge_prices_opt = GE_PRICES.load();
+    serde_json::from_str(&ge_prices_opt).unwrap_or_default()
+}
+
 #[get("/ge-prices")]
 pub async fn get_ge_prices() -> Result<HttpResponse, Error> {
     let ge_prices_opt = GE_PRICES.load();

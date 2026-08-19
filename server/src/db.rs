@@ -2491,8 +2491,15 @@ pub async fn insert_dialogue_event(
     event: &DialogueEvent,
 ) -> Result<(), ApiError> {
     let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
-    insert_activity_event_payload(client, group_id, session_id, member_name, "dialogue", payload)
-        .await
+    insert_activity_event_payload(
+        client,
+        group_id,
+        session_id,
+        member_name,
+        "dialogue",
+        payload,
+    )
+    .await
 }
 
 /// Stores one object-interaction event from the plugin's "object_interactions" upload key.
@@ -2554,10 +2561,49 @@ LIMIT $5
     let rows = client
         .query(
             &stmt,
-            &[&group_id, &member_name, &event_type, &before, &limit.clamp(1, 200)],
+            &[
+                &group_id,
+                &member_name,
+                &event_type,
+                &before,
+                &limit.clamp(1, 200),
+            ],
         )
         .await
         .map_err(ApiError::ListActivityEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
+/// All `kill` events for a group in an optional `[since, until]` range, uncapped by cursor
+/// pagination (bounded by a hard safety limit) since callers aggregate the full result rather
+/// than paging it - mirrors `groupscape-old`'s `listBossKillEventsForGroup` query-time pivot
+/// that the loot summary/split endpoints are built on.
+pub async fn list_kill_events(
+    client: &Client,
+    group_id: i64,
+    member_name: Option<&str>,
+    since: Option<DateTime<Utc>>,
+    until: Option<DateTime<Utc>>,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type='kill'
+  AND ($2::text IS NULL OR member_name = $2)
+  AND ($3::timestamptz IS NULL OR occurred_at >= $3)
+  AND ($4::timestamptz IS NULL OR occurred_at <= $4)
+ORDER BY occurred_at DESC
+LIMIT 5000
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &member_name, &since, &until])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
     rows.iter().map(activity_event_from_row).collect()
 }
 

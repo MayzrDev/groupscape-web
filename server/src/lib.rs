@@ -8,6 +8,7 @@ pub mod config;
 pub mod crypto;
 pub mod db;
 pub mod discord;
+pub mod drop_rates;
 pub mod error;
 pub mod models;
 pub mod permissions;
