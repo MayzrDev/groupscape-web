@@ -1,0 +1,32 @@
+<div class="combat-achievements dialog dialog__visible">
+  <div class="combat-achievements__container dialog__container metal-border rsbackground">
+    <div class="combat-achievements__header">
+      <div></div>
+      <h2 class="combat-achievements__title">
+        ${this.playerName}'s Combat Achievements - ${combatAchievement.completedTierCount(this.member)}/6 tiers complete
+      </h2>
+      <button class="combat-achievements__close dialog__close">
+        <img src="/ui/1731-0.png" alt="Close dialog" title="Close dialog" />
+      </button>
+    </div>
+
+    <div class="combat-achievements__title-border"></div>
+
+    <div class="combat-achievements__main">
+      <div class="combat-achievements__medallions">
+        ${COMBAT_ACHIEVEMENT_TIERS.map(([key, label]) => `
+        <button
+          type="button"
+          class="combat-achievements__medallion combat-achievements__medallion--${key} ${key === this.openTier ? "combat-achievements__medallion--open" : ""}"
+          tier-key="${key}"
+        >
+          <span class="combat-achievements__medallion-ring" style="--pct: ${combatAchievement.tierCompletionPercent(this.member, key)}"></span>
+          <span class="combat-achievements__medallion-name">${label}</span>
+          <span class="combat-achievements__medallion-frac">${combatAchievement.completedTaskCountForTier(this.member, key)}/${combatAchievement.totalTasksForTier(key)}</span>
+        </button>`).join("")}
+      </div>
+
+      <div class="combat-achievements__accordion-body"></div>
+    </div>
+  </div>
+</div>

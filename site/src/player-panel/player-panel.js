@@ -41,6 +41,11 @@ export class PlayerPanel extends BaseElement {
       "click",
       this.handleCollectionLogClick.bind(this)
     );
+    this.eventListener(
+      this.querySelector(".player-panel__combat-achievements"),
+      "click",
+      this.handleCombatAchievementsClick.bind(this)
+    );
   }
 
   disconnectedCallback() {
@@ -51,6 +56,12 @@ export class PlayerPanel extends BaseElement {
     const collectionLogEl = document.createElement("collection-log");
     collectionLogEl.setAttribute("player-name", this.playerName);
     document.body.appendChild(collectionLogEl);
+  }
+
+  handleCombatAchievementsClick() {
+    const combatAchievementsEl = document.createElement("combat-achievements");
+    combatAchievementsEl.setAttribute("player-name", this.playerName);
+    document.body.appendChild(combatAchievementsEl);
   }
 
   handleMiniBarClick(event) {

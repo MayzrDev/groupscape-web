@@ -1,5 +1,11 @@
 combat-achievements-page {
   display: flex;
+  --tier-easy: rgb(111, 174, 74);
+  --tier-medium: rgb(74, 155, 174);
+  --tier-hard: rgb(194, 90, 60);
+  --tier-elite: rgb(194, 60, 138);
+  --tier-master: rgb(138, 74, 194);
+  --tier-grandmaster: rgb(212, 175, 55);
 }
 
 .combat-achievements-page__container {
@@ -11,4 +17,94 @@ combat-achievements-page {
 .combat-achievements-page__hint {
   opacity: 0.75;
   margin-top: 0;
+}
+
+.combat-achievements-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.combat-achievements-page__table th {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--orange);
+  opacity: 0.85;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--light-border);
+  cursor: default;
+  white-space: nowrap;
+}
+
+.combat-achievements-page__table th[sort-key] {
+  cursor: pointer;
+  user-select: none;
+}
+
+.combat-achievements-page__table th:first-child {
+  text-align: left;
+}
+
+.combat-achievements-page__table td {
+  text-align: center;
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.combat-achievements-page__table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.combat-achievements-page__name {
+  color: var(--orange);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.combat-achievements-page__name:hover {
+  text-decoration: underline;
+}
+
+.combat-achievements-page__pip {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.combat-achievements-page__pip--on.combat-achievements-page__pip--easy {
+  background: var(--tier-easy);
+}
+.combat-achievements-page__pip--on.combat-achievements-page__pip--medium {
+  background: var(--tier-medium);
+}
+.combat-achievements-page__pip--on.combat-achievements-page__pip--hard {
+  background: var(--tier-hard);
+}
+.combat-achievements-page__pip--on.combat-achievements-page__pip--elite {
+  background: var(--tier-elite);
+}
+.combat-achievements-page__pip--on.combat-achievements-page__pip--master {
+  background: var(--tier-master);
+}
+.combat-achievements-page__pip--on.combat-achievements-page__pip--grandmaster {
+  background: var(--tier-grandmaster);
+}
+
+.combat-achievements-page__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.combat-achievements-page__count--full {
+  color: var(--green);
+  opacity: 1;
+  font-weight: 600;
 }
