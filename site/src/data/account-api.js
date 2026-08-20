@@ -45,6 +45,14 @@ class AccountApi {
     return this.baseUrl;
   }
 
+  get vapidPublicKeyUrl() {
+    return `${this.baseUrl}/push/vapid-public-key`;
+  }
+
+  get pushSubscribeUrl() {
+    return `${this.baseUrl}/push/subscribe`;
+  }
+
   async register(email, password) {
     const response = await fetch(this.registerUrl, {
       body: JSON.stringify({ email, password }),
@@ -137,6 +145,37 @@ class AccountApi {
         Authorization: accountToken,
       },
       method: "PUT",
+    });
+    return response;
+  }
+
+  async vapidPublicKey() {
+    const response = await fetch(this.vapidPublicKeyUrl);
+    return response;
+  }
+
+  async subscribePush(subscription) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.pushSubscribeUrl, {
+      body: JSON.stringify(subscription.toJSON()),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "POST",
+    });
+    return response;
+  }
+
+  async unsubscribePush(endpoint) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.pushSubscribeUrl, {
+      body: JSON.stringify({ endpoint }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "DELETE",
     });
     return response;
   }
