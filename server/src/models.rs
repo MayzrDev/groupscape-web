@@ -226,15 +226,34 @@ pub enum AlertEvent {
     WildernessEntry(WildernessEntryAlert),
 }
 impl AlertEvent {
-    /// Push notification title/body, mirroring `groupscape-old`'s alert-push copy.
-    pub fn push_title_and_body(&self) -> (&'static str, String) {
+    /// Matches the enum's own serde tag ("low_hp"/"wilderness_entry") - used as both the push
+    /// payload's `type` field and its notification `tag` (so a fresh low-HP alert replaces a
+    /// stale one instead of stacking, per `groupscape-web#39`'s design review).
+    pub fn alert_type(&self) -> &'static str {
+        match self {
+            AlertEvent::LowHp(_) => "low_hp",
+            AlertEvent::WildernessEntry(_) => "wilderness_entry",
+        }
+    }
+
+    /// Low-HP alerts stay on screen until dismissed - unlike the other alert/toast copy in this
+    /// app, this one exists specifically for when the player isn't looking at the tab, so letting
+    /// it auto-vanish after a few seconds defeats the point. Wilderness entry is informational
+    /// and auto-dismisses like a normal OS notification.
+    pub fn requires_interaction(&self) -> bool {
+        matches!(self, AlertEvent::LowHp(_))
+    }
+
+    /// Push notification title/body, mirroring `groupscape-old`'s alert-push copy, with the
+    /// member name appended so a multi-character account can tell which one fired.
+    pub fn push_title_and_body(&self, member_name: &str) -> (String, String) {
         match self {
             AlertEvent::LowHp(alert) => (
-                "Low HP",
+                format!("Low HP — {}", member_name),
                 format!("{}/{} HP remaining", alert.current_hp, alert.max_hp),
             ),
             AlertEvent::WildernessEntry(alert) => (
-                "Wilderness entry",
+                format!("Wilderness entry — {}", member_name),
                 format!("Entered level {} wilderness", alert.wilderness_level),
             ),
         }
@@ -683,4 +702,42 @@ pub struct AdminAuditLogResponse {
 #[derive(Serialize)]
 pub struct AdminAccountsSummary {
     pub count: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn low_hp_alert_requires_interaction_and_names_the_member() {
+        let alert = AlertEvent::LowHp(LowHpAlert {
+            current_hp: 14,
+            max_hp: 99,
+            world_x: 0,
+            world_y: 0,
+            plane: 0,
+            world: 0,
+        });
+        assert_eq!(alert.alert_type(), "low_hp");
+        assert!(alert.requires_interaction());
+        let (title, body) = alert.push_title_and_body("Woox");
+        assert_eq!(title, "Low HP — Woox");
+        assert_eq!(body, "14/99 HP remaining");
+    }
+
+    #[test]
+    fn wilderness_entry_alert_auto_dismisses_and_names_the_member() {
+        let alert = AlertEvent::WildernessEntry(WildernessEntryAlert {
+            wilderness_level: 27,
+            world_x: 0,
+            world_y: 0,
+            plane: 0,
+            world: 0,
+        });
+        assert_eq!(alert.alert_type(), "wilderness_entry");
+        assert!(!alert.requires_interaction());
+        let (title, body) = alert.push_title_and_body("Woox");
+        assert_eq!(title, "Wilderness entry — Woox");
+        assert_eq!(body, "Entered level 27 wilderness");
+    }
 }

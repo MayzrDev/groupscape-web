@@ -445,6 +445,7 @@ pub async fn update_group_member(
                     config.push.clone(),
                     db_pool.get_ref().clone(),
                     account_id,
+                    group_member_inner.name.clone(),
                     alert,
                 );
             }

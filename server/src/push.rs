@@ -66,6 +66,7 @@ pub fn dispatch_alert_push(
     push_config: PushConfig,
     db_pool: Pool,
     account_id: i64,
+    member_name: String,
     alert: AlertEvent,
 ) {
     if !push_config.enabled {
@@ -92,8 +93,14 @@ pub fn dispatch_alert_push(
             return;
         }
 
-        let (title, body) = alert.push_title_and_body();
-        let payload = serde_json::json!({ "title": title, "body": body }).to_string();
+        let (title, body) = alert.push_title_and_body(&member_name);
+        let payload = serde_json::json!({
+            "title": title,
+            "body": body,
+            "type": alert.alert_type(),
+            "requireInteraction": alert.requires_interaction(),
+        })
+        .to_string();
 
         for subscription in subscriptions {
             let vapid_private_key = push_config.vapid_private_key.clone();
