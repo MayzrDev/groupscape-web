@@ -95,8 +95,7 @@ export class AccountPage extends BaseElement {
     this.status.textContent = "Checking your session…";
     const response = await accountApi.me();
     if (!response.ok) {
-      this.status.innerHTML =
-        'You need to be logged into a GroupScape account. <men-link link-href="/account/login">Log in</men-link>';
+      window.history.pushState("", "", "/account/login");
       return;
     }
     const account = await response.json();
