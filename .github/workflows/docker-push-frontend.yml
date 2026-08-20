@@ -5,6 +5,7 @@ on:
     paths:
       - 'site/**'
     branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
   docker:
