@@ -3,13 +3,149 @@ skills-graphs {
   position: relative;
 }
 
+.skills-graphs__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 820px) {
+  .skills-graphs__body {
+    flex-direction: column;
+  }
+}
+
 .skills-graphs__chart-container {
+  flex: 1;
+  min-width: 0;
   width: 100%;
   height: 100%;
   position: relative;
   box-sizing: border-box;
-  margin-top: 12px;
   padding-bottom: 12px;
+}
+
+.skills-graphs__leaderboard {
+  flex-shrink: 0;
+  width: 260px;
+  box-sizing: border-box;
+  padding: 10px;
+}
+
+@media (max-width: 820px) {
+  .skills-graphs__leaderboard {
+    width: 100%;
+  }
+}
+
+.skills-graphs__leaderboard-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.skills-graphs__leaderboard-metric-select,
+.skills-graphs__leaderboard-boss-select {
+  width: 100%;
+}
+
+.skills-graphs__leaderboard-boss-container {
+  display: none;
+}
+
+.skills-graphs__leaderboard-boss-container.visible {
+  display: block;
+}
+
+.skills-graphs__leaderboard-window-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.skills-graphs__leaderboard-window-btn {
+  flex: 1;
+}
+
+.skills-graphs__leaderboard-window-btn.active {
+  background: rgb(66, 55, 38);
+  outline: 1px solid rgb(200, 200, 200);
+}
+
+.skills-graphs__leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skills-graphs__leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 3px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.85em;
+}
+
+.skills-graphs__leaderboard-row:nth-child(odd) {
+  background: var(--elevated);
+}
+
+.skills-graphs__leaderboard-row--top1 {
+  background: rgba(255, 215, 0, 0.1) !important;
+}
+
+.skills-graphs__leaderboard-rank {
+  width: 20px;
+  text-align: center;
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  color: var(--primary-text);
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}
+
+.skills-graphs__leaderboard-row--top1 .skills-graphs__leaderboard-rank {
+  color: #ffd700;
+  opacity: 1;
+}
+
+.skills-graphs__leaderboard-row--top2 .skills-graphs__leaderboard-rank {
+  color: #c7c7c7;
+  opacity: 1;
+}
+
+.skills-graphs__leaderboard-row--top3 .skills-graphs__leaderboard-rank {
+  color: #c98a4b;
+  opacity: 1;
+}
+
+.skills-graphs__leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skills-graphs__leaderboard-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--orange);
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+}
+
+.skills-graphs__leaderboard-empty {
+  display: none;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  opacity: 0.7;
+  font-size: 0.85em;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.skills-graphs__leaderboard-empty--visible {
+  display: block;
 }
 
 .skills-graphs__control-container {

@@ -81,6 +81,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-skill-data`;
   }
 
+  get leaderboardUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-leaderboard`;
+  }
+
   get captchaEnabledUrl() {
     return `${this.baseUrl}/captcha-enabled`;
   }
@@ -347,6 +351,20 @@ class Api {
       });
       return response.json();
     }
+  }
+
+  async getLeaderboard(metric, window, boss) {
+    const query = new URLSearchParams({ metric, window });
+    if (boss) query.set("boss", boss);
+    const response = await fetch(`${this.leaderboardUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return { metric, window, boss: boss || null, available_bosses: [], entries: [] };
+    }
+    return response.json();
   }
 
   async getCaptchaEnabled() {

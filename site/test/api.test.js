@@ -40,6 +40,47 @@ describe("api", () => {
     expect(api.activityEventsUrl).toContain("/group/iron-team/get-activity-events");
     expect(api.lootSummaryUrl).toContain("/group/iron-team/get-loot-summary");
     expect(api.lootSplitUrl).toContain("/group/iron-team/get-loot-split");
+    expect(api.leaderboardUrl).toContain("/group/iron-team/get-leaderboard");
+  });
+
+  it("getLeaderboard builds the query string from metric/window/boss and returns the parsed result", async () => {
+    api.setCredentials("iron-team", "secret-token");
+
+    const result = { metric: "boss_kc", window: "daily", boss: "Vorkath", available_bosses: ["Vorkath"], entries: [] };
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(result) });
+
+    const actual = await api.getLeaderboard("boss_kc", "daily", "Vorkath");
+
+    expect(actual).toEqual(result);
+    const [url, options] = globalThis.fetch.mock.calls[0];
+    expect(url).toContain("/group/iron-team/get-leaderboard?");
+    expect(url).toContain("metric=boss_kc");
+    expect(url).toContain("window=daily");
+    expect(url).toContain("boss=Vorkath");
+    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
+  });
+
+  it("getLeaderboard omits the boss param when not provided", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
+
+    await api.getLeaderboard("xp", "weekly");
+
+    const [url] = globalThis.fetch.mock.calls[0];
+    expect(url).not.toContain("boss=");
+  });
+
+  it("getLeaderboard returns an empty result when the request fails", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: false });
+
+    expect(await api.getLeaderboard("xp", "daily")).toEqual({
+      metric: "xp",
+      window: "daily",
+      boss: null,
+      available_bosses: [],
+      entries: [],
+    });
   });
 
   it("getLootSummary builds the query string from provided filters and returns the parsed rows", async () => {
@@ -94,7 +135,12 @@ describe("api", () => {
     const events = [{ id: 1, event_type: "kill" }];
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(events) });
 
-    const result = await api.getActivityEvents({ memberName: "Zezima", eventType: "kill", before: "2026-01-01T00:00:00Z", limit: 10 });
+    const result = await api.getActivityEvents({
+      memberName: "Zezima",
+      eventType: "kill",
+      before: "2026-01-01T00:00:00Z",
+      limit: 10,
+    });
 
     expect(result).toEqual(events);
     const [url, options] = globalThis.fetch.mock.calls[0];
