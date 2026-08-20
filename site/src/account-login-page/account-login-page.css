@@ -21,6 +21,11 @@ account-login-page {
   font-size: 1.2em;
 }
 
+.account-login__container men-input,
+.account-login__container input {
+  width: 100%;
+}
+
 .account-login__subtitle {
   font-size: 0.8em;
   opacity: 0.8;

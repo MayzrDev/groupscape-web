@@ -21,6 +21,11 @@ account-signup-page {
   font-size: 1.2em;
 }
 
+.account-signup__container men-input,
+.account-signup__container input {
+  width: 100%;
+}
+
 .account-signup__subtitle {
   font-size: 0.8em;
   opacity: 0.8;

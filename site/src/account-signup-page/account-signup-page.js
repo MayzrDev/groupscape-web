@@ -28,10 +28,18 @@ export class AccountSignupPage extends BaseElement {
       }
     };
 
+    const passwordConfirmValidator = (value) => {
+      if (value !== this.password.value) {
+        return "Passwords don't match.";
+      }
+    };
+
     this.email = this.querySelector(".account-signup__email");
     this.email.validators = [emailValidator];
     this.password = this.querySelector(".account-signup__password");
     this.password.validators = [passwordValidator];
+    this.passwordConfirm = this.querySelector(".account-signup__password-confirm");
+    this.passwordConfirm.validators = [passwordConfirmValidator];
     this.signupButton = this.querySelector(".account-signup__button");
     this.discordButton = this.querySelector(".account-signup__discord");
     this.error = this.querySelector(".account-signup__error");
@@ -45,7 +53,7 @@ export class AccountSignupPage extends BaseElement {
   }
 
   async signup() {
-    if (!this.email.valid || !this.password.valid) return;
+    if (!this.email.valid || !this.password.valid || !this.passwordConfirm.valid) return;
     try {
       this.error.textContent = "";
       this.signupButton.disabled = true;

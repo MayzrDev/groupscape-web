@@ -38,11 +38,25 @@ homepage social-links {
   margin: 0;
 }
 
-.homepage__links {
+.homepage__primary {
   margin-top: 1.5em;
-  display: flex;
+  font-size: 1.1em;
+  padding: 0.7em 1.4em;
 }
 
-.homepage__links > men-link + men-link {
+.homepage__secondary-links {
+  margin-top: 1.2em;
+  display: flex;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.homepage__secondary-links men-link a {
+  text-decoration: underline;
+  color: inherit;
+  cursor: pointer;
+}
+
+.homepage__secondary-links men-link + men-link {
   margin-left: 2em;
 }
