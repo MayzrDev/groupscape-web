@@ -1,5 +1,9 @@
 use crate::config::DiscordConfig;
+use crate::db;
+use crate::drop_rates;
 use crate::error::ApiError;
+use crate::models::GameEvent;
+use deadpool_postgres::Pool;
 use serde::Deserialize;
 use tokio::task;
 
@@ -77,4 +81,115 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
     })
     .await
     .unwrap()
+}
+
+const KILL_COLOR: u32 = 0x2ECC71;
+const DEATH_COLOR: u32 = 0xE74C3C;
+const LOOT_COLOR: u32 = 0xF1C40F;
+const TEST_COLOR: u32 = 0x5865F2;
+
+fn send_webhook_embed_sync(url: &str, title: &str, description: &str, color: u32) -> Result<(), ureq::Error> {
+    ureq::post(url)
+        .send_json(serde_json::json!({
+            "embeds": [{ "title": title, "description": description, "color": color }],
+        }))?;
+    Ok(())
+}
+
+/// Awaited (not fire-and-forget) so a bad URL fails the settings save immediately, matching
+/// `groupscape-old`'s `discordSettings.ts` validate-before-save behavior.
+pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
+    let url = url.to_owned();
+    task::spawn_blocking(move || {
+        send_webhook_embed_sync(
+            &url,
+            "GroupScape",
+            "This channel is now connected to a GroupScape group.",
+            TEST_COLOR,
+        )
+        .map_err(|err| ApiError::DiscordWebhookInvalidError(err.to_string()))
+    })
+    .await
+    .unwrap_or_else(|err| Err(ApiError::DiscordWebhookInvalidError(err.to_string())))
+}
+
+async fn send_webhook_embed(url: String, title: &'static str, description: String, color: u32) {
+    let _ = task::spawn_blocking(move || {
+        if let Err(err) = send_webhook_embed_sync(&url, title, &description, color) {
+            log::warn!("discord: webhook send failed: {}", err);
+        }
+    })
+    .await;
+}
+
+/// Fire-and-forget, mirroring `push::dispatch_alert_push` - a dead or misconfigured webhook must
+/// never fail the telemetry upload that triggered it. Loads this group's webhook settings fresh
+/// on every call rather than threading them through from the caller, since `update_group_member`
+/// may fire this for several events per upload and settings rarely change.
+pub fn dispatch_event_webhook(
+    db_pool: Pool,
+    group_id: i64,
+    member_name: String,
+    event: GameEvent,
+) {
+    tokio::spawn(async move {
+        let client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                log::warn!("discord: failed to get db client: {}", err);
+                return;
+            }
+        };
+        let settings = match db::get_discord_webhook_settings(&client, group_id).await {
+            Ok(settings) => settings,
+            Err(err) => {
+                log::warn!("discord: failed to load webhook settings: {}", err);
+                return;
+            }
+        };
+        drop(client);
+        let Some(webhook_url) = settings.webhook_url else {
+            return;
+        };
+
+        match event {
+            GameEvent::Kill(kill) => {
+                if settings.notify_kills {
+                    let description = format!("{} killed {}", member_name, kill.npc_name);
+                    send_webhook_embed(webhook_url.clone(), "Kill", description, KILL_COLOR).await;
+                }
+                if settings.notify_loot {
+                    if let Some(loot) = &kill.loot {
+                        if !loot.is_empty() {
+                            let lines: Vec<String> = loot
+                                .iter()
+                                .map(|item| {
+                                    let name = drop_rates::lookup(&kill.npc_name, item.item_id)
+                                        .map(|drop| drop.name.clone())
+                                        .unwrap_or_else(|| format!("item #{}", item.item_id));
+                                    format!("{}x {}", item.quantity, name)
+                                })
+                                .collect();
+                            let description = format!(
+                                "{} received {} from {}",
+                                member_name,
+                                lines.join(", "),
+                                kill.npc_name
+                            );
+                            send_webhook_embed(webhook_url, "Loot", description, LOOT_COLOR).await;
+                        }
+                    }
+                }
+            }
+            GameEvent::Death(death) => {
+                if settings.notify_deaths {
+                    let description = match &death.killer_name {
+                        Some(killer) => format!("{} died to {}", member_name, killer),
+                        None => format!("{} died", member_name),
+                    };
+                    send_webhook_embed(webhook_url, "Death", description, DEATH_COLOR).await;
+                }
+            }
+        }
+    });
 }

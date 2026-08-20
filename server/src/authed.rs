@@ -2,13 +2,14 @@ use crate::auth_middleware::Authenticated;
 use crate::config::Config;
 use crate::crypto::session_token_hash;
 use crate::db;
+use crate::discord;
 use crate::drop_rates;
 use crate::error::ApiError;
 use crate::models::{
-    ActivityEvent, AmIInGroupRequest, BlockedMember, GameEvent, GroupCredentials, GroupMember,
-    GroupMemberName, GroupMemberPermissions, GroupSession, GroupSkillData, LootSplitParticipant,
-    LootSplitResult, LootSummaryRow, PermissionFlags, PermissionKey, RenameGroup,
-    UpdateGroupPermissionsRequest, SHARED_MEMBER,
+    ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
+    GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupSession,
+    GroupSkillData, LootSplitParticipant, LootSplitResult, LootSummaryRow, PermissionFlags,
+    PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::push;
@@ -234,6 +235,47 @@ pub async fn update_group_permissions(
     }
 }
 
+/// Gated on `ManageDiscord` (kept separate from `ManageSettings` since the webhook URL is a
+/// credential, matching `groupscape-old`'s `discordSettings.ts` decision) - the `GET` doubles as
+/// the client-side admin gate for the settings page, same pattern as `get_group_permissions`.
+#[get("/get-discord-settings")]
+pub async fn get_discord_settings(
+    req: HttpRequest,
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<DiscordWebhookSettings>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageDiscord).await?;
+    let settings = db::get_discord_webhook_settings(&client, auth.group_id).await?;
+    Ok(web::Json(settings))
+}
+
+/// Always submits full settings state (not a patch) - see [`DiscordWebhookSettings`]. A
+/// non-empty `webhook_url` is validated with a live test message before saving, so a typo'd URL
+/// never gets silently stored; an empty/`None` URL clears it without a test call.
+#[put("/update-discord-settings")]
+pub async fn update_discord_settings(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<DiscordWebhookSettings>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<DiscordWebhookSettings>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageDiscord).await?;
+
+    let mut settings = body.into_inner();
+    settings.webhook_url = settings
+        .webhook_url
+        .map(|url| url.trim().to_string())
+        .filter(|url| !url.is_empty());
+    if let Some(url) = &settings.webhook_url {
+        discord::test_webhook(url).await?;
+    }
+
+    db::update_discord_webhook_settings(&client, auth.group_id, &settings).await?;
+    Ok(web::Json(settings))
+}
+
 #[post("/update-group-member")]
 pub async fn update_group_member(
     auth: Authenticated,
@@ -395,6 +437,12 @@ pub async fn update_group_member(
                     event,
                 )
                 .await?;
+                discord::dispatch_event_webhook(
+                    db_pool.get_ref().clone(),
+                    auth.group_id,
+                    group_member_inner.name.clone(),
+                    event.clone(),
+                );
             }
         }
     }

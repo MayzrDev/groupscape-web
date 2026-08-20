@@ -115,6 +115,12 @@ pub enum ApiError {
     #[from(ignore)]
     ListPushSubscriptionsError(tokio_postgres::error::Error),
     PushNotConfiguredError,
+    #[from(ignore)]
+    GetDiscordWebhookSettingsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateDiscordWebhookSettingsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    DiscordWebhookInvalidError(String),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -275,6 +281,15 @@ impl ResponseError for ApiError {
             }
             ApiError::PushNotConfiguredError => {
                 HttpResponse::ServiceUnavailable().body("Web push is not configured on this server")
+            }
+            ApiError::GetDiscordWebhookSettingsError(ref err) => {
+                handle_pg_error(err, "GetDiscordWebhookSettingsError")
+            }
+            ApiError::UpdateDiscordWebhookSettingsError(ref err) => {
+                handle_pg_error(err, "UpdateDiscordWebhookSettingsError")
+            }
+            ApiError::DiscordWebhookInvalidError(ref reason) => {
+                HttpResponse::BadRequest().body(format!("Discord webhook URL is invalid: {}", reason))
             }
         }
     }

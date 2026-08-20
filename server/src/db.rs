@@ -2,9 +2,10 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, DialogueEvent, GameEvent, GroupMember,
-    GroupMemberPermissions, GroupPermissions, GroupSession, GroupSkillData, MemberSkillData,
-    ObjectInteractionEvent, PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
+    AggregateSkillData, BlockedMember, CreateGroup, DialogueEvent, DiscordWebhookSettings,
+    GameEvent, GroupMember, GroupMemberPermissions, GroupPermissions, GroupSession,
+    GroupSkillData, MemberSkillData, ObjectInteractionEvent, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -400,6 +401,59 @@ pub async fn reroll_group_token(
         .await
         .map_err(ApiError::RerollGroupTokenError)?;
     Ok(new_token)
+}
+
+/// Groups always have a row (columns default `true`/`NULL` at creation via the migration), so
+/// this is a plain `query_one`, unlike `get_group_permissions`' `Option` (no row until a
+/// character links in).
+pub async fn get_discord_webhook_settings(
+    client: &Client,
+    group_id: i64,
+) -> Result<DiscordWebhookSettings, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_loot \
+             FROM groupscape.groups WHERE group_id=$1",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetDiscordWebhookSettingsError)?;
+    Ok(DiscordWebhookSettings {
+        webhook_url: row.try_get("discord_webhook_url")?,
+        notify_kills: row.try_get("discord_notify_kills")?,
+        notify_deaths: row.try_get("discord_notify_deaths")?,
+        notify_loot: row.try_get("discord_notify_loot")?,
+    })
+}
+
+pub async fn update_discord_webhook_settings(
+    client: &Client,
+    group_id: i64,
+    settings: &DiscordWebhookSettings,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.groups SET \
+             discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_loot=$5 \
+             WHERE group_id=$1",
+        )
+        .await?;
+    client
+        .execute(
+            &stmt,
+            &[
+                &group_id,
+                &settings.webhook_url,
+                &settings.notify_kills,
+                &settings.notify_deaths,
+                &settings.notify_loot,
+            ],
+        )
+        .await
+        .map_err(ApiError::UpdateDiscordWebhookSettingsError)?;
+    Ok(())
 }
 
 pub struct HomepageStats {
@@ -1694,6 +1748,25 @@ CREATE INDEX IF NOT EXISTS push_subscriptions_account_id_idx ON groupscape.push_
             .await?;
 
         commit_migration(&transaction, "create_push_subscriptions_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_groups_discord_webhook_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_webhook_url TEXT,
+ADD COLUMN IF NOT EXISTS discord_notify_kills BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_deaths BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_loot BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_webhook_columns").await?;
         transaction.commit().await?;
     }
 

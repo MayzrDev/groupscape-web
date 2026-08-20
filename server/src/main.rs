@@ -132,6 +132,8 @@ async fn main() -> std::io::Result<()> {
             .service(authed::get_group_permissions)
             .service(authed::get_my_permissions)
             .service(authed::update_group_permissions)
+            .service(authed::get_discord_settings)
+            .service(authed::update_discord_settings)
             .service(authed::rename_group)
             .service(authed::reroll_group_token)
             .service(authed::delete_group)

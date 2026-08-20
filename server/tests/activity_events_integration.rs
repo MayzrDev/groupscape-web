@@ -5,7 +5,10 @@ use tokio_postgres::NoTls;
 
 use server::config::Config;
 use server::db;
-use server::models::{DeathEvent, DialogueEvent, GameEvent, KillEvent, LootItem, ObjectInteractionEvent};
+use server::models::{
+    DeathEvent, DialogueEvent, DiscordWebhookSettings, GameEvent, KillEvent, LootItem,
+    ObjectInteractionEvent,
+};
 
 /// Serializes integration tests since they all share the same database
 /// and each test drops/recreates the schema.
@@ -338,4 +341,116 @@ async fn test_insert_object_interaction_event_round_trips() {
     assert_eq!(events.len(), 1);
     assert_eq!(events[0].event_type, "object_interaction");
     assert_eq!(events[0].payload["objectName"], serde_json::json!("Bank booth"));
+}
+
+#[tokio::test]
+async fn test_discord_webhook_settings_default_to_disabled_and_all_notify_true() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "discordtest1").await;
+
+    let settings = db::get_discord_webhook_settings(&client, group_id)
+        .await
+        .expect("query should succeed");
+    assert_eq!(settings.webhook_url, None);
+    assert!(settings.notify_kills);
+    assert!(settings.notify_deaths);
+    assert!(settings.notify_loot);
+}
+
+#[tokio::test]
+async fn test_discord_webhook_settings_round_trip() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "discordtest2").await;
+
+    let updated = DiscordWebhookSettings {
+        webhook_url: Some("https://discord.com/api/webhooks/123/abc".to_string()),
+        notify_kills: true,
+        notify_deaths: false,
+        notify_loot: true,
+    };
+    db::update_discord_webhook_settings(&client, group_id, &updated)
+        .await
+        .expect("update should succeed");
+
+    let settings = db::get_discord_webhook_settings(&client, group_id)
+        .await
+        .expect("query should succeed");
+    assert_eq!(settings.webhook_url, updated.webhook_url);
+    assert!(settings.notify_kills);
+    assert!(!settings.notify_deaths);
+    assert!(settings.notify_loot);
+}
+
+#[tokio::test]
+async fn test_discord_webhook_settings_url_can_be_cleared() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "discordtest3").await;
+
+    db::update_discord_webhook_settings(
+        &client,
+        group_id,
+        &DiscordWebhookSettings {
+            webhook_url: Some("https://discord.com/api/webhooks/123/abc".to_string()),
+            notify_kills: true,
+            notify_deaths: true,
+            notify_loot: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    db::update_discord_webhook_settings(
+        &client,
+        group_id,
+        &DiscordWebhookSettings {
+            webhook_url: None,
+            notify_kills: true,
+            notify_deaths: true,
+            notify_loot: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    let settings = db::get_discord_webhook_settings(&client, group_id)
+        .await
+        .unwrap();
+    assert_eq!(settings.webhook_url, None);
+}
+
+#[tokio::test]
+async fn test_discord_webhook_settings_scoped_per_group() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_a = create_test_group(&client, "discordtest4a").await;
+    let group_b = create_test_group(&client, "discordtest4b").await;
+
+    db::update_discord_webhook_settings(
+        &client,
+        group_a,
+        &DiscordWebhookSettings {
+            webhook_url: Some("https://discord.com/api/webhooks/111/aaa".to_string()),
+            notify_kills: true,
+            notify_deaths: true,
+            notify_loot: true,
+        },
+    )
+    .await
+    .unwrap();
+
+    let settings_b = db::get_discord_webhook_settings(&client, group_b)
+        .await
+        .unwrap();
+    assert_eq!(settings_b.webhook_url, None, "group b's settings must be unaffected");
 }

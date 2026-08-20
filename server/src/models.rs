@@ -582,6 +582,19 @@ pub struct UpdateGroupPermissionsRequest {
     #[serde(flatten)]
     pub patch: PermissionFlagsPatch,
 }
+
+/// `webhook_url: None` disables dispatch (stored as `NULL`) rather than being an "unset,
+/// leave alone" patch field like [`PermissionFlagsPatch`] - the discord settings form always
+/// submits its full state, mirroring `groupscape-old`'s `PUT /groups/:groupId/discord`.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
+pub struct DiscordWebhookSettings {
+    pub webhook_url: Option<String>,
+    pub notify_kills: bool,
+    pub notify_deaths: bool,
+    pub notify_loot: bool,
+}
+
 #[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,
