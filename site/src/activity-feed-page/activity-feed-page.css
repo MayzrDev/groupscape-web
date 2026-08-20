@@ -31,6 +31,7 @@ activity-feed-page {
   cursor: pointer;
   text-align: left;
   color: var(--primary-text);
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   font-size: 0.85em;
 }
 
@@ -76,6 +77,7 @@ activity-feed-page {
 }
 
 .activity-feed-page__type-chip {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   font-size: 0.78em;
   padding: 4px 10px;
   border-radius: 999px;
