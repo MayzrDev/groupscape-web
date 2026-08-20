@@ -234,3 +234,63 @@ characters-page {
   text-align: center;
   margin-top: 1em;
 }
+
+.characters-page__tile-group-pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 2px;
+  background: rgba(13, 193, 13, 0.14);
+  border: 1px solid var(--green);
+  color: var(--green);
+}
+
+.characters-page__tile-group-pill--none {
+  background: var(--darken);
+  border: 1px dashed var(--light-border);
+  color: var(--primary-text);
+  opacity: 0.7;
+}
+
+.characters-page__tile-leave,
+.characters-page__tile-join {
+  margin-top: 4px;
+  background: none;
+  border: none;
+  color: var(--primary-text);
+  opacity: 0.65;
+  cursor: pointer;
+  font-size: 0.8em;
+  text-decoration: underline;
+}
+
+.characters-page__tile-leave:hover,
+.characters-page__tile-leave:focus-visible,
+.characters-page__tile-join:hover,
+.characters-page__tile-join:focus-visible {
+  opacity: 1;
+  color: var(--orange);
+}
+
+.characters-page__join-dialog-container {
+  width: 320px;
+}
+
+.characters-page__join-dialog-sub {
+  opacity: 0.75;
+  font-size: 0.85em;
+  margin: 0 0 12px;
+}
+
+.characters-page__join-dialog-error {
+  min-height: 1em;
+  margin: 12px 0 8px;
+}
+
+.characters-page__join-dialog-buttons {
+  display: flex;
+}
+
+.characters-page__join-dialog-buttons > button + button {
+  margin-left: 8px;
+}

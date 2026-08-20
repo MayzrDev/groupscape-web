@@ -30,6 +30,13 @@ function initials(rsn) {
  * (`POST /api/account/characters/:id/confirm`) and Remove (confirm dialog, then
  * `DELETE /api/account/characters/:id/pending` — permanently blocks the character from
  * re-linking, unlike unlink).
+ *
+ * Confirmed tiles also show group status (`group_name`, only populated on this listing - see
+ * `Character::group_id` doc in `models.rs`) with a Join/Leave action: Join opens
+ * `.characters-page__join-dialog` to collect a group name + token for
+ * `POST /api/account/characters/link-group`; Leave goes through the same confirm dialog as
+ * unlink, then `POST /api/account/characters/:id/leave-group` (switching groups requires
+ * leaving first - the backend rejects a direct switch).
  */
 export class CharactersPage extends BaseElement {
   constructor() {
@@ -52,11 +59,20 @@ export class CharactersPage extends BaseElement {
     this.instructions = this.querySelector(".characters-page__instructions");
     this.instructionsClose = this.querySelector(".characters-page__instructions-close");
     this.error = this.querySelector(".characters-page__error");
+    this.joinDialog = this.querySelector(".characters-page__join-dialog");
+    this.joinDialogSub = this.querySelector(".characters-page__join-dialog-sub");
+    this.joinDialogName = this.querySelector(".characters-page__join-dialog-name");
+    this.joinDialogToken = this.querySelector(".characters-page__join-dialog-token");
+    this.joinDialogError = this.querySelector(".characters-page__join-dialog-error");
+    this.joinDialogSubmit = this.querySelector(".characters-page__join-dialog-submit");
+    this.joinDialogCancel = this.querySelector(".characters-page__join-dialog-cancel");
 
     this.eventListener(this.addTile, "click", this.toggleInstructions.bind(this));
     this.eventListener(this.instructionsClose, "click", this.toggleInstructions.bind(this));
     this.eventListener(this.grid, "click", this.handleGridClick.bind(this));
     this.eventListener(this.pendingGrid, "click", this.handlePendingGridClick.bind(this));
+    this.eventListener(this.joinDialogSubmit, "click", this.submitJoinGroup.bind(this));
+    this.eventListener(this.joinDialogCancel, "click", this.hideJoinDialog.bind(this));
 
     this.checkSession();
   }
@@ -115,6 +131,19 @@ export class CharactersPage extends BaseElement {
     this.grid.innerHTML = confirmed
       .map((character) => {
         const boundAt = new Date(character.bound_at).toLocaleDateString();
+        const groupAction = character.group_name
+          ? `
+            <span class="characters-page__tile-group-pill">${escapeHtml(character.group_name)}</span>
+            <button class="characters-page__tile-leave" data-character-id="${character.id}" data-rsn="${escapeHtml(
+              character.display_rsn
+            )}">Leave group</button>
+          `
+          : `
+            <span class="characters-page__tile-group-pill characters-page__tile-group-pill--none">Not in a group</span>
+            <button class="characters-page__tile-join" data-character-id="${character.id}" data-rsn="${escapeHtml(
+              character.display_rsn
+            )}">Join group</button>
+          `;
         return `
           <div class="characters-page__tile">
             <button
@@ -127,6 +156,7 @@ export class CharactersPage extends BaseElement {
             <div class="characters-page__tile-badge">${escapeHtml(initials(character.display_rsn))}</div>
             <span class="characters-page__tile-rsn">${escapeHtml(character.display_rsn)}</span>
             <span class="characters-page__tile-meta">Linked ${boundAt}</span>
+            ${groupAction}
           </div>
         `;
       })
@@ -164,16 +194,84 @@ export class CharactersPage extends BaseElement {
 
   handleGridClick(event) {
     const unlinkButton = event.target.closest(".characters-page__tile-unlink");
-    if (!unlinkButton) return;
+    if (unlinkButton) {
+      const characterId = unlinkButton.dataset.characterId;
+      const rsn = unlinkButton.dataset.rsn;
+      confirmDialogManager.confirm({
+        headline: "Unlink character?",
+        body: `${rsn} will no longer be linked to this account. You can re-link it later from RuneLite.`,
+        yesCallback: () => this.unlinkCharacter(characterId),
+        noCallback: () => {},
+      });
+      return;
+    }
 
-    const characterId = unlinkButton.dataset.characterId;
-    const rsn = unlinkButton.dataset.rsn;
-    confirmDialogManager.confirm({
-      headline: "Unlink character?",
-      body: `${rsn} will no longer be linked to this account. You can re-link it later from RuneLite.`,
-      yesCallback: () => this.unlinkCharacter(characterId),
-      noCallback: () => {},
-    });
+    const joinButton = event.target.closest(".characters-page__tile-join");
+    if (joinButton) {
+      this.showJoinDialog(joinButton.dataset.characterId, joinButton.dataset.rsn);
+      return;
+    }
+
+    const leaveButton = event.target.closest(".characters-page__tile-leave");
+    if (leaveButton) {
+      const characterId = leaveButton.dataset.characterId;
+      const rsn = leaveButton.dataset.rsn;
+      confirmDialogManager.confirm({
+        headline: "Leave group?",
+        body: `${rsn} will leave its current group. You can join a different group afterward.`,
+        yesCallback: () => this.leaveGroup(characterId),
+        noCallback: () => {},
+      });
+    }
+  }
+
+  showJoinDialog(characterId, rsn) {
+    this.joinDialogCharacterId = characterId;
+    this.joinDialogSub.textContent = `${rsn} will join once you enter its group's name and token.`;
+    this.joinDialogName.input.value = "";
+    this.joinDialogToken.input.value = "";
+    this.joinDialogError.textContent = "";
+    this.joinDialog.classList.add("dialog__visible");
+  }
+
+  hideJoinDialog() {
+    this.joinDialog.classList.remove("dialog__visible");
+  }
+
+  async submitJoinGroup() {
+    const groupName = this.joinDialogName.value;
+    const groupToken = this.joinDialogToken.value;
+    if (!groupName || !groupToken) {
+      this.joinDialogError.textContent = "Enter both the group name and token.";
+      return;
+    }
+
+    this.joinDialogError.textContent = "";
+    try {
+      const response = await accountApi.linkCharacterToGroup(this.joinDialogCharacterId, groupName, groupToken);
+      if (response.ok) {
+        this.hideJoinDialog();
+        this.fetchCharacters();
+      } else {
+        this.joinDialogError.textContent = "Couldn't find that group — check the name and token.";
+      }
+    } catch (error) {
+      this.joinDialogError.textContent = "Couldn't find that group — check the name and token.";
+    }
+  }
+
+  async leaveGroup(characterId) {
+    this.error.textContent = "";
+    try {
+      const response = await accountApi.leaveGroup(characterId);
+      if (response.ok) {
+        this.fetchCharacters();
+      } else {
+        this.error.textContent = "Couldn't leave that group — try again.";
+      }
+    } catch (error) {
+      this.error.textContent = "Couldn't leave that group — try again.";
+    }
   }
 
   handlePendingGridClick(event) {

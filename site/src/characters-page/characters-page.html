@@ -25,4 +25,31 @@
     </ol>
   </div>
   <div class="characters-page__error validation-error"></div>
+
+  <div class="dialog characters-page__join-dialog">
+    <div class="dialog__container characters-page__join-dialog-container rsborder rsbackground">
+      <h2>Join a group</h2>
+      <p class="characters-page__join-dialog-sub"></p>
+      <men-input
+        class="characters-page__join-dialog-name"
+        max-length="64"
+        input-id="joinGroupName"
+        placeholder-text="e.g. Iron Legion"
+        input-label="Group name"
+      ></men-input>
+      <men-input
+        class="characters-page__join-dialog-token"
+        max-length="256"
+        input-id="joinGroupToken"
+        placeholder-text="Group token"
+        input-label="Group token"
+        type-password
+      ></men-input>
+      <p class="characters-page__join-dialog-error validation-error"></p>
+      <div class="characters-page__join-dialog-buttons">
+        <button class="characters-page__join-dialog-submit men-button">Join</button>
+        <button class="characters-page__join-dialog-cancel men-button">Cancel</button>
+      </div>
+    </div>
+  </div>
 </div>
