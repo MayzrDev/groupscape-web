@@ -5,13 +5,15 @@ use crate::db;
 use crate::discord;
 use crate::drop_rates;
 use crate::error::ApiError;
-use crate::models::{
-    ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
-    GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupSession,
-    GroupSkillData, LootSplitParticipant, LootSplitResult, LootSummaryRow, PermissionFlags,
-    PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
-};
+use crate::goal_reference::validate_goal_reference;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
+use crate::models::{
+    ActivityEvent, AmIInGroupRequest, BlockedMember, CreateGroupGoalRequest,
+    DiscordWebhookSettings, GameEvent, GroupCredentials, GroupGoal, GroupMember, GroupMemberName,
+    GroupMemberPermissions, GroupSession, GroupSkillData, LootSplitParticipant, LootSplitResult,
+    LootSummaryRow, PermissionFlags, PermissionKey, RenameGroup, UpdateGroupGoalRequest,
+    UpdateGroupGoalStatusRequest, UpdateGroupPermissionsRequest, SHARED_MEMBER,
+};
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
@@ -275,6 +277,166 @@ pub async fn update_discord_settings(
 
     db::update_discord_webhook_settings(&client, auth.group_id, &settings).await?;
     Ok(web::Json(settings))
+}
+
+/// No permission gate - §20's "group-wide visibility (any member can list)".
+#[get("/get-group-goals")]
+pub async fn get_group_goals(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<Vec<GroupGoal>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let goals = db::list_group_goals(&client, auth.group_id).await?;
+    Ok(web::Json(goals))
+}
+
+#[post("/create-group-goal")]
+pub async fn create_group_goal(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<CreateGroupGoalRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<GroupGoal>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account_id =
+        require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageGoals).await?;
+
+    let title = body.title.trim();
+    if title.is_empty() {
+        return Err(
+            ApiError::GoalReferenceValidationError("title must not be empty".to_string()).into(),
+        );
+    }
+    let reference = validate_goal_reference(&body.reference_type, body.reference_id.as_deref());
+    if let Some(error) = reference.error {
+        return Err(ApiError::GoalReferenceValidationError(error.to_string()).into());
+    }
+
+    let goal = db::insert_group_goal(
+        &client,
+        auth.group_id,
+        title,
+        &body.reference_type,
+        reference.reference_id.as_deref(),
+        account_id,
+    )
+    .await?;
+    Ok(web::Json(goal))
+}
+
+#[put("/update-group-goal/{goal_id}")]
+pub async fn update_group_goal(
+    req: HttpRequest,
+    auth: Authenticated,
+    path: web::Path<(String, i64)>,
+    body: web::Json<UpdateGroupGoalRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<GroupGoal>, Error> {
+    let (_group_name, goal_id) = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageGoals).await?;
+
+    let existing = db::find_group_goal(&client, auth.group_id, goal_id)
+        .await?
+        .ok_or(ApiError::GroupGoalNotFoundError)?;
+
+    let title = match &body.title {
+        Some(title) => {
+            let trimmed = title.trim();
+            if trimmed.is_empty() {
+                return Err(ApiError::GoalReferenceValidationError(
+                    "title must not be empty".to_string(),
+                )
+                .into());
+            }
+            Some(trimmed)
+        }
+        None => None,
+    };
+
+    let reference_id: Option<Option<String>> =
+        if body.reference_type.is_some() || body.reference_id.is_some() {
+            let reference_type = body
+                .reference_type
+                .as_deref()
+                .unwrap_or(&existing.reference_type);
+            let raw_reference_id = match &body.reference_id {
+                Some(inner) => inner.as_deref(),
+                None => existing.reference_id.as_deref(),
+            };
+            let reference = validate_goal_reference(reference_type, raw_reference_id);
+            if let Some(error) = reference.error {
+                return Err(ApiError::GoalReferenceValidationError(error.to_string()).into());
+            }
+            Some(reference.reference_id)
+        } else {
+            None
+        };
+
+    let goal = db::update_group_goal(
+        &client,
+        auth.group_id,
+        goal_id,
+        title,
+        body.reference_type.as_deref(),
+        reference_id.as_ref().map(|inner| inner.as_deref()),
+    )
+    .await?
+    .ok_or(ApiError::GroupGoalNotFoundError)?;
+    Ok(web::Json(goal))
+}
+
+/// Separate endpoint from the general edit PUT above so the site can flip status with a single
+/// tap without resending the whole goal shape - matches `groupscape-old`'s split.
+#[put("/update-group-goal-status/{goal_id}")]
+pub async fn update_group_goal_status(
+    req: HttpRequest,
+    auth: Authenticated,
+    path: web::Path<(String, i64)>,
+    body: web::Json<UpdateGroupGoalStatusRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<GroupGoal>, Error> {
+    let (_group_name, goal_id) = path.into_inner();
+    if body.status != "open" && body.status != "complete" {
+        return Err(ApiError::GoalReferenceValidationError(
+            "status must be \"open\" or \"complete\"".to_string(),
+        )
+        .into());
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account_id =
+        require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageGoals).await?;
+
+    let completed_by = if body.status == "complete" {
+        Some(account_id)
+    } else {
+        None
+    };
+    let goal =
+        db::set_group_goal_status(&client, auth.group_id, goal_id, &body.status, completed_by)
+            .await?
+            .ok_or(ApiError::GroupGoalNotFoundError)?;
+    Ok(web::Json(goal))
+}
+
+#[delete("/delete-group-goal/{goal_id}")]
+pub async fn delete_group_goal(
+    req: HttpRequest,
+    auth: Authenticated,
+    path: web::Path<(String, i64)>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let (_group_name, goal_id) = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageGoals).await?;
+
+    let deleted = db::delete_group_goal(&client, auth.group_id, goal_id).await?;
+    if deleted {
+        Ok(HttpResponse::Ok().finish())
+    } else {
+        Err(ApiError::GroupGoalNotFoundError.into())
+    }
 }
 
 #[post("/update-group-member")]
@@ -813,16 +975,26 @@ pub async fn get_leaderboard(
         }
         LeaderboardMetric::GpEarned => {
             let ge_prices = get_ge_prices_map();
-            let raw =
-                db::get_gp_earned_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
-                    .await?;
+            let raw = db::get_gp_earned_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                now,
+                &ge_prices,
+            )
+            .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
         LeaderboardMetric::LootValue => {
             let ge_prices = get_ge_prices_map();
-            let raw =
-                db::get_loot_value_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
-                    .await?;
+            let raw = db::get_loot_value_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                now,
+                &ge_prices,
+            )
+            .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
     };

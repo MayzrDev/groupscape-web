@@ -10,6 +10,7 @@ pub mod db;
 pub mod discord;
 pub mod drop_rates;
 pub mod error;
+pub mod goal_reference;
 pub mod leaderboard;
 pub mod models;
 pub mod notable_npcs;

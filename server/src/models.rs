@@ -615,6 +615,61 @@ pub struct DiscordWebhookSettings {
     pub notify_loot: bool,
 }
 
+/// A group todo-list entry, ported from `groupscape-old`'s `GroupGoal`
+/// (`repositories/groupGoals.ts`). `reference_type`/`reference_id` are an optional structured
+/// link (e.g. a specific skill or boss) validated by [`crate::goal_reference`] -
+/// auto-complete-from-telemetry wiring is left to a future ticket, this schema just has the
+/// columns ready for it (`auto_completed` distinguishes a system-driven completion from a
+/// manual one, per §20).
+#[derive(Serialize, Clone)]
+pub struct GroupGoal {
+    pub id: i64,
+    pub group_id: i64,
+    pub title: String,
+    pub reference_type: String,
+    pub reference_id: Option<String>,
+    pub created_by: i64,
+    pub status: String,
+    pub completed_by: Option<i64>,
+    pub auto_completed: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateGroupGoalRequest {
+    pub title: String,
+    #[serde(default = "default_goal_reference_type")]
+    pub reference_type: String,
+    #[serde(default)]
+    pub reference_id: Option<String>,
+}
+
+fn default_goal_reference_type() -> String {
+    "none".to_string()
+}
+
+/// `None` per field leaves the stored value alone, same convention as [`PermissionFlagsPatch`].
+/// `reference_id` uses a nested `Option` (`#[serde(default)]` outer, `Option<String>` inner) so
+/// the request can distinguish "don't touch reference_id" from "clear it to null".
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateGroupGoalRequest {
+    #[serde(default)]
+    pub title: Option<String>,
+    #[serde(default)]
+    pub reference_type: Option<String>,
+    #[serde(default)]
+    pub reference_id: Option<Option<String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateGroupGoalStatusRequest {
+    pub status: String,
+}
+
 #[derive(Deserialize)]
 pub struct CaptchaVerifyResponse {
     pub success: bool,
