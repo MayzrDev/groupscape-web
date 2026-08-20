@@ -26,6 +26,13 @@ account-signup-page {
   width: 100%;
 }
 
+.account-signup__home-link {
+  align-self: flex-start;
+  font-size: 0.8em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
 .account-signup__subtitle {
   font-size: 0.8em;
   opacity: 0.8;

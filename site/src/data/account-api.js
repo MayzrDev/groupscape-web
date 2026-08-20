@@ -17,6 +17,14 @@ class AccountApi {
     return `${this.baseUrl}/characters/link`;
   }
 
+  get linkCharacterToGroupUrl() {
+    return `${this.baseUrl}/characters/link-group`;
+  }
+
+  leaveGroupUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}/leave-group`;
+  }
+
   characterUrl(characterId) {
     return `${this.baseUrl}/characters/${characterId}`;
   }
@@ -128,6 +136,28 @@ class AccountApi {
         "Content-Type": "application/json",
         Authorization: accountToken,
       },
+      method: "POST",
+    });
+    return response;
+  }
+
+  async linkCharacterToGroup(characterId, groupName, groupToken) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.linkCharacterToGroupUrl, {
+      body: JSON.stringify({ character_id: Number(characterId), group_name: groupName, group_token: groupToken }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: accountToken,
+      },
+      method: "POST",
+    });
+    return response;
+  }
+
+  async leaveGroup(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.leaveGroupUrl(characterId), {
+      headers: { Authorization: accountToken },
       method: "POST",
     });
     return response;

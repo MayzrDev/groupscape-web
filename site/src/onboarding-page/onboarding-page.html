@@ -1,0 +1,91 @@
+<div class="onboarding-page__container rsborder rsbackground">
+  <men-link link-href="/" class="onboarding-page__home-link">&larr; GroupScape</men-link>
+  <p class="onboarding-page__status"></p>
+
+  <div class="onboarding-page__content" hidden>
+    <div class="onboarding-page__stepper">
+      <span class="onboarding-page__step onboarding-page__step--link">1</span>
+      <span class="onboarding-page__step-line"></span>
+      <span class="onboarding-page__step onboarding-page__step--group">2</span>
+    </div>
+
+    <div class="onboarding-page__link-empty" hidden>
+      <h1 class="onboarding-page__title">Link your character</h1>
+      <p class="onboarding-page__sub">Paste this key into the RuneLite plugin so it can report your character.</p>
+      <div class="onboarding-page__apikey-box" hidden>
+        <code class="onboarding-page__apikey-value"></code>
+        <button class="men-button small onboarding-page__apikey-copy">Copy</button>
+      </div>
+      <button class="men-button onboarding-page__reveal-key" hidden>Show my API key</button>
+      <p class="onboarding-page__reveal-hint" hidden>
+        This invalidates any key you generated before — you'll need to re-paste it into the plugin.
+      </p>
+      <ol class="onboarding-page__steps-list">
+        <li>Install the GroupScape plugin from the RuneLite Plugin Hub.</li>
+        <li>Open its settings and paste your key above.</li>
+        <li>Log into RuneScape — this page updates automatically.</li>
+      </ol>
+      <div class="onboarding-page__waiting">
+        <span class="onboarding-page__spinner"></span> Waiting for your character to check in&hellip;
+      </div>
+      <div class="onboarding-page__key-error validation-error"></div>
+    </div>
+
+    <div class="onboarding-page__link-pending" hidden>
+      <h1 class="onboarding-page__title">Link your character</h1>
+      <p class="onboarding-page__sub">We found this character from the plugin — confirm it's you.</p>
+      <div class="onboarding-page__pending-card">
+        <div class="onboarding-page__pending-portrait-slot"></div>
+        <span class="onboarding-page__pending-rsn"></span>
+        <span class="onboarding-page__pending-stats"></span>
+        <div class="onboarding-page__pending-actions">
+          <button class="men-button onboarding-page__confirm-btn">Confirm</button>
+          <button class="onboarding-page__remove-btn">Remove</button>
+        </div>
+      </div>
+      <div class="onboarding-page__waiting">
+        <span class="onboarding-page__spinner"></span> Still watching for more characters from the plugin&hellip;
+      </div>
+      <div class="onboarding-page__pending-error validation-error"></div>
+    </div>
+
+    <div class="onboarding-page__group-step" hidden>
+      <h1 class="onboarding-page__title">Join or create a group</h1>
+      <p class="onboarding-page__sub"><span class="onboarding-page__group-character-name"></span> isn't in a group yet.</p>
+      <div class="onboarding-page__choice-row">
+        <button class="onboarding-page__choice-card" data-choice="join">
+          <span class="onboarding-page__choice-icon">🔑</span>
+          <span class="onboarding-page__choice-title">Join a group</span>
+          <span class="onboarding-page__choice-desc">Have an invite from a friend?</span>
+        </button>
+        <button class="onboarding-page__choice-card" data-choice="create">
+          <span class="onboarding-page__choice-icon">🏴</span>
+          <span class="onboarding-page__choice-title">Create a group</span>
+          <span class="onboarding-page__choice-desc">Start a new one and invite others</span>
+        </button>
+      </div>
+      <div class="onboarding-page__join-panel" hidden>
+        <men-input
+          class="onboarding-page__join-name"
+          input-id="joinGroupName"
+          input-label="Group name"
+          placeholder-text="e.g. Iron Legion"
+          max-length="64"
+        ></men-input>
+        <men-input
+          class="onboarding-page__join-token"
+          input-id="joinGroupToken"
+          input-label="Group token"
+          placeholder-text="Shared by the group owner"
+          max-length="128"
+        ></men-input>
+        <button class="men-button onboarding-page__join-submit">Join group</button>
+        <div class="onboarding-page__join-error validation-error"></div>
+      </div>
+    </div>
+
+    <div class="onboarding-page__skip">
+      <a class="onboarding-page__skip-link">Skip for now — take me to my account</a>
+    </div>
+  </div>
+</div>

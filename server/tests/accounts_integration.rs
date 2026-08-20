@@ -329,7 +329,7 @@ async fn test_relinking_same_account_refreshes_display_rsn() {
         .await
         .unwrap();
 
-    let refreshed = db::update_character_display_rsn(&client, character.id, "NewName")
+    let refreshed = db::update_character_display_rsn(&client, character.id, "NewName", None, None)
         .await
         .expect("failed to refresh display rsn");
     assert_eq!(refreshed.id, character.id);
@@ -340,6 +340,44 @@ async fn test_relinking_same_account_refreshes_display_rsn() {
         .await
         .expect("query failed");
     assert_eq!(count, 1, "refresh should not create a second character");
+}
+
+#[tokio::test]
+async fn test_update_character_display_rsn_sets_and_preserves_summary_stats() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "stats-refresher@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-stats", "Zezima")
+        .await
+        .unwrap();
+    assert_eq!(character.combat_level, None);
+    assert_eq!(character.total_level, None);
+
+    let with_stats = db::update_character_display_rsn(
+        &client,
+        character.id,
+        "Zezima",
+        Some(126),
+        Some(2277),
+    )
+    .await
+    .expect("failed to set summary stats");
+    assert_eq!(with_stats.combat_level, Some(126));
+    assert_eq!(with_stats.total_level, Some(2277));
+
+    // A later report that only sends RSN (older plugin build) shouldn't wipe out the
+    // stats a newer build already reported.
+    let rsn_only_update = db::update_character_display_rsn(&client, character.id, "Zezima", None, None)
+        .await
+        .expect("failed to refresh rsn");
+    assert_eq!(rsn_only_update.combat_level, Some(126));
+    assert_eq!(rsn_only_update.total_level, Some(2277));
 }
 
 #[tokio::test]
@@ -419,13 +457,14 @@ async fn test_list_characters_for_account_orders_oldest_first() {
         .await
         .expect("failed to create character");
 
-    let characters = db::list_characters_for_account(&client, account_id)
+    let characters = db::list_characters_for_account_with_group_status(&client, account_id)
         .await
         .expect("query failed");
 
     assert_eq!(characters.len(), 2);
-    assert_eq!(characters[0].id, first.id);
-    assert_eq!(characters[1].id, second.id);
+    assert_eq!(characters[0].character.id, first.id);
+    assert_eq!(characters[1].character.id, second.id);
+    assert_eq!(characters[0].group_id, None);
 }
 
 #[tokio::test]
@@ -449,12 +488,45 @@ async fn test_list_characters_for_account_excludes_other_accounts() {
         .await
         .expect("failed to create character");
 
-    let characters = db::list_characters_for_account(&client, account_a)
+    let characters = db::list_characters_for_account_with_group_status(&client, account_a)
         .await
         .expect("query failed");
 
     assert_eq!(characters.len(), 1);
-    assert_eq!(characters[0].account_hash, "hash-a");
+    assert_eq!(characters[0].character.account_hash, "hash-a");
+}
+
+#[tokio::test]
+async fn test_list_characters_for_account_reports_group_status() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "grouped-lister@example.com", &password_hash)
+        .await
+        .unwrap();
+    let grouped = db::create_character(&client, account_id, "hash-grouped", "Grouped")
+        .await
+        .expect("failed to create character");
+    let ungrouped = db::create_character(&client, account_id, "hash-ungrouped", "Ungrouped")
+        .await
+        .expect("failed to create character");
+    let group_id = create_test_group(&client, "listerstatusgroup").await;
+    db::link_character_to_group(&mut client, grouped.id, account_id, group_id)
+        .await
+        .expect("failed to link character to group");
+
+    let characters = db::list_characters_for_account_with_group_status(&client, account_id)
+        .await
+        .expect("query failed");
+
+    assert_eq!(characters.len(), 2);
+    let grouped_entry = characters.iter().find(|c| c.character.id == grouped.id).unwrap();
+    let ungrouped_entry = characters.iter().find(|c| c.character.id == ungrouped.id).unwrap();
+    assert_eq!(grouped_entry.group_id, Some(group_id));
+    assert_eq!(ungrouped_entry.group_id, None);
 }
 
 #[tokio::test]
@@ -584,6 +656,106 @@ async fn test_link_character_to_group_creates_link() {
         admin,
         Some(account_id),
         "the first account whose character links into a group becomes its admin"
+    );
+}
+
+#[tokio::test]
+async fn test_unlink_character_from_group_allows_rejoin_to_a_different_group() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "leaver@example.com", &password_hash)
+        .await
+        .unwrap();
+    let character = db::create_character(&client, account_id, "hash-leaver", "Zezima")
+        .await
+        .unwrap();
+    let first_group_id = create_test_group(&client, "leavergroupone").await;
+    let second_group_id = create_test_group(&client, "leavergrouptwo").await;
+
+    db::link_character_to_group(&mut client, character.id, account_id, first_group_id)
+        .await
+        .expect("first link should succeed");
+
+    // Switching straight to a different group is rejected while the old link still exists.
+    let blocked =
+        db::link_character_to_group(&mut client, character.id, account_id, second_group_id).await;
+    assert!(blocked.is_err(), "should not be able to switch groups without leaving first");
+
+    db::unlink_character_from_group(&client, character.id)
+        .await
+        .expect("leaving the group should succeed");
+    assert!(
+        db::find_character_group_link(&client, character.id)
+            .await
+            .expect("query failed")
+            .is_none(),
+        "character should have no group link after leaving"
+    );
+
+    let rejoined =
+        db::link_character_to_group(&mut client, character.id, account_id, second_group_id)
+            .await
+            .expect("should be able to join a different group after leaving the first");
+    assert_eq!(rejoined.group_id, second_group_id);
+}
+
+#[tokio::test]
+async fn test_find_group_id_for_account_character_scopes_by_account_and_confirmed_status() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let owner_id = db::create_account(&client, "resolver-owner@example.com", &password_hash)
+        .await
+        .unwrap();
+    let other_id = db::create_account(&client, "resolver-other@example.com", &password_hash)
+        .await
+        .unwrap();
+    let group_id = create_test_group(&client, "resolvergroup").await;
+
+    let confirmed = db::create_character(&client, owner_id, "hash-resolver-confirmed", "Confirmed")
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, confirmed.id, owner_id, group_id)
+        .await
+        .expect("linking should succeed");
+
+    assert_eq!(
+        db::find_group_id_for_account_character(&client, owner_id, "resolvergroup")
+            .await
+            .expect("query failed"),
+        Some(group_id)
+    );
+
+    // A different account's characters don't resolve, even for the same group name.
+    assert_eq!(
+        db::find_group_id_for_account_character(&client, other_id, "resolvergroup")
+            .await
+            .expect("query failed"),
+        None
+    );
+
+    // A pending (unconfirmed) character's group membership doesn't count for this account
+    // either, even though it can still be linked at the DB layer.
+    let pending_group_id = create_test_group(&client, "resolvergrouppending").await;
+    let pending = db::create_pending_character(&client, other_id, "hash-resolver-pending")
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, pending.id, other_id, pending_group_id)
+        .await
+        .expect("linking a pending character should still succeed at the DB layer");
+    assert_eq!(
+        db::find_group_id_for_account_character(&client, other_id, "resolvergrouppending")
+            .await
+            .expect("query failed"),
+        None,
+        "an unconfirmed character's group membership shouldn't grant account-session access"
     );
 }
 

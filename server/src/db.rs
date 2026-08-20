@@ -1911,6 +1911,33 @@ CREATE TABLE IF NOT EXISTS groupscape.character_mesh (
         transaction.commit().await?;
     }
 
+    // Lets the onboarding "confirm this character" card show a rough sense of the character
+    // before it's in a group (full per-skill data is only tracked once a character has a group
+    // to store it against). Reported by the plugin alongside RSN via `identify_character`;
+    // both nullable since older plugin builds won't send them.
+    if !has_migration_run(client, "add_character_summary_stats_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.characters ADD COLUMN IF NOT EXISTS combat_level SMALLINT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.characters ADD COLUMN IF NOT EXISTS total_level INTEGER
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_character_summary_stats_columns").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2162,10 +2189,12 @@ pub struct Character {
     pub display_rsn: String,
     pub bound_at: DateTime<Utc>,
     pub status: String,
+    pub combat_level: Option<i16>,
+    pub total_level: Option<i32>,
 }
 
 const CHARACTER_COLUMNS: &str =
-    "character_id, account_id, account_hash, display_rsn, bound_at, status";
+    "character_id, account_id, account_hash, display_rsn, bound_at, status, combat_level, total_level";
 
 fn character_from_row(row: Row) -> Result<Character, ApiError> {
     Ok(Character {
@@ -2175,6 +2204,8 @@ fn character_from_row(row: Row) -> Result<Character, ApiError> {
         display_rsn: row.try_get("display_rsn")?,
         bound_at: row.try_get("bound_at")?,
         status: row.try_get("status")?,
+        combat_level: row.try_get("combat_level")?,
+        total_level: row.try_get("total_level")?,
     })
 }
 
@@ -2254,14 +2285,16 @@ pub async fn update_character_display_rsn(
     client: &Client,
     character_id: i64,
     display_rsn: &str,
+    combat_level: Option<i16>,
+    total_level: Option<i32>,
 ) -> Result<Character, ApiError> {
     let stmt = client
         .prepare_cached(&format!(
-            "UPDATE groupscape.characters SET display_rsn=$1 WHERE character_id=$2 RETURNING {CHARACTER_COLUMNS}"
+            "UPDATE groupscape.characters SET display_rsn=$1, combat_level=COALESCE($3, combat_level), total_level=COALESCE($4, total_level) WHERE character_id=$2 RETURNING {CHARACTER_COLUMNS}"
         ))
         .await?;
     let row = client
-        .query_one(&stmt, &[&display_rsn, &character_id])
+        .query_one(&stmt, &[&display_rsn, &character_id, &combat_level, &total_level])
         .await
         .map_err(ApiError::GetCharacterError)?;
     character_from_row(row)
@@ -2305,20 +2338,48 @@ pub async fn find_character_by_id(
     }
 }
 
-pub async fn list_characters_for_account(
+/// A confirmed character's row plus whether it already has a group, single query via
+/// `LEFT JOIN` - lets the onboarding flow tell "needs a group" apart from "already has one"
+/// without an extra round trip per character.
+pub struct CharacterWithGroupStatus {
+    pub character: Character,
+    pub group_id: Option<i64>,
+    /// Needed by the site to actually navigate into the group (its dashboard routes are keyed
+    /// by name, not id) - see `find_group_id_for_account_character` for why name alone can't
+    /// be trusted the other direction (name -> id).
+    pub group_name: Option<String>,
+}
+
+pub async fn list_characters_for_account_with_group_status(
     client: &Client,
     account_id: i64,
-) -> Result<Vec<Character>, ApiError> {
+) -> Result<Vec<CharacterWithGroupStatus>, ApiError> {
     let stmt = client
-        .prepare_cached(&format!(
-            "SELECT {CHARACTER_COLUMNS} FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at ASC"
-        ))
+        .prepare_cached(
+            "SELECT c.character_id, c.account_id, c.account_hash, c.display_rsn, c.bound_at, \
+             c.status, c.combat_level, c.total_level, l.group_id AS link_group_id, \
+             g.group_name AS link_group_name \
+             FROM groupscape.characters c \
+             LEFT JOIN groupscape.character_group_links l ON l.character_id = c.character_id \
+             LEFT JOIN groupscape.groups g ON g.group_id = l.group_id \
+             WHERE c.account_id=$1 ORDER BY c.bound_at ASC",
+        )
         .await?;
     let rows = client
         .query(&stmt, &[&account_id])
         .await
         .map_err(ApiError::GetCharacterError)?;
-    rows.into_iter().map(character_from_row).collect()
+    rows.into_iter()
+        .map(|row| {
+            let group_id: Option<i64> = row.try_get("link_group_id")?;
+            let group_name: Option<String> = row.try_get("link_group_name")?;
+            Ok(CharacterWithGroupStatus {
+                character: character_from_row(row)?,
+                group_id,
+                group_name,
+            })
+        })
+        .collect()
 }
 
 /// Unlinks a character from its account. `character_group_links` references `character_id`
@@ -2680,6 +2741,56 @@ pub async fn link_character_to_group(
         group_id: row.try_get("group_id")?,
         linked_at: row.try_get("linked_at")?,
     })
+}
+
+/// Removes a character's group membership without touching the character itself (unlike
+/// `delete_character`, which cascades this same row as a side effect of deleting the whole
+/// character). Lets the account owner re-run `link_character_to_group` against a different
+/// group afterward - `character_group_links.character_id` is a primary key, so a character
+/// can't hold two memberships at once and `link_character_to_group` rejects a switch outright
+/// while an old link still exists.
+pub async fn unlink_character_from_group(
+    client: &Client,
+    character_id: i64,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.character_group_links WHERE character_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::LinkCharacterToGroupError)?;
+    Ok(())
+}
+
+/// Resolves a group for account-session-based dashboard access (see `auth_middleware`'s
+/// account-session fallback): does this account have a confirmed character already linked to
+/// a group with this name? `group_name` alone isn't globally unique (see `groups`' composite
+/// primary key), so on the rare case of a genuine collision this just takes the most recently
+/// linked match rather than erroring - good enough since it only needs to agree with *this*
+/// account's own memberships, not resolve the name globally.
+pub async fn find_group_id_for_account_character(
+    client: &Client,
+    account_id: i64,
+    group_name: &str,
+) -> Result<Option<i64>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT l.group_id FROM groupscape.character_group_links l \
+             JOIN groupscape.characters c ON c.character_id = l.character_id \
+             JOIN groupscape.groups g ON g.group_id = l.group_id \
+             WHERE c.account_id = $1 AND c.status = 'confirmed' AND g.group_name = $2 \
+             ORDER BY l.linked_at DESC LIMIT 1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_id, &group_name])
+        .await
+        .map_err(ApiError::GetCharacterGroupLinkError)?;
+    match row {
+        Some(row) => Ok(Some(row.try_get("group_id")?)),
+        None => Ok(None),
+    }
 }
 
 /// The account of the first character ever linked into `group_id`, or `None` for a group

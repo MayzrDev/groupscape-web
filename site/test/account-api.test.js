@@ -125,6 +125,42 @@ describe("accountApi", () => {
     expect(response.ok).toBe(true);
   });
 
+  it("linkCharacterToGroup posts the character id and group credentials", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 201 });
+
+    const response = await accountApi.linkCharacterToGroup("42", "Iron Legion", "group-token");
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/link-group",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ character_id: 42, group_name: "Iron Legion", group_token: "group-token" }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "session-token",
+        },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("leaveGroup posts to the character's leave-group url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 200 });
+
+    const response = await accountApi.leaveGroup(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42/leave-group",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
   it("confirmCharacter posts to the character's confirm url", async () => {
     accountStorage.storeAccountToken("session-token");
     globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });

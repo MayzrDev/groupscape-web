@@ -59,7 +59,7 @@ export class AccountSignupPage extends BaseElement {
       this.signupButton.disabled = true;
       const response = await accountApi.register(this.email.value, this.password.value);
       if (response.ok) {
-        window.history.pushState("", "", "/");
+        window.history.pushState("", "", "/welcome");
       } else if (response.status === 409) {
         this.error.textContent = "That email is already registered.";
       } else if (response.status === 400) {

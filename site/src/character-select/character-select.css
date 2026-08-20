@@ -1,0 +1,129 @@
+character-select {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.character-select__container {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 24px 24px;
+  text-align: center;
+}
+
+.character-select__account-link {
+  align-self: flex-start;
+  font-size: 0.8em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
+.character-select__status {
+  font-size: 1.2em;
+}
+
+.character-select__content {
+  width: 100%;
+}
+
+.character-select__title {
+  margin: 0 0 4px;
+}
+
+.character-select__sub {
+  font-size: 0.85em;
+  opacity: 0.75;
+  margin: 0 0 1.2em;
+}
+
+.character-select__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.character-select__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 4px;
+}
+
+.character-select__badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--darken);
+  border: 1px solid var(--light-border);
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  color: var(--orange);
+  flex: none;
+}
+
+.character-select__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.character-select__rsn {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 15px;
+}
+
+.character-select__group {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.character-select__view {
+  flex: none;
+}
+
+.character-select__leave {
+  flex: none;
+  background: none;
+  border: none;
+  color: var(--primary-text);
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 0.8em;
+  text-decoration: underline;
+}
+
+.character-select__leave:hover,
+.character-select__leave:focus-visible {
+  opacity: 1;
+  color: var(--red);
+}
+
+.character-select__link-more {
+  display: inline-block;
+  margin-top: 1.2em;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.character-select__link-more a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.character-select__error {
+  text-align: center;
+  margin-top: 1em;
+}

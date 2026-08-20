@@ -5,6 +5,13 @@ account-page {
   padding: 20px 8px 60px;
 }
 
+.account-page__characters-link {
+  display: inline-block;
+  font-size: 0.8em;
+  opacity: 0.75;
+  margin-bottom: 8px;
+}
+
 .account-page__status {
   font-size: 0.9em;
   opacity: 0.85;

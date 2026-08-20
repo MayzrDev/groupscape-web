@@ -43,7 +43,7 @@ export class AccountLoginPage extends BaseElement {
       this.loginButton.disabled = true;
       const response = await accountApi.login(this.email.value, this.password.value);
       if (response.ok) {
-        window.history.pushState("", "", "/");
+        window.history.pushState("", "", "/welcome");
       } else if (response.status === 403) {
         this.error.textContent = "This account has been disabled.";
       } else {

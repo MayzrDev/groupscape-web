@@ -196,7 +196,8 @@ pub async fn list_characters(
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let characters = db::list_characters_for_account(&client, authenticated.id).await?;
+    let characters =
+        db::list_characters_for_account_with_group_status(&client, authenticated.id).await?;
     let characters: Vec<Character> = characters.into_iter().map(Character::from).collect();
     Ok(HttpResponse::Ok().json(characters))
 }
@@ -250,7 +251,7 @@ pub async fn link_character(
         if existing.account_id != authenticated.id {
             return Err(ApiError::CharacterLinkedToAnotherAccountError.into());
         }
-        let refreshed = db::update_character_display_rsn(&client, existing.id, &rsn).await?;
+        let refreshed = db::update_character_display_rsn(&client, existing.id, &rsn, None, None).await?;
         return Ok(HttpResponse::Ok().json(Character::from(refreshed)));
     }
 
@@ -397,6 +398,29 @@ pub async fn link_character_to_group(
     })
     .json(CharacterGroupLink::from(link));
     Ok(response)
+}
+
+/// Lets the account owner leave a character's current group so it can be linked to a
+/// different one afterward - `link_character_to_group` refuses to switch a character straight
+/// from one group to another, so this is the explicit first step. No-ops (200) if the
+/// character wasn't in a group to begin with.
+#[post("/characters/{character_id}/leave-group")]
+pub async fn leave_group(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    match character {
+        Some(character) if character.account_id == authenticated.id => character,
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    };
+
+    db::unlink_character_from_group(&client, character_id).await?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 /// Sends the browser to Discord's consent screen. `state` is a signed, self-verifying value

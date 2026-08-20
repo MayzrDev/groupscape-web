@@ -176,6 +176,43 @@ async fn authenticate_via_db(
     Ok(group_id)
 }
 
+/// Fallback when the token in `Authorization` isn't a valid group token for this group: try it
+/// as an account session token instead (same header, same field - there's no ambiguity to
+/// resolve up front since a group token and a session token are drawn from unrelated random
+/// spaces). Grants access only if the account has a confirmed character already linked to a
+/// group with this name, so this can never grant access beyond what the account's own
+/// characters are already members of. Lets a signed-in account view a group's dashboard on a
+/// device that never had that group's token saved locally - see `db::find_group_id_for_account_character`.
+async fn authenticate_via_account_session(
+    req: &ServiceRequest,
+    group_name: &str,
+    token: &str,
+    token_hash: &str,
+    cache: &AuthenticationCache,
+) -> Result<i64, actix_web::Error> {
+    let db_pool = req
+        .app_data::<web::Data<Pool>>()
+        .ok_or_else(|| actix_web::error::ErrorInternalServerError(""))?;
+    let client = db_pool
+        .get()
+        .await
+        .map_err(|_| actix_web::error::ErrorInternalServerError(""))?;
+
+    let session_token_hash = crate::crypto::session_token_hash(token);
+    let account = db::get_account_by_session_token_hash(&client, &session_token_hash)
+        .await
+        .map_err(|_| actix_web::error::ErrorInternalServerError(""))?
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized(""))?;
+
+    let group_id = db::find_group_id_for_account_character(&client, account.id, group_name)
+        .await
+        .map_err(|_| actix_web::error::ErrorInternalServerError(""))?
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized(""))?;
+
+    cache.insert(group_name, token_hash.to_owned(), group_id);
+    Ok(group_id)
+}
+
 impl<S, B> Service<ServiceRequest> for AuthenticateMiddleware<S>
 where
     S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
@@ -230,7 +267,20 @@ where
                         .await
                     {
                         Ok(group_id) => group_id,
-                        Err(e) => return Ok(req.error_response(e)),
+                        Err(_) => {
+                            match authenticate_via_account_session(
+                                &req,
+                                group_name,
+                                token,
+                                &token_hash,
+                                &cache,
+                            )
+                            .await
+                            {
+                                Ok(group_id) => group_id,
+                                Err(e) => return Ok(req.error_response(e)),
+                            }
+                        }
                     },
                 };
 

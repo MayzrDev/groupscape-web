@@ -26,6 +26,13 @@ account-login-page {
   width: 100%;
 }
 
+.account-login__home-link {
+  align-self: flex-start;
+  font-size: 0.8em;
+  opacity: 0.75;
+  margin-bottom: 4px;
+}
+
 .account-login__subtitle {
   font-size: 0.8em;
   opacity: 0.8;

@@ -2,7 +2,7 @@ use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::GroupMember;
-use actix_web::{get, rt, web, Error, HttpRequest, HttpResponse};
+use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use futures_util::StreamExt;
@@ -166,7 +166,6 @@ pub fn to_wire_vitals(member: &GroupMember) -> WireVitals {
 /// before this handler runs). On connect, sends one `roster_snapshot` built
 /// from the current DB state, then forwards this group's broadcast channel
 /// as `vitals_update` frames until the socket closes.
-#[get("/ws")]
 pub async fn party_overlay_ws(
     req: HttpRequest,
     stream: web::Payload,

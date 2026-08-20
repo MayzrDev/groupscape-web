@@ -473,6 +473,16 @@ pub struct Character {
     pub display_rsn: String,
     pub bound_at: DateTime<Utc>,
     pub status: String,
+    pub combat_level: Option<i16>,
+    pub total_level: Option<i32>,
+    /// A real "not in a group" signal only on the account-scoped character list (see
+    /// `list_characters_for_account_with_group_status`), which joins against
+    /// `character_group_links`. Every other endpoint that returns `Character` (confirm,
+    /// remove-pending, unlink, link) always sends `None` here regardless of actual group
+    /// status - they don't do that join, so absence isn't meaningful there.
+    pub group_id: Option<i64>,
+    /// Same "only meaningful on the account-scoped list" caveat as `group_id` above.
+    pub group_name: Option<String>,
 }
 impl From<crate::db::Character> for Character {
     fn from(character: crate::db::Character) -> Self {
@@ -482,7 +492,19 @@ impl From<crate::db::Character> for Character {
             display_rsn: character.display_rsn,
             bound_at: character.bound_at,
             status: character.status,
+            combat_level: character.combat_level,
+            total_level: character.total_level,
+            group_id: None,
+            group_name: None,
         }
+    }
+}
+impl From<crate::db::CharacterWithGroupStatus> for Character {
+    fn from(entry: crate::db::CharacterWithGroupStatus) -> Self {
+        let mut character = Character::from(entry.character);
+        character.group_id = entry.group_id;
+        character.group_name = entry.group_name;
+        character
     }
 }
 /// Returned once from `register`/first Discord login and from `regenerate_api_key` - the raw
@@ -497,6 +519,10 @@ pub struct AccountApiKey {
 #[serde(deny_unknown_fields)]
 pub struct IdentifyCharacter {
     pub rsn: String,
+    #[serde(default)]
+    pub combat_level: Option<i16>,
+    #[serde(default)]
+    pub total_level: Option<i32>,
 }
 
 /// Per-member permission toggles, ported from `groupscape-old`'s `PermissionKey`

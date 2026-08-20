@@ -278,7 +278,6 @@ pub async fn update_discord_settings(
     Ok(web::Json(settings))
 }
 
-#[post("/update-group-member")]
 pub async fn update_group_member(
     auth: Authenticated,
     group_member: web::Json<GroupMember>,
@@ -556,7 +555,6 @@ pub struct GetActivityEventsQuery {
     #[serde(default = "default_activity_limit")]
     pub limit: i64,
 }
-#[get("/get-activity-events")]
 pub async fn get_activity_events(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -584,7 +582,6 @@ pub struct GetSessionsQuery {
     #[serde(default = "default_sessions_limit")]
     pub limit: i64,
 }
-#[get("/get-sessions")]
 pub async fn get_sessions(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -610,7 +607,6 @@ pub struct GetLootSummaryQuery {
 /// value (in-process price cache, no live wiki refetch) and rarity/uniqueness (curated
 /// `drop_rates` table) at read time - mirrors `groupscape-old`'s `GET /loot-summary`, adapted
 /// to this server's flat `npc_name` (no `contentKey` slug exists here).
-#[get("/get-loot-summary")]
 pub async fn get_loot_summary(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -685,7 +681,6 @@ pub struct GetLootSplitQuery {
 /// that range. Unlike `groupscape-old`'s split (which credits a per-kill `actor_character_ids`
 /// list), this server has no multi-actor kill co-attribution, so "participants" here is the set
 /// of reporting members rather than a raid roster.
-#[get("/get-loot-split")]
 pub async fn get_loot_split(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -759,7 +754,6 @@ pub enum SkillDataPeriod {
 pub struct GetSkillDataQuery {
     pub period: SkillDataPeriod,
 }
-#[get("/get-skill-data")]
 pub async fn get_skill_data(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -787,7 +781,6 @@ pub struct GetLeaderboardQuery {
 }
 /// XP/boss-KC/GP-earned/loot-value rankings over a daily/weekly/all-time window - part of the
 /// Graphs tab rather than a standalone leaderboards page/feature (see [`crate::leaderboard`]).
-#[get("/get-leaderboard")]
 pub async fn get_leaderboard(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -837,12 +830,10 @@ pub async fn get_leaderboard(
     }))
 }
 
-#[get("/am-i-logged-in")]
 pub async fn am_i_logged_in(_auth: Authenticated) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/am-i-in-group")]
 pub async fn am_i_in_group(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
@@ -857,7 +848,6 @@ pub async fn am_i_in_group(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/collection-log")]
 pub async fn get_collection_log() -> Result<web::Json<HashMap<String, Vec<i32>>>, Error> {
     Ok(web::Json(HashMap::new()))
 }
@@ -901,7 +891,6 @@ pub async fn get_portrait(
 /// Mounted under `character_identity_scope` (no group required) - the plugin calls this once
 /// per reconcile cycle regardless of confirm/group status, so a pending character's real RSN
 /// reaches the site's confirm card instead of the account_hash placeholder it was created with.
-#[post("/identify")]
 pub async fn identify_character(
     identity: CharacterIdentified,
     body: web::Json<IdentifyCharacter>,
@@ -912,7 +901,14 @@ pub async fn identify_character(
         return Ok(HttpResponse::BadRequest().body("Provided RSN is not valid"));
     }
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    db::update_character_display_rsn(&client, identity.character_id, &rsn).await?;
+    db::update_character_display_rsn(
+        &client,
+        identity.character_id,
+        &rsn,
+        body.combat_level,
+        body.total_level,
+    )
+    .await?;
     Ok(HttpResponse::Ok().finish())
 }
 
