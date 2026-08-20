@@ -12,6 +12,7 @@ pub mod drop_rates;
 pub mod error;
 pub mod leaderboard;
 pub mod models;
+pub mod notable_npcs;
 pub mod permissions;
 pub mod push;
 pub mod unauthed;

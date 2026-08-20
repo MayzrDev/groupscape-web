@@ -263,7 +263,7 @@ async fn test_kill_event_without_loot_round_trips() {
 
     let kill_without_loot = GameEvent::Kill(KillEvent {
         npc_id: 50,
-        npc_name: "Giant rat".to_string(),
+        npc_name: "Vorkath".to_string(),
         world_x: 0,
         world_y: 0,
         plane: 0,
@@ -279,6 +279,57 @@ async fn test_kill_event_without_loot_round_trips() {
         .unwrap();
     assert_eq!(events.len(), 1);
     assert!(events[0].payload.get("loot").is_none());
+}
+
+#[tokio::test]
+async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "activitytest7").await;
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    let ordinary_kill = GameEvent::Kill(KillEvent {
+        npc_id: 41,
+        npc_name: "Cow".to_string(),
+        world_x: 0,
+        world_y: 0,
+        plane: 0,
+        world: 301,
+        loot: None,
+    });
+    let boss_kill = sample_kill();
+    let death_by_ordinary_npc = GameEvent::Death(DeathEvent {
+        world_x: 0,
+        world_y: 0,
+        plane: 0,
+        world: 301,
+        killer_name: Some("Cow".to_string()),
+    });
+
+    db::insert_activity_event(&client, group_id, session_id, "Zezima", &ordinary_kill)
+        .await
+        .unwrap();
+    db::insert_activity_event(&client, group_id, session_id, "Zezima", &boss_kill)
+        .await
+        .unwrap();
+    db::insert_activity_event(&client, group_id, session_id, "Zezima", &death_by_ordinary_npc)
+        .await
+        .unwrap();
+
+    let events = db::list_activity_events(&client, group_id, None, None, None, 30)
+        .await
+        .unwrap();
+    assert_eq!(
+        events.len(),
+        2,
+        "the ordinary-NPC kill should be hidden but the boss kill and the death should stay"
+    );
+    assert!(events.iter().any(|e| e.event_type == "death"));
+    assert!(events
+        .iter()
+        .any(|e| e.event_type == "kill" && e.payload["npcName"] == serde_json::json!("Zulrah")));
 }
 
 #[tokio::test]

@@ -2809,7 +2809,26 @@ LIMIT $5
         )
         .await
         .map_err(ApiError::ListActivityEventsError)?;
-    rows.iter().map(activity_event_from_row).collect()
+    let events: Vec<ActivityEvent> = rows
+        .iter()
+        .map(activity_event_from_row)
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(events.into_iter().filter(is_feed_worthy).collect())
+}
+
+/// Kill events are only feed-worthy when they're on a curated "notable" NPC (bosses/major quest
+/// bosses, see [`crate::notable_npcs`]) - the plugin reports every kill, not just boss ones, so
+/// without this the feed/toasts would be dominated by farming spam. All other event types
+/// (deaths included) always pass through.
+fn is_feed_worthy(event: &ActivityEvent) -> bool {
+    if event.event_type != "kill" {
+        return true;
+    }
+    event
+        .payload
+        .get("npcName")
+        .and_then(|v| v.as_str())
+        .is_some_and(crate::notable_npcs::is_notable)
 }
 
 /// All `kill` events for a group in an optional `[since, until]` range, uncapped by cursor
