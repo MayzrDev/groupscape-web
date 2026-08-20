@@ -125,21 +125,6 @@ pub enum ApiError {
     CaptureLeaderboardSnapshotsError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetLeaderboardSnapshotsError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    InsertGroupGoalError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    ListGroupGoalsError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    FindGroupGoalError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    UpdateGroupGoalError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    SetGroupGoalStatusError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    DeleteGroupGoalError(tokio_postgres::error::Error),
-    #[from(ignore)]
-    GoalReferenceValidationError(String),
-    GroupGoalNotFoundError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -307,26 +292,15 @@ impl ResponseError for ApiError {
             ApiError::UpdateDiscordWebhookSettingsError(ref err) => {
                 handle_pg_error(err, "UpdateDiscordWebhookSettingsError")
             }
-            ApiError::DiscordWebhookInvalidError(ref reason) => HttpResponse::BadRequest()
-                .body(format!("Discord webhook URL is invalid: {}", reason)),
+            ApiError::DiscordWebhookInvalidError(ref reason) => {
+                HttpResponse::BadRequest().body(format!("Discord webhook URL is invalid: {}", reason))
+            }
             ApiError::CaptureLeaderboardSnapshotsError(ref err) => {
                 handle_pg_error(err, "CaptureLeaderboardSnapshotsError")
             }
             ApiError::GetLeaderboardSnapshotsError(ref err) => {
                 handle_pg_error(err, "GetLeaderboardSnapshotsError")
             }
-            ApiError::InsertGroupGoalError(ref err) => handle_pg_error(err, "InsertGroupGoalError"),
-            ApiError::ListGroupGoalsError(ref err) => handle_pg_error(err, "ListGroupGoalsError"),
-            ApiError::FindGroupGoalError(ref err) => handle_pg_error(err, "FindGroupGoalError"),
-            ApiError::UpdateGroupGoalError(ref err) => handle_pg_error(err, "UpdateGroupGoalError"),
-            ApiError::SetGroupGoalStatusError(ref err) => {
-                handle_pg_error(err, "SetGroupGoalStatusError")
-            }
-            ApiError::DeleteGroupGoalError(ref err) => handle_pg_error(err, "DeleteGroupGoalError"),
-            ApiError::GoalReferenceValidationError(ref reason) => {
-                HttpResponse::BadRequest().body(reason.clone())
-            }
-            ApiError::GroupGoalNotFoundError => HttpResponse::NotFound().body("Goal not found"),
         }
     }
 }

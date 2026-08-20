@@ -3,9 +3,9 @@ use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
     AggregateSkillData, BlockedMember, CreateGroup, DialogueEvent, DiscordWebhookSettings,
-    GameEvent, GroupGoal, GroupMember, GroupMemberPermissions, GroupPermissions, GroupSession,
-    GroupSkillData, MemberSkillData, ObjectInteractionEvent, PermissionFlags, PermissionFlagsPatch,
-    PermissionKey, SHARED_MEMBER,
+    GameEvent, GroupMember, GroupMemberPermissions, GroupPermissions, GroupSession,
+    GroupSkillData, MemberSkillData, ObjectInteractionEvent, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -1804,41 +1804,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS bank_value_snapshots_member_date_idx ON groups
         transaction.commit().await?;
     }
 
-    if !has_migration_run(client, "create_group_goals_table").await? {
-        let transaction = client.transaction().await?;
-        transaction
-            .execute(
-                r#"
-CREATE TABLE IF NOT EXISTS groupscape.group_goals (
-  id BIGSERIAL PRIMARY KEY,
-  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  reference_type TEXT NOT NULL DEFAULT 'none',
-  reference_id TEXT,
-  created_by BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
-  status TEXT NOT NULL DEFAULT 'open',
-  completed_by BIGINT REFERENCES groupscape.accounts(id) ON DELETE SET NULL,
-  auto_completed BOOLEAN NOT NULL DEFAULT false,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-"#,
-                &[],
-            )
-            .await?;
-        transaction
-            .execute(
-                r#"
-CREATE INDEX IF NOT EXISTS group_goals_group_id_idx ON groupscape.group_goals (group_id)
-"#,
-                &[],
-            )
-            .await?;
-
-        commit_migration(&transaction, "create_group_goals_table").await?;
-        transaction.commit().await?;
-    }
-
     Ok(())
 }
 
@@ -3221,10 +3186,7 @@ pub async fn admin_count_accounts(client: &Client) -> Result<i64, ApiError> {
 // needed. Only GP-earned needs new history, since bank *contents* aren't tracked anywhere else;
 // see `bank_value_snapshots` above.
 
-fn leaderboard_window_cutoff(
-    window: crate::leaderboard::LeaderboardWindow,
-    now: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
+fn leaderboard_window_cutoff(window: crate::leaderboard::LeaderboardWindow, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
     use crate::leaderboard::LeaderboardWindow;
     match window {
         LeaderboardWindow::Daily => Some(now - chrono::Duration::days(1)),
@@ -3347,9 +3309,7 @@ async fn list_member_names(client: &Client, group_id: i64) -> Result<Vec<String>
         .query(&stmt, &[&group_id])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
-    rows.iter()
-        .map(|row| row.try_get("member_name").map_err(ApiError::from))
-        .collect()
+    rows.iter().map(|row| row.try_get("member_name").map_err(ApiError::from)).collect()
 }
 
 /// Cumulative per-member boss-kill counts (all bosses, or one `boss` filter) over the window,
@@ -3361,8 +3321,7 @@ pub async fn get_boss_kc_leaderboard(
     boss: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<(Vec<(String, i64)>, Vec<String>), ApiError> {
-    let events =
-        list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
 
     let mut counts: HashMap<String, i64> = list_member_names(client, group_id)
         .await?
@@ -3396,8 +3355,7 @@ pub async fn get_loot_value_leaderboard(
     now: DateTime<Utc>,
     ge_prices: &crate::models::GEPrices,
 ) -> Result<Vec<(String, i64)>, ApiError> {
-    let events =
-        list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
 
     let mut totals: HashMap<String, i64> = list_member_names(client, group_id)
         .await?
@@ -3536,159 +3494,4 @@ pub async fn get_gp_earned_leaderboard(
             (member_name, value - base)
         })
         .collect())
-}
-
-fn row_to_group_goal(row: &Row) -> Result<GroupGoal, ApiError> {
-    Ok(GroupGoal {
-        id: row.try_get("id")?,
-        group_id: row.try_get("group_id")?,
-        title: row.try_get("title")?,
-        reference_type: row.try_get("reference_type")?,
-        reference_id: row.try_get("reference_id")?,
-        created_by: row.try_get("created_by")?,
-        status: row.try_get("status")?,
-        completed_by: row.try_get("completed_by")?,
-        auto_completed: row.try_get("auto_completed")?,
-        created_at: row.try_get("created_at")?,
-        updated_at: row.try_get("updated_at")?,
-    })
-}
-
-const GROUP_GOAL_COLUMNS: &str = "id, group_id, title, reference_type, reference_id, created_by, status, completed_by, auto_completed, created_at, updated_at";
-
-pub async fn insert_group_goal(
-    client: &Client,
-    group_id: i64,
-    title: &str,
-    reference_type: &str,
-    reference_id: Option<&str>,
-    created_by: i64,
-) -> Result<GroupGoal, ApiError> {
-    let stmt = client
-        .prepare_cached(&format!(
-            "INSERT INTO groupscape.group_goals (group_id, title, reference_type, reference_id, created_by) \
-             VALUES ($1, $2, $3, $4, $5) RETURNING {GROUP_GOAL_COLUMNS}"
-        ))
-        .await?;
-    let row = client
-        .query_one(
-            &stmt,
-            &[
-                &group_id,
-                &title,
-                &reference_type,
-                &reference_id,
-                &created_by,
-            ],
-        )
-        .await
-        .map_err(ApiError::InsertGroupGoalError)?;
-    row_to_group_goal(&row)
-}
-
-pub async fn list_group_goals(client: &Client, group_id: i64) -> Result<Vec<GroupGoal>, ApiError> {
-    let stmt = client
-        .prepare_cached(&format!(
-            "SELECT {GROUP_GOAL_COLUMNS} FROM groupscape.group_goals WHERE group_id=$1 ORDER BY created_at DESC"
-        ))
-        .await?;
-    let rows = client
-        .query(&stmt, &[&group_id])
-        .await
-        .map_err(ApiError::ListGroupGoalsError)?;
-    rows.iter().map(row_to_group_goal).collect()
-}
-
-pub async fn find_group_goal(
-    client: &Client,
-    group_id: i64,
-    goal_id: i64,
-) -> Result<Option<GroupGoal>, ApiError> {
-    let stmt = client
-        .prepare_cached(&format!(
-            "SELECT {GROUP_GOAL_COLUMNS} FROM groupscape.group_goals WHERE group_id=$1 AND id=$2"
-        ))
-        .await?;
-    let row = client
-        .query_opt(&stmt, &[&group_id, &goal_id])
-        .await
-        .map_err(ApiError::FindGroupGoalError)?;
-    row.as_ref().map(row_to_group_goal).transpose()
-}
-
-/// Partial update: `None` per field leaves the stored value alone, matching
-/// [`crate::models::UpdateGroupGoalRequest`]'s convention. Always bumps `updated_at`.
-pub async fn update_group_goal(
-    client: &Client,
-    group_id: i64,
-    goal_id: i64,
-    title: Option<&str>,
-    reference_type: Option<&str>,
-    reference_id: Option<Option<&str>>,
-) -> Result<Option<GroupGoal>, ApiError> {
-    let stmt = client
-        .prepare_cached(&format!(
-            "UPDATE groupscape.group_goals SET \
-             title = COALESCE($3, title), \
-             reference_type = COALESCE($4, reference_type), \
-             reference_id = CASE WHEN $5 THEN $6 ELSE reference_id END, \
-             updated_at = now() \
-             WHERE group_id=$1 AND id=$2 RETURNING {GROUP_GOAL_COLUMNS}"
-        ))
-        .await?;
-    let reference_id_provided = reference_id.is_some();
-    let reference_id_value = reference_id.flatten();
-    let row = client
-        .query_opt(
-            &stmt,
-            &[
-                &group_id,
-                &goal_id,
-                &title,
-                &reference_type,
-                &reference_id_provided,
-                &reference_id_value,
-            ],
-        )
-        .await
-        .map_err(ApiError::UpdateGroupGoalError)?;
-    row.as_ref().map(row_to_group_goal).transpose()
-}
-
-/// Manual status toggle. Always clears `auto_completed` - a manual action is, by definition, no
-/// longer an automatically-derived state, whichever direction it flips (matches
-/// `groupscape-old`'s `setGroupGoalStatus`).
-pub async fn set_group_goal_status(
-    client: &Client,
-    group_id: i64,
-    goal_id: i64,
-    status: &str,
-    completed_by: Option<i64>,
-) -> Result<Option<GroupGoal>, ApiError> {
-    let stmt = client
-        .prepare_cached(&format!(
-            "UPDATE groupscape.group_goals SET status=$3, completed_by=$4, auto_completed=false, updated_at=now() \
-             WHERE group_id=$1 AND id=$2 RETURNING {GROUP_GOAL_COLUMNS}"
-        ))
-        .await?;
-    let row = client
-        .query_opt(&stmt, &[&group_id, &goal_id, &status, &completed_by])
-        .await
-        .map_err(ApiError::SetGroupGoalStatusError)?;
-    row.as_ref().map(row_to_group_goal).transpose()
-}
-
-pub async fn delete_group_goal(
-    client: &Client,
-    group_id: i64,
-    goal_id: i64,
-) -> Result<bool, ApiError> {
-    let stmt = client
-        .prepare_cached("DELETE FROM groupscape.group_goals WHERE group_id=$1 AND id=$2")
-        .await?;
-    let deleted = client
-        .execute(&stmt, &[&group_id, &goal_id])
-        .await
-        .map_err(ApiError::DeleteGroupGoalError)?;
-    Ok(deleted > 0)
 }

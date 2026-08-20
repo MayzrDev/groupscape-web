@@ -56,10 +56,7 @@ async fn main() -> std::io::Result<()> {
         std::env::var("VAPID_PRIVATE_KEY"),
         std::env::var("VAPID_SUBJECT"),
     ) {
-        if !vapid_public_key.is_empty()
-            && !vapid_private_key.is_empty()
-            && !vapid_subject.is_empty()
-        {
+        if !vapid_public_key.is_empty() && !vapid_private_key.is_empty() && !vapid_subject.is_empty() {
             config.push.enabled = true;
             config.push.vapid_public_key = vapid_public_key;
             config.push.vapid_private_key = vapid_private_key;
@@ -138,11 +135,6 @@ async fn main() -> std::io::Result<()> {
             .service(authed::update_group_permissions)
             .service(authed::get_discord_settings)
             .service(authed::update_discord_settings)
-            .service(authed::get_group_goals)
-            .service(authed::create_group_goal)
-            .service(authed::update_group_goal)
-            .service(authed::update_group_goal_status)
-            .service(authed::delete_group_goal)
             .service(authed::rename_group)
             .service(authed::reroll_group_token)
             .service(authed::delete_group)
