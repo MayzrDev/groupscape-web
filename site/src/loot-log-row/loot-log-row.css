@@ -38,34 +38,46 @@ loot-log-row[data-unique="true"] {
 
 .loot-log-row__unique-tag {
   color: var(--rarity-unique);
-  font-size: 0.6em;
+  font-size: 0.7em;
   margin-left: 6px;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .loot-log-row__meta {
-  font-size: 0.75em;
+  font-size: 0.8em;
   opacity: 0.65;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.loot-log-row__rarity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
 .loot-log-row__rarity-badge {
-  font-size: 0.68em;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 0.75em;
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: 999px;
-  font-weight: 700;
   text-shadow: none;
-  flex-shrink: 0;
   background: rgba(154, 154, 154, 0.18);
   color: var(--rarity-common);
+}
+
+.loot-log-row__rate {
+  font-size: 0.68em;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  opacity: 0.55;
 }
 
 loot-log-row[data-rarity="uncommon"] .loot-log-row__rarity-badge {
@@ -87,16 +99,16 @@ loot-log-row[data-rarity="very_rare"] .loot-log-row__rarity-badge {
   text-align: right;
   min-width: 90px;
   flex-shrink: 0;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
 }
 
 .loot-log-row__gp {
   color: var(--yellow);
-  font-weight: 700;
-  font-size: 0.85em;
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.9em;
 }
 
 .loot-log-row__qty {
-  font-size: 0.72em;
+  font-size: 0.78em;
   opacity: 0.6;
 }

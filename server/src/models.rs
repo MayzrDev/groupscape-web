@@ -304,6 +304,7 @@ pub struct LootSummaryRow {
     pub total_value: i64,
     pub rarity: Option<String>,
     pub is_unique: bool,
+    pub drop_rate: Option<String>,
 }
 
 #[derive(Serialize)]

@@ -9,6 +9,11 @@ pub struct DropRateEntry {
     pub rarity: String,
     #[serde(default)]
     pub is_unique: bool,
+    /// Wiki-sourced fixed per-kill drop rate (e.g. "1/508"), only present where the mechanic
+    /// is a simple fixed roll. Absent for rewards gated by points/team size/thresholds
+    /// (raid uniques, Barrows, Wintertodt/Tempoross reward pools) - never guessed.
+    #[serde(default)]
+    pub rate: Option<String>,
 }
 
 /// Curated per-boss drop tables ported from `groupscape-old`'s `content/drop-rates.json`

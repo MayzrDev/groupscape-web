@@ -288,7 +288,8 @@
     "11286": {
       "name": "Draconic visage",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "21486": {
       "name": "Teak seed",
@@ -308,27 +309,32 @@
     "21907": {
       "name": "Vorkath's head",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/50"
     },
     "21992": {
       "name": "Vorki",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "22006": {
       "name": "Skeletal visage",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "22106": {
       "name": "Jar of decay",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "22111": {
       "name": "Dragonbone necklace",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1000"
     },
     "22118": {
       "name": "Wrath talisman",
@@ -610,7 +616,8 @@
     "6571": {
       "name": "Uncut onyx",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1024"
     },
     "9193": {
       "name": "Dragonstone bolt tips",
@@ -620,22 +627,26 @@
     "12921": {
       "name": "Pet snakeling",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/4000"
     },
     "12922": {
       "name": "Tanzanite fang",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1024"
     },
     "12927": {
       "name": "Serpentine visage",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1024"
     },
     "12932": {
       "name": "Magic fang",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1024"
     },
     "12934": {
       "name": "Zulrah's scales",
@@ -645,17 +656,20 @@
     "12936": {
       "name": "Jar of swamp",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "13200": {
       "name": "Tanzanite mutagen",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/13107"
     },
     "13201": {
       "name": "Magma mutagen",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/13107"
     },
     "23083": {
       "name": "Brimstone key",
@@ -912,37 +926,44 @@
     "13227": {
       "name": "Eternal crystal",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/520"
     },
     "13229": {
       "name": "Pegasian crystal",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/520"
     },
     "13231": {
       "name": "Primordial crystal",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/520"
     },
     "13233": {
       "name": "Smouldering stone",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/520"
     },
     "13245": {
       "name": "Jar of souls",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "13247": {
       "name": "Hellpuppy",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "13249": {
       "name": "Key master teleport",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/65"
     },
     "23083": {
       "name": "Brimstone key",
@@ -1094,42 +1115,50 @@
     "11812": {
       "name": "Bandos hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11818": {
       "name": "Godsword shard 1",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11820": {
       "name": "Godsword shard 2",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11822": {
       "name": "Godsword shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11832": {
       "name": "Bandos chestplate",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "11834": {
       "name": "Bandos tassets",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "11836": {
       "name": "Bandos boots",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "12650": {
       "name": "Pet general graardor",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -1266,42 +1295,50 @@
     "11787": {
       "name": "Steam battlestaff",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/127"
     },
     "11791": {
       "name": "Staff of the dead",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11816": {
       "name": "Zamorak hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11818": {
       "name": "Godsword shard 1",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11820": {
       "name": "Godsword shard 2",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11822": {
       "name": "Godsword shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11824": {
       "name": "Zamorakian spear",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/127"
     },
     "12652": {
       "name": "Pet k'ril tsutsaroth",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -1443,42 +1480,50 @@
     "11785": {
       "name": "Armadyl crossbow",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11814": {
       "name": "Saradomin hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11818": {
       "name": "Godsword shard 1",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11820": {
       "name": "Godsword shard 2",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11822": {
       "name": "Godsword shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11838": {
       "name": "Saradomin sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/127"
     },
     "12651": {
       "name": "Pet zilyana",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "13256": {
       "name": "Saradomin's light",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/254"
     },
     "23083": {
       "name": "Brimstone key",
@@ -1640,42 +1685,50 @@
     "11810": {
       "name": "Armadyl hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/508"
     },
     "11818": {
       "name": "Godsword shard 1",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11820": {
       "name": "Godsword shard 2",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11822": {
       "name": "Godsword shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/762"
     },
     "11826": {
       "name": "Armadyl helmet",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "11828": {
       "name": "Armadyl chestplate",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "11830": {
       "name": "Armadyl chainskirt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/381"
     },
     "12649": {
       "name": "Pet kree'arra",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -1962,7 +2015,8 @@
     "20849": {
       "name": "Dragon thrownaxe",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "21486": {
       "name": "Teak seed",
@@ -1977,12 +2031,14 @@
     "22746": {
       "name": "Ikkle hydra",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "22804": {
       "name": "Dragon knife",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2001"
     },
     "22869": {
       "name": "Celastrus seed",
@@ -2002,42 +2058,50 @@
     "22966": {
       "name": "Hydra's claw",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1001"
     },
     "22969": {
       "name": "Hydra's heart",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/181.1"
     },
     "22971": {
       "name": "Hydra's fang",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/181.1"
     },
     "22973": {
       "name": "Hydra's eye",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/181.1"
     },
     "22983": {
       "name": "Hydra leather",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/514"
     },
     "22988": {
       "name": "Hydra tail",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/513"
     },
     "23064": {
       "name": "Jar of chemicals",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "23077": {
       "name": "Alchemical hydra heads",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "23083": {
       "name": "Brimstone key",
@@ -2209,7 +2273,8 @@
     "7980": {
       "name": "Kbd heads",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/128"
     },
     "9431": {
       "name": "Runite limbs",
@@ -2229,17 +2294,20 @@
     "11286": {
       "name": "Draconic visage",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/5000"
     },
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1000"
     },
     "12653": {
       "name": "Prince black dragon",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "19582": {
       "name": "Dragon javelin tips",
@@ -2436,7 +2504,8 @@
     "12646": {
       "name": "Baby mole",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -2446,7 +2515,8 @@
     "33382": {
       "name": "Immaculate mole skin",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/50"
     }
   },
   "kalphite_queen": {
@@ -2643,7 +2713,8 @@
     "3140": {
       "name": "Dragon chainbody",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/128"
     },
     "3175": {
       "name": "Rune spear",
@@ -2693,27 +2764,32 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "7981": {
       "name": "Kq head",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/128"
     },
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/400"
     },
     "12654": {
       "name": "Kalphite princess",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "12885": {
       "name": "Jar of sand",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -2735,22 +2811,26 @@
     "26235": {
       "name": "Zaryte vambraces",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/172"
     },
     "26348": {
       "name": "Nexling",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/500"
     },
     "26370": {
       "name": "Ancient hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/516"
     },
     "26372": {
       "name": "Nihil horn",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/258"
     },
     "26392": {
       "name": "Blood essence",
@@ -3567,17 +3647,20 @@
     "12004": {
       "name": "Kraken tentacle",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/400"
     },
     "12007": {
       "name": "Jar of dirt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1000"
     },
     "12655": {
       "name": "Pet kraken",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -3924,7 +4007,8 @@
     "13273": {
       "name": "Unsired",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/100"
     },
     "21486": {
       "name": "Teak seed",
@@ -4111,7 +4195,8 @@
     "3140": {
       "name": "Dragon chainbody",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "3175": {
       "name": "Rune spear",
@@ -4171,17 +4256,20 @@
     "11998": {
       "name": "Smoke battlestaff",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/512"
     },
     "12002": {
       "name": "Occult necklace",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/350"
     },
     "22663": {
       "name": "Pet smoke devil",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/3000"
     },
     "23083": {
       "name": "Brimstone key",
@@ -4191,7 +4279,8 @@
     "25524": {
       "name": "Jar of smoke",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2000"
     },
     "30900": {
       "name": "Shark lure",
@@ -4313,7 +4402,8 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "8778": {
       "name": "Oak plank",
@@ -4333,7 +4423,8 @@
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "11936": {
       "name": "Dark crab",
@@ -4343,12 +4434,14 @@
     "12601": {
       "name": "Ring of the gods",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/512"
     },
     "13179": {
       "name": "Vet'ion jr.",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1500"
     },
     "21257": {
       "name": "Slayer's enchantment",
@@ -4378,12 +4471,14 @@
     "27673": {
       "name": "Skull of vet'ion",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/196"
     },
     "27684": {
       "name": "Voidwaker blade",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/360"
     }
   },
   "callisto": {
@@ -4505,7 +4600,8 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "10976": {
       "name": "Long bone",
@@ -4520,7 +4616,8 @@
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "11936": {
       "name": "Dark crab",
@@ -4530,12 +4627,14 @@
     "12603": {
       "name": "Tyrannical ring",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/512"
     },
     "13178": {
       "name": "Callisto cub",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1500"
     },
     "21257": {
       "name": "Slayer's enchantment",
@@ -4565,12 +4664,14 @@
     "27667": {
       "name": "Claws of callisto",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/196"
     },
     "27681": {
       "name": "Voidwaker hilt",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/360"
     }
   },
   "venenatis": {
@@ -4667,7 +4768,8 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "9194": {
       "name": "Onyx bolt tips",
@@ -4692,7 +4794,8 @@
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "11936": {
       "name": "Dark crab",
@@ -4702,12 +4805,14 @@
     "12605": {
       "name": "Treasonous ring",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/512"
     },
     "13177": {
       "name": "Venenatis spiderling",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/1500"
     },
     "21257": {
       "name": "Slayer's enchantment",
@@ -4737,12 +4842,14 @@
     "27670": {
       "name": "Fangs of venenatis",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/196"
     },
     "27687": {
       "name": "Voidwaker gem",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/360"
     }
   },
   "chaos_elemental": {
@@ -4964,7 +5071,8 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/128"
     },
     "8782": {
       "name": "Mahogany plank",
@@ -4974,12 +5082,14 @@
     "11920": {
       "name": "Dragon pickaxe",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "11995": {
       "name": "Pet chaos elemental",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/300"
     },
     "21257": {
       "name": "Slayer's enchantment",
@@ -5106,7 +5216,8 @@
     "7158": {
       "name": "Dragon 2h sword",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/128"
     },
     "9194": {
       "name": "Onyx bolt tips",
@@ -5116,17 +5227,20 @@
     "11930": {
       "name": "Odium shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "11933": {
       "name": "Malediction shard 3",
       "rarity": "rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/256"
     },
     "13181": {
       "name": "Scorpia's offspring",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2015.75"
     },
     "19582": {
       "name": "Dragon javelin tips",
@@ -5335,7 +5449,8 @@
     "6571": {
       "name": "Uncut onyx",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/8000"
     },
     "7936": {
       "name": "Pure essence",
@@ -5345,7 +5460,8 @@
     "23760": {
       "name": "Smolcano",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2250"
     },
     "23908": {
       "name": "Zalcano shard",
@@ -5754,17 +5870,20 @@
     "27590": {
       "name": "Muphin",
       "rarity": "very_rare",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/2500"
     },
     "27614": {
       "name": "Venator shard",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "1/100"
     },
     "27627": {
       "name": "Ancient icon",
       "rarity": "uncommon",
-      "isUnique": true
+      "isUnique": true,
+      "rate": "2/100"
     },
     "30900": {
       "name": "Shark lure",

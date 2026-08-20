@@ -35,6 +35,10 @@ export class LootLogRow extends BaseElement {
     return RARITY_LABELS[this.row.rarity] || null;
   }
 
+  get dropRateLabel() {
+    return this.row.drop_rate || null;
+  }
+
   get formattedValue() {
     return `${this.row.total_value.toLocaleString()} gp`;
   }

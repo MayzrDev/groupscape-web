@@ -16,7 +16,7 @@ loot-log-page {
   gap: 12px;
   margin-bottom: 12px;
   flex-wrap: wrap;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
 }
 
 .loot-log-page__split-card {
@@ -30,7 +30,7 @@ loot-log-page {
 
 .loot-log-page__split-n {
   font-size: 1.25em;
-  font-weight: 700;
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   color: var(--orange);
   font-variant-numeric: tabular-nums;
   text-shadow: none;
@@ -48,7 +48,7 @@ loot-log-page {
   gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 16px;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   font-size: 0.78em;
 }
 
@@ -74,7 +74,7 @@ loot-log-page {
 
 .loot-log-page__toolbar-label {
   font-size: 0.7em;
-  font-family: ui-sans-serif, Arial, sans-serif;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   opacity: 0.7;
   margin-right: -2px;
 }

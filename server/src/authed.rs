@@ -653,6 +653,7 @@ pub async fn get_loot_summary(
                 total_value: 0,
                 rarity: drop.map(|d| d.rarity.clone()),
                 is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
+                drop_rate: drop.and_then(|d| d.rate.clone()),
             });
             row.quantity += item.quantity;
             row.total_value += unit_value.unwrap_or(0) * item.quantity as i64;
