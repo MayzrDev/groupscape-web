@@ -103,6 +103,36 @@ pub fn start_skills_aggregator(db_pool: Pool) {
     });
 }
 
+/// Captures each member's current bank value once per UTC day, feeding the GP-earned
+/// leaderboard metric ([`crate::leaderboard`]) - runs far more often than "once a day" (same
+/// margin as `start_session_idle_closer`) purely so a server that was down at midnight still
+/// picks today's snapshot up soon after; the upsert on `(member_id, snapshot_date)` makes
+/// repeat runs within the same day a no-op refresh rather than a duplicate row.
+pub fn start_bank_value_snapshotter(db_pool: Pool) {
+    task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(1800));
+
+        loop {
+            interval.tick().await;
+            log::info!("Capturing bank value snapshots");
+
+            match db_pool.get().await {
+                Ok(client) => {
+                    let ge_prices = get_ge_prices_map();
+                    if let Err(err) =
+                        db::capture_bank_value_snapshots(&client, &ge_prices, chrono::Utc::now()).await
+                    {
+                        log::error!("Failed to capture bank value snapshots: {}", err);
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to get db client: {}", err);
+                }
+            }
+        }
+    });
+}
+
 /// Mirrors `groupscape-old`'s `closeIdleSessions` recurring job: closes any session that's
 /// gone 15 minutes without a heartbeat from its group. Runs far more often than that window
 /// (every minute) so a session closes promptly after it actually goes idle.

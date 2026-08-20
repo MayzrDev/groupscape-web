@@ -1770,6 +1770,40 @@ ADD COLUMN IF NOT EXISTS discord_notify_loot BOOLEAN NOT NULL DEFAULT true
         transaction.commit().await?;
     }
 
+    // Leaderboards (XP/KC/GP/loot) reuse the Graphs tab's existing `skills_day`/`skills_month`/
+    // `skills_year` history for XP, and `activity_events` (already unbounded/retained) for
+    // boss-KC and loot-value - no new snapshot table needed for those three. Bank *contents*
+    // have no history anywhere in this schema though, so GP-earned needs one new lightweight
+    // table; unlike the skills_* tables it's never pruned (one small row/member/day forever).
+    if !has_migration_run(client, "create_bank_value_snapshots_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.bank_value_snapshots (
+  id BIGSERIAL PRIMARY KEY,
+  member_id BIGINT NOT NULL REFERENCES groupscape.members(member_id) ON DELETE CASCADE,
+  snapshot_date DATE NOT NULL,
+  captured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  bank_value BIGINT NOT NULL DEFAULT 0
+);
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS bank_value_snapshots_member_date_idx ON groupscape.bank_value_snapshots (member_id, snapshot_date)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_bank_value_snapshots_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -3122,4 +3156,323 @@ pub async fn admin_count_accounts(client: &Client) -> Result<i64, ApiError> {
         .map_err(|e| ApiError::AdminDbError("AdminCountAccountsError".to_string(), e))?
         .try_get(0)?;
     Ok(count)
+}
+
+// --- Leaderboards ---
+//
+// XP reuses the Graphs tab's existing `skills_day`/`skills_month`/`skills_year` history
+// (`skills[1]` is the "Overall" total, same convention the site's `SkillName.Overall` reads at
+// index 0 of the decoded array - Postgres arrays are 1-indexed). Boss-KC and loot-value are
+// computed live from `activity_events`, which is already unbounded/retained - no snapshot
+// needed. Only GP-earned needs new history, since bank *contents* aren't tracked anywhere else;
+// see `bank_value_snapshots` above.
+
+fn leaderboard_window_cutoff(window: crate::leaderboard::LeaderboardWindow, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+    use crate::leaderboard::LeaderboardWindow;
+    match window {
+        LeaderboardWindow::Daily => Some(now - chrono::Duration::days(1)),
+        LeaderboardWindow::Weekly => Some(now - chrono::Duration::days(7)),
+        LeaderboardWindow::AllTime => None,
+    }
+}
+
+/// XP gained in the window: live "Overall" total minus the oldest available history-table
+/// reading at/after (daily) or at/before (weekly/all-time) the cutoff. All-time has no cutoff -
+/// it diffs against the earliest surviving row across every history table, whatever that is
+/// (those tables never fully delete a member's last row, so there's always some baseline).
+pub async fn get_xp_leaderboard(
+    client: &Client,
+    group_id: i64,
+    window: crate::leaderboard::LeaderboardWindow,
+    now: DateTime<Utc>,
+) -> Result<Vec<(String, i64)>, ApiError> {
+    use crate::leaderboard::LeaderboardWindow;
+
+    let live_stmt = client
+        .prepare_cached(
+            "SELECT member_name, COALESCE(skills[1], 0) AS xp FROM groupscape.members WHERE group_id=$1",
+        )
+        .await?;
+    let live_rows = client
+        .query(&live_stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetLeaderboardSnapshotsError)?;
+    let mut live: HashMap<String, i64> = HashMap::new();
+    for row in &live_rows {
+        let member_name: String = row.try_get("member_name")?;
+        let xp: i32 = row.try_get("xp")?;
+        live.insert(member_name, xp as i64);
+    }
+
+    let baseline_sql = match window {
+        LeaderboardWindow::Daily => {
+            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+             FROM groupscape.skills_day s JOIN groupscape.members m ON m.member_id = s.member_id
+             WHERE m.group_id = $1 AND s.time >= $2
+             ORDER BY m.member_name, s.time ASC"
+        }
+        LeaderboardWindow::Weekly => {
+            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+             FROM groupscape.skills_month s JOIN groupscape.members m ON m.member_id = s.member_id
+             WHERE m.group_id = $1 AND s.time <= $2
+             ORDER BY m.member_name, s.time DESC"
+        }
+        LeaderboardWindow::AllTime => {
+            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+             FROM groupscape.skills_year s JOIN groupscape.members m ON m.member_id = s.member_id
+             WHERE m.group_id = $1
+             ORDER BY m.member_name, s.time ASC"
+        }
+    };
+    let cutoff = leaderboard_window_cutoff(window, now);
+    let baseline_stmt = client.prepare_cached(baseline_sql).await?;
+    let baseline_rows = match cutoff {
+        Some(cutoff) => client
+            .query(&baseline_stmt, &[&group_id, &cutoff])
+            .await
+            .map_err(ApiError::GetLeaderboardSnapshotsError)?,
+        None => client
+            .query(&baseline_stmt, &[&group_id])
+            .await
+            .map_err(ApiError::GetLeaderboardSnapshotsError)?,
+    };
+    let mut baseline: HashMap<String, i64> = HashMap::new();
+    for row in &baseline_rows {
+        let member_name: String = row.try_get("member_name")?;
+        let xp: i32 = row.try_get("xp")?;
+        baseline.insert(member_name, xp as i64);
+    }
+
+    Ok(live
+        .into_iter()
+        .map(|(member_name, xp)| {
+            let base = baseline.get(&member_name).copied().unwrap_or(xp);
+            (member_name, xp - base)
+        })
+        .collect())
+}
+
+/// All `kill` activity events for a group since `since` (`None` = unbounded/all-time) - unlike
+/// `list_kill_events`, no `LIMIT`, since leaderboard aggregation needs the true total rather
+/// than a recency-capped page.
+async fn list_kill_events_since(
+    client: &Client,
+    group_id: i64,
+    since: Option<DateTime<Utc>>,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type='kill'
+  AND ($2::timestamptz IS NULL OR occurred_at >= $2)
+ORDER BY occurred_at DESC
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &since])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
+/// Every member's name in a group - used to zero-fill leaderboard metrics computed from
+/// `activity_events` so a member with no matching events still ranks (at 0) rather than being
+/// omitted outright.
+async fn list_member_names(client: &Client, group_id: i64) -> Result<Vec<String>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT member_name FROM groupscape.members WHERE group_id=$1")
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetLeaderboardSnapshotsError)?;
+    rows.iter().map(|row| row.try_get("member_name").map_err(ApiError::from)).collect()
+}
+
+/// Cumulative per-member boss-kill counts (all bosses, or one `boss` filter) over the window,
+/// plus the set of bosses the group has actually killed (for the site's boss-filter dropdown).
+pub async fn get_boss_kc_leaderboard(
+    client: &Client,
+    group_id: i64,
+    window: crate::leaderboard::LeaderboardWindow,
+    boss: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<(Vec<(String, i64)>, Vec<String>), ApiError> {
+    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+
+    let mut counts: HashMap<String, i64> = list_member_names(client, group_id)
+        .await?
+        .into_iter()
+        .map(|name| (name, 0))
+        .collect();
+    let mut available_bosses: HashSet<String> = HashSet::new();
+    for event in &events {
+        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        available_bosses.insert(kill.npc_name.clone());
+        if boss.is_some_and(|b| b != kill.npc_name) {
+            continue;
+        }
+        *counts.entry(event.member_name.clone()).or_insert(0) += 1;
+    }
+
+    let mut available: Vec<String> = available_bosses.into_iter().collect();
+    available.sort();
+    Ok((counts.into_iter().collect(), available))
+}
+
+/// Cumulative per-member loot value (GE price at read time) over the window, mirroring
+/// `get_loot_summary`'s value lookup.
+pub async fn get_loot_value_leaderboard(
+    client: &Client,
+    group_id: i64,
+    window: crate::leaderboard::LeaderboardWindow,
+    now: DateTime<Utc>,
+    ge_prices: &crate::models::GEPrices,
+) -> Result<Vec<(String, i64)>, ApiError> {
+    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+
+    let mut totals: HashMap<String, i64> = list_member_names(client, group_id)
+        .await?
+        .into_iter()
+        .map(|name| (name, 0))
+        .collect();
+    for event in &events {
+        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        let Some(loot) = kill.loot else { continue };
+        let value: i64 = loot
+            .iter()
+            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+            .sum();
+        *totals.entry(event.member_name.clone()).or_insert(0) += value;
+    }
+    Ok(totals.into_iter().collect())
+}
+
+/// Sums a flat `[item_id, quantity, item_id, quantity, ...]` array (this server's on-wire bank
+/// format, see `validate_member_prop_length`'s `ArrayFormat::ItemPairs`) into a GE-priced total.
+fn bank_value(bank: &[i32], ge_prices: &crate::models::GEPrices) -> i64 {
+    bank.chunks_exact(2)
+        .map(|pair| {
+            let (item_id, quantity) = (pair[0], pair[1]);
+            ge_prices.get(&item_id).copied().unwrap_or(0) * quantity as i64
+        })
+        .sum()
+}
+
+/// Captures each member's current bank value once per UTC day - the only leaderboard metric
+/// that needs its own history table, since nothing else records what a member's bank was worth
+/// on any past day. Upserted on `(member_id, snapshot_date)` so a re-run within the same day
+/// (e.g. a restarted job) just refreshes today's figure.
+pub async fn capture_bank_value_snapshots(
+    client: &Client,
+    ge_prices: &crate::models::GEPrices,
+    now: DateTime<Utc>,
+) -> Result<(), ApiError> {
+    let members_stmt = client
+        .prepare_cached("SELECT member_id, bank FROM groupscape.members WHERE bank IS NOT NULL")
+        .await?;
+    let rows = client
+        .query(&members_stmt, &[])
+        .await
+        .map_err(ApiError::CaptureLeaderboardSnapshotsError)?;
+
+    let upsert_stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.bank_value_snapshots (member_id, snapshot_date, captured_at, bank_value)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (member_id, snapshot_date) DO UPDATE SET captured_at=excluded.captured_at, bank_value=excluded.bank_value
+"#,
+        )
+        .await?;
+    let snapshot_date = now.date_naive();
+    for row in &rows {
+        let member_id: i64 = row.try_get("member_id")?;
+        let bank: Vec<i32> = row.try_get("bank")?;
+        let value = bank_value(&bank, ge_prices);
+        client
+            .execute(&upsert_stmt, &[&member_id, &snapshot_date, &now, &value])
+            .await
+            .map_err(ApiError::CaptureLeaderboardSnapshotsError)?;
+    }
+    Ok(())
+}
+
+/// GP earned in the window: live bank value minus the nearest snapshot at/before the cutoff
+/// (`None` cutoff for all-time uses the earliest snapshot ever captured for that member).
+pub async fn get_gp_earned_leaderboard(
+    client: &Client,
+    group_id: i64,
+    window: crate::leaderboard::LeaderboardWindow,
+    now: DateTime<Utc>,
+    ge_prices: &crate::models::GEPrices,
+) -> Result<Vec<(String, i64)>, ApiError> {
+    use crate::leaderboard::LeaderboardWindow;
+
+    let live_stmt = client
+        .prepare_cached(
+            "SELECT member_name, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank FROM groupscape.members WHERE group_id=$1",
+        )
+        .await?;
+    let live_rows = client
+        .query(&live_stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetLeaderboardSnapshotsError)?;
+    let mut live: HashMap<String, i64> = HashMap::new();
+    for row in &live_rows {
+        let member_name: String = row.try_get("member_name")?;
+        let bank: Vec<i32> = row.try_get("bank")?;
+        live.insert(member_name, bank_value(&bank, ge_prices));
+    }
+
+    let baseline_sql = match window {
+        LeaderboardWindow::AllTime => {
+            "SELECT DISTINCT ON (m.member_name) m.member_name, b.bank_value
+             FROM groupscape.bank_value_snapshots b JOIN groupscape.members m ON m.member_id = b.member_id
+             WHERE m.group_id = $1
+             ORDER BY m.member_name, b.snapshot_date ASC"
+        }
+        LeaderboardWindow::Daily | LeaderboardWindow::Weekly => {
+            "SELECT DISTINCT ON (m.member_name) m.member_name, b.bank_value
+             FROM groupscape.bank_value_snapshots b JOIN groupscape.members m ON m.member_id = b.member_id
+             WHERE m.group_id = $1 AND b.captured_at <= $2
+             ORDER BY m.member_name, b.snapshot_date DESC"
+        }
+    };
+    let cutoff = leaderboard_window_cutoff(window, now).unwrap_or(now);
+    let baseline_stmt = client.prepare_cached(baseline_sql).await?;
+    let baseline_rows = match window {
+        LeaderboardWindow::AllTime => client
+            .query(&baseline_stmt, &[&group_id])
+            .await
+            .map_err(ApiError::GetLeaderboardSnapshotsError)?,
+        _ => client
+            .query(&baseline_stmt, &[&group_id, &cutoff])
+            .await
+            .map_err(ApiError::GetLeaderboardSnapshotsError)?,
+    };
+    let mut baseline: HashMap<String, i64> = HashMap::new();
+    for row in &baseline_rows {
+        let member_name: String = row.try_get("member_name")?;
+        let value: i64 = row.try_get("bank_value")?;
+        baseline.insert(member_name, value);
+    }
+
+    Ok(live
+        .into_iter()
+        .map(|(member_name, value)| {
+            let base = baseline.get(&member_name).copied().unwrap_or(value);
+            (member_name, value - base)
+        })
+        .collect())
 }

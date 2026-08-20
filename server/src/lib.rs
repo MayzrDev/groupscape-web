@@ -10,6 +10,7 @@ pub mod db;
 pub mod discord;
 pub mod drop_rates;
 pub mod error;
+pub mod leaderboard;
 pub mod models;
 pub mod permissions;
 pub mod push;

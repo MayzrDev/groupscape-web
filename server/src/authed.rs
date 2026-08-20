@@ -11,6 +11,7 @@ use crate::models::{
     GroupSkillData, LootSplitParticipant, LootSplitResult, LootSummaryRow, PermissionFlags,
     PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
+use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
@@ -772,6 +773,66 @@ pub async fn get_skill_data(
     let group_skill_data =
         db::get_skills_for_period(&client, auth.group_id, aggregate_period).await?;
     Ok(web::Json(group_skill_data))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetLeaderboardQuery {
+    pub metric: LeaderboardMetric,
+    pub window: LeaderboardWindow,
+    #[serde(default)]
+    pub boss: Option<String>,
+}
+/// XP/boss-KC/GP-earned/loot-value rankings over a daily/weekly/all-time window - part of the
+/// Graphs tab rather than a standalone leaderboards page/feature (see [`crate::leaderboard`]).
+#[get("/get-leaderboard")]
+pub async fn get_leaderboard(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetLeaderboardQuery>,
+) -> Result<web::Json<LeaderboardResult>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let now = Utc::now();
+
+    let (entries, available_bosses) = match query.metric {
+        LeaderboardMetric::Xp => {
+            let raw = db::get_xp_leaderboard(&client, auth.group_id, query.window, now).await?;
+            (crate::leaderboard::rank_entries(raw), vec![])
+        }
+        LeaderboardMetric::BossKc => {
+            let (raw, bosses) = db::get_boss_kc_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                query.boss.as_deref(),
+                now,
+            )
+            .await?;
+            (crate::leaderboard::rank_entries(raw), bosses)
+        }
+        LeaderboardMetric::GpEarned => {
+            let ge_prices = get_ge_prices_map();
+            let raw =
+                db::get_gp_earned_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
+                    .await?;
+            (crate::leaderboard::rank_entries(raw), vec![])
+        }
+        LeaderboardMetric::LootValue => {
+            let ge_prices = get_ge_prices_map();
+            let raw =
+                db::get_loot_value_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
+                    .await?;
+            (crate::leaderboard::rank_entries(raw), vec![])
+        }
+    };
+
+    Ok(web::Json(LeaderboardResult {
+        metric: query.metric,
+        window: query.window,
+        boss: query.boss.clone(),
+        available_bosses,
+        entries,
+    }))
 }
 
 #[get("/am-i-logged-in")]

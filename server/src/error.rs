@@ -121,6 +121,10 @@ pub enum ApiError {
     UpdateDiscordWebhookSettingsError(tokio_postgres::error::Error),
     #[from(ignore)]
     DiscordWebhookInvalidError(String),
+    #[from(ignore)]
+    CaptureLeaderboardSnapshotsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetLeaderboardSnapshotsError(tokio_postgres::error::Error),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -290,6 +294,12 @@ impl ResponseError for ApiError {
             }
             ApiError::DiscordWebhookInvalidError(ref reason) => {
                 HttpResponse::BadRequest().body(format!("Discord webhook URL is invalid: {}", reason))
+            }
+            ApiError::CaptureLeaderboardSnapshotsError(ref err) => {
+                handle_pg_error(err, "CaptureLeaderboardSnapshotsError")
+            }
+            ApiError::GetLeaderboardSnapshotsError(ref err) => {
+                handle_pg_error(err, "GetLeaderboardSnapshotsError")
             }
         }
     }
