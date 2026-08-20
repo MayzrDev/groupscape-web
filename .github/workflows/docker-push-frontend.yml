@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'site/**'
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   docker:
