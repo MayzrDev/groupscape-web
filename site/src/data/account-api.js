@@ -21,6 +21,22 @@ class AccountApi {
     return `${this.baseUrl}/characters/${characterId}`;
   }
 
+  confirmCharacterUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}/confirm`;
+  }
+
+  pendingCharacterUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}/pending`;
+  }
+
+  characterPortraitUrl(characterId) {
+    return `${this.baseUrl}/characters/${characterId}/portrait`;
+  }
+
+  get apiKeyUrl() {
+    return `${this.baseUrl}/api-key`;
+  }
+
   get registerUrl() {
     return `${this.baseUrl}/register`;
   }
@@ -62,6 +78,9 @@ class AccountApi {
     if (response.ok) {
       const authenticated = await response.json();
       accountStorage.storeAccountToken(authenticated.token);
+      if (authenticated.api_key) {
+        sessionStorage.setItem("freshApiKey", authenticated.api_key);
+      }
     }
     return response;
   }
@@ -119,6 +138,44 @@ class AccountApi {
     const response = await fetch(this.characterUrl(characterId), {
       headers: { Authorization: accountToken },
       method: "DELETE",
+    });
+    return response;
+  }
+
+  async confirmCharacter(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.confirmCharacterUrl(characterId), {
+      headers: { Authorization: accountToken },
+      method: "POST",
+    });
+    return response;
+  }
+
+  async removePendingCharacter(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.pendingCharacterUrl(characterId), {
+      headers: { Authorization: accountToken },
+      method: "DELETE",
+    });
+    return response;
+  }
+
+  async getCharacterPortrait(characterId) {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.characterPortraitUrl(characterId), {
+      headers: { Authorization: accountToken },
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return response.arrayBuffer();
+  }
+
+  async regenerateApiKey() {
+    const accountToken = accountStorage.getAccountToken();
+    const response = await fetch(this.apiKeyUrl, {
+      headers: { Authorization: accountToken },
+      method: "POST",
     });
     return response;
   }

@@ -19,6 +19,9 @@
   --admin-accent: #ff4b4b;
   --admin-accent-soft: rgba(255, 75, 75, 0.16);
 
+  --pending-characters-accent: #c9962b;
+  --pending-characters-accent-soft: rgba(201, 150, 43, 0.16);
+
   --rarity-common: #9a9a9a;
   --rarity-uncommon: #4caf50;
   --rarity-rare: #3b82f6;

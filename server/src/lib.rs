@@ -4,6 +4,7 @@ pub mod admin;
 pub mod admin_auth_middleware;
 pub mod auth_middleware;
 pub mod authed;
+pub mod character_auth_middleware;
 pub mod config;
 pub mod crypto;
 pub mod db;

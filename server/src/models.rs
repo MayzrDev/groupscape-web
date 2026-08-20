@@ -404,6 +404,9 @@ pub struct Account {
 pub struct AuthenticatedAccount {
     pub account: Account,
     pub token: String,
+    /// Only set on `register`/first-ever Discord login, the one time the raw API key is
+    /// available to hand back - `login` always returns `None`, the key is never re-shown.
+    pub api_key: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -469,6 +472,7 @@ pub struct Character {
     pub account_hash: String,
     pub display_rsn: String,
     pub bound_at: DateTime<Utc>,
+    pub status: String,
 }
 impl From<crate::db::Character> for Character {
     fn from(character: crate::db::Character) -> Self {
@@ -477,8 +481,22 @@ impl From<crate::db::Character> for Character {
             account_hash: character.account_hash,
             display_rsn: character.display_rsn,
             bound_at: character.bound_at,
+            status: character.status,
         }
     }
+}
+/// Returned once from `register`/first Discord login and from `regenerate_api_key` - the raw
+/// key is never re-shown after that (only its hash is persisted).
+#[derive(Serialize)]
+pub struct AccountApiKey {
+    pub api_key: String,
+}
+/// Sent by the plugin independently of group-link status (see `character_identity_scope` in
+/// main.rs) so a pending, not-yet-grouped character's RSN reaches the site's confirm card.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdentifyCharacter {
+    pub rsn: String,
 }
 
 /// Per-member permission toggles, ported from `groupscape-old`'s `PermissionKey`

@@ -56,6 +56,17 @@ pub fn session_token_hash(token: &str) -> String {
     token_hash(token, "account_session")
 }
 
+/// A fresh, unguessable plugin API key - the RuneLite plugin's only credential. Mirrors
+/// `new_session_token`: the raw value is returned to the client once (shown once on the account
+/// page) and only its `api_key_hash` (salted with "account_api_key") is ever persisted.
+pub fn new_api_key() -> String {
+    uuid::Uuid::new_v4().hyphenated().to_string()
+}
+
+pub fn api_key_hash(key: &str) -> String {
+    token_hash(key, "account_api_key")
+}
+
 /// A signed, self-verifying OAuth `state` value: `nonce.expiry.signature`. No server-side
 /// storage needed to validate it on callback, which matters here because the account API is
 /// stateless bearer-token auth (no session store to stash a pending-OAuth nonce in between the
@@ -122,6 +133,15 @@ mod password_tests {
         assert_ne!(a, b);
         assert_eq!(session_token_hash(&a), session_token_hash(&a));
         assert_ne!(session_token_hash(&a), session_token_hash(&b));
+    }
+
+    #[test]
+    fn api_keys_are_unique_and_hash_deterministically() {
+        let a = new_api_key();
+        let b = new_api_key();
+        assert_ne!(a, b);
+        assert_eq!(api_key_hash(&a), api_key_hash(&a));
+        assert_ne!(api_key_hash(&a), api_key_hash(&b));
     }
 
     #[test]

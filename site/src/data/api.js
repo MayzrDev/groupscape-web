@@ -162,7 +162,7 @@ class Api {
       if (!response.ok) {
         if (response.status === 401) {
           await this.disable();
-          window.history.pushState("", "", "/login");
+          window.history.pushState("", "", "/");
           pubsub.publish("get-group-data");
         }
         return;

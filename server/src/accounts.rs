@@ -5,9 +5,9 @@ use crate::db;
 use crate::discord;
 use crate::error::ApiError;
 use crate::models::{
-    Account, AuthenticatedAccount, ChangeAccountPassword, Character, CharacterGroupLink,
-    DiscordCallbackQuery, LinkCharacter, LinkCharacterToGroup, LoginAccount, RegisterAccount,
-    UpdateAccountEmail,
+    Account, AccountApiKey, AuthenticatedAccount, ChangeAccountPassword, Character,
+    CharacterGroupLink, DiscordCallbackQuery, LinkCharacter, LinkCharacterToGroup, LoginAccount,
+    RegisterAccount, UpdateAccountEmail,
 };
 use crate::validators::{valid_email, valid_name, valid_password};
 use actix_web::{delete, get, post, put, web, Error, HttpResponse};
@@ -53,6 +53,8 @@ pub async fn register(
     };
 
     let token = issue_session(&client, account_id).await?;
+    let api_key = crypto::new_api_key();
+    db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key)).await?;
     let account = db::get_account_by_email(&client, &email)
         .await?
         .ok_or(ApiError::InvalidCredentialsError)?;
@@ -64,6 +66,7 @@ pub async fn register(
             created_at: account.created_at,
         },
         token,
+        api_key: Some(api_key),
     }))
 }
 
@@ -97,6 +100,7 @@ pub async fn login(
             created_at: account.created_at,
         },
         token,
+        api_key: None,
     }))
 }
 
@@ -250,6 +254,10 @@ pub async fn link_character(
         return Ok(HttpResponse::Ok().json(Character::from(refreshed)));
     }
 
+    if db::is_character_denylisted(&client, authenticated.id, &account_hash).await? {
+        return Err(ApiError::CharacterLinkedToAnotherAccountError.into());
+    }
+
     let character_count = db::count_characters_for_account(&client, authenticated.id).await?;
     if character_count >= db::CHARACTER_CAP_PER_ACCOUNT {
         return Err(ApiError::CharacterCapReachedError.into());
@@ -257,6 +265,100 @@ pub async fn link_character(
 
     let character = db::create_character(&client, authenticated.id, &account_hash, &rsn).await?;
     Ok(HttpResponse::Created().json(Character::from(character)))
+}
+
+/// Generates a fresh API key and overwrites the stored hash immediately - no grace period, so
+/// any plugin still holding the old key stops authenticating the moment this returns.
+#[post("/api-key")]
+pub async fn regenerate_api_key(
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let api_key = crypto::new_api_key();
+    db::set_account_api_key_hash(&client, authenticated.id, &crypto::api_key_hash(&api_key))
+        .await?;
+    Ok(HttpResponse::Ok().json(AccountApiKey { api_key }))
+}
+
+/// Confirms a pending character (auto-created by the plugin's first telemetry request under a
+/// given account_hash) - only after this can it be assigned to a group.
+#[post("/characters/{character_id}/confirm")]
+pub async fn confirm_character(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    match character {
+        Some(character) if character.account_id == authenticated.id && character.status == "pending" => {}
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    }
+
+    let confirmed = db::confirm_character(&client, character_id).await?;
+    Ok(HttpResponse::Ok().json(Character::from(confirmed)))
+}
+
+/// Removes a *pending* character and permanently denylists its account_hash from re-linking to
+/// this account - distinct from `unlink_character`, which only removes an already-confirmed
+/// character and does not denylist.
+#[delete("/characters/{character_id}/pending")]
+pub async fn remove_pending_character(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    let character = match character {
+        Some(character) if character.account_id == authenticated.id && character.status == "pending" => {
+            character
+        }
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    };
+
+    db::remove_pending_character(
+        &mut client,
+        authenticated.id,
+        character_id,
+        &character.account_hash,
+    )
+    .await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+/// The confirm card's 3D portrait needs to render before a character has a group (it may still
+/// be pending), so this is keyed by ownership of the character itself rather than group
+/// membership - reads from `character_mesh`, populated by the plugin's account-hash-scoped
+/// portrait upload (`authed::update_character_portrait`).
+#[get("/characters/{character_id}/portrait")]
+pub async fn get_character_portrait(
+    path: web::Path<i64>,
+    authenticated: AccountAuthenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+
+    let character = db::find_character_by_id(&client, character_id).await?;
+    match character {
+        Some(character) if character.account_id == authenticated.id => {}
+        _ => return Err(ApiError::CharacterNotFoundError.into()),
+    }
+
+    let mesh = db::get_character_mesh(&client, character_id).await?;
+    match mesh {
+        Some(mesh) => Ok(HttpResponse::Ok()
+            .append_header(("Cache-Control", "private, max-age=60"))
+            .content_type("application/octet-stream")
+            .body(mesh)),
+        None => Ok(HttpResponse::NotFound().finish()),
+    }
 }
 
 /// Ported from `groupscape-old`'s `character_group_links` invariant: a character (an
@@ -351,13 +453,18 @@ pub async fn discord_callback(
     };
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let account = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
-        Some(account) => account,
+    let (account, fresh_api_key) = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
+        Some(account) => (account, None),
         None => {
-            db::create_account_with_discord_id(&client, &discord_user.id).await?;
-            db::get_account_by_discord_id(&client, &discord_user.id)
+            let account_id =
+                db::create_account_with_discord_id(&client, &discord_user.id).await?;
+            let api_key = crypto::new_api_key();
+            db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key))
+                .await?;
+            let account = db::get_account_by_discord_id(&client, &discord_user.id)
                 .await?
-                .ok_or(ApiError::InvalidCredentialsError)?
+                .ok_or(ApiError::InvalidCredentialsError)?;
+            (account, Some(api_key))
         }
     };
     if account.disabled {
@@ -365,5 +472,9 @@ pub async fn discord_callback(
     }
 
     let token = issue_session(&client, account.id).await?;
-    Ok(redirect_to(&format!("token={}", token)))
+    let fragment = match fresh_api_key {
+        Some(api_key) => format!("token={}&api_key={}", token, api_key),
+        None => format!("token={}", token),
+    };
+    Ok(redirect_to(&fragment))
 }

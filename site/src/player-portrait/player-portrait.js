@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
+import { accountApi } from "../data/account-api";
 
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
@@ -21,6 +22,7 @@ export class PlayerPortrait extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
+    this.accountCharacterId = this.getAttribute("account-character-id");
     this.mode = this.getAttribute("mode") === "full" ? "full" : "bust";
     this.setAttribute("mode", this.mode);
     this.render();
@@ -134,9 +136,11 @@ export class PlayerPortrait extends BaseElement {
   async loadPortrait() {
     let buffer = null;
     try {
-      buffer = await api.getPortrait(this.playerName);
+      buffer = this.accountCharacterId
+        ? await accountApi.getCharacterPortrait(this.accountCharacterId)
+        : await api.getPortrait(this.playerName);
     } catch (ex) {
-      console.error(`failed to load portrait for ${this.playerName}`, ex);
+      console.error(`failed to load portrait for ${this.playerName || this.accountCharacterId}`, ex);
     }
     if (!this.isConnected) return;
 

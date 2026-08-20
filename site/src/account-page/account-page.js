@@ -69,6 +69,13 @@ export class AccountPage extends BaseElement {
     this.passwordStatus = this.querySelector(".account-page__password-status");
     this.eventListener(this.passwordSaveButton, "click", this.savePassword.bind(this));
 
+    this.apiKeyReveal = this.querySelector(".account-page__api-key-reveal");
+    this.apiKeyValue = this.querySelector(".account-page__api-key-value");
+    this.apiKeyRegenerateButton = this.querySelector(".account-page__api-key-regenerate");
+    this.apiKeyError = this.querySelector(".account-page__api-key-error");
+    this.apiKeyStatus = this.querySelector(".account-page__api-key-status");
+    this.eventListener(this.apiKeyRegenerateButton, "click", this.confirmRegenerateApiKey.bind(this));
+
     this.deleteButton = this.querySelector(".account-page__delete-button");
     this.eventListener(this.deleteButton, "click", this.confirmDeleteAccount.bind(this));
 
@@ -96,6 +103,19 @@ export class AccountPage extends BaseElement {
     this.status.textContent = "";
     this.content.hidden = false;
     this.renderProfile(account);
+    this.showFreshApiKeyIfPresent();
+  }
+
+  showFreshApiKeyIfPresent() {
+    const freshApiKey = sessionStorage.getItem("freshApiKey");
+    if (!freshApiKey) return;
+    sessionStorage.removeItem("freshApiKey");
+    this.renderApiKey(freshApiKey);
+  }
+
+  renderApiKey(apiKey) {
+    this.apiKeyValue.textContent = apiKey;
+    this.apiKeyReveal.hidden = false;
   }
 
   renderProfile(account) {
@@ -211,6 +231,37 @@ export class AccountPage extends BaseElement {
       return;
     }
     await this.refreshNotificationsState();
+  }
+
+  confirmRegenerateApiKey() {
+    confirmDialogManager.confirm({
+      headline: "Regenerate API key?",
+      body: "Your old key will stop working immediately.",
+      yesCallback: this.regenerateApiKey.bind(this),
+      noCallback: () => {},
+    });
+  }
+
+  async regenerateApiKey() {
+    this.apiKeyError.textContent = "";
+    this.apiKeyStatus.textContent = "";
+    this.apiKeyStatus.classList.remove("ok");
+    try {
+      this.apiKeyRegenerateButton.disabled = true;
+      const response = await accountApi.regenerateApiKey();
+      if (response.ok) {
+        const { api_key } = await response.json();
+        this.renderApiKey(api_key);
+        this.apiKeyStatus.textContent = "New key generated.";
+        this.apiKeyStatus.classList.add("ok");
+      } else {
+        this.apiKeyError.textContent = "Couldn't regenerate your API key — try again.";
+      }
+    } catch (error) {
+      this.apiKeyError.textContent = "Couldn't regenerate your API key — try again.";
+    } finally {
+      this.apiKeyRegenerateButton.disabled = false;
+    }
   }
 
   confirmDeleteAccount() {

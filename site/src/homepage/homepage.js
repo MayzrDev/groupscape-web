@@ -1,5 +1,4 @@
 import { BaseElement } from "../base-element/base-element";
-import { storage } from "../data/storage";
 
 export class Homepage extends BaseElement {
   constructor() {
@@ -17,11 +16,6 @@ export class Homepage extends BaseElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-  }
-
-  get hasLogin() {
-    const group = storage.getGroup();
-    return group && group.groupName && group.groupToken && group.groupName !== "@EXAMPLE";
   }
 }
 

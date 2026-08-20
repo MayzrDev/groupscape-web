@@ -1,0 +1,36 @@
+pending-characters-indicator {
+  display: none;
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+}
+
+pending-characters-indicator.pending-characters-indicator--visible {
+  display: block;
+}
+
+.pending-characters-indicator__link {
+  display: flex;
+}
+
+.pending-characters-indicator__link a {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 14px;
+  color: white;
+  text-decoration: none;
+  background: var(--pending-characters-accent);
+  padding: 6px 12px 6px 9px;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.pending-characters-indicator__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: white;
+}

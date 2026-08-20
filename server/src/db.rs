@@ -1804,6 +1804,113 @@ CREATE UNIQUE INDEX IF NOT EXISTS bank_value_snapshots_member_date_idx ON groups
         transaction.commit().await?;
     }
 
+    // Plugin auth redesign: the account API key replaces group_name/group_token as the
+    // plugin's credential. Nullable rather than NOT NULL UNIQUE at the column level since
+    // pre-existing accounts have none yet; `register`/Discord account-creation always set it
+    // going forward, and the partial unique index only enforces uniqueness once a value exists.
+    if !has_migration_run(client, "add_account_api_key_hash").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS api_key_hash TEXT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_api_key_hash_idx ON groupscape.accounts (api_key_hash) WHERE api_key_hash IS NOT NULL
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_account_api_key_hash").await?;
+        transaction.commit().await?;
+    }
+
+    // A character auto-created from an unattended plugin request starts 'pending' until the
+    // account owner confirms it on the site; the existing manual `link_character` fallback
+    // still inserts 'confirmed' directly, same as before this column existed.
+    if !has_migration_run(client, "add_character_status_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.characters ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'confirmed'
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.characters DROP CONSTRAINT IF EXISTS characters_status_check
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.characters ADD CONSTRAINT characters_status_check CHECK (status IN ('pending', 'confirmed'))
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_character_status_column").await?;
+        transaction.commit().await?;
+    }
+
+    // Modeled on `blocked_members`: a per-account (not global) denylist. Removing a pending
+    // character permanently blocks that RuneScape account from re-linking to *this* GroupScape
+    // account - a real decision, not something the next plugin heartbeat silently undoes.
+    if !has_migration_run(client, "create_character_denylist_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.character_denylist (
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  account_hash TEXT NOT NULL,
+  denied_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (account_id, account_hash)
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_character_denylist_table").await?;
+        transaction.commit().await?;
+    }
+
+    // Portrait meshes for a character with no group yet (pending confirmation) can't be keyed
+    // through `member_mesh` (which requires a `members` row, itself group-scoped) - a separate
+    // table keyed directly on `character_id` lets the identify/portrait routes work regardless
+    // of group-link status.
+    if !has_migration_run(client, "create_character_mesh_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.character_mesh (
+  character_id BIGINT PRIMARY KEY REFERENCES groupscape.characters(character_id) ON DELETE CASCADE,
+  mesh BYTEA NOT NULL,
+  mesh_last_update TIMESTAMPTZ NOT NULL
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_character_mesh_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2054,6 +2161,21 @@ pub struct Character {
     pub account_hash: String,
     pub display_rsn: String,
     pub bound_at: DateTime<Utc>,
+    pub status: String,
+}
+
+const CHARACTER_COLUMNS: &str =
+    "character_id, account_id, account_hash, display_rsn, bound_at, status";
+
+fn character_from_row(row: Row) -> Result<Character, ApiError> {
+    Ok(Character {
+        id: row.try_get("character_id")?,
+        account_id: row.try_get("account_id")?,
+        account_hash: row.try_get("account_hash")?,
+        display_rsn: row.try_get("display_rsn")?,
+        bound_at: row.try_get("bound_at")?,
+        status: row.try_get("status")?,
+    })
 }
 
 pub async fn find_character_by_account_hash(
@@ -2061,22 +2183,16 @@ pub async fn find_character_by_account_hash(
     account_hash: &str,
 ) -> Result<Option<Character>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE account_hash=$1",
-        )
+        .prepare_cached(&format!(
+            "SELECT {CHARACTER_COLUMNS} FROM groupscape.characters WHERE account_hash=$1"
+        ))
         .await?;
     let row = client
         .query_opt(&stmt, &[&account_hash])
         .await
         .map_err(ApiError::GetCharacterError)?;
     match row {
-        Some(row) => Ok(Some(Character {
-            id: row.try_get("character_id")?,
-            account_id: row.try_get("account_id")?,
-            account_hash: row.try_get("account_hash")?,
-            display_rsn: row.try_get("display_rsn")?,
-            bound_at: row.try_get("bound_at")?,
-        })),
+        Some(row) => Ok(Some(character_from_row(row)?)),
         None => Ok(None),
     }
 }
@@ -2102,21 +2218,36 @@ pub async fn create_character(
     display_rsn: &str,
 ) -> Result<Character, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "INSERT INTO groupscape.characters (account_id, account_hash, display_rsn) VALUES ($1, $2, $3) RETURNING character_id, account_id, account_hash, display_rsn, bound_at",
-        )
+        .prepare_cached(&format!(
+            "INSERT INTO groupscape.characters (account_id, account_hash, display_rsn, status) VALUES ($1, $2, $3, 'confirmed') RETURNING {CHARACTER_COLUMNS}"
+        ))
         .await?;
     let row = client
         .query_one(&stmt, &[&account_id, &account_hash, &display_rsn])
         .await
         .map_err(ApiError::CreateCharacterError)?;
-    Ok(Character {
-        id: row.try_get("character_id")?,
-        account_id: row.try_get("account_id")?,
-        account_hash: row.try_get("account_hash")?,
-        display_rsn: row.try_get("display_rsn")?,
-        bound_at: row.try_get("bound_at")?,
-    })
+    character_from_row(row)
+}
+
+/// Auto-created by the plugin-facing auth middleware the first time it sees an unrecognized
+/// `account_hash` under a valid API key - starts `pending` (no RSN known yet; the real RSN
+/// arrives via `identify_character`, called independently of group-link status) until the
+/// account owner confirms it on the site.
+pub async fn create_pending_character(
+    client: &Client,
+    account_id: i64,
+    account_hash: &str,
+) -> Result<Character, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "INSERT INTO groupscape.characters (account_id, account_hash, display_rsn, status) VALUES ($1, $2, $2, 'pending') RETURNING {CHARACTER_COLUMNS}"
+        ))
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&account_id, &account_hash])
+        .await
+        .map_err(ApiError::CreateCharacterError)?;
+    character_from_row(row)
 }
 
 pub async fn update_character_display_rsn(
@@ -2125,21 +2256,34 @@ pub async fn update_character_display_rsn(
     display_rsn: &str,
 ) -> Result<Character, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "UPDATE groupscape.characters SET display_rsn=$1 WHERE character_id=$2 RETURNING character_id, account_id, account_hash, display_rsn, bound_at",
-        )
+        .prepare_cached(&format!(
+            "UPDATE groupscape.characters SET display_rsn=$1 WHERE character_id=$2 RETURNING {CHARACTER_COLUMNS}"
+        ))
         .await?;
     let row = client
         .query_one(&stmt, &[&display_rsn, &character_id])
         .await
         .map_err(ApiError::GetCharacterError)?;
-    Ok(Character {
-        id: row.try_get("character_id")?,
-        account_id: row.try_get("account_id")?,
-        account_hash: row.try_get("account_hash")?,
-        display_rsn: row.try_get("display_rsn")?,
-        bound_at: row.try_get("bound_at")?,
-    })
+    character_from_row(row)
+}
+
+/// Confirms a pending character (no-op'd to nothing if it's already confirmed or doesn't
+/// exist - the caller distinguishes those via `find_character_by_id`/ownership checks first).
+pub async fn confirm_character(
+    client: &Client,
+    character_id: i64,
+) -> Result<Character, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "UPDATE groupscape.characters SET status='confirmed' WHERE character_id=$1 AND status='pending' RETURNING {CHARACTER_COLUMNS}"
+        ))
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::GetCharacterError)?
+        .ok_or(ApiError::CharacterNotFoundError)?;
+    character_from_row(row)
 }
 
 pub async fn find_character_by_id(
@@ -2147,22 +2291,16 @@ pub async fn find_character_by_id(
     character_id: i64,
 ) -> Result<Option<Character>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE character_id=$1",
-        )
+        .prepare_cached(&format!(
+            "SELECT {CHARACTER_COLUMNS} FROM groupscape.characters WHERE character_id=$1"
+        ))
         .await?;
     let row = client
         .query_opt(&stmt, &[&character_id])
         .await
         .map_err(ApiError::GetCharacterError)?;
     match row {
-        Some(row) => Ok(Some(Character {
-            id: row.try_get("character_id")?,
-            account_id: row.try_get("account_id")?,
-            account_hash: row.try_get("account_hash")?,
-            display_rsn: row.try_get("display_rsn")?,
-            bound_at: row.try_get("bound_at")?,
-        })),
+        Some(row) => Ok(Some(character_from_row(row)?)),
         None => Ok(None),
     }
 }
@@ -2172,25 +2310,15 @@ pub async fn list_characters_for_account(
     account_id: i64,
 ) -> Result<Vec<Character>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT character_id, account_id, account_hash, display_rsn, bound_at FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at ASC",
-        )
+        .prepare_cached(&format!(
+            "SELECT {CHARACTER_COLUMNS} FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at ASC"
+        ))
         .await?;
     let rows = client
         .query(&stmt, &[&account_id])
         .await
         .map_err(ApiError::GetCharacterError)?;
-    rows.into_iter()
-        .map(|row| {
-            Ok(Character {
-                id: row.try_get("character_id")?,
-                account_id: row.try_get("account_id")?,
-                account_hash: row.try_get("account_hash")?,
-                display_rsn: row.try_get("display_rsn")?,
-                bound_at: row.try_get("bound_at")?,
-            })
-        })
-        .collect()
+    rows.into_iter().map(character_from_row).collect()
 }
 
 /// Unlinks a character from its account. `character_group_links` references `character_id`
@@ -2206,6 +2334,150 @@ pub async fn delete_character(client: &Client, character_id: i64) -> Result<(), 
         .await
         .map_err(ApiError::DeleteCharacterError)?;
     Ok(())
+}
+
+pub async fn is_character_denylisted(
+    client: &Client,
+    account_id: i64,
+    account_hash: &str,
+) -> Result<bool, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT EXISTS(SELECT 1 FROM groupscape.character_denylist WHERE account_id=$1 AND account_hash=$2)",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&account_id, &account_hash])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    Ok(row.try_get(0)?)
+}
+
+pub async fn denylist_character(
+    client: &Client,
+    account_id: i64,
+    account_hash: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.character_denylist (account_id, account_hash) VALUES ($1, $2) ON CONFLICT (account_id, account_hash) DO NOTHING",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id, &account_hash])
+        .await
+        .map_err(ApiError::DeleteCharacterError)?;
+    Ok(())
+}
+
+/// Removes a *pending* character and permanently denylists its account_hash in one transaction,
+/// so the next plugin heartbeat can't silently recreate it. Confirmed-character removal stays on
+/// the plain `delete_character` (no denylist) - only a pending-card "Remove" denylists.
+pub async fn remove_pending_character(
+    client: &mut Client,
+    account_id: i64,
+    character_id: i64,
+    account_hash: &str,
+) -> Result<(), ApiError> {
+    let transaction = client.transaction().await?;
+
+    let delete_stmt = transaction
+        .prepare_cached("DELETE FROM groupscape.characters WHERE character_id=$1")
+        .await?;
+    transaction
+        .execute(&delete_stmt, &[&character_id])
+        .await
+        .map_err(ApiError::DeleteCharacterError)?;
+
+    let denylist_stmt = transaction
+        .prepare_cached(
+            "INSERT INTO groupscape.character_denylist (account_id, account_hash) VALUES ($1, $2) ON CONFLICT (account_id, account_hash) DO NOTHING",
+        )
+        .await?;
+    transaction
+        .execute(&denylist_stmt, &[&account_id, &account_hash])
+        .await
+        .map_err(ApiError::DeleteCharacterError)?;
+
+    transaction.commit().await?;
+    Ok(())
+}
+
+pub async fn get_account_by_api_key_hash(
+    client: &Client,
+    api_key_hash: &str,
+) -> Result<Option<crate::models::Account>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT id, email, created_at FROM groupscape.accounts WHERE api_key_hash=$1 AND disabled=false",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&api_key_hash])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    match row {
+        Some(row) => Ok(Some(crate::models::Account {
+            id: row.try_get("id")?,
+            email: row.try_get("email")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
+}
+
+pub async fn set_account_api_key_hash(
+    client: &Client,
+    account_id: i64,
+    api_key_hash: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET api_key_hash=$1 WHERE id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&api_key_hash, &account_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    Ok(())
+}
+
+/// Portrait mesh for a character, keyed directly on `character_id` rather than `(group_id,
+/// member_name)` like `member_mesh` - so it works for a pending character with no group yet.
+pub async fn upsert_character_mesh(
+    client: &Client,
+    character_id: i64,
+    mesh: &[u8],
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.character_mesh (character_id, mesh, mesh_last_update) VALUES ($1, $2, NOW())
+ON CONFLICT (character_id) DO UPDATE SET mesh=excluded.mesh, mesh_last_update=excluded.mesh_last_update
+"#,
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&character_id, &mesh])
+        .await
+        .map_err(ApiError::UpsertMemberMeshError)?;
+    Ok(())
+}
+
+pub async fn get_character_mesh(
+    client: &Client,
+    character_id: i64,
+) -> Result<Option<Vec<u8>>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT mesh FROM groupscape.character_mesh WHERE character_id=$1")
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&character_id])
+        .await
+        .map_err(ApiError::GetMemberMeshError)?;
+    match row {
+        Some(row) => Ok(Some(row.try_get("mesh")?)),
+        None => Ok(None),
+    }
 }
 
 pub struct PushSubscription {

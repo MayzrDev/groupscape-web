@@ -4,6 +4,7 @@ use server::admin;
 use server::admin_auth_middleware::{AdminAuthenticateMiddlewareFactory, AdminLoginRateLimiter};
 use server::auth_middleware::AuthenticateMiddlewareFactory;
 use server::authed;
+use server::character_auth_middleware::CharacterAuthenticateMiddlewareFactory;
 use server::config::Config;
 use server::db;
 use server::models;
@@ -86,6 +87,9 @@ async fn main() -> std::io::Result<()> {
     let auth_cache = std::sync::Arc::new(server::auth_middleware::AuthenticationCache::new());
     let account_auth_cache =
         std::sync::Arc::new(server::account_auth_middleware::AccountAuthenticationCache::new());
+    let character_auth_cache = std::sync::Arc::new(
+        server::character_auth_middleware::CharacterAuthenticationCache::new(),
+    );
     let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let config_data = web::Data::new(config.clone());
@@ -115,9 +119,16 @@ async fn main() -> std::io::Result<()> {
             .service(accounts::link_character)
             .service(accounts::unlink_character)
             .service(accounts::link_character_to_group)
+            .service(accounts::regenerate_api_key)
+            .service(accounts::confirm_character)
+            .service(accounts::remove_pending_character)
+            .service(accounts::get_character_portrait)
             .service(push::subscribe)
             .service(push::unsubscribe);
-        let authed_scope = web::scope("/api/group/{group_name}")
+        // The site's own `/group` dashboard (a browser viewing a group's live data via the
+        // group's invite-code token) - unrelated to the plugin, unchanged by the account-API-key
+        // redesign. Carries the exact same handler list as before.
+        let group_dashboard_scope = web::scope("/api/group/{group_name}")
             .wrap(AuthenticateMiddlewareFactory::new(auth_cache.clone()))
             .service(authed::update_group_member)
             .service(authed::get_group_data)
@@ -148,8 +159,40 @@ async fn main() -> std::io::Result<()> {
                 web::resource("/update-portrait/{member_name}")
                     .app_data(web::PayloadConfig::new(5_000_000))
                     .route(web::post().to(authed::update_portrait)),
-            )
+            );
+        // Plugin-facing routes needing a linked group - same handler functions as the group
+        // dashboard scope above (they only ever read `Authenticated{group_id}`), just reached
+        // via `{account_hash}` + an API key instead of `{group_name}` + a group token.
+        let character_scope = web::scope("/api/characters/{account_hash}")
+            .wrap(CharacterAuthenticateMiddlewareFactory::new(
+                character_auth_cache.clone(),
+                true,
+            ))
+            .service(authed::update_group_member)
+            .service(authed::get_activity_events)
+            .service(authed::get_sessions)
+            .service(authed::get_loot_summary)
+            .service(authed::get_loot_split)
+            .service(authed::am_i_logged_in)
+            .service(authed::am_i_in_group)
+            .service(authed::get_skill_data)
+            .service(authed::get_leaderboard)
+            .service(authed::get_collection_log)
             .service(websocket::party_overlay_ws);
+        // Plugin-facing routes exempted from the "must have a group" gate: a pending, ungrouped
+        // character still needs to be identifiable (RSN) and get its portrait uploaded so the
+        // site's confirm card has real data to show.
+        let character_identity_scope = web::scope("/api/characters/{account_hash}")
+            .wrap(CharacterAuthenticateMiddlewareFactory::new(
+                character_auth_cache.clone(),
+                false,
+            ))
+            .service(authed::identify_character)
+            .service(
+                web::resource("/update-portrait/{member_name}")
+                    .app_data(web::PayloadConfig::new(5_000_000))
+                    .route(web::post().to(authed::update_character_portrait)),
+            );
         let admin_scope = web::scope("/api/admin")
             .wrap(AdminAuthenticateMiddlewareFactory::new(
                 config_data.clone(),
@@ -191,7 +234,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(config.clone()))
             .app_data(web::Data::new(tx.clone()))
             .app_data(broadcast_registry.clone())
-            .service(authed_scope)
+            .service(group_dashboard_scope)
+            .service(character_scope)
+            .service(character_identity_scope)
             .service(admin_scope)
             .service(account_scope)
             .service(authed_account_scope)

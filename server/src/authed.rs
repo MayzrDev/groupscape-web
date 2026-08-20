@@ -1,4 +1,5 @@
 use crate::auth_middleware::Authenticated;
+use crate::character_auth_middleware::CharacterIdentified;
 use crate::config::Config;
 use crate::crypto::session_token_hash;
 use crate::db;
@@ -8,8 +9,8 @@ use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupSession,
-    GroupSkillData, LootSplitParticipant, LootSplitResult, LootSummaryRow, PermissionFlags,
-    PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
+    GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult, LootSummaryRow,
+    PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
@@ -895,4 +896,40 @@ pub async fn get_portrait(
             .body(mesh)),
         None => Ok(HttpResponse::NotFound().finish()),
     }
+}
+
+/// Mounted under `character_identity_scope` (no group required) - the plugin calls this once
+/// per reconcile cycle regardless of confirm/group status, so a pending character's real RSN
+/// reaches the site's confirm card instead of the account_hash placeholder it was created with.
+#[post("/identify")]
+pub async fn identify_character(
+    identity: CharacterIdentified,
+    body: web::Json<IdentifyCharacter>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let rsn = body.rsn.trim().to_string();
+    if !valid_name(&rsn) {
+        return Ok(HttpResponse::BadRequest().body("Provided RSN is not valid"));
+    }
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::update_character_display_rsn(&client, identity.character_id, &rsn).await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Mounted under `character_identity_scope` (no group required) - portrait meshes are keyed by
+/// `character_id` (`character_mesh`), not `(group_id, member_name)`, so a pending character can
+/// have a live 3D render on its confirm card before it ever joins a group.
+// Not decorated with #[post(...)] - registered manually in main.rs with its own larger
+// PayloadConfig since the global 100KB cap rejects real meshes.
+pub async fn update_character_portrait(
+    identity: CharacterIdentified,
+    // {account_hash} is consumed by the middleware; {member_name} is unused (kept only so the
+    // plugin's URL shape mirrors the old `/update-portrait/{member_name}` route).
+    _path: web::Path<(String, String)>,
+    body: web::Bytes,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    db::upsert_character_mesh(&client, identity.character_id, &body).await?;
+    Ok(HttpResponse::Ok().finish())
 }

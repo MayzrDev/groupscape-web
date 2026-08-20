@@ -279,7 +279,7 @@ describe("api", () => {
     await api.getGroupData();
 
     expect(disableSpy).toHaveBeenCalled();
-    expect(pushStateSpy).toHaveBeenCalledWith("", "", "/login");
+    expect(pushStateSpy).toHaveBeenCalledWith("", "", "/");
     expect(publishSpy).toHaveBeenCalledWith("get-group-data");
   });
 

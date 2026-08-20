@@ -61,12 +61,6 @@
       route-wrapper=".unauthed-section"
     ></app-route>
     <app-route
-      route-path="/login"
-      route-component="login-page"
-      route-outlet=".unauthed-section__outlet"
-      route-wrapper=".unauthed-section"
-    ></app-route>
-    <app-route
       route-path="/logout"
       route-component="logout-page"
       route-outlet=".unauthed-section__outlet"
@@ -232,6 +226,7 @@
     <rs-tooltip></rs-tooltip>
     <confirm-dialog class="dialog"></confirm-dialog>
     <admin-indicator></admin-indicator>
+    <pending-characters-indicator></pending-characters-indicator>
     <script>{{js}}</script>
     <app-route route-path="*" route-redirect="/"></app-route>
   </body>

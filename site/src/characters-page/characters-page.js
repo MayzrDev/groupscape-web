@@ -11,18 +11,25 @@ function initials(rsn) {
 }
 
 /**
- * Lists every character linked to the signed-in account as a grid of tiles, with an inline
- * "add a character" tile that expands the plugin-linking instructions in place — no separate
- * page or modal needed for a flow this short. Reached directly or via the account dashboard's
- * "Linked characters" card (`/account`), so it does its own session check rather than relying
- * on a route wrapper, matching `link-page`.
+ * Lists every character linked to the signed-in account, split into two groups by `status`:
+ * pending characters (auto-created server-side from plugin telemetry) need explicit
+ * confirmation before they can join a group, shown above as richer "confirm cards" with a live
+ * 3D portrait; confirmed characters render as the existing plain grid below, unchanged.
  *
- * Character tiles show initials in place of a portrait — the live 3D character render is a
- * separate, unbuilt feature (no plugin capture, no renderer yet), so this page doesn't reserve
- * space for it.
+ * Also has an inline "add a character" tile that expands the plugin-linking instructions in
+ * place — no separate page or modal needed for a flow this short. Reached directly or via the
+ * account dashboard's "Linked characters" card (`/account`), so it does its own session check
+ * rather than relying on a route wrapper, matching `link-page`.
  *
- * Each tile has an unlink control (confirm dialog, then `DELETE /api/account/characters/:id`)
- * — RSN itself isn't editable here since it's derived from plugin telemetry, not user-settable.
+ * Confirmed tiles show initials in place of a portrait — the live 3D character render is
+ * reserved for the pending confirm cards where a positive ID before confirming matters most.
+ *
+ * Each confirmed tile has an unlink control (confirm dialog, then
+ * `DELETE /api/account/characters/:id`) — RSN itself isn't editable here since it's derived
+ * from plugin telemetry, not user-settable. Pending cards instead have Confirm
+ * (`POST /api/account/characters/:id/confirm`) and Remove (confirm dialog, then
+ * `DELETE /api/account/characters/:id/pending` — permanently blocks the character from
+ * re-linking, unlike unlink).
  */
 export class CharactersPage extends BaseElement {
   constructor() {
@@ -38,6 +45,8 @@ export class CharactersPage extends BaseElement {
     this.render();
 
     this.status = this.querySelector(".characters-page__status");
+    this.pendingSection = this.querySelector(".characters-page__pending-section");
+    this.pendingGrid = this.querySelector(".characters-page__pending-grid");
     this.grid = this.querySelector(".characters-page__grid");
     this.addTile = this.querySelector(".characters-page__add-tile");
     this.instructions = this.querySelector(".characters-page__instructions");
@@ -47,6 +56,7 @@ export class CharactersPage extends BaseElement {
     this.eventListener(this.addTile, "click", this.toggleInstructions.bind(this));
     this.eventListener(this.instructionsClose, "click", this.toggleInstructions.bind(this));
     this.eventListener(this.grid, "click", this.handleGridClick.bind(this));
+    this.eventListener(this.pendingGrid, "click", this.handlePendingGridClick.bind(this));
 
     this.checkSession();
   }
@@ -91,12 +101,18 @@ export class CharactersPage extends BaseElement {
 
   renderCharacters(characters) {
     this.error.textContent = "";
-    this.status.textContent =
-      characters.length === 0
-        ? "You haven't linked any characters yet."
-        : `${characters.length} character${characters.length === 1 ? "" : "s"} linked to your account.`;
 
-    this.grid.innerHTML = characters
+    const pending = characters.filter((character) => character.status === "pending");
+    const confirmed = characters.filter((character) => character.status !== "pending");
+
+    this.status.textContent =
+      confirmed.length === 0
+        ? "You haven't linked any characters yet."
+        : `${confirmed.length} character${confirmed.length === 1 ? "" : "s"} linked to your account.`;
+
+    this.renderPendingCharacters(pending);
+
+    this.grid.innerHTML = confirmed
       .map((character) => {
         const boundAt = new Date(character.bound_at).toLocaleDateString();
         return `
@@ -117,6 +133,35 @@ export class CharactersPage extends BaseElement {
       .join("");
   }
 
+  renderPendingCharacters(pending) {
+    this.pendingSection.hidden = pending.length === 0;
+    this.pendingGrid.innerHTML = pending
+      .map((character) => {
+        return `
+          <div class="characters-page__pending-card">
+            <player-portrait
+              account-character-id="${character.id}"
+              mode="bust"
+              class="characters-page__pending-portrait"
+            ></player-portrait>
+            <span class="characters-page__pending-rsn">${escapeHtml(character.display_rsn)}</span>
+            <div class="characters-page__pending-actions">
+              <button
+                class="characters-page__pending-confirm men-button small"
+                data-character-id="${character.id}"
+              >Confirm</button>
+              <button
+                class="characters-page__pending-remove"
+                data-character-id="${character.id}"
+                data-rsn="${escapeHtml(character.display_rsn)}"
+              >Remove</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
   handleGridClick(event) {
     const unlinkButton = event.target.closest(".characters-page__tile-unlink");
     if (!unlinkButton) return;
@@ -129,6 +174,54 @@ export class CharactersPage extends BaseElement {
       yesCallback: () => this.unlinkCharacter(characterId),
       noCallback: () => {},
     });
+  }
+
+  handlePendingGridClick(event) {
+    const confirmButton = event.target.closest(".characters-page__pending-confirm");
+    if (confirmButton) {
+      this.confirmCharacter(confirmButton.dataset.characterId);
+      return;
+    }
+
+    const removeButton = event.target.closest(".characters-page__pending-remove");
+    if (removeButton) {
+      const characterId = removeButton.dataset.characterId;
+      const rsn = removeButton.dataset.rsn;
+      confirmDialogManager.confirm({
+        headline: `Remove ${rsn}?`,
+        body: "This character will be permanently blocked from linking to your account again.",
+        yesCallback: () => this.removePendingCharacter(characterId),
+        noCallback: () => {},
+      });
+    }
+  }
+
+  async confirmCharacter(characterId) {
+    this.error.textContent = "";
+    try {
+      const response = await accountApi.confirmCharacter(characterId);
+      if (response.ok) {
+        this.fetchCharacters();
+      } else {
+        this.error.textContent = "Couldn't confirm that character — try again.";
+      }
+    } catch (error) {
+      this.error.textContent = "Couldn't confirm that character — try again.";
+    }
+  }
+
+  async removePendingCharacter(characterId) {
+    this.error.textContent = "";
+    try {
+      const response = await accountApi.removePendingCharacter(characterId);
+      if (response.ok) {
+        this.fetchCharacters();
+      } else {
+        this.error.textContent = "Couldn't remove that character — try again.";
+      }
+    } catch (error) {
+      this.error.textContent = "Couldn't remove that character — try again.";
+    }
   }
 
   async unlinkCharacter(characterId) {

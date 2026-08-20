@@ -6,6 +6,7 @@ describe("accountApi", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn();
     accountStorage.clearAccountToken();
+    sessionStorage.removeItem("freshApiKey");
   });
 
   it("exposes account auth urls", () => {
@@ -40,6 +41,18 @@ describe("accountApi", () => {
     await accountApi.register("a@b.com", "password123");
 
     expect(accountStorage.getAccountToken()).toBeNull();
+  });
+
+  it("register stashes the fresh api key in sessionStorage on success", async () => {
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 201,
+      json: () => Promise.resolve({ account: { id: 1, email: "a@b.com" }, token: "new-token", api_key: "gsk_abc" }),
+    });
+
+    await accountApi.register("a@b.com", "password123");
+
+    expect(sessionStorage.getItem("freshApiKey")).toBe("gsk_abc");
   });
 
   it("login stores the session token on success", async () => {
@@ -106,6 +119,81 @@ describe("accountApi", () => {
       "/api/account/characters/42",
       expect.objectContaining({
         method: "DELETE",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("confirmCharacter posts to the character's confirm url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.confirmCharacter(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42/confirm",
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("removePendingCharacter deletes the character's pending url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.removePendingCharacter(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42/pending",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: { Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("getCharacterPortrait returns the array buffer on success", async () => {
+    accountStorage.storeAccountToken("session-token");
+    const buffer = new ArrayBuffer(8);
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 200, arrayBuffer: () => Promise.resolve(buffer) });
+
+    const result = await accountApi.getCharacterPortrait(42);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/characters/42/portrait",
+      expect.objectContaining({ headers: { Authorization: "session-token" } }),
+    );
+    expect(result).toBe(buffer);
+  });
+
+  it("getCharacterPortrait returns null on failure", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: false, status: 404 });
+
+    const result = await accountApi.getCharacterPortrait(42);
+
+    expect(result).toBeNull();
+  });
+
+  it("regenerateApiKey posts to the api-key url", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ api_key: "gsk_new" }),
+    });
+
+    const response = await accountApi.regenerateApiKey();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/api-key",
+      expect.objectContaining({
+        method: "POST",
         headers: { Authorization: "session-token" },
       }),
     );
