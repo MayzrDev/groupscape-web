@@ -181,4 +181,48 @@ describe("accountApi", () => {
 
     expect(accountStorage.getAccountToken()).toBe("session-token");
   });
+
+  it("vapidPublicKey fetches the unauthed vapid-public-key url", async () => {
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve({ publicKey: "abc" }) });
+
+    const response = await accountApi.vapidPublicKey();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith("/api/account/push/vapid-public-key");
+    expect(response.ok).toBe(true);
+  });
+
+  it("subscribePush posts the subscription's JSON with the stored token", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 201, json: () => Promise.resolve({ id: 1 }) });
+    const subscription = { toJSON: () => ({ endpoint: "https://push.example/x", keys: { p256dh: "p", auth: "a" } }) };
+
+    const response = await accountApi.subscribePush(subscription);
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/push/subscribe",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ endpoint: "https://push.example/x", keys: { p256dh: "p", auth: "a" } }),
+        headers: { "Content-Type": "application/json", Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
+
+  it("unsubscribePush sends the endpoint with the stored token", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
+
+    const response = await accountApi.unsubscribePush("https://push.example/x");
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/push/subscribe",
+      expect.objectContaining({
+        method: "DELETE",
+        body: JSON.stringify({ endpoint: "https://push.example/x" }),
+        headers: { "Content-Type": "application/json", Authorization: "session-token" },
+      }),
+    );
+    expect(response.ok).toBe(true);
+  });
 });

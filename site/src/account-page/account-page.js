@@ -1,6 +1,7 @@
 import { BaseElement } from "../base-element/base-element";
 import { accountApi } from "../data/account-api";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
+import { pushNotifications } from "../data/push-notifications";
 
 const emailValidator = (value) => {
   if (value.length === 0) {
@@ -71,7 +72,12 @@ export class AccountPage extends BaseElement {
     this.deleteButton = this.querySelector(".account-page__delete-button");
     this.eventListener(this.deleteButton, "click", this.confirmDeleteAccount.bind(this));
 
+    this.notificationsToggle = this.querySelector(".account-page__notifications-toggle");
+    this.notificationsStatus = this.querySelector(".account-page__notifications-status");
+    this.eventListener(this.notificationsToggle, "click", this.toggleNotifications.bind(this));
+
     this.checkSession();
+    this.refreshNotificationsState();
   }
 
   disconnectedCallback() {
@@ -159,6 +165,52 @@ export class AccountPage extends BaseElement {
     } finally {
       this.passwordSaveButton.disabled = false;
     }
+  }
+
+  async refreshNotificationsState() {
+    const state = await pushNotifications.state();
+    this.renderNotificationsState(state);
+  }
+
+  renderNotificationsState(state) {
+    if (state === "unsupported") {
+      this.notificationsToggle.setAttribute("aria-checked", "false");
+      this.notificationsToggle.disabled = true;
+      this.notificationsStatus.textContent = "Not supported in this browser.";
+      this.notificationsStatus.className = "account-page__notifications-status status-msg";
+      return;
+    }
+    if (state === "denied") {
+      this.notificationsToggle.setAttribute("aria-checked", "false");
+      this.notificationsToggle.disabled = true;
+      this.notificationsStatus.textContent = "Notifications are blocked in your browser settings.";
+      this.notificationsStatus.className = "account-page__notifications-status status-msg warn";
+      return;
+    }
+    const subscribed = state === "subscribed";
+    this.notificationsToggle.disabled = false;
+    this.notificationsToggle.setAttribute("aria-checked", subscribed ? "true" : "false");
+    this.notificationsStatus.textContent = subscribed ? "You'll get alerts on this device." : "";
+    this.notificationsStatus.className = subscribed
+      ? "account-page__notifications-status status-msg ok"
+      : "account-page__notifications-status status-msg";
+  }
+
+  async toggleNotifications() {
+    this.notificationsToggle.disabled = true;
+    const subscribed = this.notificationsToggle.getAttribute("aria-checked") === "true";
+    const result = subscribed ? await pushNotifications.unsubscribe() : await pushNotifications.subscribe();
+    if (!result.ok && result.denied) {
+      this.renderNotificationsState("denied");
+      return;
+    }
+    if (!result.ok) {
+      this.notificationsToggle.disabled = false;
+      this.notificationsStatus.textContent = "Couldn't update notifications — try again.";
+      this.notificationsStatus.className = "account-page__notifications-status status-msg warn";
+      return;
+    }
+    await this.refreshNotificationsState();
   }
 
   confirmDeleteAccount() {
