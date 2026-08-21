@@ -123,8 +123,7 @@ button.side-panel__move {
   font-size: 0.8em;
 }
 
-.side-panel__empty-status {
-  margin: 0;
-  font-size: 0.85em;
+.side-panel__empty-text--linked {
   color: var(--green);
+  opacity: 1;
 }

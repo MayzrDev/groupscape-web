@@ -36,10 +36,10 @@ export class SidePanel extends BaseElement {
     this.render();
     this.sidePanels = this.querySelector(".side-panel__panels");
     this.empty = this.querySelector(".side-panel__empty");
+    this.emptyTitle = this.querySelector(".side-panel__empty-title");
     this.emptyText = this.querySelector(".side-panel__empty-text");
     this.emptyLogin = this.querySelector(".side-panel__empty-login");
     this.emptyAction = this.querySelector(".side-panel__empty-action");
-    this.emptyStatus = this.querySelector(".side-panel__empty-status");
     this.emptyError = this.querySelector(".side-panel__empty-error");
     this.picker = this.querySelector(".side-panel__picker");
     this.pickerList = this.querySelector(".side-panel__picker-list");
@@ -70,14 +70,15 @@ export class SidePanel extends BaseElement {
   }
 
   async refreshEmptyState() {
-    this.emptyStatus.hidden = true;
     this.emptyError.textContent = "";
     this.picker.hidden = true;
     this.emptyAction.hidden = true;
     this.emptyLogin.hidden = true;
+    this.emptyText.classList.remove("side-panel__empty-text--linked");
 
     const session = await accountApi.me();
     if (!session.ok) {
+      this.emptyTitle.textContent = "No characters linked";
       this.emptyText.textContent = "Log in to your GroupScape account to link a detected character to this group.";
       this.emptyLogin.hidden = false;
       return;
@@ -86,18 +87,36 @@ export class SidePanel extends BaseElement {
     try {
       const response = await accountApi.listCharacters();
       if (!response.ok) {
+        this.emptyTitle.textContent = "No characters linked";
         this.emptyText.textContent = "Couldn't load your characters — try again.";
         return;
       }
       const characters = await response.json();
-      this.linkableCharacters = characters.filter(
-        (character) => character.status === "confirmed" && character.group_id == null
+      const { groupName } = storage.getGroup();
+      const normalizedGroupName = (groupName ?? "").toLowerCase();
+      const confirmed = characters.filter((character) => character.status === "confirmed");
+      const linkedHere = confirmed.filter(
+        (character) => character.group_name && character.group_name.toLowerCase() === normalizedGroupName
       );
+      this.linkableCharacters = confirmed.filter((character) => character.group_id == null);
 
+      if (linkedHere.length > 0) {
+        // Already linked (this button click or a previous page load) - just waiting on the
+        // RuneLite plugin's first telemetry update for this group, not something to re-link.
+        this.emptyTitle.textContent = "Waiting for game data";
+        this.emptyText.textContent = `${linkedHere
+          .map((character) => character.display_rsn)
+          .join(", ")} linked. Their panel will appear once the RuneLite plugin reports data.`;
+        this.emptyText.classList.add("side-panel__empty-text--linked");
+        return;
+      }
+
+      this.emptyTitle.textContent = "No characters linked";
       this.emptyText.textContent = "Link one of your RuneLite-detected characters to see their panel here.";
       this.emptyAction.hidden = false;
       this.emptyAction.textContent = "Link a character";
     } catch (error) {
+      this.emptyTitle.textContent = "No characters linked";
       this.emptyText.textContent = "Couldn't load your characters — try again.";
     }
   }
@@ -147,12 +166,7 @@ export class SidePanel extends BaseElement {
     try {
       const response = await accountApi.linkCharacterToGroup(characterId, groupName, groupToken);
       if (response.ok) {
-        this.picker.hidden = true;
-        this.emptyAction.hidden = true;
-        this.emptyStatus.hidden = false;
-        this.emptyStatus.textContent = `${
-          character?.display_rsn ?? "Character"
-        } linked. Their panel will appear once the RuneLite plugin reports data.`;
+        this.refreshEmptyState();
       } else if (response.status === 409) {
         this.emptyError.textContent = `${
           character?.display_rsn ?? "That character"
