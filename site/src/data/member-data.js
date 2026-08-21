@@ -141,6 +141,8 @@ export class MemberData {
     if (memberData.color && memberData.color !== this.colorKey) {
       this.colorKey = memberData.color;
       this.hue = MEMBER_COLOR_HUES[memberData.color] ?? 0;
+      this.publishUpdate("color", "hue");
+      updatedAttributes.add("color");
     }
 
     for (const field of parsedFieldMappings) {

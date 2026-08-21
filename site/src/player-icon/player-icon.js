@@ -16,6 +16,12 @@ export class PlayerIcon extends BaseElement {
     const hue = groupData.members.get(playerName).hue || 0;
     this.style.setProperty("--player-icon-color", `${hue}deg`);
     this.render();
+
+    this.subscribe(`color:${playerName}`, this.handleColorUpdate.bind(this));
+  }
+
+  handleColorUpdate(hue) {
+    this.style.setProperty("--player-icon-color", `${hue || 0}deg`);
   }
 
   disconnectedCallback() {
