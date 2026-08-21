@@ -21,6 +21,7 @@ export class CombatAchievements extends BaseElement {
     super.connectedCallback();
     loadingScreenManager.showLoadingScreen();
     this.playerName = this.getAttribute("player-name");
+    this.initialTier = this.getAttribute("open-tier");
     this.subscribeOnce("get-group-data", this.init.bind(this));
   }
 
@@ -42,7 +43,8 @@ export class CombatAchievements extends BaseElement {
   async init(groupData) {
     await combatAchievement.initCatalog();
     this.member = groupData.members.get(this.playerName);
-    this.openTier = combatAchievement.firstIncompleteTier(this.member);
+    const validInitialTier = COMBAT_ACHIEVEMENT_TIERS.some(([key]) => key === this.initialTier);
+    this.openTier = validInitialTier ? this.initialTier : combatAchievement.firstIncompleteTier(this.member);
     this.view = "tier";
     this.searchTerm = "";
     this.expandedBoss = null;

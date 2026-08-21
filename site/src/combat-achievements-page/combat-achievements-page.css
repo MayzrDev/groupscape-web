@@ -53,49 +53,89 @@ combat-achievements-page {
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.combat-achievements-page__table tbody tr {
+  cursor: pointer;
+}
+
 .combat-achievements-page__table tbody tr:hover {
   background: rgba(255, 255, 255, 0.04);
+}
+
+.combat-achievements-page__table tbody tr:active {
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .combat-achievements-page__name {
   color: var(--orange);
   font-weight: 600;
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  cursor: pointer;
 }
 
-.combat-achievements-page__name:hover {
+.combat-achievements-page__table tbody tr:hover .combat-achievements-page__name {
   text-decoration: underline;
 }
 
-.combat-achievements-page__pip {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
+.combat-achievements-page__barcell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 2px 4px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.08);
 }
 
-.combat-achievements-page__pip--on.combat-achievements-page__pip--easy {
+.combat-achievements-page__barcell:hover {
+  background: rgba(255, 152, 31, 0.12);
+  box-shadow: 0 0 0 1px rgba(255, 152, 31, 0.4);
+}
+
+.combat-achievements-page__barcell:hover .combat-achievements-page__bar-frac {
+  color: var(--orange);
+}
+
+.combat-achievements-page__bar-track {
+  width: 34px;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--light-border);
+  overflow: hidden;
+}
+
+.combat-achievements-page__bar-track--complete {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green) inset;
+}
+
+.combat-achievements-page__bar-fill {
+  display: block;
+  height: 100%;
+}
+
+.combat-achievements-page__bar-fill--easy {
   background: var(--tier-easy);
 }
-.combat-achievements-page__pip--on.combat-achievements-page__pip--medium {
+.combat-achievements-page__bar-fill--medium {
   background: var(--tier-medium);
 }
-.combat-achievements-page__pip--on.combat-achievements-page__pip--hard {
+.combat-achievements-page__bar-fill--hard {
   background: var(--tier-hard);
 }
-.combat-achievements-page__pip--on.combat-achievements-page__pip--elite {
+.combat-achievements-page__bar-fill--elite {
   background: var(--tier-elite);
 }
-.combat-achievements-page__pip--on.combat-achievements-page__pip--master {
+.combat-achievements-page__bar-fill--master {
   background: var(--tier-master);
 }
-.combat-achievements-page__pip--on.combat-achievements-page__pip--grandmaster {
+.combat-achievements-page__bar-fill--grandmaster {
   background: var(--tier-grandmaster);
+}
+
+.combat-achievements-page__bar-frac {
+  font-size: 10px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
 }
 
 .combat-achievements-page__count {
@@ -107,4 +147,9 @@ combat-achievements-page {
   color: var(--green);
   opacity: 1;
   font-weight: 600;
+}
+
+.combat-achievements-page__points {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
 }
