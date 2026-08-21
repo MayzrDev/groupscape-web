@@ -4,6 +4,23 @@ import { api } from "../data/api";
 import { SkillName } from "../data/skill";
 import { GroupData, groupData } from "../data/group-data";
 
+// Day/Week/Month/Year is the single period toggle that drives both the chart and the
+// leaderboard. The leaderboard only understands 3 windows on the wire, so this collapses
+// Month and Year down onto the same "all_time" window (no new window value is introduced).
+export const windowForPeriod = {
+  Day: "daily",
+  Week: "weekly",
+  Month: "all_time",
+  Year: "all_time",
+};
+
+export function formatLeaderboardValue(metric, value) {
+  if (metric === "gp_earned" || metric === "loot_value") {
+    return `${Math.round(value).toLocaleString()} gp`;
+  }
+  return Math.round(value).toLocaleString();
+}
+
 export class SkillsGraphs extends BaseElement {
   constructor() {
     super();
@@ -23,79 +40,111 @@ export class SkillsGraphs extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.render();
-    this.period = "Day";
-    this.chartGeneration = 0;
-    this.leaderboardMetric = "xp";
-    this.leaderboardWindow = "daily";
-    this.leaderboardBoss = "";
-    this.leaderboardGeneration = 0;
+
+    // Single source of truth for both the chart and the leaderboard.
+    this.state = {
+      period: "Day",
+      metric: "xp",
+      skill: "Overall",
+      boss: "",
+    };
+    this.fetchGeneration = 0;
 
     this.chartContainer = this.querySelector(".skills-graphs__chart-container");
     this.periodButtons = this.querySelectorAll(".skills-graphs__period-btn");
     this.refreshButton = this.querySelector(".skills-graphs__refresh");
+    this.metricSelect = this.querySelector(".skills-graphs__metric-select");
     this.skillSelect = this.querySelector(".skills-graphs__skill-select");
-    this.selectedSkill = this.skillSelect.value;
+    this.skillSelectContainer = this.querySelector(".skills-graphs__sub-select-container--skill");
+    this.bossSelect = this.querySelector(".skills-graphs__boss-select");
+    this.bossSelectContainer = this.querySelector(".skills-graphs__sub-select-container--boss");
+    this.leaderboardList = this.querySelector(".skills-graphs__leaderboard-list");
+    this.leaderboardEmpty = this.querySelector(".skills-graphs__leaderboard-empty");
+
+    this.state.skill = this.skillSelect.value;
+
     this.periodButtons.forEach((btn) => {
       this.eventListener(btn, "click", this.handlePeriodChange.bind(this));
     });
     this.eventListener(this.refreshButton, "click", this.handleRefreshClicked.bind(this));
+    this.eventListener(this.metricSelect, "change", this.handleMetricChange.bind(this));
     this.eventListener(this.skillSelect, "change", this.handleSkillSelectChange.bind(this));
+    this.eventListener(this.bossSelect, "change", this.handleBossSelectChange.bind(this));
 
-    this.subscribeOnce("get-group-data", this.createChart.bind(this));
-
-    this.leaderboardMetricSelect = this.querySelector(".skills-graphs__leaderboard-metric-select");
-    this.leaderboardBossContainer = this.querySelector(".skills-graphs__leaderboard-boss-container");
-    this.leaderboardBossSelect = this.querySelector(".skills-graphs__leaderboard-boss-select");
-    this.leaderboardWindowButtons = this.querySelectorAll(".skills-graphs__leaderboard-window-btn");
-    this.leaderboardList = this.querySelector(".skills-graphs__leaderboard-list");
-    this.leaderboardEmpty = this.querySelector(".skills-graphs__leaderboard-empty");
-
-    this.eventListener(this.leaderboardMetricSelect, "change", this.handleLeaderboardMetricChange.bind(this));
-    this.eventListener(this.leaderboardBossSelect, "change", this.handleLeaderboardBossChange.bind(this));
-    this.leaderboardWindowButtons.forEach((btn) => {
-      this.eventListener(btn, "click", this.handleLeaderboardWindowChange.bind(this));
-    });
-
-    this.fetchLeaderboard();
+    this.updateSubSelectVisibility();
+    this.triggerRefresh();
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
   }
 
-  handleLeaderboardMetricChange() {
-    this.leaderboardMetric = this.leaderboardMetricSelect.value;
-    this.leaderboardBoss = "";
-    this.leaderboardBossContainer.classList.toggle("visible", this.leaderboardMetric === "boss_kc");
-    this.fetchLeaderboard();
+  updateSubSelectVisibility() {
+    this.skillSelectContainer.classList.toggle("visible", this.state.metric === "xp");
+    this.bossSelectContainer.classList.toggle("visible", this.state.metric === "boss_kc");
   }
 
-  handleLeaderboardBossChange() {
-    this.leaderboardBoss = this.leaderboardBossSelect.value;
-    this.fetchLeaderboard();
+  handleMetricChange() {
+    this.state.metric = this.metricSelect.value;
+    if (this.state.metric === "xp") {
+      this.state.skill = this.skillSelect.value || "Overall";
+    } else if (this.state.metric === "boss_kc") {
+      this.state.boss = this.bossSelect.value || "";
+    } else {
+      this.state.boss = "";
+    }
+    this.updateSubSelectVisibility();
+    this.triggerRefresh();
   }
 
-  handleLeaderboardWindowChange(event) {
-    this.leaderboardWindow = event.currentTarget.dataset.window;
-    this.leaderboardWindowButtons.forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.window === this.leaderboardWindow);
+  handleSkillSelectChange() {
+    this.state.skill = this.skillSelect.value;
+    this.triggerRefresh();
+  }
+
+  handleBossSelectChange() {
+    this.state.boss = this.bossSelect.value;
+    this.triggerRefresh();
+  }
+
+  handlePeriodChange(event) {
+    this.state.period = event.currentTarget.dataset.period;
+    this.periodButtons.forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.period === this.state.period);
     });
-    this.fetchLeaderboard();
+    this.triggerRefresh();
   }
 
-  async fetchLeaderboard() {
-    const generation = ++this.leaderboardGeneration;
+  handleRefreshClicked() {
+    this.triggerRefresh();
+  }
+
+  // Single pipeline entry point: bumps one generation counter shared by the chart fetch and
+  // the leaderboard fetch so stale in-flight responses from a previous state are discarded
+  // the same way the old two independent generation counters did.
+  triggerRefresh() {
+    const generation = ++this.fetchGeneration;
+    this.fetchLeaderboard(generation);
+    this.subscribeOnce("get-group-data", () => this.createChart(generation));
+  }
+
+  async fetchLeaderboard(generation) {
     try {
+      const isXp = this.state.metric === "xp";
+      const skillParam = isXp && this.state.skill && this.state.skill !== "Overall" ? this.state.skill : undefined;
+      const bossParam = this.state.metric === "boss_kc" ? this.state.boss || undefined : undefined;
+
       const result = await api.getLeaderboard(
-        this.leaderboardMetric,
-        this.leaderboardWindow,
-        this.leaderboardBoss || undefined
+        this.state.metric,
+        windowForPeriod[this.state.period] || "daily",
+        bossParam,
+        skillParam
       );
-      if (generation !== this.leaderboardGeneration) return;
-      this.renderLeaderboardBossOptions(result.available_bosses || []);
+      if (generation !== this.fetchGeneration) return;
+      this.renderBossOptions(result.available_bosses || []);
       this.renderLeaderboard(result.entries || []);
     } catch (err) {
-      if (generation !== this.leaderboardGeneration) return;
+      if (generation !== this.fetchGeneration) return;
       console.error(err);
       this.leaderboardList.innerHTML = "";
       this.leaderboardEmpty.textContent = `Failed to load ${err}`;
@@ -103,14 +152,14 @@ export class SkillsGraphs extends BaseElement {
     }
   }
 
-  renderLeaderboardBossOptions(bosses) {
-    if (this.leaderboardMetric !== "boss_kc") return;
-    const previousValue = this.leaderboardBossSelect.value || this.leaderboardBoss;
-    this.leaderboardBossSelect.innerHTML = `
-      <option value="">All bosses</option>
+  renderBossOptions(bosses) {
+    if (this.state.metric !== "boss_kc") return;
+    const previousValue = this.bossSelect.value || this.state.boss;
+    this.bossSelect.innerHTML = `
+      <option value="">All Bosses</option>
       ${bosses.map((boss) => `<option value="${boss}">${boss}</option>`).join("")}
     `;
-    this.leaderboardBossSelect.value = previousValue;
+    this.bossSelect.value = previousValue;
   }
 
   renderLeaderboard(entries) {
@@ -143,32 +192,15 @@ export class SkillsGraphs extends BaseElement {
 
       const value = document.createElement("span");
       value.classList.add("skills-graphs__leaderboard-value");
-      value.textContent = entry.value.toLocaleString();
+      value.textContent = formatLeaderboardValue(this.state.metric, entry.value);
       row.appendChild(value);
 
       this.leaderboardList.appendChild(row);
     }
   }
 
-  handleSkillSelectChange() {
-    this.selectedSkill = this.skillSelect.value;
-    this.subscribeOnce("get-group-data", this.createChart.bind(this));
-  }
-
-  handlePeriodChange(event) {
-    this.period = event.currentTarget.dataset.period;
-    this.periodButtons.forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.period === this.period);
-    });
-    this.subscribeOnce("get-group-data", this.createChart.bind(this));
-  }
-
-  handleRefreshClicked() {
-    this.subscribeOnce("get-group-data", this.createChart.bind(this));
-  }
-
-  async createChart() {
-    const generation = ++this.chartGeneration;
+  async createChart(generation) {
+    if (generation !== this.fetchGeneration) return;
     this.querySelector(".skills-graphs__loader-overlay")?.remove();
     const overlay = document.createElement("div");
     overlay.classList.add("skills-graphs__loader-overlay");
@@ -179,16 +211,41 @@ export class SkillsGraphs extends BaseElement {
     this.appendChild(overlay);
 
     try {
-      const [skillDataForGroup] = await Promise.all([api.getSkillData(this.period), this.waitForChartjs()]);
-      if (generation !== this.chartGeneration) return;
-      skillDataForGroup.sort((a, b) => a.name.localeCompare(b.name));
-      skillDataForGroup.forEach((playerSkillData) => {
-        playerSkillData.skill_data.forEach((x) => {
-          x.time = new Date(x.time);
-          x.data = GroupData.transformSkillsFromStorage(x.data);
+      const isXp = this.state.metric === "xp";
+      const dataPromise = isXp
+        ? api.getSkillData(this.state.period)
+        : api.getMetricData(this.state.metric, this.state.period, this.state.boss || undefined);
+      const [rawData] = await Promise.all([dataPromise, this.waitForChartjs()]);
+      if (generation !== this.fetchGeneration) return;
+
+      rawData.sort((a, b) => a.name.localeCompare(b.name));
+
+      const skillGraph = document.createElement("skill-graph");
+      skillGraph.setAttribute("data-period", this.state.period);
+      skillGraph.setAttribute("metric", this.state.metric);
+
+      if (isXp) {
+        rawData.forEach((playerSkillData) => {
+          playerSkillData.skill_data.forEach((x) => {
+            x.time = new Date(x.time);
+            x.data = GroupData.transformSkillsFromStorage(x.data);
+          });
+          playerSkillData.skill_data.sort((a, b) => b.time - a.time);
         });
-        playerSkillData.skill_data.sort((a, b) => b.time - a.time);
-      });
+        skillGraph.skillDataForGroup = rawData;
+        skillGraph.setAttribute("skill-name", this.state.skill);
+      } else {
+        rawData.forEach((playerMetricData) => {
+          playerMetricData.metric_data.forEach((x) => {
+            x.time = new Date(x.time);
+          });
+          playerMetricData.metric_data.sort((a, b) => b.time - a.time);
+        });
+        skillGraph.metricDataForGroup = rawData;
+        if (this.state.metric === "boss_kc") {
+          skillGraph.setAttribute("boss", this.state.boss || "");
+        }
+      }
 
       overlay.remove();
       this.chartContainer.innerHTML = "";
@@ -197,10 +254,6 @@ export class SkillsGraphs extends BaseElement {
       Chart.defaults.color = style.getPropertyValue("--primary-text");
       Chart.defaults.scale.grid.color = style.getPropertyValue("--graph-grid-border");
 
-      const skillGraph = document.createElement("skill-graph");
-      skillGraph.skillDataForGroup = skillDataForGroup;
-      skillGraph.setAttribute("data-period", this.period);
-      skillGraph.setAttribute("skill-name", this.selectedSkill);
       this.chartContainer.appendChild(skillGraph);
     } catch (err) {
       overlay.remove();

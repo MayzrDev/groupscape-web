@@ -9,34 +9,31 @@
   </div>
 
   <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover">
+    <select class="skills-graphs__metric-select">
+      <option value="xp">XP</option>
+      <option value="boss_kc">Boss KC</option>
+      <option value="gp_earned">GP Earned</option>
+      <option value="loot_value">Loot Value</option>
+    </select>
+  </div>
+
+  <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover skills-graphs__sub-select-container skills-graphs__sub-select-container--skill visible">
     <select class="skills-graphs__skill-select">
       ${skillNames.map((skillName) => `
       <option value="${skillName}">${skillName}</option>
       `).join('')}
     </select>
   </div>
+
+  <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover skills-graphs__sub-select-container skills-graphs__sub-select-container--boss">
+    <select class="skills-graphs__boss-select">
+      <option value="">All Bosses</option>
+    </select>
+  </div>
 </div>
 <div class="skills-graphs__body">
   <div class="skills-graphs__chart-container rsborder rsbackground"></div>
   <div class="skills-graphs__leaderboard rsborder rsbackground">
-    <div class="skills-graphs__leaderboard-controls">
-      <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover">
-        <select class="skills-graphs__leaderboard-metric-select">
-          <option value="xp">XP</option>
-          <option value="boss_kc">Boss KC</option>
-          <option value="gp_earned">GP Earned</option>
-          <option value="loot_value">Loot Value</option>
-        </select>
-      </div>
-      <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover skills-graphs__leaderboard-boss-container">
-        <select class="skills-graphs__leaderboard-boss-select"></select>
-      </div>
-      <div class="skills-graphs__leaderboard-window-toggle">
-        <button class="men-button small skills-graphs__leaderboard-window-btn active" data-window="daily">Daily</button>
-        <button class="men-button small skills-graphs__leaderboard-window-btn" data-window="weekly">Weekly</button>
-        <button class="men-button small skills-graphs__leaderboard-window-btn" data-window="all_time">All-time</button>
-      </div>
-    </div>
     <div class="skills-graphs__leaderboard-list"></div>
     <p class="skills-graphs__leaderboard-empty">No data for this window yet.</p>
   </div>

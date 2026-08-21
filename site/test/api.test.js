@@ -70,6 +70,26 @@ describe("api", () => {
     expect(url).not.toContain("boss=");
   });
 
+  it("getLeaderboard includes the skill param only for the xp metric", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
+
+    await api.getLeaderboard("xp", "daily", undefined, "Woodcutting");
+
+    const [url] = globalThis.fetch.mock.calls[0];
+    expect(url).toContain("skill=Woodcutting");
+  });
+
+  it("getLeaderboard omits the skill param for non-xp metrics", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
+
+    await api.getLeaderboard("boss_kc", "daily", "Vorkath", "Woodcutting");
+
+    const [url] = globalThis.fetch.mock.calls[0];
+    expect(url).not.toContain("skill=");
+  });
+
   it("getLeaderboard returns an empty result when the request fails", async () => {
     api.setCredentials("iron-team", "secret-token");
     globalThis.fetch.mockResolvedValueOnce({ ok: false });
@@ -81,6 +101,46 @@ describe("api", () => {
       available_bosses: [],
       entries: [],
     });
+  });
+
+  it("getMetricData builds the query string from metric/period/boss and returns the parsed result", async () => {
+    api.setCredentials("iron-team", "secret-token");
+
+    const payload = [{ name: "Zezima", metric_data: [{ time: "2026-01-01T00:00:00Z", value: 5 }] }];
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(payload) });
+
+    const result = await api.getMetricData("boss_kc", "Week", "Vorkath");
+
+    expect(result).toBe(payload);
+    const [url, options] = globalThis.fetch.mock.calls[0];
+    expect(url).toContain("/group/iron-team/get-metric-data?");
+    expect(url).toContain("metric=boss_kc");
+    expect(url).toContain("period=Week");
+    expect(url).toContain("boss=Vorkath");
+    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
+  });
+
+  it("getMetricData omits the boss param when not provided and returns [] on failure", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: false });
+
+    const result = await api.getMetricData("gp_earned", "Day");
+
+    expect(result).toEqual([]);
+    const [url] = globalThis.fetch.mock.calls[0];
+    expect(url).not.toContain("boss=");
+  });
+
+  it("getMetricData uses example data when enabled", async () => {
+    api.exampleDataEnabled = true;
+    const payload = [{ name: "Example", metric_data: [] }];
+    vi.spyOn(exampleData, "getMetricData").mockReturnValue(payload);
+
+    const result = await api.getMetricData("loot_value", "Month", "");
+
+    expect(result).toBe(payload);
+    expect(exampleData.getMetricData).toHaveBeenCalledWith("loot_value", "Month", groupData, "");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("getLootSummary builds the query string from provided filters and returns the parsed rows", async () => {

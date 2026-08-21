@@ -120,7 +120,11 @@ describe("SkillGraph.generateCompleteTimeSeries", () => {
       [skillName]: { xp: 250 },
     };
 
-    const completeSeries = graph.generateCompleteTimeSeries(playerSkillData, currentSkillData, skillName);
+    const completeSeries = graph.generateCompleteTimeSeries(
+      playerSkillData,
+      currentSkillData[skillName].xp,
+      (item) => item.data[skillName]
+    );
     const bucketTime = SkillGraph.truncatedDateForPeriod(newerSnapshotTime, "Week").getTime();
     const bucketIndex = graph.dates.findIndex((date) => date.getTime() === bucketTime);
 
@@ -133,6 +137,7 @@ describe("SkillGraph.createTable", () => {
     const graph = new SkillGraph();
     graph.skillName = SkillName.Attack;
     graph.period = "Day";
+    graph.metric = "xp";
     graph.tableContainer = document.createElement("div");
     graph.currentGroupData = { members: new Map() };
 
@@ -148,5 +153,62 @@ describe("SkillGraph.createTable", () => {
 
     expect(graph.tableContainer.innerHTML).not.toContain("NaN%");
     expect(graph.tableContainer.innerHTML).not.toContain("Infinity%");
+  });
+});
+
+describe("SkillGraph.createMetricTable", () => {
+  it("degrades gracefully for non-xp metrics: no Level/XP-to-Next columns, gp formatting", () => {
+    const graph = new SkillGraph();
+    graph.period = "Day";
+    graph.metric = "gp_earned";
+    graph.tableContainer = document.createElement("div");
+    graph.currentGroupData = { members: new Map() };
+
+    graph.createTable([
+      { label: "Alice", data: [0, 500000], borderColor: "#f00" },
+      { label: "Bob", data: [0, 100000], borderColor: "#0f0" },
+    ]);
+
+    const html = graph.tableContainer.innerHTML;
+    expect(html).not.toContain(">Level<");
+    expect(html).not.toContain("XP to Next");
+    expect(html).toContain("500,000 gp");
+    expect(html).toContain("Alice");
+    expect(html).toContain("Bob");
+  });
+
+  it("formats boss_kc gains as plain integers with no k/M suffix", () => {
+    const graph = new SkillGraph();
+    graph.period = "Day";
+    graph.metric = "boss_kc";
+    graph.tableContainer = document.createElement("div");
+    graph.currentGroupData = { members: new Map() };
+
+    graph.createTable([{ label: "Alice", data: [0, 1234], borderColor: "#f00" }]);
+
+    expect(graph.tableContainer.innerHTML).toContain("1,234");
+  });
+});
+
+describe("SkillGraph.generateCompleteTimeSeries (generic metric series)", () => {
+  it("buckets and forward-fills a generic {time, value} series the same way as skill data", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-02T23:30:00"));
+
+    const graph = new SkillGraph();
+    graph.period = "Week";
+    graph.dates = SkillGraph.datesForPeriod("Week");
+
+    const bucketDate = new Date(graph.dates[graph.dates.length - 2]);
+    bucketDate.setHours(12, 0, 0, 0);
+
+    const series = [{ time: bucketDate, value: 42 }];
+    const completeSeries = graph.generateCompleteTimeSeries(series, 42, (item) => item.value);
+
+    const bucketTime = SkillGraph.truncatedDateForPeriod(bucketDate, "Week").getTime();
+    const bucketIndex = graph.dates.findIndex((date) => date.getTime() === bucketTime);
+
+    expect(completeSeries[bucketIndex]).toBe(42);
+    expect(completeSeries[completeSeries.length - 1]).toBe(42);
   });
 });

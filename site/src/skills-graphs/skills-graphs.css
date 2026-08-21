@@ -39,40 +39,6 @@ skills-graphs {
   }
 }
 
-.skills-graphs__leaderboard-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-.skills-graphs__leaderboard-metric-select,
-.skills-graphs__leaderboard-boss-select {
-  width: 100%;
-}
-
-.skills-graphs__leaderboard-boss-container {
-  display: none;
-}
-
-.skills-graphs__leaderboard-boss-container.visible {
-  display: block;
-}
-
-.skills-graphs__leaderboard-window-toggle {
-  display: flex;
-  gap: 4px;
-}
-
-.skills-graphs__leaderboard-window-btn {
-  flex: 1;
-}
-
-.skills-graphs__leaderboard-window-btn.active {
-  background: rgb(66, 55, 38);
-  outline: 1px solid rgb(200, 200, 200);
-}
-
 .skills-graphs__leaderboard-list {
   display: flex;
   flex-direction: column;
@@ -158,6 +124,19 @@ skills-graphs {
 .skills-graphs__period-toggle {
   display: flex;
   gap: 4px;
+}
+
+.skills-graphs__sub-select-container {
+  display: none;
+}
+
+.skills-graphs__sub-select-container.visible {
+  display: block;
+}
+
+.skills-graphs__skill-select,
+.skills-graphs__boss-select {
+  width: 100%;
 }
 
 .skills-graphs__period-btn.active {

@@ -5,6 +5,7 @@ use tokio_postgres::NoTls;
 
 use server::config::Config;
 use server::db;
+use server::leaderboard::LeaderboardWindow;
 use server::models::{DeathEvent, DiscordWebhookSettings, GameEvent, KillEvent, LootItem};
 use server::progress_events::ProgressEvent;
 
@@ -541,5 +542,303 @@ async fn test_discord_webhook_settings_scoped_per_group() {
     assert_eq!(
         settings_b.webhook_url, None,
         "group b's settings must be unaffected"
+    );
+}
+
+// --- Leaderboard / Graphs-tab metric data ---
+//
+// Kept in this file (rather than a separate integration test binary) so these share
+// `TEST_MUTEX` with the rest of the suite - separate `tests/*.rs` files are separate binaries,
+// which cargo can run concurrently, and every one of them drops/recreates the shared
+// `groupscape_test` schema, so a second binary racing this one is a real cross-process hazard,
+// not just an in-process one.
+
+/// 24 distinct values, one per stored skill slot, so a slot-index bug and a "sum everything"
+/// bug produce different, checkable totals: slot i (1-indexed) gets value `i`, so the sum of
+/// all 24 is 300, while any single slot's value is just its own index.
+fn distinct_skills() -> Vec<i32> {
+    (1..=24).collect()
+}
+
+async fn set_skills(client: &deadpool_postgres::Client, group_id: i64, name: &str, skills: &[i32]) {
+    client
+        .execute(
+            "UPDATE groupscape.members SET skills=$1 WHERE group_id=$2 AND member_name=$3",
+            &[&skills, &group_id, &name],
+        )
+        .await
+        .unwrap();
+}
+
+/// `get_xp_leaderboard` reports live-minus-baseline, defaulting the baseline to the live value
+/// itself (i.e. a diff of 0) when no history row exists yet for a member/window. Seeding an
+/// all-zero baseline row in `skills_year` (read by the `AllTime` window) makes the reported
+/// value equal the live read directly, which is what these tests want to assert on.
+async fn seed_zero_baseline(client: &deadpool_postgres::Client, group_id: i64, name: &str) {
+    let member_id: i64 = client
+        .query_one(
+            "SELECT member_id FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
+            &[&group_id, &name],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    let zeros = vec![0i32; 24];
+    client
+        .execute(
+            "INSERT INTO groupscape.skills_year (member_id, time, skills) VALUES ($1, $2, $3)",
+            &[&member_id, &(Utc::now() - Duration::days(365)), &zeros],
+        )
+        .await
+        .unwrap();
+}
+
+fn metric_sample_kill(npc_name: &str, loot_item_id: i32) -> GameEvent {
+    GameEvent::Kill(KillEvent {
+        npc_id: 1,
+        npc_name: npc_name.to_string(),
+        world_x: 0,
+        world_y: 0,
+        plane: 0,
+        world: 1,
+        loot: Some(vec![LootItem {
+            item_id: loot_item_id,
+            quantity: 1,
+        }]),
+    })
+}
+
+#[tokio::test]
+async fn test_xp_leaderboard_overall_sums_all_24_skills_not_slot_one() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "xptest1").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    set_skills(&client, group_id, "Zezima", &distinct_skills()).await;
+    seed_zero_baseline(&client, group_id, "Zezima").await;
+
+    let raw = db::get_xp_leaderboard(&client, group_id, LeaderboardWindow::AllTime, None, Utc::now())
+        .await
+        .unwrap();
+    let zezima = raw.iter().find(|(name, _)| name == "Zezima").unwrap();
+    // Sum of 1..=24 is 300. The old (buggy) behavior would report 1 (skills[1] == Agility's slot).
+    assert_eq!(zezima.1, 300, "Overall XP must sum all 24 skill slots, not read skills[1] alone");
+}
+
+#[tokio::test]
+async fn test_xp_leaderboard_specific_skill_ranks_by_that_slot() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "xptest2").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    set_skills(&client, group_id, "Zezima", &distinct_skills()).await;
+    seed_zero_baseline(&client, group_id, "Zezima").await;
+
+    // Woodcutting is 1-indexed slot 23 in the stored array (see skill_array_index mapping).
+    let raw = db::get_xp_leaderboard(
+        &client,
+        group_id,
+        LeaderboardWindow::AllTime,
+        Some("Woodcutting"),
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    let zezima = raw.iter().find(|(name, _)| name == "Zezima").unwrap();
+    assert_eq!(zezima.1, 23, "Woodcutting XP must read its own 1-indexed slot (23)");
+
+    // Sailing trails the array at slot 24.
+    let raw = db::get_xp_leaderboard(
+        &client,
+        group_id,
+        LeaderboardWindow::AllTime,
+        Some("Sailing"),
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    let zezima = raw.iter().find(|(name, _)| name == "Zezima").unwrap();
+    assert_eq!(zezima.1, 24, "Sailing XP must read its own 1-indexed slot (24)");
+}
+
+#[tokio::test]
+async fn test_xp_leaderboard_unrecognized_skill_falls_back_to_overall() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "xptest3").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    set_skills(&client, group_id, "Zezima", &distinct_skills()).await;
+    seed_zero_baseline(&client, group_id, "Zezima").await;
+
+    let raw = db::get_xp_leaderboard(
+        &client,
+        group_id,
+        LeaderboardWindow::AllTime,
+        Some("NotARealSkill"),
+        Utc::now(),
+    )
+    .await
+    .unwrap();
+    let zezima = raw.iter().find(|(name, _)| name == "Zezima").unwrap();
+    assert_eq!(
+        zezima.1, 300,
+        "an unrecognized skill string should behave like Overall (sum), not error"
+    );
+}
+
+#[tokio::test]
+async fn test_aggregate_bank_value_and_get_bank_value_for_period_round_trip() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "bankvaluetest1").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    client
+        .execute(
+            "UPDATE groupscape.members SET bank=$1 WHERE group_id=$2 AND member_name=$3",
+            &[&vec![314i32, 10i32], &group_id, &"Zezima"],
+        )
+        .await
+        .unwrap();
+
+    let mut ge_prices = std::collections::HashMap::new();
+    ge_prices.insert(314, 3i64); // 10 * 3 = 30
+
+    let now = Utc::now();
+    db::aggregate_bank_value(&mut client, &ge_prices, now)
+        .await
+        .expect("aggregate_bank_value should succeed");
+
+    let day_data = db::get_bank_value_for_period(&client, group_id, db::AggregatePeriod::Day)
+        .await
+        .expect("get_bank_value_for_period should succeed");
+    let zezima = day_data
+        .iter()
+        .find(|m| m.name == "Zezima")
+        .expect("Zezima should have bank value data");
+    assert_eq!(zezima.metric_data.len(), 1);
+    assert_eq!(zezima.metric_data[0].value, 30);
+
+    // Retention should not delete the only (most recent) row.
+    db::apply_bank_value_retention(&mut client)
+        .await
+        .expect("apply_bank_value_retention should succeed");
+    let day_data = db::get_bank_value_for_period(&client, group_id, db::AggregatePeriod::Day)
+        .await
+        .unwrap();
+    assert_eq!(
+        day_data.iter().find(|m| m.name == "Zezima").unwrap().metric_data.len(),
+        1
+    );
+}
+
+#[tokio::test]
+async fn test_get_boss_kc_metric_data_is_cumulative_and_zero_fills_are_absent() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "bosskcmetrictest1").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    db::add_group_member(&client, group_id, "Woox").await.unwrap();
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &metric_sample_kill("Vorkath", 100),
+    )
+    .await
+    .unwrap();
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &metric_sample_kill("Vorkath", 100),
+    )
+    .await
+    .unwrap();
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &metric_sample_kill("Zulrah", 100),
+    )
+    .await
+    .unwrap();
+
+    let all_bosses = db::get_boss_kc_metric_data(&client, group_id, db::AggregatePeriod::Year, None)
+        .await
+        .unwrap();
+    let zezima = all_bosses.iter().find(|m| m.name == "Zezima").unwrap();
+    assert_eq!(
+        zezima.metric_data.last().unwrap().value,
+        3,
+        "All Bosses should count every kill regardless of npc name"
+    );
+    assert!(
+        all_bosses.iter().find(|m| m.name == "Woox").is_none(),
+        "a member with zero matching events should be absent, not zero-filled"
+    );
+
+    let vorkath_only =
+        db::get_boss_kc_metric_data(&client, group_id, db::AggregatePeriod::Year, Some("Vorkath"))
+            .await
+            .unwrap();
+    let zezima = vorkath_only.iter().find(|m| m.name == "Zezima").unwrap();
+    assert_eq!(zezima.metric_data.last().unwrap().value, 2);
+}
+
+#[tokio::test]
+async fn test_get_loot_value_metric_data_is_cumulative() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "lootvaluemetrictest1").await;
+    db::add_group_member(&client, group_id, "Zezima").await.unwrap();
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &metric_sample_kill("Vorkath", 314),
+    )
+    .await
+    .unwrap();
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &metric_sample_kill("Vorkath", 314),
+    )
+    .await
+    .unwrap();
+
+    let mut ge_prices = std::collections::HashMap::new();
+    ge_prices.insert(314, 7i64);
+
+    let data = db::get_loot_value_metric_data(&client, group_id, db::AggregatePeriod::Year, &ge_prices)
+        .await
+        .unwrap();
+    let zezima = data.iter().find(|m| m.name == "Zezima").unwrap();
+    assert_eq!(
+        zezima.metric_data.last().unwrap().value,
+        14,
+        "two kills of one item worth 7 each"
     );
 }

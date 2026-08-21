@@ -133,6 +133,45 @@ pub fn start_bank_value_snapshotter(db_pool: Pool) {
     });
 }
 
+/// Feeds the Graphs tab's GP-earned chart history (`bank_value_day`/`bank_value_month`/
+/// `bank_value_year`) - a parallel, purely-additive job to `start_bank_value_snapshotter` above,
+/// which stays daily-only and keeps serving the GP-earned *leaderboard* metric unchanged. Same
+/// 1800s interval and log-and-continue-on-error style as `start_skills_aggregator`.
+pub fn start_bank_value_aggregator(db_pool: Pool) {
+    task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(1800));
+
+        loop {
+            interval.tick().await;
+            log::info!("Running bank value aggregator");
+
+            match db_pool.get().await {
+                Ok(mut client) => {
+                    let ge_prices = get_ge_prices_map();
+                    match db::aggregate_bank_value(&mut client, &ge_prices, chrono::Utc::now())
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(err) => {
+                            log::error!("Failed to aggregate bank value: {}", err);
+                        }
+                    }
+
+                    match db::apply_bank_value_retention(&mut client).await {
+                        Ok(_) => (),
+                        Err(err) => {
+                            log::error!("Failed to apply bank value retention: {}", err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("Failed to get db client: {}", err);
+                }
+            }
+        }
+    });
+}
+
 /// Mirrors `groupscape-old`'s `closeIdleSessions` recurring job: closes any session that's
 /// gone 15 minutes without a heartbeat from its group. Runs far more often than that window
 /// (every minute) so a session closes promptly after it actually goes idle.

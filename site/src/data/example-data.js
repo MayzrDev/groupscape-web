@@ -226,6 +226,38 @@ class ExampleData {
     return result;
   }
 
+  getMetricData(metric, period, groupData, boss) {
+    // Example/demo data doesn't need per-boss fidelity, just a plausible cumulative curve for
+    // whichever metric/boss combo was picked - `boss` only nudges the seed a bit for variety.
+    const bossSeed = boss ? boss.length : 0;
+    const dates = SkillGraph.datesForPeriod(period);
+    const result = [];
+    const increment = () => {
+      if (metric === "boss_kc") return Math.floor(Math.random() * 5);
+      return Math.floor(Math.random() * 500000);
+    };
+
+    for (const member of groupData.members.values()) {
+      let value = bossSeed + Math.floor(Math.random() * (metric === "boss_kc" ? 50 : 1000000));
+      const metricData = [];
+      for (const date of dates) {
+        metricData.push({
+          time: date.toISOString(),
+          value,
+        });
+        if (Math.random() > 0.85) {
+          value += increment();
+        }
+      }
+      result.push({
+        name: member.name,
+        metric_data: metricData,
+      });
+    }
+
+    return result;
+  }
+
   getCollectionLog() {
     return {};
   }
