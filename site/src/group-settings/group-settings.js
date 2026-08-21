@@ -134,7 +134,7 @@ export class GroupSettings extends BaseElement {
   confirmRerollToken() {
     confirmDialogManager.confirm({
       headline: "Reroll group token?",
-      body: "The current token stops working immediately - every member will need to re-paste the new one into the plugin.",
+      body: "The current token stops working immediately - anyone who hasn't joined yet will need the new one.",
       yesCallback: this.rerollToken.bind(this),
       noCallback: () => {},
     });
