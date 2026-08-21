@@ -30,6 +30,10 @@ button.side-panel__move {
   pointer-events: auto;
 }
 
+.side-panel__empty[hidden] {
+  display: none;
+}
+
 .side-panel__empty {
   display: flex;
   flex-direction: column;
