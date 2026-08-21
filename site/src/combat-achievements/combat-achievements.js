@@ -45,6 +45,7 @@ export class CombatAchievements extends BaseElement {
     this.openTier = combatAchievement.firstIncompleteTier(this.member);
     this.view = "tier";
     this.searchTerm = "";
+    this.expandedBoss = null;
     loadingScreenManager.hideLoadingScreen();
 
     this.render();
@@ -65,6 +66,7 @@ export class CombatAchievements extends BaseElement {
     this.eventListener(this.tiers, "click", this.handleTierClick.bind(this));
     this.eventListener(this.viewSwitch, "click", this.handleViewClick.bind(this));
     this.eventListener(this.searchInput, "input", this.handleSearchInput.bind(this));
+    this.eventListener(this.bossView, "click", this.handleBossCardClick.bind(this));
     this.eventListener(this.background, "click", this.closeIfBackgroundClick.bind(this));
     this.eventListener(this.querySelector(".dialog__close"), "click", this.close.bind(this));
   }
@@ -110,6 +112,17 @@ export class CombatAchievements extends BaseElement {
       view !== "tier"
     );
     this.bossView.classList.toggle("combat-achievements__hidden", view !== "boss");
+  }
+
+  handleBossCardClick(event) {
+    if (event.target.closest("a")) return;
+
+    const card = event.target.closest("button[boss-name]");
+    const bossName = card?.getAttribute("boss-name");
+    if (!bossName) return;
+
+    this.expandedBoss = this.expandedBoss === bossName ? null : bossName;
+    this.renderBossView();
   }
 
   handleSearchInput(event) {
@@ -203,19 +216,32 @@ export class CombatAchievements extends BaseElement {
     const total = group.tasks.length;
     const percent = total ? Math.round((done / total) * 100) : 0;
     const level = COMBAT_ACHIEVEMENT_BOSS_LEVELS[group.boss];
+    const expanded = this.expandedBoss === group.boss;
 
     return `
-      <a
-        href="${combatAchievement.bossWikiUrl(group.boss)}"
-        target="_blank"
-        rel="noopener"
-        class="combat-achievements__boss-card"
-      >
-        <span class="combat-achievements__boss-card-name">${group.boss}</span>
+      <div class="combat-achievements__boss-card ${expanded ? "combat-achievements__boss-card--open" : ""}">
+        <div class="combat-achievements__boss-card-head">
+          <button type="button" boss-name="${escapeAttribute(
+            group.boss
+          )}" class="combat-achievements__boss-card-name">${group.boss}</button>
+          <a
+            href="${combatAchievement.bossWikiUrl(group.boss)}"
+            target="_blank"
+            rel="noopener"
+            class="combat-achievements__wiki-link"
+          >Wiki &#8599;</a>
+        </div>
         ${level ? `<span class="combat-achievements__boss-card-level">Level ${level}</span>` : ""}
         <span class="combat-achievements__boss-card-track"><span class="combat-achievements__boss-card-fill" style="width: ${percent}%"></span></span>
         <span class="combat-achievements__boss-card-frac">${done}/${total}</span>
-      </a>
+        ${
+          expanded
+            ? `<div class="combat-achievements__task-grid combat-achievements__task-grid--boss">
+                ${group.tasks.map((task) => this.renderTaskRow(task)).join("")}
+              </div>`
+            : ""
+        }
+      </div>
     `;
   }
 }

@@ -372,10 +372,34 @@ combat-achievements h2 {
   gap: 5px;
 }
 
+.combat-achievements__boss-card--open {
+  grid-column: 1 / -1;
+  border-color: var(--orange);
+  background: #3e3529;
+}
+
+.combat-achievements__boss-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .combat-achievements__boss-card-name {
+  font-family: inherit;
   font-size: 12px;
   font-weight: 600;
   color: var(--orange);
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.combat-achievements__boss-card-name:hover {
+  text-decoration: underline;
 }
 
 .combat-achievements__boss-card-level {
@@ -405,6 +429,11 @@ combat-achievements h2 {
   font-variant-numeric: tabular-nums;
 }
 
+.combat-achievements__task-grid--boss {
+  margin-top: 4px;
+  grid-template-columns: repeat(3, 1fr);
+}
+
 .combat-achievements__empty {
   grid-column: 1 / -1;
   text-align: center;
@@ -423,6 +452,10 @@ combat-achievements h2 {
   }
 
   .combat-achievements__boss-view {
+    grid-template-columns: 1fr;
+  }
+
+  .combat-achievements__task-grid--boss {
     grid-template-columns: 1fr;
   }
 }
