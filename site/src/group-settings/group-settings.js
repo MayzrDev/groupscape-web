@@ -250,32 +250,32 @@ export class GroupSettings extends BaseElement {
     }
   }
 
-  // The permissions endpoint itself is the admin gate (server-side, requires ManagePermissions)
-  // - a 401/403 here means this account isn't the group admin, so the whole section stays
-  // hidden rather than showing controls that would just 403 on save.
+  // The permissions endpoint itself is the section's admin gate (server-side, requires
+  // ManagePermissions or ManageSettings) - a 401/403 here means this account has neither, so the
+  // whole section stays hidden rather than showing controls that would just 403 on save. Which
+  // controls each row actually renders (permission toggles vs. colour picker) is then decided
+  // per this account's own flags from `get-my-permissions`, since the two are gated separately.
   async loadPermissions() {
     const section = this.querySelector(".group-settings__permissions-section");
-    const response = await api.getGroupPermissions();
+    const [response, myPermissionsResponse] = await Promise.all([api.getGroupPermissions(), api.getMyPermissions()]);
     if (!response.ok) {
       section.style.display = "none";
       return;
     }
     section.style.display = "";
 
+    const myPermissions = myPermissionsResponse.ok ? await myPermissionsResponse.json() : {};
+    const showPermissions = !!myPermissions.manage_permissions;
+    const showColor = !!myPermissions.manage_settings;
+
     const permissions = await response.json();
     const container = this.querySelector(".group-settings__permissions");
     container.innerHTML = "";
 
     for (const permission of permissions) {
-      if (permission.is_admin) {
-        const adminRow = document.createElement("div");
-        adminRow.className = "group-settings__permissions-admin-row";
-        adminRow.innerHTML = `<span class="group-settings__permissions-admin-name">${permission.display_rsn}</span><span class="group-settings__permissions-admin-badge">Admin</span><span class="group-settings__permissions-admin-note">All permissions</span>`;
-        container.appendChild(adminRow);
-        continue;
-      }
-
       const permissionMember = document.createElement("permission-member");
+      permissionMember.showPermissions = showPermissions;
+      permissionMember.showColor = showColor;
       permissionMember.permission = permission;
       container.appendChild(permissionMember);
     }

@@ -1,6 +1,7 @@
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { loadingScreenManager } from "../loading-screen/loading-screen-manager";
+import { MEMBER_COLOR_HUES, MEMBER_COLOR_PALETTE } from "../data/member-data";
 
 // Ordered to match server/src/models.rs's PermissionFlags field order, so the toggle grid
 // reads the same top-to-bottom as the struct it's editing.
@@ -38,16 +39,29 @@ export class PermissionMember extends BaseElement {
     this.head = this.querySelector(".permission-member__head");
     this.body = this.querySelector(".permission-member__body");
     this.arrow = this.querySelector(".permission-member__arrow");
-    this.error = this.querySelector(".permission-member__error");
-    this.renderToggles();
+    this.updateSwatch();
 
     this.eventListener(this.head, "click", this.toggleOpen.bind(this));
-    const saveButton = this.querySelector(".permission-member__save");
-    this.eventListener(saveButton, "click", this.save.bind(this));
+
+    if (this.showColor) {
+      this.renderColorGrid();
+    }
+
+    if (this.showPermissions && !this.permission.is_admin) {
+      this.renderToggles();
+      const saveButton = this.querySelector(".permission-member__save");
+      this.eventListener(saveButton, "click", this.save.bind(this));
+    }
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+  }
+
+  updateSwatch() {
+    const swatch = this.querySelector(".permission-member__swatch");
+    const hue = this.permission.color ? MEMBER_COLOR_HUES[this.permission.color] : null;
+    swatch.style.background = hue != null ? `hsl(${hue}, 70%, 45%)` : "transparent";
   }
 
   renderToggles() {
@@ -74,17 +88,69 @@ export class PermissionMember extends BaseElement {
     }
   }
 
+  renderColorGrid() {
+    const grid = this.querySelector(".permission-member__color-grid");
+    grid.innerHTML = "";
+    for (const colorKey of MEMBER_COLOR_PALETTE) {
+      const chip = document.createElement("div");
+      chip.className = "permission-member__color-chip";
+      chip.dataset.color = colorKey;
+      if (this.permission.color === colorKey) {
+        chip.classList.add("permission-member__color-chip--selected");
+      }
+
+      const icon = document.createElement("div");
+      icon.className = "permission-member__color-icon";
+      icon.style.color = `hsl(${MEMBER_COLOR_HUES[colorKey]}, 70%, 45%)`;
+      icon.innerHTML = `<svg><use href="#permission-member-helmet-icon"></use></svg>`;
+
+      chip.appendChild(icon);
+      chip.title = colorKey;
+      this.eventListener(chip, "click", () => this.selectColor(colorKey));
+      grid.appendChild(chip);
+    }
+  }
+
   toggleOpen() {
     this.body.classList.toggle("permission-member__body--open");
     this.arrow.classList.toggle("permission-member__arrow--open");
   }
 
   hideError() {
-    this.error.innerHTML = "";
+    this.querySelector(".permission-member__error").innerHTML = "";
   }
 
   showError(message) {
-    this.error.innerHTML = message;
+    this.querySelector(".permission-member__error").innerHTML = message;
+  }
+
+  hideColorError() {
+    this.querySelector(".permission-member__color-error").innerHTML = "";
+  }
+
+  showColorError(message) {
+    this.querySelector(".permission-member__color-error").innerHTML = message;
+  }
+
+  async selectColor(colorKey) {
+    if (colorKey === this.permission.color) return;
+    this.hideColorError();
+    try {
+      loadingScreenManager.showLoadingScreen();
+      const result = await api.updateMemberColor(this.permission.account_id, colorKey);
+      if (result.ok) {
+        this.permission = await result.json();
+        this.updateSwatch();
+        this.renderColorGrid();
+      } else {
+        const message = await result.text();
+        this.showColorError(message);
+      }
+    } catch (error) {
+      this.showColorError(`Failed to set colour: ${error}`);
+    } finally {
+      loadingScreenManager.hideLoadingScreen();
+    }
   }
 
   async save() {

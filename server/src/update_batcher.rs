@@ -639,6 +639,7 @@ mod tests {
             group_id,
             name: name.to_string(),
             account_hash: None,
+            color: None,
             stats: None,
             coordinates: None,
             skills: None,

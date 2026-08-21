@@ -78,6 +78,7 @@ async fn main() -> std::io::Result<()> {
     unauthed::start_skills_aggregator(pool.clone());
     unauthed::start_session_idle_closer(pool.clone());
     unauthed::start_bank_value_snapshotter(pool.clone());
+    unauthed::start_bank_value_aggregator(pool.clone());
 
     let update_batcher_pool = config.pg.create_pool(None, NoTls).unwrap();
     let (tx, rx) = mpsc::channel::<models::GroupMember>(10000);
@@ -152,6 +153,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/am-i-logged-in").route(web::get().to(authed::am_i_logged_in)))
             .service(web::resource("/am-i-in-group").route(web::get().to(authed::am_i_in_group)))
             .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
+            .service(web::resource("/get-metric-data").route(web::get().to(authed::get_metric_data)))
             .service(web::resource("/get-leaderboard").route(web::get().to(authed::get_leaderboard)))
             .service(web::resource("/collection-log").route(web::get().to(authed::get_collection_log)))
             .service(authed::get_group_data)
@@ -163,6 +165,7 @@ async fn main() -> std::io::Result<()> {
             .service(authed::get_group_permissions)
             .service(authed::get_my_permissions)
             .service(authed::update_group_permissions)
+            .service(authed::update_member_color)
             .service(authed::get_discord_settings)
             .service(authed::update_discord_settings)
             .service(authed::rename_group)
@@ -232,6 +235,11 @@ async fn main() -> std::io::Result<()> {
                 web::resource("/get-skill-data")
                     .wrap(grouped_character_middleware())
                     .route(web::get().to(authed::get_skill_data)),
+            )
+            .service(
+                web::resource("/get-metric-data")
+                    .wrap(grouped_character_middleware())
+                    .route(web::get().to(authed::get_metric_data)),
             )
             .service(
                 web::resource("/get-leaderboard")

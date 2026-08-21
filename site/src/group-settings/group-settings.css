@@ -143,34 +143,3 @@ group-settings {
 .group-settings__permissions {
   padding: 4px 8px;
 }
-
-.group-settings__permissions-admin-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--light-border);
-}
-
-.group-settings__permissions-admin-row:last-child {
-  border-bottom: none;
-}
-
-.group-settings__permissions-admin-name {
-  color: var(--orange);
-}
-
-.group-settings__permissions-admin-badge {
-  background: var(--elevated);
-  font-size: 0.7em;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 2px 6px;
-  border: 1px solid var(--light-border);
-}
-
-.group-settings__permissions-admin-note {
-  margin-left: auto;
-  font-size: 0.8em;
-  opacity: 0.7;
-}

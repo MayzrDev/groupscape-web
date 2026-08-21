@@ -322,6 +322,7 @@ mod tests {
             group_id: Some(1),
             name: "Alice".to_string(),
             account_hash: None,
+            color: None,
             stats: None,
             coordinates: None,
             skills: None,

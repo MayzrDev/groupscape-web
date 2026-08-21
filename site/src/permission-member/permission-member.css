@@ -28,6 +28,15 @@ permission-member:last-child {
   transform: rotate(90deg);
 }
 
+.permission-member__swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
 .permission-member__name {
   color: var(--orange);
   flex: 1;
@@ -38,6 +47,16 @@ permission-member:last-child {
   opacity: 0.7;
 }
 
+.permission-member__admin-badge {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  opacity: 0.85;
+  text-shadow: none;
+}
+
 .permission-member__body {
   display: none;
   padding: 4px 4px 12px 1.7em;
@@ -45,6 +64,12 @@ permission-member:last-child {
 
 .permission-member__body--open {
   display: block;
+}
+
+.permission-member__section-label {
+  font-size: 0.85em;
+  opacity: 0.75;
+  margin: 6px 0 8px;
 }
 
 .permission-member__grid {
@@ -61,4 +86,46 @@ permission-member:last-child {
 .permission-member__save-row {
   display: flex;
   justify-content: flex-end;
+}
+
+.permission-member__color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  grid-template-rows: repeat(2, auto);
+  grid-auto-flow: column;
+  gap: 8px;
+  max-width: 260px;
+  margin-bottom: 12px;
+}
+
+.permission-member__color-chip {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  transition: transform 0.1s, border-color 0.1s;
+}
+
+.permission-member__color-chip:hover {
+  transform: scale(1.06);
+}
+
+.permission-member__color-chip--selected {
+  border-color: var(--orange);
+  box-shadow: 0 0 8px rgba(255, 152, 31, 0.5);
+}
+
+.permission-member__color-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.permission-member__color-icon svg {
+  width: 100%;
+  height: 100%;
 }

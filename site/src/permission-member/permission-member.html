@@ -1,12 +1,23 @@
 <div class="permission-member__head">
   <span class="permission-member__arrow">&#9656;</span>
+  <span class="permission-member__swatch"></span>
   <span class="permission-member__name">${this.permission.display_rsn}</span>
-  <span class="permission-member__count">${this.grantedCount()} / ${this.permissionKeys.length}</span>
+  ${this.permission.is_admin
+    ? `<span class="permission-member__admin-badge">Admin</span>`
+    : `<span class="permission-member__count">${this.grantedCount()} / ${this.permissionKeys.length}</span>`}
 </div>
 <div class="permission-member__body">
-  <div class="permission-member__grid"></div>
-  <div class="permission-member__error validation-error"></div>
-  <div class="permission-member__save-row">
-    <button class="permission-member__save men-button small">Save</button>
-  </div>
+  ${this.showColor ? `
+    <div class="permission-member__section-label">Helmet colour</div>
+    <div class="permission-member__color-grid"></div>
+    <div class="permission-member__color-error validation-error"></div>
+  ` : ""}
+  ${this.showPermissions && !this.permission.is_admin ? `
+    <div class="permission-member__section-label">Permissions</div>
+    <div class="permission-member__grid"></div>
+    <div class="permission-member__error validation-error"></div>
+    <div class="permission-member__save-row">
+      <button class="permission-member__save men-button small">Save</button>
+    </div>
+  ` : ""}
 </div>

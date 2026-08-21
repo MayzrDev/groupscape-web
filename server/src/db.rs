@@ -2,22 +2,26 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
-    GroupMemberPermissions, GroupPermissions, GroupSession, GroupSkillData, MemberSkillData,
-    PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
+    AggregateSkillData, BlockedMember, CreateGroup, DiscordWebhookSettings, GameEvent,
+    GroupMember, GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession,
+    GroupSkillData, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, MEMBER_COLOR_PALETTE, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Transaction};
+use rand_core::{OsRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio_postgres::Row;
 
 const CURRENT_GROUP_VERSION: i32 = 2;
 pub async fn create_group(client: &mut Client, create_group: &CreateGroup) -> Result<(), ApiError> {
     let create_group_stmt = client.prepare_cached("INSERT INTO groupscape.groups (group_name, group_token_hash, version) VALUES($1, $2, $3) RETURNING group_id").await?;
     let create_member_stmt = client
-        .prepare_cached("INSERT INTO groupscape.members (group_id, member_name) VALUES($1, $2)")
+        .prepare_cached(
+            "INSERT INTO groupscape.members (group_id, member_name, color) VALUES($1, $2, $3)",
+        )
         .await?;
     let transaction = client.transaction().await?;
 
@@ -32,12 +36,17 @@ pub async fn create_group(client: &mut Client, create_group: &CreateGroup) -> Re
         .map_err(ApiError::GroupCreationError)?;
 
     transaction
-        .execute(&create_member_stmt, &[&group_id, &SHARED_MEMBER])
+        .execute(
+            &create_member_stmt,
+            &[&group_id, &SHARED_MEMBER, &Option::<String>::None],
+        )
         .await
         .map_err(ApiError::GroupCreationError)?;
-    for member_name in &create_group.member_names {
+    let colors = shuffled_color_palette();
+    for (index, member_name) in create_group.member_names.iter().enumerate() {
+        let color = colors[index % colors.len()];
         transaction
-            .execute(&create_member_stmt, &[&group_id, &member_name])
+            .execute(&create_member_stmt, &[&group_id, &member_name, &color])
             .await
             .map_err(ApiError::GroupCreationError)?;
     }
@@ -46,6 +55,49 @@ pub async fn create_group(client: &mut Client, create_group: &CreateGroup) -> Re
         .commit()
         .await
         .map_err(ApiError::GroupCreationError)
+}
+
+/// Fisher-Yates shuffle of [`MEMBER_COLOR_PALETTE`], for assigning distinct colours to a batch
+/// of brand-new members (e.g. `create_group`) without a DB round-trip - a new group has no
+/// existing colour rows to collide with.
+fn shuffled_color_palette() -> Vec<&'static str> {
+    let mut palette = MEMBER_COLOR_PALETTE.to_vec();
+    for i in (1..palette.len()).rev() {
+        let j = (OsRng.next_u32() as usize) % (i + 1);
+        palette.swap(i, j);
+    }
+    palette
+}
+
+/// Picks a random colour from [`MEMBER_COLOR_PALETTE`] not already assigned to another member
+/// of this group, for a single new member joining an existing group. Falls back to a uniformly
+/// random colour from the full palette once every colour is taken (§ "helmet colour" ticket:
+/// duplicates are an accepted fallback over leaving a member uncoloured).
+async fn pick_unused_member_color(client: &Client, group_id: i64) -> Result<String, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT color FROM groupscape.members WHERE group_id=$1 AND color IS NOT NULL")
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetMemberColorsError)?;
+    let used: HashSet<String> = rows
+        .iter()
+        .map(|row| row.try_get::<_, String>(0))
+        .collect::<Result<_, _>>()?;
+
+    let unused: Vec<&str> = MEMBER_COLOR_PALETTE
+        .iter()
+        .filter(|color| !used.contains(**color))
+        .copied()
+        .collect();
+    let pool: &[&str] = if unused.is_empty() {
+        &MEMBER_COLOR_PALETTE
+    } else {
+        &unused
+    };
+    let index = (OsRng.next_u32() as usize) % pool.len();
+    Ok(pool[index].to_string())
 }
 
 pub async fn add_group_member(
@@ -68,11 +120,14 @@ pub async fn add_group_member(
         return Err(ApiError::GroupFullError);
     }
 
+    let color = pick_unused_member_color(client, group_id).await?;
     let create_member_stmt = client
-        .prepare_cached("INSERT INTO groupscape.members (group_id, member_name) VALUES($1, $2)")
+        .prepare_cached(
+            "INSERT INTO groupscape.members (group_id, member_name, color) VALUES($1, $2, $3)",
+        )
         .await?;
     client
-        .execute(&create_member_stmt, &[&group_id, &member_name])
+        .execute(&create_member_stmt, &[&group_id, &member_name, &color])
         .await
         .map_err(ApiError::AddMemberError)?;
     Ok(())
@@ -157,15 +212,16 @@ pub async fn ensure_member_for_linked_character(
         return Err(ApiError::GroupFullError);
     }
 
+    let color = pick_unused_member_color(client, group_id).await?;
     let create_member_stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.members (group_id, member_name, account_hash) VALUES($1, $2, $3)",
+            "INSERT INTO groupscape.members (group_id, member_name, account_hash, color) VALUES($1, $2, $3, $4)",
         )
         .await?;
     client
         .execute(
             &create_member_stmt,
-            &[&group_id, &display_rsn, &account_hash],
+            &[&group_id, &display_rsn, &account_hash, &color],
         )
         .await
         .map_err(ApiError::AddMemberError)?;
@@ -609,7 +665,7 @@ pub async fn get_group_data(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT member_name,
+SELECT member_name, color,
 GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
 quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
 rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
@@ -649,6 +705,7 @@ FROM groupscape.members WHERE group_id=$2
             group_id: Some(group_id),
             name: member_name,
             account_hash: None,
+            color: row.try_get("color").ok(),
             last_updated,
             stats: row.try_get("stats").ok(),
             coordinates: row.try_get("coordinates").ok(),
@@ -705,6 +762,7 @@ pub async fn get_member_color_map(
     Ok(colors)
 }
 
+#[derive(Clone, Copy)]
 pub enum AggregatePeriod {
     Day,
     Month,
@@ -773,19 +831,26 @@ WHERE time < ($1::timestamptz - interval '{1}') AND (member_id, time) NOT IN (
     Ok(())
 }
 
-pub async fn get_last_skills_aggregation(client: &Client) -> Result<DateTime<Utc>, ApiError> {
+/// Reads `aggregation_info.last_aggregation` for a given `type` row (`'skills'`, `'bank_value'`,
+/// ...) - the watermark each periodic aggregator uses to only pick up rows updated since its
+/// last run.
+async fn get_last_aggregation(client: &Client, aggregation_type: &str) -> Result<DateTime<Utc>, ApiError> {
     let last_aggregation_stmt = client
         .prepare_cached(
             r#"
-SELECT last_aggregation FROM groupscape.aggregation_info WHERE type='skills'"#,
+SELECT last_aggregation FROM groupscape.aggregation_info WHERE type=$1"#,
         )
         .await?;
     let last_aggregation: DateTime<Utc> = client
-        .query_one(&last_aggregation_stmt, &[])
+        .query_one(&last_aggregation_stmt, &[&aggregation_type])
         .await?
         .try_get(0)?;
 
     Ok(last_aggregation)
+}
+
+pub async fn get_last_skills_aggregation(client: &Client) -> Result<DateTime<Utc>, ApiError> {
+    get_last_aggregation(client, "skills").await
 }
 
 pub async fn aggregate_skills(client: &mut Client) -> Result<(), ApiError> {
@@ -1810,6 +1875,48 @@ CREATE UNIQUE INDEX IF NOT EXISTS bank_value_snapshots_member_date_idx ON groups
         transaction.commit().await?;
     }
 
+    // Purely-additive, parallel to `bank_value_snapshots` above: that table stays
+    // daily-granularity and keeps serving the GP-earned *leaderboard* metric unchanged. This is
+    // history for the Graphs tab's GP-earned *chart* instead, at the same hour/day/month
+    // granularity the skills_day/month/year tables use for the XP chart, following the exact
+    // same shape (see "add_skill_periods" above) - except `member_id` is BIGINT here, not
+    // BIGSERIAL like skills_day/month/year's column (that's a foreign key referencing an
+    // existing member, not an autoincrementing identity, so BIGSERIAL there is a latent typo
+    // this migration does not repeat).
+    if !has_migration_run(client, "add_bank_value_periods").await? {
+        let transaction = client.transaction().await?;
+
+        let periods = vec!["day", "month", "year"];
+        for period in periods {
+            let create_bank_value_aggregate = format!(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.bank_value_{} (
+    member_id BIGINT REFERENCES groupscape.members(member_id),
+    time TIMESTAMPTZ,
+    bank_value BIGINT,
+
+    PRIMARY KEY (member_id, time)
+);
+"#,
+                period
+            );
+            transaction.execute(&create_bank_value_aggregate, &[]).await?;
+        }
+
+        transaction
+            .execute(
+                r#"
+INSERT INTO groupscape.aggregation_info (type) VALUES ('bank_value')
+ON CONFLICT (type) DO NOTHING
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_bank_value_periods").await?;
+        transaction.commit().await?;
+    }
+
     // Plugin auth redesign: the account API key replaces group_name/group_token as the
     // plugin's credential. Nullable rather than NOT NULL UNIQUE at the column level since
     // pre-existing accounts have none yet; `register`/Discord account-creation always set it
@@ -1941,6 +2048,62 @@ ALTER TABLE groupscape.characters ADD COLUMN IF NOT EXISTS total_level INTEGER
             .await?;
 
         commit_migration(&transaction, "add_character_summary_stats_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_members_color_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members ADD COLUMN IF NOT EXISTS color TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        // Backfill every pre-existing real member (excluding the synthetic shared-bank row) with
+        // a colour, group by group, so "every member has a colour" stays a true invariant instead
+        // of needing a NULL fallback throughout the read paths added for the helmet-colour
+        // feature. New members from here on get one at insert time (see
+        // `pick_unused_member_color`/`shuffled_color_palette` in this module).
+        let group_ids_stmt = transaction
+            .prepare_cached(
+                "SELECT DISTINCT group_id FROM groupscape.members WHERE color IS NULL AND member_name != $1",
+            )
+            .await?;
+        let group_ids: Vec<i64> = transaction
+            .query(&group_ids_stmt, &[&SHARED_MEMBER])
+            .await?
+            .iter()
+            .map(|row| row.try_get(0))
+            .collect::<Result<_, _>>()?;
+
+        let members_stmt = transaction
+            .prepare_cached(
+                "SELECT member_id FROM groupscape.members WHERE group_id=$1 AND member_name != $2 ORDER BY member_id ASC",
+            )
+            .await?;
+        let set_color_stmt = transaction
+            .prepare_cached("UPDATE groupscape.members SET color=$1 WHERE member_id=$2")
+            .await?;
+        for group_id in group_ids {
+            let member_ids: Vec<i64> = transaction
+                .query(&members_stmt, &[&group_id, &SHARED_MEMBER])
+                .await?
+                .iter()
+                .map(|row| row.try_get(0))
+                .collect::<Result<_, _>>()?;
+            let colors = shuffled_color_palette();
+            for (index, member_id) in member_ids.into_iter().enumerate() {
+                let color = colors[index % colors.len()];
+                transaction
+                    .execute(&set_color_stmt, &[&color, &member_id])
+                    .await?;
+            }
+        }
+
+        commit_migration(&transaction, "add_members_color_column").await?;
         transaction.commit().await?;
     }
 
@@ -2888,10 +3051,11 @@ pub async fn list_group_member_permissions(
     let admin_account_id = get_group_admin_account_id(client, group_id).await?;
     let stmt = client
         .prepare_cached(&format!(
-            "SELECT DISTINCT ON (c.account_id) c.account_id, c.display_rsn, {GROUP_PERMISSION_COLUMNS} \
+            "SELECT DISTINCT ON (c.account_id) c.account_id, c.display_rsn, m.color, {GROUP_PERMISSION_COLUMNS} \
              FROM groupscape.character_group_links cgl \
              JOIN groupscape.characters c ON c.character_id = cgl.character_id \
              JOIN groupscape.group_permissions gp ON gp.group_id = cgl.group_id AND gp.account_id = c.account_id \
+             LEFT JOIN groupscape.members m ON m.group_id = cgl.group_id AND m.account_hash = c.account_hash \
              WHERE cgl.group_id = $1 \
              ORDER BY c.account_id, c.bound_at DESC"
         ))
@@ -2907,6 +3071,7 @@ pub async fn list_group_member_permissions(
                 account_id,
                 display_rsn: row.try_get("display_rsn")?,
                 is_admin: admin_account_id == Some(account_id),
+                color: row.try_get("color").ok(),
                 flags: PermissionFlags {
                     invite_members: row.try_get("invite_members")?,
                     regenerate_group_key: row.try_get("regenerate_group_key")?,
@@ -2922,6 +3087,80 @@ pub async fn list_group_member_permissions(
             })
         })
         .collect()
+}
+
+/// Resolves `account_id`'s member row within `group_id` via the same account-hash join
+/// `list_group_member_permissions` and `get_member_mesh` use, picking the most recently bound
+/// character if the account has linked more than one. `None` means the account has no member
+/// row here yet (e.g. never connected the plugin since linking).
+async fn resolve_member_name_for_account(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+) -> Result<Option<String>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT m.member_name FROM groupscape.character_group_links cgl \
+             JOIN groupscape.characters c ON c.character_id = cgl.character_id \
+             JOIN groupscape.members m ON m.group_id = cgl.group_id AND m.account_hash = c.account_hash \
+             WHERE cgl.group_id = $1 AND c.account_id = $2 \
+             ORDER BY c.bound_at DESC LIMIT 1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id, &account_id])
+        .await
+        .map_err(ApiError::ResolveMemberForAccountError)?;
+    match row {
+        Some(row) => Ok(Some(row.try_get(0)?)),
+        None => Ok(None),
+    }
+}
+
+/// Sets `account_id`'s member colour within `group_id`, enforcing "blocked, not swapped" on a
+/// conflict (see the helmet-colour ticket): a colour already worn by a different member is
+/// rejected outright rather than reassigning that member's colour out from under them.
+pub async fn update_member_color(
+    client: &Client,
+    group_id: i64,
+    account_id: i64,
+    color: &str,
+) -> Result<GroupMemberPermissions, ApiError> {
+    if !MEMBER_COLOR_PALETTE.contains(&color) {
+        return Err(ApiError::InvalidMemberColorError);
+    }
+
+    let member_name = resolve_member_name_for_account(client, group_id, account_id)
+        .await?
+        .ok_or(ApiError::MemberColorTargetNotFoundError)?;
+
+    let conflict_stmt = client
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND color=$2 AND member_name != $3",
+        )
+        .await?;
+    if let Some(row) = client
+        .query_opt(&conflict_stmt, &[&group_id, &color, &member_name])
+        .await
+        .map_err(ApiError::UpdateMemberColorError)?
+    {
+        let taken_by: String = row.try_get(0)?;
+        return Err(ApiError::MemberColorTakenError(taken_by));
+    }
+
+    let update_stmt = client
+        .prepare_cached("UPDATE groupscape.members SET color=$1 WHERE group_id=$2 AND member_name=$3")
+        .await?;
+    client
+        .execute(&update_stmt, &[&color, &group_id, &member_name])
+        .await
+        .map_err(ApiError::UpdateMemberColorError)?;
+
+    list_group_member_permissions(client, group_id)
+        .await?
+        .into_iter()
+        .find(|permission| permission.account_id == account_id)
+        .ok_or(ApiError::MemberColorTargetNotFoundError)
 }
 
 /// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same
@@ -3579,12 +3818,13 @@ pub async fn admin_count_accounts(client: &Client) -> Result<i64, ApiError> {
 
 // --- Leaderboards ---
 //
-// XP reuses the Graphs tab's existing `skills_day`/`skills_month`/`skills_year` history
-// (`skills[1]` is the "Overall" total, same convention the site's `SkillName.Overall` reads at
-// index 0 of the decoded array - Postgres arrays are 1-indexed). Boss-KC and loot-value are
-// computed live from `activity_events`, which is already unbounded/retained - no snapshot
-// needed. Only GP-earned needs new history, since bank *contents* aren't tracked anywhere else;
-// see `bank_value_snapshots` above.
+// XP reuses the Graphs tab's existing `skills_day`/`skills_month`/`skills_year` history. The
+// stored `skills INTEGER[24]` column has no slot for "Overall" - it holds only the 24
+// non-Overall skills (see `skill_array_index`'s doc comment), so "Overall" XP is the sum of all
+// 24 elements, and a specific skill's XP is a single 1-indexed array read. Boss-KC and
+// loot-value are computed live from `activity_events`, which is already unbounded/retained - no
+// snapshot needed. Only GP-earned needs new history, since bank *contents* aren't tracked
+// anywhere else; see `bank_value_snapshots` above.
 
 fn leaderboard_window_cutoff(
     window: crate::leaderboard::LeaderboardWindow,
@@ -3598,23 +3838,80 @@ fn leaderboard_window_cutoff(
     }
 }
 
-/// XP gained in the window: live "Overall" total minus the oldest available history-table
-/// reading at/after (daily) or at/before (weekly/all-time) the cutoff. All-time has no cutoff -
-/// it diffs against the earliest surviving row across every history table, whatever that is
-/// (those tables never fully delete a member's last row, so there's always some baseline).
+/// Maps a `SkillName` string (exactly as the client sends it, e.g. `"Woodcutting"`) to its
+/// 1-indexed position in the stored `skills INTEGER[24]` column. The column has no slot for
+/// "Overall" - it holds exactly the 24 non-Overall skills in the order `Object.keys(SkillName)`
+/// visits them client-side (site/src/data/skill.js's `SkillName`, alphabetical except Overall is
+/// skipped and Sailing trails), so 0-indexed slot 0=Agility ... 23=Sailing, i.e. Postgres
+/// skills[1]=Agility ... skills[24]=Sailing. Returns `None` for "Overall" or any unrecognized
+/// string, both of which the caller treats as "sum all 24 elements" rather than a single read.
+fn skill_array_index(name: &str) -> Option<i32> {
+    Some(match name {
+        "Agility" => 1,
+        "Attack" => 2,
+        "Construction" => 3,
+        "Cooking" => 4,
+        "Crafting" => 5,
+        "Defence" => 6,
+        "Farming" => 7,
+        "Firemaking" => 8,
+        "Fishing" => 9,
+        "Fletching" => 10,
+        "Herblore" => 11,
+        "Hitpoints" => 12,
+        "Hunter" => 13,
+        "Magic" => 14,
+        "Mining" => 15,
+        "Prayer" => 16,
+        "Ranged" => 17,
+        "Runecraft" => 18,
+        "Slayer" => 19,
+        "Smithing" => 20,
+        "Strength" => 21,
+        "Thieving" => 22,
+        "Woodcutting" => 23,
+        "Sailing" => 24,
+        _ => return None,
+    })
+}
+
+/// SQL fragment reading a member's XP for the given (optional, validated) skill: a single
+/// 1-indexed array read for a specific skill, or a sum of all 24 elements for "Overall"/`None`/
+/// an unrecognized skill name. `column` is the fully-qualified array column reference to read
+/// (e.g. `"skills"` or `"s.skills"`) - always a fixed literal from this module, never
+/// interpolated from user input.
+fn xp_read_expr(column: &str, skill: Option<&str>) -> String {
+    match skill.and_then(skill_array_index) {
+        Some(index) => format!("COALESCE({column}[{index}], 0)::BIGINT"),
+        None => format!("(SELECT COALESCE(SUM(v), 0)::BIGINT FROM unnest({column}) AS v)"),
+    }
+}
+
+/// XP gained in the window: live total (Overall sum, or a single skill's slot when `skill` is
+/// `Some`) minus the oldest available history-table reading at/after (daily) or at/before
+/// (weekly/all-time) the cutoff. All-time has no cutoff - it diffs against the earliest
+/// surviving row across every history table, whatever that is (those tables never fully delete
+/// a member's last row, so there's always some baseline).
+///
+/// `skill` is a `SkillName` string exactly as the client sends it (e.g. `"Woodcutting"`); `None`
+/// or `"Overall"` (or any string this server doesn't recognize) means "Overall" - the sum of all
+/// 24 stored skills. Note this fixes a pre-existing bug: this function used to read `skills[1]`
+/// unconditionally for "Overall" XP, which is actually Agility's slot, not a sum - see
+/// `skill_array_index`'s doc comment for the stored-array layout.
 pub async fn get_xp_leaderboard(
     client: &Client,
     group_id: i64,
     window: crate::leaderboard::LeaderboardWindow,
+    skill: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<Vec<(String, i64)>, ApiError> {
     use crate::leaderboard::LeaderboardWindow;
 
-    let live_stmt = client
-        .prepare_cached(
-            "SELECT member_name, COALESCE(skills[1], 0) AS xp FROM groupscape.members WHERE group_id=$1",
-        )
-        .await?;
+    let live_sql = format!(
+        "SELECT member_name, {} AS xp FROM groupscape.members WHERE group_id=$1",
+        xp_read_expr("skills", skill)
+    );
+    let live_stmt = client.prepare_cached(&live_sql).await?;
     let live_rows = client
         .query(&live_stmt, &[&group_id])
         .await
@@ -3622,32 +3919,39 @@ pub async fn get_xp_leaderboard(
     let mut live: HashMap<String, i64> = HashMap::new();
     for row in &live_rows {
         let member_name: String = row.try_get("member_name")?;
-        let xp: i32 = row.try_get("xp")?;
-        live.insert(member_name, xp as i64);
+        let xp: i64 = row.try_get("xp")?;
+        live.insert(member_name, xp);
     }
 
+    let xp_expr = xp_read_expr("s.skills", skill);
     let baseline_sql = match window {
         LeaderboardWindow::Daily => {
-            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+            format!(
+                "SELECT DISTINCT ON (m.member_name) m.member_name, {xp_expr} AS xp
              FROM groupscape.skills_day s JOIN groupscape.members m ON m.member_id = s.member_id
              WHERE m.group_id = $1 AND s.time >= $2
              ORDER BY m.member_name, s.time ASC"
+            )
         }
         LeaderboardWindow::Weekly => {
-            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+            format!(
+                "SELECT DISTINCT ON (m.member_name) m.member_name, {xp_expr} AS xp
              FROM groupscape.skills_month s JOIN groupscape.members m ON m.member_id = s.member_id
              WHERE m.group_id = $1 AND s.time <= $2
              ORDER BY m.member_name, s.time DESC"
+            )
         }
         LeaderboardWindow::AllTime => {
-            "SELECT DISTINCT ON (m.member_name) m.member_name, COALESCE(s.skills[1], 0) AS xp
+            format!(
+                "SELECT DISTINCT ON (m.member_name) m.member_name, {xp_expr} AS xp
              FROM groupscape.skills_year s JOIN groupscape.members m ON m.member_id = s.member_id
              WHERE m.group_id = $1
              ORDER BY m.member_name, s.time ASC"
+            )
         }
     };
     let cutoff = leaderboard_window_cutoff(window, now);
-    let baseline_stmt = client.prepare_cached(baseline_sql).await?;
+    let baseline_stmt = client.prepare_cached(&baseline_sql).await?;
     let baseline_rows = match cutoff {
         Some(cutoff) => client
             .query(&baseline_stmt, &[&group_id, &cutoff])
@@ -3661,8 +3965,8 @@ pub async fn get_xp_leaderboard(
     let mut baseline: HashMap<String, i64> = HashMap::new();
     for row in &baseline_rows {
         let member_name: String = row.try_get("member_name")?;
-        let xp: i32 = row.try_get("xp")?;
-        baseline.insert(member_name, xp as i64);
+        let xp: i64 = row.try_get("xp")?;
+        baseline.insert(member_name, xp);
     }
 
     Ok(live
@@ -3901,4 +4205,279 @@ pub async fn get_gp_earned_leaderboard(
             (member_name, value - base)
         })
         .collect())
+}
+
+// --- Graphs tab metric data (get-metric-data) ---
+//
+// Backs the Graphs tab's chart controls once they merge with the leaderboard's period/metric
+// picker. Boss-KC and loot-value are bucketed live from the same unbounded `activity_events`
+// history the leaderboard metrics already read (queried with no `since` cutoff here, unlike the
+// leaderboard's window-limited read, since the chart needs history from before the visible
+// period to seed its baseline point - the client's `SkillGraph.generateCompleteTimeSeries`
+// does the analogous thing for skills). GP-earned reads `bank_value_day/month/year`, this
+// module's other new addition, which are cumulative-by-construction so no delta/running-sum step
+// is needed for that one - see `get_bank_value_for_period`.
+
+/// Bucket granularity for a chart period, mirroring `aggregate_skills_for_period`'s existing
+/// Day→hour / Month→day / Year→month mapping.
+fn bucket_granularity(period: AggregatePeriod) -> &'static str {
+    match period {
+        AggregatePeriod::Day => "hour",
+        AggregatePeriod::Month => "day",
+        AggregatePeriod::Year => "month",
+    }
+}
+
+/// Truncates a timestamp down to the start of its containing hour/day/month bucket.
+fn truncate_datetime(dt: DateTime<Utc>, granularity: &str) -> DateTime<Utc> {
+    use chrono::{Datelike, Timelike};
+
+    let date = dt.date_naive();
+    let naive = match granularity {
+        "hour" => date.and_hms_opt(dt.hour(), 0, 0).unwrap(),
+        "month" => date.with_day(1).unwrap().and_hms_opt(0, 0, 0).unwrap(),
+        // "day" and anything else fall back to a day bucket.
+        _ => date.and_hms_opt(0, 0, 0).unwrap(),
+    };
+    naive.and_utc()
+}
+
+/// Turns per-member, per-bucket deltas into ascending, running-cumulative `GroupMetricData` -
+/// members with no buckets at all are omitted entirely (same "absent means no data" shape
+/// `get_skills_for_period` already has for a member with zero rows).
+fn cumulative_metric_data(per_member: HashMap<String, BTreeMap<DateTime<Utc>, i64>>) -> GroupMetricData {
+    per_member
+        .into_iter()
+        .filter(|(_, buckets)| !buckets.is_empty())
+        .map(|(name, buckets)| {
+            let mut running = 0i64;
+            let metric_data = buckets
+                .into_iter()
+                .map(|(time, delta)| {
+                    running += delta;
+                    MetricDataPoint { time, value: running }
+                })
+                .collect();
+            MemberMetricData { name, metric_data }
+        })
+        .collect()
+}
+
+/// Cumulative per-member boss-kill-count time series (all bosses summed, or one `boss` filter),
+/// bucketed at `period`'s granularity - the chart counterpart to `get_boss_kc_leaderboard`.
+pub async fn get_boss_kc_metric_data(
+    client: &Client,
+    group_id: i64,
+    period: AggregatePeriod,
+    boss: Option<&str>,
+) -> Result<GroupMetricData, ApiError> {
+    let events = list_kill_events_since(client, group_id, None).await?;
+    let granularity = bucket_granularity(period);
+
+    let mut per_member: HashMap<String, BTreeMap<DateTime<Utc>, i64>> = HashMap::new();
+    for event in &events {
+        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        if boss.is_some_and(|b| b != kill.npc_name) {
+            continue;
+        }
+        let bucket = truncate_datetime(event.occurred_at, granularity);
+        *per_member
+            .entry(event.member_name.clone())
+            .or_default()
+            .entry(bucket)
+            .or_insert(0) += 1;
+    }
+
+    Ok(cumulative_metric_data(per_member))
+}
+
+/// Cumulative per-member loot-value time series (GE price at read time), bucketed at `period`'s
+/// granularity - the chart counterpart to `get_loot_value_leaderboard`.
+pub async fn get_loot_value_metric_data(
+    client: &Client,
+    group_id: i64,
+    period: AggregatePeriod,
+    ge_prices: &crate::models::GEPrices,
+) -> Result<GroupMetricData, ApiError> {
+    let events = list_kill_events_since(client, group_id, None).await?;
+    let granularity = bucket_granularity(period);
+
+    let mut per_member: HashMap<String, BTreeMap<DateTime<Utc>, i64>> = HashMap::new();
+    for event in &events {
+        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        let Some(loot) = kill.loot else { continue };
+        let value: i64 = loot
+            .iter()
+            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+            .sum();
+        let bucket = truncate_datetime(event.occurred_at, granularity);
+        *per_member
+            .entry(event.member_name.clone())
+            .or_default()
+            .entry(bucket)
+            .or_insert(0) += value;
+    }
+
+    Ok(cumulative_metric_data(per_member))
+}
+
+/// Hourly/daily/monthly GP-earned history for the chart, reading `bank_value_day/month/year`
+/// (populated by `aggregate_bank_value`) - mirrors `get_skills_for_period` exactly, since bank
+/// value is already a cumulative absolute total at each row (no delta/running-sum needed here,
+/// unlike the boss-KC/loot-value metrics above).
+pub async fn get_bank_value_for_period(
+    client: &Client,
+    group_id: i64,
+    period: AggregatePeriod,
+) -> Result<GroupMetricData, ApiError> {
+    let s = format!(
+        r#"
+SELECT member_name, time, b.bank_value
+FROM groupscape.bank_value_{} b
+INNER JOIN groupscape.members m ON m.member_id=b.member_id
+WHERE m.group_id=$1
+"#,
+        match period {
+            AggregatePeriod::Day => "day",
+            AggregatePeriod::Month => "month",
+            AggregatePeriod::Year => "year",
+        }
+    );
+    let stmt = client.prepare_cached(&s).await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetLeaderboardSnapshotsError)?;
+
+    let mut member_data: HashMap<String, MemberMetricData> = HashMap::new();
+    for row in rows {
+        let member_name: String = row.try_get("member_name")?;
+        let point = MetricDataPoint {
+            time: row.try_get("time")?,
+            value: row.try_get("bank_value")?,
+        };
+        member_data
+            .entry(member_name.clone())
+            .or_insert_with(|| MemberMetricData {
+                name: member_name,
+                metric_data: vec![],
+            })
+            .metric_data
+            .push(point);
+    }
+
+    Ok(member_data.into_values().collect())
+}
+
+/// Computes and upserts every member's current bank value into `bank_value_day/month/year`,
+/// truncated to each table's granularity - the chart-history counterpart to
+/// `capture_bank_value_snapshots` (which stays daily-only and keeps serving the GP-earned
+/// leaderboard metric unchanged). Bank contents aren't a per-update-timestamped column the way
+/// skills are, so unlike `aggregate_skills_for_period` this can't `INSERT ... SELECT` straight
+/// from `members` - each member's value is computed app-side via `bank_value()` first, then
+/// upserted with a prepared statement per member per table (matching
+/// `capture_bank_value_snapshots`'s existing per-member loop style).
+pub async fn aggregate_bank_value(
+    client: &mut Client,
+    ge_prices: &crate::models::GEPrices,
+    now: DateTime<Utc>,
+) -> Result<(), ApiError> {
+    let members_stmt = client
+        .prepare_cached("SELECT member_id, bank FROM groupscape.members WHERE bank IS NOT NULL")
+        .await?;
+    let rows = client
+        .query(&members_stmt, &[])
+        .await
+        .map_err(ApiError::CaptureLeaderboardSnapshotsError)?;
+    let mut values: Vec<(i64, i64)> = Vec::with_capacity(rows.len());
+    for row in &rows {
+        let member_id: i64 = row.try_get("member_id")?;
+        let bank: Vec<i32> = row.try_get("bank")?;
+        values.push((member_id, bank_value(&bank, ge_prices)));
+    }
+
+    let transaction = client.transaction().await?;
+    let update_last_aggregation_stmt = transaction
+        .prepare_cached(
+            r#"
+UPDATE groupscape.aggregation_info SET last_aggregation=NOW() WHERE type='bank_value'"#,
+        )
+        .await?;
+    transaction
+        .execute(&update_last_aggregation_stmt, &[])
+        .await?;
+
+    for (table, granularity) in [("day", "hour"), ("month", "day"), ("year", "month")] {
+        let bucket = truncate_datetime(now, granularity);
+        let upsert_sql = format!(
+            r#"
+INSERT INTO groupscape.bank_value_{table} (member_id, time, bank_value)
+VALUES ($1, $2, $3)
+ON CONFLICT (member_id, time) DO UPDATE SET bank_value=excluded.bank_value
+"#
+        );
+        let upsert_stmt = transaction.prepare_cached(&upsert_sql).await?;
+        for (member_id, value) in &values {
+            transaction
+                .execute(&upsert_stmt, &[member_id, &bucket, value])
+                .await?;
+        }
+    }
+
+    transaction.commit().await?;
+    Ok(())
+}
+
+async fn apply_bank_value_retention_for_period(
+    transaction: &Transaction<'_>,
+    period: AggregatePeriod,
+    last_aggregation: &DateTime<Utc>,
+) -> Result<(), ApiError> {
+    let s = format!(
+        r#"
+DELETE FROM groupscape.bank_value_{0}
+WHERE time < ($1::timestamptz - interval '{1}') AND (member_id, time) NOT IN (
+  SELECT member_id, max(time) FROM groupscape.bank_value_{0} WHERE time < ($1::timestamptz - interval '{1}') GROUP BY member_id
+)
+"#,
+        match period {
+            AggregatePeriod::Day => "day",
+            AggregatePeriod::Month => "month",
+            AggregatePeriod::Year => "year",
+        },
+        match period {
+            AggregatePeriod::Day => "1 day",
+            AggregatePeriod::Month => "1 month",
+            AggregatePeriod::Year => "1 year",
+        }
+    );
+    let stmt = transaction.prepare_cached(&s).await?;
+    transaction.execute(&stmt, &[last_aggregation]).await?;
+
+    Ok(())
+}
+
+/// Mirrors `apply_skills_retention` exactly, against `bank_value_day/month/year` instead of
+/// `skills_day/month/year` - same retention windows (day table thinned past 1 day, month table
+/// past 1 month, year table past 1 year), same "keep only the last row per member past the
+/// cutoff" delete.
+pub async fn apply_bank_value_retention(client: &mut Client) -> Result<(), ApiError> {
+    let last_aggregation = get_last_aggregation(client, "bank_value").await?;
+
+    let transaction = client.transaction().await?;
+    apply_bank_value_retention_for_period(&transaction, AggregatePeriod::Day, &last_aggregation)
+        .await?;
+    apply_bank_value_retention_for_period(&transaction, AggregatePeriod::Month, &last_aggregation)
+        .await?;
+    apply_bank_value_retention_for_period(&transaction, AggregatePeriod::Year, &last_aggregation)
+        .await?;
+    transaction.commit().await?;
+
+    Ok(())
 }

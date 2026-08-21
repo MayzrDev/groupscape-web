@@ -61,6 +61,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/update-group-permissions`;
   }
 
+  get updateMemberColorUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/update-member-color`;
+  }
+
   get renameGroupUrl() {
     return `${this.baseUrl}/group/${this.groupName}/rename-group`;
   }
@@ -83,6 +87,10 @@ class Api {
 
   get leaderboardUrl() {
     return `${this.baseUrl}/group/${this.groupName}/get-leaderboard`;
+  }
+
+  get metricDataUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-metric-data`;
   }
 
   get captchaEnabledUrl() {
@@ -288,6 +296,20 @@ class Api {
     return response;
   }
 
+  async updateMemberColor(accountId, color) {
+    const response = await fetch(this.updateMemberColorUrl, {
+      body: JSON.stringify({ account_id: accountId, color }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.groupToken,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
+    });
+
+    return response;
+  }
+
   async renameGroup(newName) {
     const response = await fetch(this.renameGroupUrl, {
       body: JSON.stringify({ new_name: newName }),
@@ -353,9 +375,10 @@ class Api {
     }
   }
 
-  async getLeaderboard(metric, window, boss) {
+  async getLeaderboard(metric, window, boss, skill) {
     const query = new URLSearchParams({ metric, window });
     if (boss) query.set("boss", boss);
+    if (skill && metric === "xp") query.set("skill", skill);
     const response = await fetch(`${this.leaderboardUrl}?${query.toString()}`, {
       headers: {
         Authorization: this.groupToken,
@@ -365,6 +388,24 @@ class Api {
       return { metric, window, boss: boss || null, available_bosses: [], entries: [] };
     }
     return response.json();
+  }
+
+  async getMetricData(metric, period, boss) {
+    if (this.exampleDataEnabled) {
+      return exampleData.getMetricData(metric, period, groupData, boss);
+    } else {
+      const query = new URLSearchParams({ metric, period });
+      if (boss) query.set("boss", boss);
+      const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
+        headers: {
+          Authorization: this.groupToken,
+        },
+      });
+      if (!response.ok) {
+        return [];
+      }
+      return response.json();
+    }
   }
 
   async getCaptchaEnabled() {

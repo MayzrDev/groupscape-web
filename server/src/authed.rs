@@ -9,11 +9,12 @@ use crate::error::ApiError;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
-    GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupSession,
-    GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult, LootSummaryRow,
-    PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
+    GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
+    GroupSession, GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult,
+    LootSummaryRow, PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest,
+    UpdateMemberColorRequest, SHARED_MEMBER,
 };
-use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
+use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
@@ -157,10 +158,11 @@ pub async fn delete_group(
     Ok(HttpResponse::Ok().finish())
 }
 
-/// Doubles as the client-side admin gate for the permission-management UI: only accounts
-/// holding `ManagePermissions` (by default, only the group admin, via the implicit override in
-/// `has_group_permission`) can call this at all, so the site treats a 401/403 here as "hide the
-/// section" rather than needing a separate am-I-admin check.
+/// Doubles as the client-side admin gate for the member-roster UI: accounts holding
+/// `ManagePermissions` (permission toggles) or `ManageSettings` (helmet-colour assignment) can
+/// call this - either implies enough to see *some* control in this section, so the site treats a
+/// 401/403 here as "hide the section" rather than needing a separate am-I-admin check. Which
+/// controls a given caller actually gets to edit is decided client-side from `/get-my-permissions`.
 #[get("/get-group-permissions")]
 pub async fn get_group_permissions(
     req: HttpRequest,
@@ -168,11 +170,11 @@ pub async fn get_group_permissions(
     db_pool: web::Data<Pool>,
 ) -> Result<web::Json<Vec<GroupMemberPermissions>>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    require_group_permission(
+    require_any_group_permission(
         &req,
         &client,
         auth.group_id,
-        PermissionKey::ManagePermissions,
+        &[PermissionKey::ManagePermissions, PermissionKey::ManageSettings],
     )
     .await?;
     let permissions = db::list_group_member_permissions(&client, auth.group_id).await?;
@@ -236,6 +238,24 @@ pub async fn update_group_permissions(
         Some(permissions) => Ok(HttpResponse::Ok().json(permissions)),
         None => Ok(HttpResponse::NotFound().body("Account has no permissions row in this group")),
     }
+}
+
+/// Assigns a member's helmet/accent colour. Gated on `ManageSettings` rather than
+/// `ManagePermissions` - deliberately a different flag from `update_group_permissions`, so an
+/// account with settings access but not permissions access can still restyle the roster.
+#[put("/update-member-color")]
+pub async fn update_member_color(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<UpdateMemberColorRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
+    let body = body.into_inner();
+    let updated =
+        db::update_member_color(&client, auth.group_id, body.account_id, &body.color).await?;
+    Ok(HttpResponse::Ok().json(updated))
 }
 
 /// Gated on `ManageDiscord` (kept separate from `ManageSettings` since the webhook URL is a
@@ -790,6 +810,11 @@ pub struct GetLeaderboardQuery {
     pub window: LeaderboardWindow,
     #[serde(default)]
     pub boss: Option<String>,
+    /// Only meaningful when `metric == Xp`. A `SkillName` string exactly as the client sends it
+    /// (e.g. `"Woodcutting"`, `"Overall"`), or omitted for "Overall". See
+    /// `db::skill_array_index`'s doc comment for how this is resolved.
+    #[serde(default)]
+    pub skill: Option<String>,
 }
 /// XP/boss-KC/GP-earned/loot-value rankings over a daily/weekly/all-time window - part of the
 /// Graphs tab rather than a standalone leaderboards page/feature (see [`crate::leaderboard`]).
@@ -803,7 +828,14 @@ pub async fn get_leaderboard(
 
     let (entries, available_bosses) = match query.metric {
         LeaderboardMetric::Xp => {
-            let raw = db::get_xp_leaderboard(&client, auth.group_id, query.window, now).await?;
+            let raw = db::get_xp_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                query.skill.as_deref(),
+                now,
+            )
+            .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
         LeaderboardMetric::BossKc => {
@@ -850,6 +882,61 @@ pub async fn get_leaderboard(
         available_bosses,
         entries,
     }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetMetricDataQuery {
+    pub metric: LeaderboardMetric,
+    pub period: SkillDataPeriod,
+    /// Only used when `metric == BossKc`. `None` means "All Bosses" (every kill counted), same
+    /// as `get_boss_kc_leaderboard`'s existing `boss: None` semantics.
+    #[serde(default)]
+    pub boss: Option<String>,
+}
+/// Graphs tab chart data for boss-KC/GP-earned/loot-value, at the period's bucket granularity,
+/// as running cumulative totals (not pre-diffed - the client turns a cumulative series into
+/// "gained since period start" itself, mirroring how it already does that for skill XP). XP has
+/// its own richer endpoint (`get_skill_data`) and is rejected here.
+pub async fn get_metric_data(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetMetricDataQuery>,
+) -> Result<web::Json<GroupMetricData>, Error> {
+    if query.metric == LeaderboardMetric::Xp {
+        return Err(ApiError::MetricDataXpNotSupportedError.into());
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let aggregate_period = match query.period {
+        SkillDataPeriod::Day => db::AggregatePeriod::Day,
+        SkillDataPeriod::Week => db::AggregatePeriod::Month,
+        SkillDataPeriod::Month => db::AggregatePeriod::Month,
+        SkillDataPeriod::Year => db::AggregatePeriod::Year,
+    };
+
+    let data = match query.metric {
+        LeaderboardMetric::Xp => unreachable!("rejected above"),
+        LeaderboardMetric::BossKc => {
+            db::get_boss_kc_metric_data(
+                &client,
+                auth.group_id,
+                aggregate_period,
+                query.boss.as_deref(),
+            )
+            .await?
+        }
+        LeaderboardMetric::GpEarned => {
+            db::get_bank_value_for_period(&client, auth.group_id, aggregate_period).await?
+        }
+        LeaderboardMetric::LootValue => {
+            let ge_prices = get_ge_prices_map();
+            db::get_loot_value_metric_data(&client, auth.group_id, aggregate_period, &ge_prices)
+                .await?
+        }
+    };
+
+    Ok(web::Json(data))
 }
 
 pub async fn am_i_logged_in(_auth: Authenticated) -> Result<HttpResponse, Error> {

@@ -34,6 +34,8 @@
   --rarity-rare: #3b82f6;
   --rarity-very-rare: #a855f7;
   --rarity-unique: #ffd700;
+
+  --helmet-cut: #241a10;
 }
 
 html,
@@ -282,6 +284,7 @@ select:focus-visible {
 option {
   color: var(--orange);
   text-shadow: none;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
 }
 
 fieldset {

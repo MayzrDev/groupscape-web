@@ -5,14 +5,25 @@ import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { AchievementDiary } from "./diaries";
 
-const playerColors = [
-  "hsl(41, 100%, 40%)", // yellow
-  "hsl(151, 69%, 26%)", // green
-  "hsl(210, 50%, 40%)", // blue
-  "hsl(355, 76%, 36%)", // red
-  "hsl(288, 65%, 45%)", // purple
-];
-let currentColor = 0;
+// Keys match the server's `MEMBER_COLOR_PALETTE` (models.rs) - the server owns which key a
+// member has, this module only owns what hue each key renders as. Admin-assigned and persisted
+// server-side (see group-settings' member roster), not picked client-side any more.
+export const MEMBER_COLOR_HUES = {
+  yellow: 41,
+  green: 151,
+  blue: 210,
+  red: 355,
+  purple: 288,
+  orange: 25,
+  cyan: 185,
+  pink: 330,
+  lime: 95,
+  teal: 170,
+  indigo: 245,
+  brown: 30,
+};
+
+export const MEMBER_COLOR_PALETTE = Object.keys(MEMBER_COLOR_HUES);
 
 export const memberInventoryFields = ["bank", "inventory", "equipment", "runePouch", "seedVault"];
 
@@ -118,14 +129,19 @@ export class MemberData {
     }
     this.inactive = false;
 
-    this.color = playerColors[currentColor];
-    currentColor = (currentColor + 1) % playerColors.length;
-    // Store the hue for player-icon
-    this.hue = this.color.substring(this.color.indexOf("(") + 1, this.color.indexOf(","));
+    // Set once real data arrives (see `update` below) - 0 until then just keeps player-icon's
+    // hue-rotate a no-op rather than undefined.
+    this.colorKey = null;
+    this.hue = 0;
   }
 
   update(memberData) {
     let updatedAttributes = new Set();
+
+    if (memberData.color && memberData.color !== this.colorKey) {
+      this.colorKey = memberData.color;
+      this.hue = MEMBER_COLOR_HUES[memberData.color] ?? 0;
+    }
 
     for (const field of parsedFieldMappings) {
       this.applyParsedFieldUpdate(memberData, field, updatedAttributes);

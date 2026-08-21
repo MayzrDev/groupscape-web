@@ -127,6 +127,15 @@ pub enum ApiError {
     CaptureLeaderboardSnapshotsError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetLeaderboardSnapshotsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ResolveMemberForAccountError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateMemberColorError(tokio_postgres::error::Error),
+    InvalidMemberColorError,
+    MemberColorTargetNotFoundError,
+    #[from(ignore)]
+    MemberColorTakenError(String),
+    MetricDataXpNotSupportedError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -305,6 +314,22 @@ impl ResponseError for ApiError {
             ApiError::GetLeaderboardSnapshotsError(ref err) => {
                 handle_pg_error(err, "GetLeaderboardSnapshotsError")
             }
+            ApiError::ResolveMemberForAccountError(ref err) => {
+                handle_pg_error(err, "ResolveMemberForAccountError")
+            }
+            ApiError::UpdateMemberColorError(ref err) => {
+                handle_pg_error(err, "UpdateMemberColorError")
+            }
+            ApiError::InvalidMemberColorError => {
+                HttpResponse::BadRequest().body("Not a valid helmet colour")
+            }
+            ApiError::MemberColorTargetNotFoundError => HttpResponse::NotFound()
+                .body("This account has no character in this group yet"),
+            ApiError::MemberColorTakenError(ref taken_by) => {
+                HttpResponse::Conflict().body(format!("That colour is already worn by {taken_by}"))
+            }
+            ApiError::MetricDataXpNotSupportedError => HttpResponse::BadRequest()
+                .body("Xp is not supported on get-metric-data; use get-skill-data instead"),
         }
     }
 }

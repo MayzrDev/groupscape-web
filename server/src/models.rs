@@ -3,6 +3,14 @@ use serde::{Deserialize, Serialize};
 
 pub const SHARED_MEMBER: &str = "@SHARED";
 
+/// Helmet/accent colour keys a member row's `color` column may hold. Shared vocabulary with the
+/// site's `member-data.js` palette - the hue each key maps to is a frontend-only concern, so
+/// only the keys themselves need to agree between the two.
+pub const MEMBER_COLOR_PALETTE: [&str; 12] = [
+    "yellow", "green", "blue", "red", "purple", "orange", "cyan", "pink", "lime", "teal", "indigo",
+    "brown",
+];
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Coordinates {
@@ -66,6 +74,11 @@ pub struct GroupMember {
     /// existing member row by name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_hash: Option<String>,
+    /// Admin-assigned helmet/accent colour (one of [`MEMBER_COLOR_PALETTE`]), unconditionally
+    /// included rather than gated by the heartbeat's `$1` staleness cutoff like the fields below
+    /// - it changes far less often than telemetry, so there's no "since timestamp" to check.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stats: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -343,6 +356,17 @@ pub struct MemberSkillData {
     pub skill_data: Vec<AggregateSkillData>,
 }
 pub type GroupSkillData = Vec<MemberSkillData>;
+#[derive(Serialize)]
+pub struct MetricDataPoint {
+    pub time: DateTime<Utc>,
+    pub value: i64,
+}
+#[derive(Serialize)]
+pub struct MemberMetricData {
+    pub name: String,
+    pub metric_data: Vec<MetricDataPoint>,
+}
+pub type GroupMetricData = Vec<MemberMetricData>;
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CreateGroup {
@@ -635,8 +659,19 @@ pub struct GroupMemberPermissions {
     pub account_id: i64,
     pub display_rsn: String,
     pub is_admin: bool,
+    /// `None` for an account whose linked character has no member row yet (e.g. joined before
+    /// this feature existed and hasn't reconnected to trigger the backfill in
+    /// `ensure_member_for_linked_character`).
+    pub color: Option<String>,
     #[serde(flatten)]
     pub flags: PermissionFlags,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateMemberColorRequest {
+    pub account_id: i64,
+    pub color: String,
 }
 
 #[derive(Deserialize)]

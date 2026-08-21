@@ -38,3 +38,32 @@ pub async fn require_group_permission(
         Err(ApiError::PermissionDeniedError)
     }
 }
+
+/// Same as [`require_group_permission`], but succeeds if the acting account holds *any* of
+/// `keys` - for surfaces shared by more than one permission (e.g. the member-roster section,
+/// which shows permission toggles to `ManagePermissions` holders and the colour picker to
+/// `ManageSettings` holders, so either should be able to open it at all).
+pub async fn require_any_group_permission(
+    req: &HttpRequest,
+    client: &Client,
+    group_id: i64,
+    keys: &[PermissionKey],
+) -> Result<i64, ApiError> {
+    let token = req
+        .headers()
+        .get(ACCOUNT_AUTH_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .ok_or(ApiError::AccountAuthRequiredError)?;
+
+    let token_hash = session_token_hash(token);
+    let account = db::get_account_by_session_token_hash(client, &token_hash)
+        .await?
+        .ok_or(ApiError::AccountAuthRequiredError)?;
+
+    for key in keys {
+        if db::has_group_permission(client, group_id, account.id, *key).await? {
+            return Ok(account.id);
+        }
+    }
+    Err(ApiError::PermissionDeniedError)
+}
