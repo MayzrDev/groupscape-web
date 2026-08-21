@@ -119,6 +119,7 @@ async fn main() -> std::io::Result<()> {
                     .wrap(AccountAuthenticateMiddlewareFactory::new(
                         account_auth_cache.clone(),
                     ))
+                    .app_data(web::Data::from(character_auth_cache.clone()))
                     .service(accounts::me)
                     .service(accounts::update_email)
                     .service(accounts::change_password)

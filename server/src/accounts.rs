@@ -1,4 +1,5 @@
 use crate::account_auth_middleware::AccountAuthenticated;
+use crate::character_auth_middleware::CharacterAuthenticationCache;
 use crate::config::Config;
 use crate::crypto;
 use crate::db;
@@ -210,17 +211,19 @@ pub async fn unlink_character(
     path: web::Path<i64>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
+    character_auth_cache: web::Data<CharacterAuthenticationCache>,
 ) -> Result<HttpResponse, Error> {
     let character_id = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
     let character = db::find_character_by_id(&client, character_id).await?;
-    match character {
-        Some(character) if character.account_id == authenticated.id => {}
+    let character = match character {
+        Some(character) if character.account_id == authenticated.id => character,
         _ => return Err(ApiError::CharacterNotFoundError.into()),
-    }
+    };
 
     db::delete_character(&client, character_id).await?;
+    character_auth_cache.invalidate(&character.account_hash);
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -289,6 +292,7 @@ pub async fn confirm_character(
     path: web::Path<i64>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
+    character_auth_cache: web::Data<CharacterAuthenticationCache>,
 ) -> Result<HttpResponse, Error> {
     let character_id = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -300,6 +304,7 @@ pub async fn confirm_character(
     }
 
     let confirmed = db::confirm_character(&client, character_id).await?;
+    character_auth_cache.invalidate(&confirmed.account_hash);
     Ok(HttpResponse::Ok().json(Character::from(confirmed)))
 }
 
@@ -311,6 +316,7 @@ pub async fn remove_pending_character(
     path: web::Path<i64>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
+    character_auth_cache: web::Data<CharacterAuthenticationCache>,
 ) -> Result<HttpResponse, Error> {
     let character_id = path.into_inner();
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -330,6 +336,7 @@ pub async fn remove_pending_character(
         &character.account_hash,
     )
     .await?;
+    character_auth_cache.invalidate(&character.account_hash);
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -372,6 +379,7 @@ pub async fn link_character_to_group(
     link: web::Json<LinkCharacterToGroup>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
+    character_auth_cache: web::Data<CharacterAuthenticationCache>,
 ) -> Result<HttpResponse, Error> {
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
@@ -391,6 +399,7 @@ pub async fn link_character_to_group(
 
     let link =
         db::link_character_to_group(&mut client, character.id, authenticated.id, group_id).await?;
+    character_auth_cache.invalidate(&character.account_hash);
     let response = HttpResponse::build(if already_linked_to_this_group {
         actix_web::http::StatusCode::OK
     } else {
@@ -409,17 +418,19 @@ pub async fn leave_group(
     path: web::Path<i64>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
+    character_auth_cache: web::Data<CharacterAuthenticationCache>,
 ) -> Result<HttpResponse, Error> {
     let character_id = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
     let character = db::find_character_by_id(&client, character_id).await?;
-    match character {
+    let character = match character {
         Some(character) if character.account_id == authenticated.id => character,
         _ => return Err(ApiError::CharacterNotFoundError.into()),
     };
 
     db::unlink_character_from_group(&client, character_id).await?;
+    character_auth_cache.invalidate(&character.account_hash);
     Ok(HttpResponse::Ok().finish())
 }
 
