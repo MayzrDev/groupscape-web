@@ -3093,7 +3093,7 @@ pub async fn list_group_member_permissions(
 /// `list_group_member_permissions` and `get_member_mesh` use, picking the most recently bound
 /// character if the account has linked more than one. `None` means the account has no member
 /// row here yet (e.g. never connected the plugin since linking).
-async fn resolve_member_name_for_account(
+pub async fn resolve_member_name_for_account(
     client: &Client,
     group_id: i64,
     account_id: i64,

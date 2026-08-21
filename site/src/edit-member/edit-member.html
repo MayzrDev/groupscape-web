@@ -5,7 +5,7 @@
     <div class="edit-member__meta">${this.lastSeenText()}</div>
   </div>
   <div class="edit-member__buttons">
-    ${this.canKick ? `<button class="edit-member__remove men-button small">Remove</button><button class="edit-member__block men-button small">Block</button>` : ""}
+    ${this.canKick && !this.isSelf ? `<button class="edit-member__remove men-button small">Remove</button><button class="edit-member__block men-button small">Block</button>` : ""}
   </div>
 </div>
 

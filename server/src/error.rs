@@ -136,6 +136,8 @@ pub enum ApiError {
     #[from(ignore)]
     MemberColorTakenError(String),
     MetricDataXpNotSupportedError,
+    CannotRemoveSelfError,
+    CannotBlockSelfError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -330,6 +332,12 @@ impl ResponseError for ApiError {
             }
             ApiError::MetricDataXpNotSupportedError => HttpResponse::BadRequest()
                 .body("Xp is not supported on get-metric-data; use get-skill-data instead"),
+            ApiError::CannotRemoveSelfError => {
+                HttpResponse::BadRequest().body("You can't remove yourself from the group")
+            }
+            ApiError::CannotBlockSelfError => {
+                HttpResponse::BadRequest().body("You can't block yourself from the group")
+            }
         }
     }
 }

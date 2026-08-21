@@ -8,6 +8,7 @@ export class EditMember extends BaseElement {
   constructor() {
     super();
     this._canKick = false;
+    this._isSelf = false;
   }
 
   // Set by group-settings once it knows the acting account's effective permissions - defaults
@@ -20,6 +21,18 @@ export class EditMember extends BaseElement {
 
   get canKick() {
     return this._canKick;
+  }
+
+  // Set by group-settings when this row is the acting account's own member row - an admin
+  // can't remove or block themself (the server rejects it too), so the row never shows those
+  // controls in the first place.
+  set isSelf(value) {
+    this._isSelf = value;
+    this.updateButtonsVisibility();
+  }
+
+  get isSelf() {
+    return this._isSelf;
   }
 
   html() {
@@ -42,7 +55,7 @@ export class EditMember extends BaseElement {
   updateButtonsVisibility() {
     const buttons = this.querySelector(".edit-member__buttons");
     if (buttons) {
-      buttons.style.display = this._canKick ? "" : "none";
+      buttons.style.display = this._canKick && !this._isSelf ? "" : "none";
     }
   }
 

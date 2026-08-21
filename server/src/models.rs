@@ -598,6 +598,17 @@ impl PermissionFlags {
     }
 }
 
+/// Response body for `/get-my-permissions`: the caller's effective flags plus their own member
+/// name in this group (`None` if their account has no member row here yet). Lets the client
+/// identify which roster row is "you" without a second round trip, e.g. to hide the
+/// remove/block-self controls.
+#[derive(Serialize, Debug)]
+pub struct MyPermissions {
+    pub member_name: Option<String>,
+    #[serde(flatten)]
+    pub flags: PermissionFlags,
+}
+
 /// One key per `PermissionFlags` toggle - lets callers reference a permission by name (e.g.
 /// enforcement middleware) instead of reaching into the struct field directly.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

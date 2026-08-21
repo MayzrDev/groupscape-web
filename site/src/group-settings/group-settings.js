@@ -79,7 +79,9 @@ export class GroupSettings extends BaseElement {
   // something that varies member-to-member, and `handleUpdatedMembers` re-runs frequently as
   // telemetry streams in.
   async loadCanKickMembers() {
-    this.canKickMembers = await api.canKickMembers();
+    const [canKickMembers, myPermissionsResponse] = await Promise.all([api.canKickMembers(), api.getMyPermissions()]);
+    this.canKickMembers = canKickMembers;
+    this.myMemberName = myPermissionsResponse.ok ? (await myPermissionsResponse.json()).member_name : null;
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
       this.handleUpdatedMembers(mostRecentMembers);
@@ -202,6 +204,7 @@ export class GroupSettings extends BaseElement {
       const memberEdit = document.createElement("edit-member");
       memberEdit.member = member;
       memberEdit.canKick = Boolean(this.canKickMembers);
+      memberEdit.isSelf = member.name === this.myMemberName;
       memberEdits.appendChild(memberEdit);
     }
 

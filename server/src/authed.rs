@@ -11,7 +11,7 @@ use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
     GroupSession, GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult,
-    LootSummaryRow, PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest,
+    LootSummaryRow, MyPermissions, PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest,
     UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
@@ -41,7 +41,15 @@ pub async fn delete_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
+    let account_id =
+        require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
+    if db::resolve_member_name_for_account(&client, auth.group_id, account_id)
+        .await?
+        .as_deref()
+        == Some(group_member.name.as_str())
+    {
+        return Err(ApiError::CannotRemoveSelfError.into());
+    }
     db::delete_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -60,7 +68,15 @@ pub async fn block_group_member(
     }
 
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
+    let account_id =
+        require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
+    if db::resolve_member_name_for_account(&client, auth.group_id, account_id)
+        .await?
+        .as_deref()
+        == Some(group_member.name.as_str())
+    {
+        return Err(ApiError::CannotBlockSelfError.into());
+    }
     db::block_group_member(&mut client, auth.group_id, &group_member.name).await?;
     Ok(HttpResponse::Ok().finish())
 }
@@ -181,18 +197,20 @@ pub async fn get_group_permissions(
     Ok(web::Json(permissions))
 }
 
-/// The caller's own effective flags (admin override folded in), keyed off whatever account
-/// `X-Account-Authorization` resolves to - unlike `get_group_permissions` this isn't gated by
-/// `ManagePermissions`, since every member needs to know their own capabilities to decide which
-/// controls to show (e.g. the remove-member button). No/invalid account header or no
-/// permissions row all fall back to [`PermissionFlags::default`] (every flag off) rather than
-/// erroring, so a logged-out browser just sees nothing gated.
+/// The caller's own effective flags (admin override folded in) plus their own member name in
+/// this group, keyed off whatever account `X-Account-Authorization` resolves to - unlike
+/// `get_group_permissions` this isn't gated by `ManagePermissions`, since every member needs to
+/// know their own capabilities to decide which controls to show (e.g. the remove-member button,
+/// and `member_name` lets the client hide that button on its own row - the server rejects
+/// self-removal too, see `delete_group_member`/`block_group_member`). No/invalid account header
+/// or no permissions row all fall back to [`PermissionFlags::default`] (every flag off) and a
+/// `None` member name, rather than erroring, so a logged-out browser just sees nothing gated.
 #[get("/get-my-permissions")]
 pub async fn get_my_permissions(
     req: HttpRequest,
     auth: Authenticated,
     db_pool: web::Data<Pool>,
-) -> Result<web::Json<PermissionFlags>, Error> {
+) -> Result<web::Json<MyPermissions>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
     let account = match req
@@ -206,14 +224,18 @@ pub async fn get_my_permissions(
         None => None,
     };
 
-    let flags = match account {
+    let (flags, member_name) = match account {
         Some(account) => {
-            db::get_effective_permission_flags(&client, auth.group_id, account.id).await?
+            let flags =
+                db::get_effective_permission_flags(&client, auth.group_id, account.id).await?;
+            let member_name =
+                db::resolve_member_name_for_account(&client, auth.group_id, account.id).await?;
+            (flags, member_name)
         }
-        None => PermissionFlags::default(),
+        None => (PermissionFlags::default(), None),
     };
 
-    Ok(web::Json(flags))
+    Ok(web::Json(MyPermissions { member_name, flags }))
 }
 
 #[put("/update-group-permissions")]
