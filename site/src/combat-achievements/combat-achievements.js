@@ -193,18 +193,50 @@ export class CombatAchievements extends BaseElement {
 
   renderTaskRow(task) {
     const done = combatAchievement.isTaskComplete(this.member, task.id);
-    const title = task.description ? ` title="${escapeAttribute(task.description)}"` : "";
+    const description = task.description
+      ? `<span class="combat-achievements__task-desc">${task.description}</span>`
+      : "";
     return `
       <a
         href="${combatAchievement.taskWikiUrl(task.name)}"
         target="_blank"
         rel="noopener"
-        class="combat-achievements__task-row ${done ? "combat-achievements__task-row--done" : ""}"${title}
+        class="combat-achievements__task-row ${done ? "combat-achievements__task-row--done" : ""}"
       >
-        <span class="combat-achievements__task-check"></span>${task.name}
+        <span class="combat-achievements__task-check"></span>
+        <span class="combat-achievements__task-body">
+          <span class="combat-achievements__task-name">${task.name}</span>
+          ${description}
+        </span>
         <span class="combat-achievements__task-wiki-mark">&#8599;</span>
       </a>
     `;
+  }
+
+  renderTaskGroupByTier(tasks) {
+    const byTier = new Map();
+    for (const task of tasks) {
+      if (!byTier.has(task.tier)) byTier.set(task.tier, []);
+      byTier.get(task.tier).push(task);
+    }
+
+    return COMBAT_ACHIEVEMENT_TIERS.filter(([key]) => byTier.has(key))
+      .map(([key, label]) => {
+        const tierTasks = byTier.get(key);
+        const done = tierTasks.filter((task) => combatAchievement.isTaskComplete(this.member, task.id)).length;
+        return `
+          <div class="combat-achievements__tier-sub combat-achievements__tier-sub--${key}">
+            <div class="combat-achievements__tier-sub-head">
+              ${label}
+              <span class="combat-achievements__tier-sub-frac">${done}/${tierTasks.length}</span>
+            </div>
+            <div class="combat-achievements__task-grid">
+              ${tierTasks.map((task) => this.renderTaskRow(task)).join("")}
+            </div>
+          </div>
+        `;
+      })
+      .join("");
   }
 
   renderBossView() {
@@ -248,8 +280,8 @@ export class CombatAchievements extends BaseElement {
         <span class="combat-achievements__boss-card-frac">${done}/${total}</span>
         ${
           expanded
-            ? `<div class="combat-achievements__task-grid combat-achievements__task-grid--boss">
-                ${group.tasks.map((task) => this.renderTaskRow(task)).join("")}
+            ? `<div class="combat-achievements__tier-split">
+                ${this.renderTaskGroupByTier(group.tasks)}
               </div>`
             : ""
         }

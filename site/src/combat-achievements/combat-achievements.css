@@ -300,19 +300,19 @@ combat-achievements h2 {
 
 .combat-achievements__task-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
+  grid-template-columns: 1fr;
+  gap: 5px;
 }
 
 .combat-achievements__task-row {
   display: flex;
-  align-items: center;
-  gap: 7px;
+  align-items: flex-start;
+  gap: 9px;
   font-size: 12px;
-  padding: 5px 8px;
+  padding: 7px 9px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 3px;
-  opacity: 0.6;
+  opacity: 0.65;
   color: inherit;
   text-decoration: none;
   border: 1px solid transparent;
@@ -320,7 +320,6 @@ combat-achievements h2 {
 
 .combat-achievements__task-row:hover {
   opacity: 1;
-  color: var(--orange);
   border-color: hsl(40deg 15.79% 29.8%);
   background: rgba(255, 255, 255, 0.05);
 }
@@ -332,6 +331,7 @@ combat-achievements h2 {
 .combat-achievements__task-check {
   width: 10px;
   height: 10px;
+  margin-top: 3px;
   border-radius: 2px;
   border: 1px solid hsl(40deg 15.79% 40%);
   flex-shrink: 0;
@@ -342,11 +342,37 @@ combat-achievements h2 {
   border-color: var(--green);
 }
 
+.combat-achievements__task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.combat-achievements__task-name {
+  font-weight: 600;
+}
+
+.combat-achievements__task-row:hover .combat-achievements__task-name {
+  color: var(--orange);
+}
+
+.combat-achievements__task-desc {
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .combat-achievements__task-wiki-mark {
   margin-left: auto;
   font-size: 10px;
   opacity: 0;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .combat-achievements__task-row:hover .combat-achievements__task-wiki-mark {
@@ -428,9 +454,64 @@ combat-achievements h2 {
   font-variant-numeric: tabular-nums;
 }
 
-.combat-achievements__task-grid--boss {
+.combat-achievements__tier-split {
   margin-top: 4px;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.combat-achievements__tier-sub {
+  --tc: var(--tier-easy);
+}
+.combat-achievements__tier-sub--easy {
+  --tc: var(--tier-easy);
+}
+.combat-achievements__tier-sub--medium {
+  --tc: var(--tier-medium);
+}
+.combat-achievements__tier-sub--hard {
+  --tc: var(--tier-hard);
+}
+.combat-achievements__tier-sub--elite {
+  --tc: var(--tier-elite);
+}
+.combat-achievements__tier-sub--master {
+  --tc: var(--tier-master);
+}
+.combat-achievements__tier-sub--grandmaster {
+  --tc: var(--tier-grandmaster);
+}
+
+.combat-achievements__tier-sub-head {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tc);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+  padding-left: 2px;
+}
+
+.combat-achievements__tier-sub-frac {
+  font-size: 10px;
+  font-weight: 400;
+  opacity: 0.7;
+  text-transform: none;
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.combat-achievements__tier-sub .combat-achievements__task-grid {
+  border-left: 2px solid var(--tc);
+  padding-left: 8px;
+}
+
+.combat-achievements__tier-sub .combat-achievements__task-row:hover .combat-achievements__task-name {
+  color: var(--tc);
 }
 
 .combat-achievements__empty {
@@ -451,10 +532,6 @@ combat-achievements h2 {
   }
 
   .combat-achievements__boss-view {
-    grid-template-columns: 1fr;
-  }
-
-  .combat-achievements__task-grid--boss {
     grid-template-columns: 1fr;
   }
 }
