@@ -31,14 +31,24 @@ activity-feed-event:last-child {
   color: var(--red);
 }
 
-.activity-feed-event__badge--dialogue {
-  background: rgba(77, 159, 255, 0.16);
-  color: #4d9fff;
+.activity-feed-event__badge--quest {
+  background: color-mix(in srgb, var(--activity-quest) 16%, transparent);
+  color: var(--activity-quest);
 }
 
-.activity-feed-event__badge--object_interaction {
-  background: rgba(181, 140, 255, 0.16);
-  color: #b58cff;
+.activity-feed-event__badge--diary {
+  background: color-mix(in srgb, var(--activity-diary) 16%, transparent);
+  color: var(--activity-diary);
+}
+
+.activity-feed-event__badge--combat_task {
+  background: color-mix(in srgb, var(--activity-combat-task) 16%, transparent);
+  color: var(--activity-combat-task);
+}
+
+.activity-feed-event__badge--collection_log {
+  background: color-mix(in srgb, var(--activity-collection-log) 16%, transparent);
+  color: var(--activity-collection-log);
 }
 
 .activity-feed-event__line {

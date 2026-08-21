@@ -2,10 +2,9 @@ use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, DialogueEvent, DiscordWebhookSettings,
-    GameEvent, GroupMember, GroupMemberPermissions, GroupPermissions, GroupSession,
-    GroupSkillData, MemberSkillData, ObjectInteractionEvent, PermissionFlags,
-    PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
+    AggregateSkillData, BlockedMember, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
+    GroupMemberPermissions, GroupPermissions, GroupSession, GroupSkillData, MemberSkillData,
+    PermissionFlags, PermissionFlagsPatch, PermissionKey, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -2301,7 +2300,10 @@ pub async fn update_character_display_rsn(
         ))
         .await?;
     let row = client
-        .query_one(&stmt, &[&display_rsn, &character_id, &combat_level, &total_level])
+        .query_one(
+            &stmt,
+            &[&display_rsn, &character_id, &combat_level, &total_level],
+        )
         .await
         .map_err(ApiError::GetCharacterError)?;
     character_from_row(row)
@@ -2309,10 +2311,7 @@ pub async fn update_character_display_rsn(
 
 /// Confirms a pending character (no-op'd to nothing if it's already confirmed or doesn't
 /// exist - the caller distinguishes those via `find_character_by_id`/ownership checks first).
-pub async fn confirm_character(
-    client: &Client,
-    character_id: i64,
-) -> Result<Character, ApiError> {
+pub async fn confirm_character(client: &Client, character_id: i64) -> Result<Character, ApiError> {
     let stmt = client
         .prepare_cached(&format!(
             "UPDATE groupscape.characters SET status='confirmed' WHERE character_id=$1 AND status='pending' RETURNING {CHARACTER_COLUMNS}"
@@ -3058,12 +3057,11 @@ pub async fn close_idle_sessions(
     Ok(rows_affected)
 }
 
-/// Shared insert behind [`insert_activity_event`]/[`insert_dialogue_event`]/
-/// [`insert_object_interaction_event`] - `groupscape.activity_events`' `(event_type, payload)`
-/// columns are already generic enough to hold any discrete event kind, so NPC
-/// dialogue/object-interaction events reuse this table and its `GET /get-activity-events`
-/// endpoint rather than getting a dedicated table.
-async fn insert_activity_event_payload(
+/// Shared insert behind [`insert_activity_event`]/[`insert_progress_event`] -
+/// `groupscape.activity_events`' `(event_type, payload)` columns are already generic enough to
+/// hold any discrete event kind, so the quest/diary/combat-task/collection-log milestones reuse
+/// this table and its `GET /get-activity-events` endpoint rather than getting a dedicated table.
+pub async fn insert_activity_event_payload(
     client: &Client,
     group_id: i64,
     session_id: i64,
@@ -3110,44 +3108,54 @@ pub async fn insert_activity_event(
     .await
 }
 
-/// Stores one NPC dialogue event from the plugin's "interactions" upload key.
-pub async fn insert_dialogue_event(
+/// Stores one milestone event derived by diffing a heartbeat against the member's stored
+/// progress columns (see [`crate::progress_events`]).
+pub async fn insert_progress_event(
     client: &Client,
     group_id: i64,
     session_id: i64,
     member_name: &str,
-    event: &DialogueEvent,
+    event: &crate::progress_events::ProgressEvent,
 ) -> Result<(), ApiError> {
-    let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
     insert_activity_event_payload(
         client,
         group_id,
         session_id,
         member_name,
-        "dialogue",
-        payload,
+        event.event_type,
+        event.payload.clone(),
     )
     .await
 }
 
-/// Stores one object-interaction event from the plugin's "object_interactions" upload key.
-pub async fn insert_object_interaction_event(
+/// The member's currently-stored progress columns, read before the batcher overwrites them so the
+/// update handler has an "old" side to diff against.
+///
+/// Returns `None` when the member row doesn't exist yet.
+pub async fn get_progress_snapshot(
     client: &Client,
     group_id: i64,
-    session_id: i64,
     member_name: &str,
-    event: &ObjectInteractionEvent,
-) -> Result<(), ApiError> {
-    let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
-    insert_activity_event_payload(
-        client,
-        group_id,
-        session_id,
-        member_name,
-        "object_interaction",
-        payload,
-    )
-    .await
+) -> Result<Option<crate::progress_events::ProgressSnapshot>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT quests, diary_vars, collection_log, combat_achievements \
+             FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::GetProgressSnapshotError)?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+    Ok(Some(crate::progress_events::ProgressSnapshot {
+        quests: row.try_get("quests").ok().flatten(),
+        diary_vars: row.try_get("diary_vars").ok().flatten(),
+        collection_log: row.try_get("collection_log").ok().flatten(),
+        combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+    }))
 }
 
 fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {
@@ -3178,6 +3186,7 @@ pub async fn list_activity_events(
 SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
+  AND event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log')
   AND ($2::text IS NULL OR member_name = $2)
   AND ($3::text IS NULL OR event_type = $3)
   AND ($4::timestamptz IS NULL OR occurred_at < $4)
@@ -3206,10 +3215,11 @@ LIMIT $5
     Ok(events.into_iter().filter(is_feed_worthy).collect())
 }
 
-/// Kill events are only feed-worthy when they're on a curated "notable" NPC (bosses/major quest
-/// bosses, see [`crate::notable_npcs`]) - the plugin reports every kill, not just boss ones, so
-/// without this the feed/toasts would be dominated by farming spam. All other event types
-/// (deaths included) always pass through.
+/// Second gate on top of the `event_type` allowlist in [`list_activity_events`]' SQL: kill events
+/// are only feed-worthy when they're on a curated "notable" NPC (bosses/major quest bosses, see
+/// [`crate::notable_npcs`]) - the plugin reports every kill, not just boss ones, so without this
+/// the feed/toasts would be dominated by farming spam. The other allowlisted types (death, quest,
+/// diary, combat_task, collection_log) are already milestone-scoped at insert time.
 fn is_feed_worthy(event: &ActivityEvent) -> bool {
     if event.event_type != "kill" {
         return true;
@@ -3576,7 +3586,10 @@ pub async fn admin_count_accounts(client: &Client) -> Result<i64, ApiError> {
 // needed. Only GP-earned needs new history, since bank *contents* aren't tracked anywhere else;
 // see `bank_value_snapshots` above.
 
-fn leaderboard_window_cutoff(window: crate::leaderboard::LeaderboardWindow, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+fn leaderboard_window_cutoff(
+    window: crate::leaderboard::LeaderboardWindow,
+    now: DateTime<Utc>,
+) -> Option<DateTime<Utc>> {
     use crate::leaderboard::LeaderboardWindow;
     match window {
         LeaderboardWindow::Daily => Some(now - chrono::Duration::days(1)),
@@ -3699,7 +3712,9 @@ async fn list_member_names(client: &Client, group_id: i64) -> Result<Vec<String>
         .query(&stmt, &[&group_id])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
-    rows.iter().map(|row| row.try_get("member_name").map_err(ApiError::from)).collect()
+    rows.iter()
+        .map(|row| row.try_get("member_name").map_err(ApiError::from))
+        .collect()
 }
 
 /// Cumulative per-member boss-kill counts (all bosses, or one `boss` filter) over the window,
@@ -3711,7 +3726,8 @@ pub async fn get_boss_kc_leaderboard(
     boss: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<(Vec<(String, i64)>, Vec<String>), ApiError> {
-    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+    let events =
+        list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
 
     let mut counts: HashMap<String, i64> = list_member_names(client, group_id)
         .await?
@@ -3745,7 +3761,8 @@ pub async fn get_loot_value_leaderboard(
     now: DateTime<Utc>,
     ge_prices: &crate::models::GEPrices,
 ) -> Result<Vec<(String, i64)>, ApiError> {
-    let events = list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+    let events =
+        list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
 
     let mut totals: HashMap<String, i64> = list_member_names(client, group_id)
         .await?

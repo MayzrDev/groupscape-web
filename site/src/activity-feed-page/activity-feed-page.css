@@ -94,14 +94,24 @@ activity-feed-page {
   opacity: 1;
 }
 
-.activity-feed-page__type-chip--dialogue.activity-feed-page__type-chip--active {
-  border-color: #4d9fff;
-  color: #4d9fff;
+.activity-feed-page__type-chip--quest.activity-feed-page__type-chip--active {
+  border-color: var(--activity-quest);
+  color: var(--activity-quest);
 }
 
-.activity-feed-page__type-chip--object_interaction.activity-feed-page__type-chip--active {
-  border-color: #b58cff;
-  color: #b58cff;
+.activity-feed-page__type-chip--diary.activity-feed-page__type-chip--active {
+  border-color: var(--activity-diary);
+  color: var(--activity-diary);
+}
+
+.activity-feed-page__type-chip--combat_task.activity-feed-page__type-chip--active {
+  border-color: var(--activity-combat-task);
+  color: var(--activity-combat-task);
+}
+
+.activity-feed-page__type-chip--collection_log.activity-feed-page__type-chip--active {
+  border-color: var(--activity-collection-log);
+  color: var(--activity-collection-log);
 }
 
 .activity-feed-page__list {

@@ -39,6 +39,22 @@ class CombatAchievement {
     if (this.catalog) return;
     const response = await fetch("/data/combat_achievement_tasks.json");
     this.catalog = await response.json();
+    this.taskLookup = undefined;
+  }
+
+  // The catalog is keyed by tier, but persisted `combat_task` activity events only carry a task
+  // id, so flatten it once (~1500 tasks) and cache the id -> { name, tier, tierLabel } lookup.
+  taskById(taskId) {
+    if (!this.catalog) return null;
+    if (!this.taskLookup) {
+      this.taskLookup = new Map();
+      for (const [tierKey] of COMBAT_ACHIEVEMENT_TIERS) {
+        for (const task of this.tasksForTier(tierKey)) {
+          this.taskLookup.set(task.id, { ...task, tier: tierKey, tierLabel: this.tierLabel(tierKey) });
+        }
+      }
+    }
+    return this.taskLookup.get(Number(taskId)) || null;
   }
 
   tasksForTier(tierKey) {

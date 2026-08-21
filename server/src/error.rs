@@ -102,6 +102,8 @@ pub enum ApiError {
     #[from(ignore)]
     ListActivityEventsError(tokio_postgres::error::Error),
     #[from(ignore)]
+    GetProgressSnapshotError(tokio_postgres::error::Error),
+    #[from(ignore)]
     ListSessionsError(tokio_postgres::error::Error),
     #[from(ignore)]
     ListKillEventsError(tokio_postgres::error::Error),
@@ -265,6 +267,9 @@ impl ResponseError for ApiError {
             ApiError::ListActivityEventsError(ref err) => {
                 handle_pg_error(err, "ListActivityEventsError")
             }
+            ApiError::GetProgressSnapshotError(ref err) => {
+                handle_pg_error(err, "GetProgressSnapshotError")
+            }
             ApiError::ListSessionsError(ref err) => handle_pg_error(err, "ListSessionsError"),
             ApiError::ListKillEventsError(ref err) => handle_pg_error(err, "ListKillEventsError"),
             ApiError::CannotModifyGroupAdminPermissionsError => HttpResponse::Conflict()
@@ -292,9 +297,8 @@ impl ResponseError for ApiError {
             ApiError::UpdateDiscordWebhookSettingsError(ref err) => {
                 handle_pg_error(err, "UpdateDiscordWebhookSettingsError")
             }
-            ApiError::DiscordWebhookInvalidError(ref reason) => {
-                HttpResponse::BadRequest().body(format!("Discord webhook URL is invalid: {}", reason))
-            }
+            ApiError::DiscordWebhookInvalidError(ref reason) => HttpResponse::BadRequest()
+                .body(format!("Discord webhook URL is invalid: {}", reason)),
             ApiError::CaptureLeaderboardSnapshotsError(ref err) => {
                 handle_pg_error(err, "CaptureLeaderboardSnapshotsError")
             }

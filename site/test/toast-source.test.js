@@ -49,6 +49,26 @@ describe("toast-source", () => {
     expect(toastSource.lastEventId).toBe(2);
   });
 
+  it("routes combat_task events onto the existing combat-achievement toast type", async () => {
+    api.getActivityEvents.mockResolvedValue([{ id: 1, event_type: "kill", member_name: "Alice", payload: {} }]);
+    toastSource.enabled = true;
+    await toastSource.poll();
+
+    api.getActivityEvents.mockResolvedValue([
+      { id: 1, event_type: "kill", member_name: "Alice", payload: {} },
+      { id: 2, event_type: "combat_task", member_name: "Bob", payload: { task_id: 300 } },
+      { id: 3, event_type: "diary", member_name: "Cara", payload: { region: "Kandarin", tier: "Elite" } },
+      { id: 4, event_type: "collection_log", member_name: "Dee", payload: { kind: "page", page: "Zulrah" } },
+    ]);
+    const published = [];
+    pubsub.subscribe("toast", (toast) => published.push(toast), false);
+
+    await toastSource.poll();
+
+    expect(published.map((toast) => toast.type)).toEqual(["combat-achievement", "diary", "collection_log"]);
+    expect(published[0].event.event_type).toBe("combat_task");
+  });
+
   it("does nothing once disabled", async () => {
     toastSource.enabled = false;
     await toastSource.poll();

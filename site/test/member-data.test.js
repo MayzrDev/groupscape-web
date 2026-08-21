@@ -177,90 +177,38 @@ describe("member-data", () => {
     expect(member.totalItemQuantity(4151)).toBe(2);
   });
 
-  it("does not publish toasts from a member's first update", () => {
+  // Milestone toasts (quest/diary/combat task/collection log) are persisted server-side and
+  // arrive through `toast-source.js`'s poll, so member-data no longer publishes any toast of its
+  // own - level-ups are out of the feed's approved scope entirely.
+  it("does not publish toasts for skill, quest or combat-achievement progress", () => {
+    Quest.questData = { 1: { name: "Cook's Assistant" } };
     const member = new MemberData("Alice");
+    member.update({
+      skills: skillsPayload({ Attack: 0 }),
+      quests: { 1: "IN_PROGRESS" },
+      combat_achievements: { tiers: { easy: false }, tasks: {} },
+    });
     pubsub.unpublish("toast");
 
     member.update({
       skills: skillsPayload({ Attack: 100 }),
       quests: { 1: "FINISHED" },
-      combat_achievements: { tiers: { easy: true }, tasks: {} },
+      combat_achievements: { tiers: { easy: true }, tasks: { 1: true } },
     });
 
     expect(pubsub.getMostRecent("toast")).toBeUndefined();
   });
 
-  it("publishes a level-up toast when a skill's level increases", () => {
+  it("still publishes xp drops when a skill gains xp", () => {
     const member = new MemberData("Alice");
     member.update({ skills: skillsPayload({ Attack: 0 }) });
-    pubsub.unpublish("toast");
+    pubsub.unpublish("xp:Alice");
 
     member.update({ skills: skillsPayload({ Attack: 100 }) });
 
-    const [toast] = pubsub.getMostRecent("toast");
-    expect(toast.type).toBe("level-up");
-    expect(toast.memberName).toBe("Alice");
-    expect(toast.skillName).toBe("Attack");
-    expect(toast.level).toBeGreaterThan(1);
-  });
-
-  it("does not publish a level-up toast when a skill's level is unchanged", () => {
-    const member = new MemberData("Alice");
-    member.update({ skills: skillsPayload({ Attack: 50 }) });
-    pubsub.unpublish("toast");
-
-    member.update({ skills: skillsPayload({ Attack: 51 }) });
-
-    expect(pubsub.getMostRecent("toast")).toBeUndefined();
-  });
-
-  it("publishes a quest toast when a quest transitions to FINISHED", () => {
-    Quest.questData = { 1: { name: "Cook's Assistant" } };
-    const member = new MemberData("Alice");
-    member.update({ quests: { 1: "IN_PROGRESS" } });
-    pubsub.unpublish("toast");
-
-    member.update({ quests: { 1: "FINISHED" } });
-
-    const [toast] = pubsub.getMostRecent("toast");
-    expect(toast.type).toBe("quest");
-    expect(toast.memberName).toBe("Alice");
-    expect(toast.questName).toBe("Cook's Assistant");
-  });
-
-  it("does not publish a quest toast when an already-finished quest is resent", () => {
-    Quest.questData = { 1: { name: "Cook's Assistant" } };
-    const member = new MemberData("Alice");
-    member.update({ quests: { 1: "FINISHED" } });
-    pubsub.unpublish("toast");
-
-    member.update({ quests: { 1: "FINISHED" } });
-
-    expect(pubsub.getMostRecent("toast")).toBeUndefined();
-  });
-
-  it("publishes a combat-achievement toast when a tier newly completes", () => {
-    const member = new MemberData("Alice");
-    member.update({ combat_achievements: { tiers: { easy: false }, tasks: {} } });
-    pubsub.unpublish("toast");
-
-    member.update({ combat_achievements: { tiers: { easy: true }, tasks: {} } });
-
-    const [toast] = pubsub.getMostRecent("toast");
-    expect(toast.type).toBe("combat-achievement");
-    expect(toast.memberName).toBe("Alice");
-    expect(toast.tierKey).toBe("easy");
-    expect(toast.tierLabel).toBe("Easy");
-  });
-
-  it("does not publish a combat-achievement toast when an already-complete tier is resent", () => {
-    const member = new MemberData("Alice");
-    member.update({ combat_achievements: { tiers: { easy: true }, tasks: {} } });
-    pubsub.unpublish("toast");
-
-    member.update({ combat_achievements: { tiers: { easy: true }, tasks: {} } });
-
-    expect(pubsub.getMostRecent("toast")).toBeUndefined();
+    const [xpDrops] = pubsub.getMostRecent("xp:Alice");
+    expect(xpDrops).toHaveLength(1);
+    expect(xpDrops[0].name).toBe("Attack");
   });
 
   afterEach(() => {

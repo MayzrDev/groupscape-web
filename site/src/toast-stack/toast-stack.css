@@ -63,15 +63,20 @@ toast-stack {
 }
 
 .toast-stack__toast--quest {
-  --toast-color: #c9962b;
+  --toast-color: var(--activity-quest);
 }
 
+.toast-stack__toast--diary {
+  --toast-color: var(--activity-diary);
+}
+
+/* Individual combat-achievement task completions reuse this key/colour (see `toast-source.js`). */
 .toast-stack__toast--combat-achievement {
-  --toast-color: #c084fc;
+  --toast-color: var(--activity-combat-task);
 }
 
-.toast-stack__toast--level-up {
-  --toast-color: var(--orange);
+.toast-stack__toast--collection_log {
+  --toast-color: var(--activity-collection-log);
 }
 
 .toast-stack__icon {

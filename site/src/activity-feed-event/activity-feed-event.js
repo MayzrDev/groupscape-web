@@ -1,4 +1,5 @@
 import { BaseElement } from "../base-element/base-element";
+import { activityBadgeLabel, activityEventDescription } from "../data/activity-event-copy";
 
 const RELATIVE_UNITS = [
   ["y", 31536000],
@@ -45,56 +46,22 @@ export class ActivityFeedEvent extends BaseElement {
     return formatRelativeTime(this.occurredAt);
   }
 
-  get isKill() {
-    return this.event.event_type === "kill";
-  }
-
-  get isDeath() {
-    return this.event.event_type === "death";
-  }
-
-  get isDialogue() {
-    return this.event.event_type === "dialogue";
-  }
-
-  get isObjectInteraction() {
-    return this.event.event_type === "object_interaction";
-  }
-
   get loot() {
     return this.event.payload?.loot || [];
   }
 
   get badgeLabel() {
-    if (this.isKill) return "Kill";
-    if (this.isDeath) return "Death";
-    if (this.isDialogue) return "Dialogue";
-    if (this.isObjectInteraction) return "Interaction";
-    return this.event.event_type;
+    return activityBadgeLabel(this.event.event_type);
   }
 
   descriptionHtml() {
-    const member = `<span class="activity-feed-event__member">${this.event.member_name}</span>`;
-    if (this.isKill) {
-      const npc = `<span class="activity-feed-event__subject">${this.event.payload.npcName}</span>`;
-      return `${member} killed ${npc}${this.loot.length === 0 ? " — no loot" : ""}`;
-    }
-    if (this.isDeath) {
-      const killerName = this.event.payload?.killerName;
-      return killerName
-        ? `${member} died to <span class="activity-feed-event__subject activity-feed-event__subject--death">${killerName}</span>`
-        : `${member} died`;
-    }
-    if (this.isDialogue) {
-      const npc = `<span class="activity-feed-event__subject">${this.event.payload.npcName}</span>`;
-      return `${member} talked to ${npc}`;
-    }
-    if (this.isObjectInteraction) {
-      const objectName = this.event.payload?.objectName;
-      const object = `<span class="activity-feed-event__subject">${objectName || "an object"}</span>`;
-      return `${member} used ${object}`;
-    }
-    return `${member} — ${this.event.event_type}`;
+    return activityEventDescription(this.event, {
+      member: (name) => `<span class="activity-feed-event__member">${name}</span>`,
+      subject: (text, variant) =>
+        `<span class="activity-feed-event__subject${
+          variant === "death" ? " activity-feed-event__subject--death" : ""
+        }">${text}</span>`,
+    });
   }
 }
 

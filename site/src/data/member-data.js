@@ -4,7 +4,6 @@ import { Skill, SkillName } from "./skill";
 import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { AchievementDiary } from "./diaries";
-import { COMBAT_ACHIEVEMENT_TIERS } from "./combat-achievement";
 
 const playerColors = [
   "hsl(41, 100%, 40%)", // yellow
@@ -127,16 +126,14 @@ export class MemberData {
 
   update(memberData) {
     let updatedAttributes = new Set();
-    const previousQuests = this.quests;
-    const previousCombatAchievements = this.combatAchievements;
 
     for (const field of parsedFieldMappings) {
       this.applyParsedFieldUpdate(memberData, field, updatedAttributes);
     }
 
-    if (memberData.quests) this.computeQuestCompletions(previousQuests);
-    if (memberData.combat_achievements) this.computeCombatAchievementTierCompletions(previousCombatAchievements);
-
+    // Quest/diary/combat-task/collection-log milestone toasts are no longer diffed locally -
+    // the server persists them as activity events and `data/toast-source.js` polls them, so
+    // doing it here too would fire every toast twice.
     if (memberData.last_updated) {
       this.lastUpdated = new Date(memberData.last_updated);
       const timeSinceLastUpdated = utility.timeSinceLastUpdate(memberData.last_updated);
@@ -256,51 +253,10 @@ export class MemberData {
       const xpDiff = this.skills[skillName].xp - previousSkills[skillName].xp;
       if (xpDiff > 0 && skillName !== "Overall") xpDrops.push(new Skill(skillName, xpDiff));
       if (xpDiff !== 0) pubsub.publish(`${skillName}:${this.name}`, this.skills[skillName]);
-
-      if (skillName !== SkillName.Overall && this.skills[skillName].level > previousSkills[skillName].level) {
-        pubsub.publish("toast", {
-          type: "level-up",
-          memberName: this.name,
-          skillName,
-          level: this.skills[skillName].level,
-        });
-      }
     }
 
     if (xpDrops.length > 0) {
       pubsub.publish(`xp:${this.name}`, xpDrops);
-    }
-  }
-
-  computeQuestCompletions(previousQuests) {
-    if (!previousQuests) return;
-
-    for (const [questId, quest] of Object.entries(this.quests)) {
-      if (quest.state !== QuestState.FINISHED) continue;
-      if (previousQuests[questId]?.state === QuestState.FINISHED) continue;
-
-      pubsub.publish("toast", {
-        type: "quest",
-        memberName: this.name,
-        questName: quest.name,
-      });
-    }
-  }
-
-  computeCombatAchievementTierCompletions(previousCombatAchievements) {
-    if (!previousCombatAchievements) return;
-
-    for (const [tierKey, tierLabel] of COMBAT_ACHIEVEMENT_TIERS) {
-      const wasComplete = !!previousCombatAchievements.tiers?.[tierKey];
-      const isComplete = !!this.combatAchievements.tiers?.[tierKey];
-      if (isComplete && !wasComplete) {
-        pubsub.publish("toast", {
-          type: "combat-achievement",
-          memberName: this.name,
-          tierKey,
-          tierLabel,
-        });
-      }
     }
   }
 

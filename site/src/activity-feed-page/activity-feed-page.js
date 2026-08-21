@@ -7,8 +7,10 @@ const EVENT_TYPES = [
   [null, "All"],
   ["kill", "Kills"],
   ["death", "Deaths"],
-  ["dialogue", "Dialogue"],
-  ["object_interaction", "Interactions"],
+  ["quest", "Quests"],
+  ["diary", "Diaries"],
+  ["combat_task", "Combat tasks"],
+  ["collection_log", "Collection log"],
 ];
 
 const FETCH_LIMIT = 100;

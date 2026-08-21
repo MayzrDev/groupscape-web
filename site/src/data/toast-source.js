@@ -5,6 +5,17 @@ import { utility } from "../utility";
 const POLL_INTERVAL_MS = 15000;
 const FETCH_LIMIT = 20;
 
+// The server persists individual combat-achievement task completions under the `combat_task`
+// event type, but the toast styling/icon for them has always lived under the `combat-achievement`
+// key. Reuse it rather than defining a second purple.
+const TOAST_TYPE_BY_EVENT_TYPE = {
+  combat_task: "combat-achievement",
+};
+
+function toastTypeFor(eventType) {
+  return TOAST_TYPE_BY_EVENT_TYPE[eventType] || eventType;
+}
+
 class ToastSource {
   constructor() {
     this.enabled = false;
@@ -40,7 +51,7 @@ class ToastSource {
     this.sawFirstPoll = true;
 
     for (const event of newEvents) {
-      pubsub.publish("toast", { type: event.event_type, event });
+      pubsub.publish("toast", { type: toastTypeFor(event.event_type), event });
     }
   }
 }

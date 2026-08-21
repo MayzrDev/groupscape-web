@@ -6,14 +6,15 @@ use crate::db;
 use crate::discord;
 use crate::drop_rates;
 use crate::error::ApiError;
+use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupSession,
     GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult, LootSummaryRow,
     PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest, SHARED_MEMBER,
 };
-use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::permissions::{require_group_permission, ACCOUNT_AUTH_HEADER};
+use crate::progress_events;
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
@@ -313,7 +314,11 @@ pub async fn update_group_member(
     // Also resolves the account a low-HP/wilderness alert (below) should push to - a character
     // can carry alerts once linked to an account even before it's linked to this specific group.
     let mut linked_account_id: Option<i64> = None;
-    if let Some(account_hash) = auth.account_hash.clone().or_else(|| group_member_inner.account_hash.clone()) {
+    if let Some(account_hash) = auth
+        .account_hash
+        .clone()
+        .or_else(|| group_member_inner.account_hash.clone())
+    {
         let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
         if let Some(character) = db::find_character_by_account_hash(&client, &account_hash).await? {
             linked_account_id = Some(character.account_id);
@@ -452,38 +457,41 @@ pub async fn update_group_member(
         }
     }
 
-    // NPC dialogue/object-interaction events ride the same heartbeat under their own
-    // "interactions"/"object_interactions" keys (see `DialogueEvent`/`ObjectInteractionEvent`),
-    // stored into the same generic `activity_events` table as kill/death.
-    if let Some(interactions) = group_member_inner.interactions.take() {
-        if !interactions.is_empty() {
-            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-            let session_id = db::ensure_open_session(&client, auth.group_id).await?;
-            for event in &interactions {
-                db::insert_dialogue_event(
-                    &client,
-                    auth.group_id,
-                    session_id,
-                    &group_member_inner.name,
-                    event,
-                )
-                .await?;
-            }
-        }
-    }
-    if let Some(object_interactions) = group_member_inner.object_interactions.take() {
-        if !object_interactions.is_empty() {
-            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-            let session_id = db::ensure_open_session(&client, auth.group_id).await?;
-            for event in &object_interactions {
-                db::insert_object_interaction_event(
-                    &client,
-                    auth.group_id,
-                    session_id,
-                    &group_member_inner.name,
-                    event,
-                )
-                .await?;
+    // NPC dialogue/object-interaction events still ride the heartbeat under their own
+    // "interactions"/"object_interactions" keys, but they're no longer feed material - the
+    // activity feed is scoped to milestones only. They're still `.take()`n so the batcher's
+    // `GroupMember` merge/dedupe logic doesn't have to carry fields it has no notion of.
+    group_member_inner.interactions.take();
+    group_member_inner.object_interactions.take();
+
+    // Quest/diary/combat-task/collection-log milestones aren't discrete plugin events - they're
+    // transitions in the full-snapshot progress columns, so they have to be diffed against the
+    // stored row *before* the batcher overwrites it. The batcher can't do this itself: it only
+    // does latest-value-wins upserts and never reads the old row.
+    //
+    // Accepted race: the batcher's write can lag this SELECT by up to its flush interval (~50ms),
+    // so two heartbeats landing inside that window could diff against the same stale row and
+    // double-fire a milestone. Heartbeat cadence is ~1s+, so this is rare enough not to be worth
+    // locking/dedup machinery (same tolerance as the non-idempotent deposit retry noted in
+    // `update_batcher.rs`).
+    {
+        let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+        if let Some(previous) =
+            db::get_progress_snapshot(&client, auth.group_id, &group_member_inner.name).await?
+        {
+            let progress_events = progress_events::diff_progress(&previous, &group_member_inner);
+            if !progress_events.is_empty() {
+                let session_id = db::ensure_open_session(&client, auth.group_id).await?;
+                for event in &progress_events {
+                    db::insert_progress_event(
+                        &client,
+                        auth.group_id,
+                        session_id,
+                        &group_member_inner.name,
+                        event,
+                    )
+                    .await?;
+                }
             }
         }
     }
@@ -811,16 +819,26 @@ pub async fn get_leaderboard(
         }
         LeaderboardMetric::GpEarned => {
             let ge_prices = get_ge_prices_map();
-            let raw =
-                db::get_gp_earned_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
-                    .await?;
+            let raw = db::get_gp_earned_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                now,
+                &ge_prices,
+            )
+            .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
         LeaderboardMetric::LootValue => {
             let ge_prices = get_ge_prices_map();
-            let raw =
-                db::get_loot_value_leaderboard(&client, auth.group_id, query.window, now, &ge_prices)
-                    .await?;
+            let raw = db::get_loot_value_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                now,
+                &ge_prices,
+            )
+            .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
     };

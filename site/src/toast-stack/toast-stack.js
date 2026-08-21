@@ -1,4 +1,5 @@
 import { BaseElement } from "../base-element/base-element";
+import { activityEventDescription, activityMetaLabel } from "../data/activity-event-copy";
 
 const TOAST_DURATION_MS = 7000;
 const LEAVE_ANIMATION_MS = 350;
@@ -7,8 +8,9 @@ const TOAST_ICONS = {
   kill: "⚔",
   death: "☠",
   quest: "✓",
+  diary: "⛰",
   "combat-achievement": "✦",
-  "level-up": "↑",
+  collection_log: "❖",
 };
 
 export class ToastStack extends BaseElement {
@@ -55,38 +57,16 @@ export class ToastStack extends BaseElement {
     return `<span class="toast-stack__subject">${name}</span>`;
   }
 
-  // Phrasing convention for group-milestone copy across this app: "<member> <verb> <subject>"
-  // (e.g. "Bandos killed Vorkath", "Zezima finished Monkey Madness II", "Woox reached level 90
-  // Slayer") - plain past-tense sentences naming the actual boss/quest/tier/skill, not a generic
-  // "New activity" label. Discord webhook payloads (#35) and low-HP/wilderness alerts (#37-39)
-  // should read the same way.
+  // Copy is shared with the activity feed (see `data/activity-event-copy.js`) - the toast just
+  // highlights the member name instead of the subject.
   titleHtml(toast) {
-    switch (toast.type) {
-      case "kill": {
-        const npc = toast.event.payload?.npc_name || "an NPC";
-        const noLoot = !toast.event.payload?.loot || toast.event.payload.loot.length === 0;
-        return `${this.subject(toast.event.member_name)} killed ${npc}${noLoot ? " — no loot" : ""}`;
-      }
-      case "death": {
-        const killer = toast.event.payload?.killer_name;
-        return killer
-          ? `${this.subject(toast.event.member_name)} died to ${killer}`
-          : `${this.subject(toast.event.member_name)} died`;
-      }
-      case "quest":
-        return `${this.subject(toast.memberName)} finished ${toast.questName}`;
-      case "combat-achievement":
-        return `${this.subject(toast.memberName)} completed ${toast.tierLabel} tier`;
-      case "level-up":
-        return `${this.subject(toast.memberName)} reached level ${toast.level} ${toast.skillName}`;
-      default:
-        return this.subject(toast.memberName || toast.event?.member_name || "");
-    }
+    if (!toast.event) return this.subject(toast.memberName || "");
+    return activityEventDescription(toast.event, { member: (name) => this.subject(name) });
   }
 
   metaHtml(toast) {
-    if (toast.type === "combat-achievement") return "Combat Achievements";
-    return "";
+    if (!toast.event) return "";
+    return activityMetaLabel(toast.event);
   }
 }
 

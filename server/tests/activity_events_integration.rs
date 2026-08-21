@@ -5,10 +5,8 @@ use tokio_postgres::NoTls;
 
 use server::config::Config;
 use server::db;
-use server::models::{
-    DeathEvent, DialogueEvent, DiscordWebhookSettings, GameEvent, KillEvent, LootItem,
-    ObjectInteractionEvent,
-};
+use server::models::{DeathEvent, DiscordWebhookSettings, GameEvent, KillEvent, LootItem};
+use server::progress_events::ProgressEvent;
 
 /// Serializes integration tests since they all share the same database
 /// and each test drops/recreates the schema.
@@ -114,12 +112,19 @@ async fn test_ensure_open_session_is_idempotent_and_atomic() {
     let second = db::ensure_open_session(&client, group_id)
         .await
         .expect("second ensure should succeed");
-    assert_eq!(first, second, "heartbeats within the same window reuse the open session");
+    assert_eq!(
+        first, second,
+        "heartbeats within the same window reuse the open session"
+    );
 
     let sessions = db::list_sessions(&client, group_id, 10)
         .await
         .expect("query failed");
-    assert_eq!(sessions.len(), 1, "only one open session should exist per group");
+    assert_eq!(
+        sessions.len(),
+        1,
+        "only one open session should exist per group"
+    );
     assert!(sessions[0].ended_at.is_none());
 }
 
@@ -162,10 +167,16 @@ async fn test_close_idle_sessions_closes_only_past_the_cutoff() {
     assert_eq!(closed, 1);
 
     let fresh_sessions = db::list_sessions(&client, fresh_group, 10).await.unwrap();
-    assert!(fresh_sessions[0].ended_at.is_none(), "fresh session should stay open");
+    assert!(
+        fresh_sessions[0].ended_at.is_none(),
+        "fresh session should stay open"
+    );
 
     let stale_sessions = db::list_sessions(&client, stale_group, 10).await.unwrap();
-    assert!(stale_sessions[0].ended_at.is_some(), "stale session should be closed");
+    assert!(
+        stale_sessions[0].ended_at.is_some(),
+        "stale session should be closed"
+    );
 
     // A heartbeat after close opens a brand new session rather than reusing the closed one.
     let reopened = db::ensure_open_session(&client, stale_group).await.unwrap();
@@ -314,9 +325,15 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
     db::insert_activity_event(&client, group_id, session_id, "Zezima", &boss_kill)
         .await
         .unwrap();
-    db::insert_activity_event(&client, group_id, session_id, "Zezima", &death_by_ordinary_npc)
-        .await
-        .unwrap();
+    db::insert_activity_event(
+        &client,
+        group_id,
+        session_id,
+        "Zezima",
+        &death_by_ordinary_npc,
+    )
+    .await
+    .unwrap();
 
     let events = db::list_activity_events(&client, group_id, None, None, None, 30)
         .await
@@ -333,7 +350,7 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
 }
 
 #[tokio::test]
-async fn test_insert_dialogue_event_round_trips() {
+async fn test_progress_events_round_trip() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
@@ -341,31 +358,47 @@ async fn test_insert_dialogue_event_round_trips() {
     let group_id = create_test_group(&client, "activitytest5").await;
     let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
 
-    let dialogue = DialogueEvent {
-        event_type: "dialogue".to_string(),
-        npc_id: 941,
-        npc_name: "Hans".to_string(),
-        combat_level: 0,
-        world_x: 3222,
-        world_y: 3218,
-        plane: 0,
-        world: 301,
-    };
-    db::insert_dialogue_event(&client, group_id, session_id, "Zezima", &dialogue)
-        .await
-        .expect("insert should succeed");
+    let milestones = [
+        ProgressEvent {
+            event_type: "quest",
+            payload: serde_json::json!({ "quest_id": 12 }),
+        },
+        ProgressEvent {
+            event_type: "diary",
+            payload: serde_json::json!({ "region": "Kandarin", "tier": "Elite" }),
+        },
+        ProgressEvent {
+            event_type: "combat_task",
+            payload: serde_json::json!({ "task_id": 300 }),
+        },
+        ProgressEvent {
+            event_type: "collection_log",
+            payload: serde_json::json!({ "kind": "page", "page": "Abyssal Sire" }),
+        },
+    ];
+    for event in &milestones {
+        db::insert_progress_event(&client, group_id, session_id, "Zezima", event)
+            .await
+            .expect("insert should succeed");
+    }
 
     let events = db::list_activity_events(&client, group_id, None, None, None, 30)
         .await
         .unwrap();
-    assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_type, "dialogue");
-    assert_eq!(events[0].member_name, "Zezima");
-    assert_eq!(events[0].payload["npcName"], serde_json::json!("Hans"));
+    assert_eq!(events.len(), 4);
+    assert!(events.iter().all(|e| e.member_name == "Zezima"));
+    assert!(events
+        .iter()
+        .any(|e| e.event_type == "diary" && e.payload["region"] == serde_json::json!("Kandarin")));
+    assert!(events.iter().any(
+        |e| e.event_type == "collection_log" && e.payload["kind"] == serde_json::json!("page")
+    ));
 }
 
+/// Rows written before the feed was scoped down to milestones (NPC dialogue, object
+/// interactions) must stop surfacing, not just stop being written.
 #[tokio::test]
-async fn test_insert_object_interaction_event_round_trips() {
+async fn test_out_of_scope_event_types_are_excluded_from_the_feed() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
@@ -373,25 +406,27 @@ async fn test_insert_object_interaction_event_round_trips() {
     let group_id = create_test_group(&client, "activitytest6").await;
     let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
 
-    let object_interaction = ObjectInteractionEvent {
-        object_id: 409,
-        object_name: Some("Bank booth".to_string()),
-        action: Some("Bank".to_string()),
-        world_x: 3185,
-        world_y: 3437,
-        plane: 0,
-        world: 301,
-    };
-    db::insert_object_interaction_event(&client, group_id, session_id, "Zezima", &object_interaction)
+    for event_type in ["dialogue", "object_interaction"] {
+        db::insert_activity_event_payload(
+            &client,
+            group_id,
+            session_id,
+            "Zezima",
+            event_type,
+            serde_json::json!({ "npcName": "Hans" }),
+        )
         .await
         .expect("insert should succeed");
+    }
+    db::insert_activity_event(&client, group_id, session_id, "Zezima", &sample_kill())
+        .await
+        .unwrap();
 
     let events = db::list_activity_events(&client, group_id, None, None, None, 30)
         .await
         .unwrap();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].event_type, "object_interaction");
-    assert_eq!(events[0].payload["objectName"], serde_json::json!("Bank booth"));
+    assert_eq!(events[0].event_type, "kill");
 }
 
 #[tokio::test]
@@ -503,5 +538,8 @@ async fn test_discord_webhook_settings_scoped_per_group() {
     let settings_b = db::get_discord_webhook_settings(&client, group_b)
         .await
         .unwrap();
-    assert_eq!(settings_b.webhook_url, None, "group b's settings must be unaffected");
+    assert_eq!(
+        settings_b.webhook_url, None,
+        "group b's settings must be unaffected"
+    );
 }
