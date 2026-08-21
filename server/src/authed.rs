@@ -848,6 +848,20 @@ pub async fn am_i_in_group(
     Ok(HttpResponse::Ok().finish())
 }
 
+/// Character-scoped counterpart to `am_i_in_group`, mounted on `/api/characters/{account_hash}`
+/// instead of `/api/group/{group_name}`. The group-token version above has to check `members`
+/// for the *named* row because any client holding the group token can ask about any member
+/// name - that's the whole point of the check there. Here, `grouped_character_middleware`
+/// already 403s unless this character is linked to a group, so reaching this handler at all is
+/// the answer. Checking `members` again would recreate the same bootstrap deadlock the plugin
+/// used to hit: a character's `members` row is only ever created as a side effect of its first
+/// successful `update-group-member` call, but the plugin gates that very first call behind this
+/// endpoint returning success - so a freshly linked character could never pass the check that
+/// was supposed to let it start sending the update that creates the row.
+pub async fn am_i_in_group_for_character(_auth: Authenticated) -> Result<HttpResponse, Error> {
+    Ok(HttpResponse::Ok().finish())
+}
+
 pub async fn get_collection_log() -> Result<web::Json<HashMap<String, Vec<i32>>>, Error> {
     Ok(web::Json(HashMap::new()))
 }

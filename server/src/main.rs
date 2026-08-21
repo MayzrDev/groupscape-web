@@ -226,7 +226,7 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::resource("/am-i-in-group")
                     .wrap(grouped_character_middleware())
-                    .route(web::get().to(authed::am_i_in_group)),
+                    .route(web::get().to(authed::am_i_in_group_for_character)),
             )
             .service(
                 web::resource("/get-skill-data")
