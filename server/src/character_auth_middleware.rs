@@ -311,6 +311,7 @@ where
             if requires_group {
                 let authentication_result = AuthenticationResult {
                     group_id: resolved.group_id.expect("checked above"),
+                    account_hash: Some(account_hash.clone()),
                 };
                 req.extensions_mut()
                     .insert::<Rc<AuthenticationResult>>(Rc::new(authentication_result));

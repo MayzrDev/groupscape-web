@@ -301,15 +301,19 @@ pub async fn update_group_member(
     let mut group_member_inner: GroupMember = group_member.into_inner();
     group_member_inner.group_id = Some(auth.group_id);
 
-    // Derive the canonical member name from the plugin-submitted account_hash rather than
-    // trusting the client-supplied name, when the character is linked (account created,
-    // character linked, and linked to this specific group). Legacy plugin builds and
-    // characters that aren't linked yet fall back to matching an existing member row by name,
-    // so group setup can still take a typed RSN in the meantime.
+    // Derive the canonical member name from the account_hash rather than trusting the
+    // client-supplied name, when the character is linked (account created, character linked, and
+    // linked to this specific group). Prefer the server-resolved account_hash from the
+    // character-key auth middleware (`auth.account_hash`) over the client-supplied JSON field -
+    // the plugin's real payloads never populate the latter (it only ever sends account_hash in
+    // the URL, not the body), so relying on the JSON field left every member row's account_hash
+    // permanently NULL and broke anything keyed off it (e.g. the group panel's portrait lookup).
+    // Legacy plugin builds and characters that aren't linked yet fall back to matching an
+    // existing member row by name, so group setup can still take a typed RSN in the meantime.
     // Also resolves the account a low-HP/wilderness alert (below) should push to - a character
     // can carry alerts once linked to an account even before it's linked to this specific group.
     let mut linked_account_id: Option<i64> = None;
-    if let Some(account_hash) = group_member_inner.account_hash.clone() {
+    if let Some(account_hash) = auth.account_hash.clone().or_else(|| group_member_inner.account_hash.clone()) {
         let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
         if let Some(character) = db::find_character_by_account_hash(&client, &account_hash).await? {
             linked_account_id = Some(character.account_id);

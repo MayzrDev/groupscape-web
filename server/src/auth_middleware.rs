@@ -123,6 +123,11 @@ where
 
 pub struct AuthenticationResult {
     pub group_id: i64,
+    /// `Some` only when this request came in through the character-key scope
+    /// (`CharacterAuthenticateMiddleware`), which resolves the account_hash server-side from the
+    /// URL + API key. `None` for the group-token dashboard scope, which has no notion of an
+    /// individual account.
+    pub account_hash: Option<String>,
 }
 type AuthenticationInfo = Rc<AuthenticationResult>;
 pub struct Authenticated(AuthenticationInfo);
@@ -284,7 +289,10 @@ where
                     },
                 };
 
-                let authentication_result = AuthenticationResult { group_id };
+                let authentication_result = AuthenticationResult {
+                    group_id,
+                    account_hash: None,
+                };
                 req.extensions_mut()
                     .insert::<AuthenticationInfo>(Rc::new(authentication_result));
             }

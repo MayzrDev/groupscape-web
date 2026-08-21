@@ -534,6 +534,12 @@ ON CONFLICT (member_id) DO UPDATE SET mesh=excluded.mesh, mesh_last_update=exclu
     Ok(())
 }
 
+/// Reads from `character_mesh`, not `member_mesh` - since the account-API-key rework, the
+/// plugin only ever uploads portraits via `update_character_portrait` (account-hash-scoped,
+/// writes `character_mesh`). `member_mesh`/`upsert_member_mesh` was the old group-token upload
+/// path and nothing populates it anymore, so joining through it here left every group-panel
+/// portrait permanently empty. `members.account_hash` is how a member row already ties back to
+/// its account-linked character (see `update_group_member`), so join through that instead.
 pub async fn get_member_mesh(
     client: &Client,
     group_id: i64,
@@ -542,8 +548,9 @@ pub async fn get_member_mesh(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT mm.mesh FROM groupscape.member_mesh mm
-INNER JOIN groupscape.members m ON m.member_id=mm.member_id
+SELECT cm.mesh FROM groupscape.character_mesh cm
+INNER JOIN groupscape.characters c ON c.character_id=cm.character_id
+INNER JOIN groupscape.members m ON m.account_hash=c.account_hash
 WHERE m.group_id=$1 AND m.member_name=$2
 "#,
         )
