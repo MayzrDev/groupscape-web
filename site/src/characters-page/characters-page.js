@@ -33,10 +33,12 @@ function initials(rsn) {
  *
  * Confirmed tiles also show group status (`group_name`, only populated on this listing - see
  * `Character::group_id` doc in `models.rs`) with a Join/Leave action: Join opens
- * `.characters-page__join-dialog` to collect a group name + token for
- * `POST /api/account/characters/link-group`; Leave goes through the same confirm dialog as
- * unlink, then `POST /api/account/characters/:id/leave-group` (switching groups requires
- * leaving first - the backend rejects a direct switch).
+ * `.characters-page__join-dialog` to collect just the group token for
+ * `POST /api/account/characters/link-group` - the group name that endpoint also wants is parsed
+ * off the token's `{group_name}|{uuid}` prefix (see `db::create_group`/`rename_group`) rather
+ * than asked for separately. Leave goes through the same confirm dialog as unlink, then
+ * `POST /api/account/characters/:id/leave-group` (switching groups requires leaving first - the
+ * backend rejects a direct switch).
  */
 export class CharactersPage extends BaseElement {
   constructor() {
@@ -61,7 +63,6 @@ export class CharactersPage extends BaseElement {
     this.error = this.querySelector(".characters-page__error");
     this.joinDialog = this.querySelector(".characters-page__join-dialog");
     this.joinDialogSub = this.querySelector(".characters-page__join-dialog-sub");
-    this.joinDialogName = this.querySelector(".characters-page__join-dialog-name");
     this.joinDialogToken = this.querySelector(".characters-page__join-dialog-token");
     this.joinDialogError = this.querySelector(".characters-page__join-dialog-error");
     this.joinDialogSubmit = this.querySelector(".characters-page__join-dialog-submit");
@@ -227,8 +228,7 @@ export class CharactersPage extends BaseElement {
 
   showJoinDialog(characterId, rsn) {
     this.joinDialogCharacterId = characterId;
-    this.joinDialogSub.textContent = `${rsn} will join once you enter its group's name and token.`;
-    this.joinDialogName.input.value = "";
+    this.joinDialogSub.textContent = `${rsn} will join once you enter its group's token.`;
     this.joinDialogToken.input.value = "";
     this.joinDialogError.textContent = "";
     this.joinDialog.classList.add("dialog__visible");
@@ -239,10 +239,11 @@ export class CharactersPage extends BaseElement {
   }
 
   async submitJoinGroup() {
-    const groupName = this.joinDialogName.value;
     const groupToken = this.joinDialogToken.value;
-    if (!groupName || !groupToken) {
-      this.joinDialogError.textContent = "Enter both the group name and token.";
+    const separatorIndex = groupToken.indexOf("|");
+    const groupName = separatorIndex === -1 ? "" : groupToken.slice(0, separatorIndex);
+    if (!groupName) {
+      this.joinDialogError.textContent = "Enter the group token.";
       return;
     }
 
@@ -253,10 +254,10 @@ export class CharactersPage extends BaseElement {
         this.hideJoinDialog();
         this.fetchCharacters();
       } else {
-        this.joinDialogError.textContent = "Couldn't find that group — check the name and token.";
+        this.joinDialogError.textContent = "Couldn't find that group — check the token.";
       }
     } catch (error) {
-      this.joinDialogError.textContent = "Couldn't find that group — check the name and token.";
+      this.joinDialogError.textContent = "Couldn't find that group — check the token.";
     }
   }
 

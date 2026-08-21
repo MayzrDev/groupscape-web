@@ -71,8 +71,6 @@ export class OnboardingPage extends BaseElement {
     this.groupCharacterName = this.querySelector(".onboarding-page__group-character-name");
     this.choiceRow = this.querySelector(".onboarding-page__choice-row");
     this.joinPanel = this.querySelector(".onboarding-page__join-panel");
-    this.joinName = this.querySelector(".onboarding-page__join-name");
-    this.joinName.validators = [requiredFieldValidator];
     this.joinToken = this.querySelector(".onboarding-page__join-token");
     this.joinToken.validators = [requiredFieldValidator];
     this.joinSubmit = this.querySelector(".onboarding-page__join-submit");
@@ -265,16 +263,19 @@ export class OnboardingPage extends BaseElement {
 
   async joinGroup() {
     this.joinError.textContent = "";
-    if (!this.joinName.valid || !this.joinToken.valid) return;
+    if (!this.joinToken.valid) return;
+    const groupToken = this.joinToken.value;
+    const separatorIndex = groupToken.indexOf("|");
+    const groupName = separatorIndex === -1 ? "" : groupToken.slice(0, separatorIndex);
+    if (!groupName) {
+      this.joinError.textContent = "That doesn't look like a valid group token.";
+      return;
+    }
     try {
       this.joinSubmit.disabled = true;
-      const response = await accountApi.linkCharacterToGroup(
-        this.currentCharacterId,
-        this.joinName.value,
-        this.joinToken.value
-      );
+      const response = await accountApi.linkCharacterToGroup(this.currentCharacterId, groupName, groupToken);
       if (response.ok) {
-        storage.storeGroup(this.joinName.value, this.joinToken.value);
+        storage.storeGroup(groupName, groupToken);
         window.history.pushState("", "", "/group");
       } else if (response.status === 401) {
         this.joinError.textContent = "Group not found, or the token is wrong.";
