@@ -7,11 +7,20 @@ import { accountApi } from "../data/account-api";
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
 const FRAMING_PADDING = 1.22;
-// Fraction of the model's total height treated as "head and shoulders" for the bust crop.
+// Fraction of the body height (feet to top of head, see findBodyTop) treated as "head and
+// shoulders" for the bust crop.
 const BUST_HEIGHT_FRACTION = 0.32;
 // Shifts the bust view downward by this fraction of the bust radius, which pushes the head
 // closer to the top of the frame instead of sitting dead-center.
-const BUST_VERTICAL_SHIFT_FRACTION = 0.06;
+const BUST_VERTICAL_SHIFT_FRACTION = 0.1;
+// Minimum width+depth, as a fraction of the model's widest band, for a horizontal band to count
+// as part of the body rather than a held weapon/staff.
+const BODY_GIRTH_FRACTION = 0.35;
+// How many horizontal bands the model is scanned in, for locating the top of the body.
+const BODY_GIRTH_SCAN_BANDS = 80;
+// Consecutive qualifying bands required before a band is trusted as the top of the body, so a
+// single wide crossguard band on a weapon doesn't get mistaken for a shoulder.
+const BODY_GIRTH_BANDS = 3;
 // Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
@@ -185,21 +194,72 @@ export class PlayerPortrait extends BaseElement {
     this.camera.updateProjectionMatrix();
   }
 
-  // Frames just the head and shoulders: the top BUST_HEIGHT_FRACTION slice of the model's
-  // (already-centered) bounding box, reusing the same vertical-FOV distance formula as the
-  // full-body fit.
+  // Frames just the head and shoulders: the top BUST_HEIGHT_FRACTION slice of the model,
+  // measured down from the top of the body rather than the raw bounding-box top — a raised
+  // two-handed weapon (spear, staff) extends well above the head, and using box.max.y directly
+  // would frame the weapon tip instead of the character.
   fitCameraToBust(geometry) {
     const box = geometry.boundingBox;
     if (!box) return;
-    const totalHeight = box.max.y - box.min.y;
+    const bodyTop = PlayerPortrait.findBodyTop(geometry, box);
+    const totalHeight = bodyTop - box.min.y;
     if (totalHeight <= 0) return;
     const bustRadius = (totalHeight * BUST_HEIGHT_FRACTION) / 2;
-    const centerY = box.max.y - bustRadius;
+    const centerY = bodyTop - bustRadius;
     const viewY = centerY - bustRadius * BUST_VERTICAL_SHIFT_FRACTION;
     const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov);
     this.camera.position.set(0, viewY, distance);
     this.camera.lookAt(0, viewY, 0);
     this.camera.updateProjectionMatrix();
+  }
+
+  // Scans the model bottom-to-top-excluded in horizontal bands and returns the y of the topmost
+  // band that's still "wide" (width + depth past BODY_GIRTH_FRACTION of the model's max girth,
+  // sustained for BODY_GIRTH_BANDS consecutive bands). A held weapon or raised staff is thin
+  // enough to fall below that threshold, so this finds the top of the head/shoulders rather than
+  // the weapon tip. Falls back to the raw bounding-box top if nothing qualifies.
+  static findBodyTop(geometry, box) {
+    const position = geometry.attributes.position;
+    const yMin = box.min.y;
+    const totalHeight = box.max.y - yMin;
+    if (totalHeight <= 0) return box.max.y;
+
+    const bandMinX = new Array(BODY_GIRTH_SCAN_BANDS).fill(Infinity);
+    const bandMaxX = new Array(BODY_GIRTH_SCAN_BANDS).fill(-Infinity);
+    const bandMinZ = new Array(BODY_GIRTH_SCAN_BANDS).fill(Infinity);
+    const bandMaxZ = new Array(BODY_GIRTH_SCAN_BANDS).fill(-Infinity);
+    for (let i = 0; i < position.count; i++) {
+      const x = position.getX(i);
+      const z = position.getZ(i);
+      let band = Math.floor(((position.getY(i) - yMin) / totalHeight) * BODY_GIRTH_SCAN_BANDS);
+      if (band >= BODY_GIRTH_SCAN_BANDS) band = BODY_GIRTH_SCAN_BANDS - 1;
+      if (band < 0) band = 0;
+      if (x < bandMinX[band]) bandMinX[band] = x;
+      if (x > bandMaxX[band]) bandMaxX[band] = x;
+      if (z < bandMinZ[band]) bandMinZ[band] = z;
+      if (z > bandMaxZ[band]) bandMaxZ[band] = z;
+    }
+
+    const girth = (band) => {
+      const width = bandMaxX[band] - bandMinX[band];
+      const depth = bandMaxZ[band] - bandMinZ[band];
+      return isFinite(width) && isFinite(depth) ? width + depth : 0;
+    };
+    let maxGirth = 0;
+    for (let band = 0; band < BODY_GIRTH_SCAN_BANDS; band++) maxGirth = Math.max(maxGirth, girth(band));
+    const threshold = maxGirth * BODY_GIRTH_FRACTION;
+
+    for (let band = BODY_GIRTH_SCAN_BANDS - 1; band >= BODY_GIRTH_BANDS - 1; band--) {
+      let sustained = true;
+      for (let k = 0; k < BODY_GIRTH_BANDS; k++) {
+        if (girth(band - k) < threshold) {
+          sustained = false;
+          break;
+        }
+      }
+      if (sustained) return yMin + (band / BODY_GIRTH_SCAN_BANDS) * totalHeight;
+    }
+    return box.max.y;
   }
 
   static fitCameraDistance(radius, fovDegrees) {
