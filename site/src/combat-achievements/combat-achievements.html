@@ -12,21 +12,46 @@
 
     <div class="combat-achievements__title-border"></div>
 
+    <div class="combat-achievements__points">
+      <div class="combat-achievements__points-row">
+        <span class="combat-achievements__points-total">Total Points: <b>${combatAchievement.totalPoints(this.member)}</b></span>
+        <span class="combat-achievements__points-next">${this.nextUnlockLabel()}</span>
+      </div>
+      <div class="combat-achievements__points-track">
+        <div class="combat-achievements__points-fill" style="width: ${this.pointsFillPercent()}%"></div>
+      </div>
+    </div>
+
     <div class="combat-achievements__main">
-      <div class="combat-achievements__medallions">
-        ${COMBAT_ACHIEVEMENT_TIERS.map(([key, label]) => `
-        <button
-          type="button"
-          class="combat-achievements__medallion combat-achievements__medallion--${key} ${key === this.openTier ? "combat-achievements__medallion--open" : ""}"
-          tier-key="${key}"
-        >
-          <span class="combat-achievements__medallion-ring" style="--pct: ${combatAchievement.tierCompletionPercent(this.member, key)}"></span>
-          <span class="combat-achievements__medallion-name">${label}</span>
-          <span class="combat-achievements__medallion-frac">${combatAchievement.completedTaskCountForTier(this.member, key)}/${combatAchievement.totalTasksForTier(key)}</span>
-        </button>`).join("")}
+      <div class="combat-achievements__controls">
+        <div class="combat-achievements__view-switch">
+          <button type="button" class="combat-achievements__view-btn ${this.view === "tier" ? "combat-achievements__view-btn--active" : ""}" view="tier">By Tier</button>
+          <button type="button" class="combat-achievements__view-btn ${this.view === "boss" ? "combat-achievements__view-btn--active" : ""}" view="boss">By Boss</button>
+        </div>
+        <div class="combat-achievements__search">
+          <input type="text" class="combat-achievements__search-input" placeholder="Search bosses or achievements&hellip;" value="${this.searchTerm || ""}" />
+        </div>
       </div>
 
-      <div class="combat-achievements__accordion-body"></div>
+      <div class="combat-achievements__tier-view ${this.view === "boss" ? "combat-achievements__hidden" : ""}">
+        <div class="combat-achievements__tiers">
+          ${COMBAT_ACHIEVEMENT_TIERS.map(([key, label]) => `
+          <button
+            type="button"
+            class="combat-achievements__tier-card combat-achievements__tier-card--${key} ${key === this.openTier ? "combat-achievements__tier-card--open" : ""}"
+            tier-key="${key}"
+          >
+            <img class="combat-achievements__tier-sword" src="/icons/combat-achievements/${key}.png" alt="${label} sword" />
+            <span class="combat-achievements__tier-name">${label}</span>
+            <span class="combat-achievements__tier-track"><span class="combat-achievements__tier-fill" style="width: ${combatAchievement.tierCompletionPercent(this.member, key)}%"></span></span>
+            <span class="combat-achievements__tier-frac">${combatAchievement.completedTaskCountForTier(this.member, key)}/${combatAchievement.totalTasksForTier(key)}</span>
+          </button>`).join("")}
+        </div>
+
+        <div class="combat-achievements__accordion-body"></div>
+      </div>
+
+      <div class="combat-achievements__boss-view ${this.view === "boss" ? "" : "combat-achievements__hidden"}"></div>
     </div>
   </div>
 </div>

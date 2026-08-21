@@ -7,6 +7,31 @@ export const COMBAT_ACHIEVEMENT_TIERS = [
   ["grandmaster", "Grandmaster"],
 ];
 
+const TIER_POINTS = {
+  easy: 1,
+  medium: 2,
+  hard: 3,
+  elite: 4,
+  master: 5,
+  grandmaster: 6,
+};
+
+// Total points required to unlock each tier's rewards, per the OSRS Combat Achievements reward system.
+const TIER_UNLOCK_THRESHOLD = {
+  easy: 41,
+  medium: 161,
+  hard: 419,
+  elite: 1075,
+  master: 1940,
+  grandmaster: 2672,
+};
+
+const NON_BOSS_GROUPS = new Set(["General", "Other"]);
+
+function wikiTitle(name) {
+  return encodeURIComponent(name.trim().replace(/\s+/g, "_"));
+}
+
 class CombatAchievement {
   constructor() {}
 
@@ -74,7 +99,59 @@ class CombatAchievement {
   }
 
   bossWikiUrl(bossName) {
-    return `https://oldschool.runescape.wiki/w/${encodeURIComponent(bossName.replace(/ /g, "_"))}`;
+    return `https://oldschool.runescape.wiki/w/${wikiTitle(bossName)}`;
+  }
+
+  taskWikiUrl(taskName) {
+    return `https://oldschool.runescape.wiki/w/${wikiTitle(taskName)}`;
+  }
+
+  pointsForTask(tierKey) {
+    return TIER_POINTS[tierKey] || 0;
+  }
+
+  earnedPointsForTier(member, tierKey) {
+    return this.completedTaskCountForTier(member, tierKey) * this.pointsForTask(tierKey);
+  }
+
+  totalPointsForTier(tierKey) {
+    return this.totalTasksForTier(tierKey) * this.pointsForTask(tierKey);
+  }
+
+  totalPoints(member) {
+    return COMBAT_ACHIEVEMENT_TIERS.reduce((sum, [key]) => sum + this.earnedPointsForTier(member, key), 0);
+  }
+
+  nextUnlock(member) {
+    const points = this.totalPoints(member);
+    const next = COMBAT_ACHIEVEMENT_TIERS.map(([key, label]) => ({
+      key,
+      label,
+      threshold: TIER_UNLOCK_THRESHOLD[key],
+    })).find((tier) => points < tier.threshold);
+
+    if (!next) return null;
+    return { label: next.label, pointsRemaining: next.threshold - points };
+  }
+
+  allBossGroups() {
+    const groups = new Map();
+    for (const [tierKey] of COMBAT_ACHIEVEMENT_TIERS) {
+      for (const task of this.tasksForTier(tierKey)) {
+        const bossName = task.boss || "General";
+        if (NON_BOSS_GROUPS.has(bossName)) continue;
+        if (!groups.has(bossName)) groups.set(bossName, []);
+        groups.get(bossName).push({ ...task, tier: tierKey });
+      }
+    }
+
+    return Array.from(groups.entries())
+      .map(([boss, tasks]) => ({ boss, tasks }))
+      .sort((a, b) => a.boss.localeCompare(b.boss));
+  }
+
+  completedTaskCountForBoss(member, tasks) {
+    return tasks.filter((task) => this.isTaskComplete(member, task.id)).length;
   }
 }
 
