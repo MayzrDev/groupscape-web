@@ -11,7 +11,7 @@ const FRAMING_PADDING = 1.22;
 const BUST_HEIGHT_FRACTION = 0.32;
 // Shifts the bust view downward by this fraction of the bust radius, which pushes the head
 // closer to the top of the frame instead of sitting dead-center.
-const BUST_VERTICAL_SHIFT_FRACTION = 0.2;
+const BUST_VERTICAL_SHIFT_FRACTION = 0.06;
 // Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
