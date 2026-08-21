@@ -67,6 +67,7 @@ export class CombatAchievements extends BaseElement {
     this.eventListener(this.viewSwitch, "click", this.handleViewClick.bind(this));
     this.eventListener(this.searchInput, "input", this.handleSearchInput.bind(this));
     this.eventListener(this.bossView, "click", this.handleBossCardClick.bind(this));
+    this.eventListener(this.bossView, "keydown", this.handleBossCardKeydown.bind(this));
     this.eventListener(this.background, "click", this.closeIfBackgroundClick.bind(this));
     this.eventListener(this.querySelector(".dialog__close"), "click", this.close.bind(this));
   }
@@ -117,12 +118,20 @@ export class CombatAchievements extends BaseElement {
   handleBossCardClick(event) {
     if (event.target.closest("a")) return;
 
-    const card = event.target.closest("button[boss-name]");
+    const card = event.target.closest("[boss-name]");
     const bossName = card?.getAttribute("boss-name");
     if (!bossName) return;
 
     this.expandedBoss = this.expandedBoss === bossName ? null : bossName;
     this.renderBossView();
+  }
+
+  handleBossCardKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (!event.target.closest("[boss-name]")) return;
+
+    event.preventDefault();
+    this.handleBossCardClick(event);
   }
 
   handleSearchInput(event) {
@@ -219,11 +228,14 @@ export class CombatAchievements extends BaseElement {
     const expanded = this.expandedBoss === group.boss;
 
     return `
-      <div class="combat-achievements__boss-card ${expanded ? "combat-achievements__boss-card--open" : ""}">
+      <div
+        role="button"
+        tabindex="0"
+        boss-name="${escapeAttribute(group.boss)}"
+        class="combat-achievements__boss-card ${expanded ? "combat-achievements__boss-card--open" : ""}"
+      >
         <div class="combat-achievements__boss-card-head">
-          <button type="button" boss-name="${escapeAttribute(
-            group.boss
-          )}" class="combat-achievements__boss-card-name">${group.boss}</button>
+          <span class="combat-achievements__boss-card-name">${group.boss}</span>
           <a
             href="${combatAchievement.bossWikiUrl(group.boss)}"
             target="_blank"
