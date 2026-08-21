@@ -10,9 +10,6 @@ const FRAMING_PADDING = 1.22;
 // Fraction of the body height (feet to top of head, see findBodyTop) treated as "head and
 // shoulders" for the bust crop.
 const BUST_HEIGHT_FRACTION = 0.32;
-// Shifts the bust view downward by this fraction of the bust radius, which pushes the head
-// closer to the top of the frame instead of sitting dead-center.
-const BUST_VERTICAL_SHIFT_FRACTION = 0.1;
 // Minimum width+depth, as a fraction of the model's widest band, for a horizontal band to count
 // as part of the body rather than a held weapon/staff.
 const BODY_GIRTH_FRACTION = 0.35;
@@ -208,12 +205,36 @@ export class PlayerPortrait extends BaseElement {
     const totalHeight = bodyTop - box.min.y;
     if (totalHeight <= 0) return;
     const bustRadius = (totalHeight * BUST_HEIGHT_FRACTION) / 2;
-    const centerY = bodyTop - bustRadius;
-    const viewY = centerY - bustRadius * BUST_VERTICAL_SHIFT_FRACTION;
+    const viewY = bodyTop - bustRadius;
     const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov);
-    this.camera.position.set(0, viewY, distance);
-    this.camera.lookAt(0, viewY, 0);
+    // Center horizontally on what's actually visible in the crop, not the whole model — a
+    // weapon held out to one side pulls the model's overall x-center away from the head.
+    const viewX = PlayerPortrait.findHorizontalCenter(geometry, viewY, distance, this.camera.fov);
+    this.camera.position.set(viewX, viewY, distance);
+    this.camera.lookAt(viewX, viewY, 0);
     this.camera.updateProjectionMatrix();
+  }
+
+  // Averages the x-extent of vertices within the vertical slice the camera will actually show,
+  // so a weapon held out to one side (which skews the whole model's bounding-box center) doesn't
+  // pull the crop off the character.
+  static findHorizontalCenter(geometry, viewY, distance, fovDegrees) {
+    const fovRadians = (fovDegrees * Math.PI) / 180;
+    const halfExtentY = distance * Math.tan(fovRadians / 2);
+    const yLow = viewY - halfExtentY;
+    const yHigh = viewY + halfExtentY;
+
+    const position = geometry.attributes.position;
+    let xMin = Infinity;
+    let xMax = -Infinity;
+    for (let i = 0; i < position.count; i++) {
+      const y = position.getY(i);
+      if (y < yLow || y > yHigh) continue;
+      const x = position.getX(i);
+      if (x < xMin) xMin = x;
+      if (x > xMax) xMax = x;
+    }
+    return isFinite(xMin) && isFinite(xMax) ? (xMin + xMax) / 2 : 0;
   }
 
   // Scans the model in horizontal bands and, starting from the top, returns the y of the first
