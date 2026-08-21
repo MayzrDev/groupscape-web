@@ -28,7 +28,7 @@ player-panel + player-panel {
 
 .player-panel__minibar {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
 }
 
 player-panel.expanded .player-panel__minibar {
@@ -63,6 +63,7 @@ player-panel.expanded .player-panel__content {
   padding: 8px 0;
 }
 
-.player-panel__collection-log img {
+.player-panel__collection-log img,
+.player-panel__combat-achievements img {
   image-rendering: initial;
 }
