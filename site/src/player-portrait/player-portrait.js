@@ -9,6 +9,9 @@ const FOV_DEGREES = 30;
 const FRAMING_PADDING = 1.22;
 // Fraction of the model's total height treated as "head and shoulders" for the bust crop.
 const BUST_HEIGHT_FRACTION = 0.32;
+// Shifts the bust view downward by this fraction of the bust radius, which pushes the head
+// closer to the top of the frame instead of sitting dead-center.
+const BUST_VERTICAL_SHIFT_FRACTION = 0.2;
 // Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
@@ -192,9 +195,10 @@ export class PlayerPortrait extends BaseElement {
     if (totalHeight <= 0) return;
     const bustRadius = (totalHeight * BUST_HEIGHT_FRACTION) / 2;
     const centerY = box.max.y - bustRadius;
+    const viewY = centerY - bustRadius * BUST_VERTICAL_SHIFT_FRACTION;
     const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov);
-    this.camera.position.set(0, centerY, distance);
-    this.camera.lookAt(0, centerY, 0);
+    this.camera.position.set(0, viewY, distance);
+    this.camera.lookAt(0, viewY, 0);
     this.camera.updateProjectionMatrix();
   }
 
