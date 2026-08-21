@@ -16,11 +16,14 @@ const BUST_VERTICAL_SHIFT_FRACTION = 0.1;
 // Minimum width+depth, as a fraction of the model's widest band, for a horizontal band to count
 // as part of the body rather than a held weapon/staff.
 const BODY_GIRTH_FRACTION = 0.35;
-// How many horizontal bands the model is scanned in, for locating the top of the body.
-const BODY_GIRTH_SCAN_BANDS = 80;
-// Consecutive qualifying bands required before a band is trusted as the top of the body, so a
-// single wide crossguard band on a weapon doesn't get mistaken for a shoulder.
-const BODY_GIRTH_BANDS = 3;
+// How many horizontal bands the model is scanned in, for locating the top of the body. Coarse on
+// purpose — OSRS models are low-poly, so a handful of vertices can land in an otherwise-empty
+// band and make a finer scan read as noise (see BODY_GIRTH_LOOKBEHIND below).
+const BODY_GIRTH_SCAN_BANDS = 24;
+// When checking a band, also accept it if any of this many bands below it (further from the top)
+// clears the threshold. Bridges single sparse bands — e.g. a gap between a hood and the
+// shoulders below it — that would otherwise be mistaken for the top of a held weapon.
+const BODY_GIRTH_LOOKBEHIND = 2;
 // Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
@@ -213,11 +216,12 @@ export class PlayerPortrait extends BaseElement {
     this.camera.updateProjectionMatrix();
   }
 
-  // Scans the model bottom-to-top-excluded in horizontal bands and returns the y of the topmost
-  // band that's still "wide" (width + depth past BODY_GIRTH_FRACTION of the model's max girth,
-  // sustained for BODY_GIRTH_BANDS consecutive bands). A held weapon or raised staff is thin
-  // enough to fall below that threshold, so this finds the top of the head/shoulders rather than
-  // the weapon tip. Falls back to the raw bounding-box top if nothing qualifies.
+  // Scans the model in horizontal bands and, starting from the top, returns the y of the first
+  // band that's still "wide" (width + depth past BODY_GIRTH_FRACTION of the model's max girth) —
+  // allowing a look behind at the BODY_GIRTH_LOOKBEHIND bands below it. A held weapon or raised
+  // staff is thin enough to fall below that threshold, so this finds the top of the head/
+  // shoulders rather than the weapon tip. Falls back to the raw bounding-box top if nothing
+  // qualifies.
   static findBodyTop(geometry, box) {
     const position = geometry.attributes.position;
     const yMin = box.min.y;
@@ -249,15 +253,13 @@ export class PlayerPortrait extends BaseElement {
     for (let band = 0; band < BODY_GIRTH_SCAN_BANDS; band++) maxGirth = Math.max(maxGirth, girth(band));
     const threshold = maxGirth * BODY_GIRTH_FRACTION;
 
-    for (let band = BODY_GIRTH_SCAN_BANDS - 1; band >= BODY_GIRTH_BANDS - 1; band--) {
-      let sustained = true;
-      for (let k = 0; k < BODY_GIRTH_BANDS; k++) {
-        if (girth(band - k) < threshold) {
-          sustained = false;
-          break;
-        }
+    for (let band = BODY_GIRTH_SCAN_BANDS - 1; band >= 0; band--) {
+      let widestNearby = 0;
+      for (let k = 0; k <= BODY_GIRTH_LOOKBEHIND; k++) {
+        const nearbyBand = band - k;
+        if (nearbyBand >= 0) widestNearby = Math.max(widestNearby, girth(nearbyBand));
       }
-      if (sustained) return yMin + (band / BODY_GIRTH_SCAN_BANDS) * totalHeight;
+      if (widestNearby >= threshold) return yMin + (band / BODY_GIRTH_SCAN_BANDS) * totalHeight;
     }
     return box.max.y;
   }
