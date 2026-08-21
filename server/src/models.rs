@@ -141,7 +141,7 @@ pub struct GroupMember {
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
 /// `PendingKill.toMap()` output verbatim (`itemId`/`quantity`).
 #[derive(Deserialize, Serialize, Clone)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct LootItem {
     pub item_id: i32,
     pub quantity: i32,
