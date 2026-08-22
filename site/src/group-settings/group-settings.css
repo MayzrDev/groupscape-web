@@ -143,3 +143,19 @@ group-settings {
 .group-settings__permissions {
   padding: 4px 8px;
 }
+
+.group-settings__map-trail-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0.5em 0;
+}
+
+.group-settings__map-trail-field input {
+  width: 4.5em;
+}
+
+.group-settings__map-trail-reset {
+  margin-top: 0.25em;
+}

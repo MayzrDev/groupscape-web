@@ -860,7 +860,7 @@ describe("CanvasMap map link pointer interactions", () => {
     const [linkX, linkY] = map.mapLinkScreenCenter(100, 201);
     const startDragSpy = vi.spyOn(map, "startDragging");
     map.onPointerDown({ clientX: linkX, clientY: linkY });
-    expect(map.pendingMapLink).not.toBeNull();
+    expect(map.pendingClick).not.toBeNull();
     expect(startDragSpy).not.toHaveBeenCalled();
   });
 
@@ -869,7 +869,7 @@ describe("CanvasMap map link pointer interactions", () => {
     const startDragSpy = vi.spyOn(map, "startDragging");
     map.onPointerDown({ clientX: 0, clientY: 0 });
     expect(startDragSpy).toHaveBeenCalled();
-    expect(map.pendingMapLink).toBeUndefined();
+    expect(map.pendingClick).toBeUndefined();
   });
 
   it("stopDragging after click navigates to destination", () => {
@@ -879,7 +879,7 @@ describe("CanvasMap map link pointer interactions", () => {
     const goToSpy = vi.spyOn(map, "goToMapLink");
     map.stopDragging({});
     expect(goToSpy).toHaveBeenCalledWith({ x: 300, y: 400, plane: 1 });
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
   });
 
   it("stopDragging after drag does not navigate", () => {
@@ -901,7 +901,7 @@ describe("CanvasMap map link pointer interactions", () => {
     map.cursor.previousY = linkY;
     map.onPointerMove({ clientX: linkX + 10, clientY: linkY + 10 });
     expect(map.pointerDragged).toBe(true);
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
     expect(startDragSpy).toHaveBeenCalled();
   });
 
@@ -944,14 +944,14 @@ describe("CanvasMap map link touch interactions", () => {
     const [linkX, linkY] = map.mapLinkScreenCenter(100, 201);
     const startDragSpy = vi.spyOn(map, "startDragging");
     map.onTouchStart({ touches: [{ clientX: linkX, clientY: linkY }], preventDefault: () => {} });
-    expect(map.pendingMapLink).not.toBeNull();
+    expect(map.pendingClick).not.toBeNull();
     expect(startDragSpy).not.toHaveBeenCalled();
   });
 
-  it("onTouchStart outside a link does not set pendingMapLink", () => {
+  it("onTouchStart outside a link does not set pendingClick", () => {
     const map = createLinkMap();
     map.onTouchStart({ touches: [{ clientX: 0, clientY: 0 }] });
-    expect(map.pendingMapLink).toBeUndefined();
+    expect(map.pendingClick).toBeUndefined();
   });
 
   it("stopDragging after tap navigates to destination", () => {
@@ -961,7 +961,7 @@ describe("CanvasMap map link touch interactions", () => {
     const goToSpy = vi.spyOn(map, "goToMapLink");
     map.stopDragging({});
     expect(goToSpy).toHaveBeenCalledWith({ x: 300, y: 400, plane: 1 });
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
   });
 
   it("onTouchMove beyond drag threshold cancels link and starts dragging", () => {
@@ -973,7 +973,7 @@ describe("CanvasMap map link touch interactions", () => {
     map.cursor.previousY = linkY;
     map.onTouchMove({ touches: [{ clientX: linkX + 10, clientY: linkY + 10 }] });
     expect(map.pointerDragged).toBe(true);
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
     expect(startDragSpy).toHaveBeenCalled();
   });
 
@@ -986,17 +986,17 @@ describe("CanvasMap map link touch interactions", () => {
     map.cursor.previousY = linkY;
     map.onTouchMove({ touches: [{ clientX: linkX + 2, clientY: linkY + 2 }] });
     expect(map.pointerDragged).toBe(false);
-    expect(map.pendingMapLink).not.toBeNull();
+    expect(map.pendingClick).not.toBeNull();
     expect(startDragSpy).not.toHaveBeenCalled();
   });
 
-  it("onTouchStart with two fingers clears pendingMapLink and sets pinch state", () => {
+  it("onTouchStart with two fingers clears pendingClick and sets pinch state", () => {
     const map = createLinkMap();
     const [linkX, linkY] = map.mapLinkScreenCenter(100, 201);
     map.onTouchStart({ touches: [{ clientX: linkX, clientY: linkY }], preventDefault: () => {} });
-    expect(map.pendingMapLink).not.toBeNull();
+    expect(map.pendingClick).not.toBeNull();
     map.onTouchStart({ touches: [{ clientX: 0, clientY: 0 }, { clientX: 100, clientY: 100 }] });
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
     expect(map.touch.startDistance).toBeGreaterThan(0);
   });
 });
@@ -1044,7 +1044,7 @@ describe("CanvasMap map link tooltip and cursor", () => {
     expect(map.hoveredMapLink).not.toBeNull();
     mockHideTooltip.mockClear();
     map.onMouseLeave();
-    expect(map.pendingMapLink).toBeNull();
+    expect(map.pendingClick).toBeNull();
     expect(map.hoveredMapLink).toBeNull();
     expect(mockHideTooltip).toHaveBeenCalled();
     expect(map.style.cursor).toBe("");

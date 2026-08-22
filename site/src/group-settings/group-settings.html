@@ -80,6 +80,24 @@
     </div>
   </fieldset>
 
+  <fieldset class="group-settings__map-trails">
+    <legend>Map trails</legend>
+    <p class="group-settings__hint">Only affects what you see on the map — not shared with the rest of the group.</p>
+    <div class="group-settings__map-trail-field">
+      <label for="map-trail__length">Trail length (points)</label>
+      <input id="map-trail__length" class="group-settings__map-trail-length" type="number" min="5" max="100" step="1" value="${mapTrailSettings.maxPoints}" />
+    </div>
+    <div class="group-settings__map-trail-field">
+      <label for="map-trail__age">Trail age (minutes)</label>
+      <input id="map-trail__age" class="group-settings__map-trail-age" type="number" min="1" max="60" step="1" value="${mapTrailAgeMinutes}" />
+    </div>
+    <div class="group-settings__map-trail-field">
+      <label for="map-trail__jump">Jump threshold (tiles)</label>
+      <input id="map-trail__jump" class="group-settings__map-trail-jump" type="number" min="2" max="50" step="1" value="${mapTrailSettings.jumpThresholdTiles}" />
+    </div>
+    <button class="group-settings__map-trail-reset men-button small">Reset to defaults</button>
+  </fieldset>
+
   <h3 class="group-settings__danger-heading">Danger zone</h3>
   <div class="group-settings__danger-zone rsborder-tiny">
     <p>Permanently removes the group, its members, and all tracked history. This can't be undone.</p>

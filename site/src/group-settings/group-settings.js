@@ -6,6 +6,7 @@ import { loadingScreenManager } from "../loading-screen/loading-screen-manager";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { validCharacters, validLength } from "../validators";
 import { pubsub } from "../data/pubsub";
+import { mapTrails, DEFAULT_MAP_TRAIL_SETTINGS } from "../data/map-trails";
 
 export class GroupSettings extends BaseElement {
   constructor() {
@@ -18,6 +19,8 @@ export class GroupSettings extends BaseElement {
     const group = storage.getGroup();
     const selectedPanelDockSide = appearance.getLayout();
     const style = appearance.getTheme();
+    const mapTrailSettings = mapTrails.settings;
+    const mapTrailAgeMinutes = Math.round(mapTrailSettings.maxAgeMs / 60000);
     return `{{group-settings.html}}`;
   }
   /* eslint-enable no-unused-vars */
@@ -42,6 +45,15 @@ export class GroupSettings extends BaseElement {
     const appearanceStyle = this.querySelector(".group-settings__style");
     this.eventListener(panelDockSide, "change", this.handlePanelDockSideChange.bind(this));
     this.eventListener(appearanceStyle, "change", this.handleStyleChange.bind(this));
+
+    this.mapTrailLength = this.querySelector(".group-settings__map-trail-length");
+    this.mapTrailAge = this.querySelector(".group-settings__map-trail-age");
+    this.mapTrailJump = this.querySelector(".group-settings__map-trail-jump");
+    this.eventListener(this.mapTrailLength, "change", this.handleMapTrailSettingsChange.bind(this));
+    this.eventListener(this.mapTrailAge, "change", this.handleMapTrailSettingsChange.bind(this));
+    this.eventListener(this.mapTrailJump, "change", this.handleMapTrailSettingsChange.bind(this));
+    const mapTrailReset = this.querySelector(".group-settings__map-trail-reset");
+    this.eventListener(mapTrailReset, "click", this.resetMapTrailSettings.bind(this));
 
     this.nameInput = this.querySelector(".group-settings__name-input");
     this.nameInput.validators = [
@@ -195,6 +207,31 @@ export class GroupSettings extends BaseElement {
     } else {
       appearance.setLayout("row");
     }
+  }
+
+  // Clamp to the input's own min/max rather than trusting the typed value - number
+  // inputs still let the field go empty or out of range before blur/change fires.
+  clampToInput(input) {
+    const min = Number(input.min);
+    const max = Number(input.max);
+    const value = Number(input.value);
+    const clamped = Math.min(max, Math.max(min, isNaN(value) ? min : value));
+    input.value = clamped;
+    return clamped;
+  }
+
+  handleMapTrailSettingsChange() {
+    const maxPoints = this.clampToInput(this.mapTrailLength);
+    const ageMinutes = this.clampToInput(this.mapTrailAge);
+    const jumpThresholdTiles = this.clampToInput(this.mapTrailJump);
+    mapTrails.setSettings({ maxPoints, maxAgeMs: ageMinutes * 60 * 1000, jumpThresholdTiles });
+  }
+
+  resetMapTrailSettings() {
+    mapTrails.setSettings(DEFAULT_MAP_TRAIL_SETTINGS);
+    this.mapTrailLength.value = DEFAULT_MAP_TRAIL_SETTINGS.maxPoints;
+    this.mapTrailAge.value = Math.round(DEFAULT_MAP_TRAIL_SETTINGS.maxAgeMs / 60000);
+    this.mapTrailJump.value = DEFAULT_MAP_TRAIL_SETTINGS.jumpThresholdTiles;
   }
 
   handleUpdatedMembers(members) {

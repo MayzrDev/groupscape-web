@@ -2,6 +2,7 @@ import { BaseElement } from "../base-element/base-element";
 import { tooltipManager } from "../rs-tooltip/tooltip-manager";
 import { utility } from "../utility";
 import { Animation } from "./animation";
+import { mapTrails } from "../data/map-trails";
 
 export const ICON_SPRITE_SIZE = 15;
 
@@ -184,7 +185,10 @@ export class CanvasMap extends BaseElement {
       this.playerMarkers.set(member.name, {
         label: member.name,
         coordinates,
+        hue: member.hue,
+        inactive: member.inactive,
       });
+      mapTrails.record(member.name, coordinates);
 
       if (this.followingPlayer.name === member.name) {
         this.followingPlayer.coordinates = coordinates;
@@ -351,6 +355,36 @@ export class CanvasMap extends BaseElement {
     return bestLink;
   }
 
+  markerScreenCenter(coordinates) {
+    const [canvasX, canvasY] = this.gamePositionToCanvas(coordinates.x, coordinates.y);
+    const half = this.pixelsPerGameTile / 2;
+    return [
+      (canvasX + half) * this.camera.zoom.current - this.camera.x.current,
+      (canvasY + half) * this.camera.zoom.current + this.camera.y.current,
+    ];
+  }
+
+  getPlayerMarkerAtClient(clientX, clientY) {
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const cx = clientX - canvasRect.left;
+    const cy = clientY - canvasRect.top;
+    const hitRadius = 10;
+    let best = null;
+    let bestDist = Infinity;
+    for (const marker of this.playerMarkers.values()) {
+      if (!this.isValidCoordinates(marker.coordinates)) continue;
+      const [screenX, screenY] = this.markerScreenCenter(marker.coordinates);
+      const dx = cx - screenX;
+      const dy = cy - screenY;
+      const dist = dx * dx + dy * dy;
+      if (dist <= hitRadius * hitRadius && dist < bestDist) {
+        bestDist = dist;
+        best = marker;
+      }
+    }
+    return best;
+  }
+
   goToMapLink(destination) {
     this.stopFollowingPlayer();
     this.showPlane(destination.plane + 1);
@@ -476,13 +510,7 @@ export class CanvasMap extends BaseElement {
       this.drawMapAreaLabels(!isPanningABigDistance);
       this.drawMapLinks();
 
-      this.drawTileMarkers(this.playerMarkers.values(), {
-        fillColor: "#348feb",
-        strokeColor: "#34d8eb",
-        labelPosition: "top",
-        labelFill: "yellow",
-        labelStroke: "black",
-      });
+      this.drawPlayerMarkersAndTrails();
       this.drawTileMarkers(this.interactingMarkers.values(), {
         fillColor: "#a832a8",
         strokeColor: "#cc2ed1",
@@ -591,6 +619,158 @@ export class CanvasMap extends BaseElement {
     }
 
     this.ctx.globalAlpha = 1;
+  }
+
+  // Draws each group member's helmet-coloured marker, name label, and movement trail.
+  // Trails and stubs are drawn per-plane so they pick up the same distance-based fade
+  // that drawTileMarkers uses for markers on nearby planes, and so a cross-plane jump's
+  // stub only appears on the plane its endpoint actually sits on.
+  drawPlayerMarkersAndTrails() {
+    const groupedByPlane = [[], [], [], []];
+    for (const marker of this.playerMarkers.values()) {
+      if (this.isValidCoordinates(marker.coordinates)) {
+        groupedByPlane[marker.coordinates.plane]?.push(marker);
+      }
+    }
+
+    const allMarkers = Array.from(this.playerMarkers.values());
+    const labelPadPx = 64;
+    const padPx = this.pixelsPerGameTile * this.camera.zoom.current + labelPadPx;
+
+    for (let plane = 0; plane < groupedByPlane.length; ++plane) {
+      this.ctx.globalAlpha = 1 - Math.abs(this.plane - 1 - plane) * 0.25;
+
+      for (const marker of allMarkers) {
+        this.drawMemberTrailOnPlane(marker, plane);
+      }
+
+      const positions = [];
+      for (const marker of groupedByPlane[plane]) {
+        if (!this.isGameTileInView(marker.coordinates.x, marker.coordinates.y, padPx)) continue;
+        const [x, y] = this.gamePositionToCanvas(marker.coordinates.x, marker.coordinates.y);
+        positions.push({ x, y, text: marker.label, hue: marker.hue, inactive: marker.inactive, name: marker.label });
+      }
+      this.drawHelmetIcons(positions);
+      this.drawLabels(positions, "yellow", "black", "top");
+    }
+
+    this.ctx.globalAlpha = 1;
+  }
+
+  drawHelmetIcons(positions) {
+    const half = this.pixelsPerGameTile / 2;
+    for (const p of positions) {
+      const hovered = this.hoveredMarkerName === p.name;
+      this.drawHelmetIcon(p.x + half, p.y + half, p.hue ?? 0, p.inactive, hovered);
+    }
+  }
+
+  // Small full-helm silhouette (dome + brim + nose guard) tinted to the member's assigned
+  // colour. Sized to stay a roughly constant screen size across zoom levels, same approach
+  // as iconCanvasSize() for location icons.
+  drawHelmetIcon(centerX, centerY, hue, inactive, hovered) {
+    const scale = 1 / Math.min(this.camera.zoom.current, 3);
+    const r = 3.6 * scale;
+    const alpha = inactive ? 0.45 : 1;
+    const fill = `hsla(${hue}, 68%, ${inactive ? 42 : 55}%, ${alpha})`;
+    const shade = `hsla(${hue}, 68%, ${inactive ? 28 : 36}%, ${alpha})`;
+    const outline = `rgba(0, 0, 0, ${inactive ? 0.35 : 0.85})`;
+
+    this.ctx.save();
+    this.ctx.translate(centerX, centerY);
+
+    if (hovered) {
+      this.ctx.strokeStyle = `hsla(${hue}, 68%, 55%, ${alpha * 0.5})`;
+      this.ctx.lineWidth = scale;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+      this.ctx.stroke();
+    }
+
+    this.ctx.lineWidth = 0.7 * scale;
+    this.ctx.strokeStyle = outline;
+
+    this.ctx.fillStyle = fill;
+    this.ctx.beginPath();
+    this.ctx.arc(0, -0.5 * scale, r, Math.PI, 0, false);
+    this.ctx.lineTo(r, 1.2 * scale);
+    this.ctx.lineTo(-r, 1.2 * scale);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = shade;
+    this.ctx.beginPath();
+    this.ctx.moveTo(-r * 1.15, 1.2 * scale);
+    this.ctx.lineTo(r * 1.15, 1.2 * scale);
+    this.ctx.lineTo(r * 0.9, 2.2 * scale);
+    this.ctx.lineTo(-r * 0.9, 2.2 * scale);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    const noseWidth = 0.28 * r;
+    this.ctx.fillStyle = shade;
+    this.ctx.fillRect(-noseWidth / 2, -0.5 * scale, noseWidth, 3 * scale);
+    this.ctx.strokeRect(-noseWidth / 2, -0.5 * scale, noseWidth, 3 * scale);
+
+    this.ctx.restore();
+  }
+
+  drawMemberTrailOnPlane(marker, plane) {
+    const segments = mapTrails.segmentsFor(marker.label);
+    if (segments.length === 0) return;
+    const scale = 1 / Math.min(this.camera.zoom.current, 3);
+
+    segments.forEach((seg, i) => {
+      const age = segments.length - i; // 1 = newest
+      const alpha = this.trailAgeAlpha(age) * (marker.inactive ? 0.4 : 1);
+      if (seg.crossPlane) {
+        const endpoint = seg.a.plane === plane ? seg.a : seg.b.plane === plane ? seg.b : null;
+        if (endpoint) this.drawPlaneChangeStub(endpoint, marker.hue ?? 0, alpha, scale);
+        return;
+      }
+      if (seg.a.plane !== plane) return;
+      this.drawTrailSegment(seg, marker.hue ?? 0, alpha, seg.isJump, scale);
+    });
+  }
+
+  // Older segments fade toward transparent; the most recent segment near the marker stays
+  // close to full strength.
+  trailAgeAlpha(age) {
+    const t = Math.max(0, 1 - (age - 1) / 10);
+    return 0.12 + 0.6 * t;
+  }
+
+  drawTrailSegment(seg, hue, alpha, isJump, scale) {
+    const [ax, ay] = this.gamePositionToCanvas(seg.a.x, seg.a.y);
+    const [bx, by] = this.gamePositionToCanvas(seg.b.x, seg.b.y);
+    const half = this.pixelsPerGameTile / 2;
+    this.ctx.save();
+    this.ctx.strokeStyle = `hsla(${hue}, 65%, 52%, ${alpha})`;
+    this.ctx.lineWidth = 1.3 * scale;
+    this.ctx.lineCap = "round";
+    this.ctx.setLineDash(isJump ? [1.5 * scale, 4 * scale] : []);
+    this.ctx.beginPath();
+    this.ctx.moveTo(ax + half, ay + half);
+    this.ctx.lineTo(bx + half, by + half);
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+
+  // A floor change can't be drawn as a line to the other plane (only one is shown at a
+  // time), so it renders as a dashed ring on whichever endpoint's plane is current.
+  drawPlaneChangeStub(point, hue, alpha, scale) {
+    const [x, y] = this.gamePositionToCanvas(point.x, point.y);
+    const half = this.pixelsPerGameTile / 2;
+    this.ctx.save();
+    this.ctx.strokeStyle = `hsla(${hue}, 65%, 52%, ${alpha})`;
+    this.ctx.lineWidth = 1.1 * scale;
+    this.ctx.setLineDash([scale, 3 * scale]);
+    this.ctx.beginPath();
+    this.ctx.arc(x + half, y + half, 5 * scale, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
   }
 
   drawMapLinks() {
@@ -797,27 +977,28 @@ export class CanvasMap extends BaseElement {
   }
 
   onMouseLeave() {
-    this.pendingMapLink = null;
+    this.pendingClick = null;
     this.pointerDragged = false;
     this.hoveredMapLink = null;
     this.hideMapLinkTooltip();
+    this.setHoveredMarker(null);
     this.style.cursor = "";
     this.stopDragging();
   }
 
-  beginMapLinkPress(link, clientX, clientY) {
-    this.pendingMapLink = link;
+  beginPendingClick(target, clientX, clientY) {
+    this.pendingClick = target;
     this.pointerDownX = clientX;
     this.pointerDownY = clientY;
     this.pointerDragged = false;
   }
 
-  checkMapLinkDragThreshold(clientX, clientY) {
+  checkClickDragThreshold(clientX, clientY) {
     const dx = clientX - this.pointerDownX;
     const dy = clientY - this.pointerDownY;
     if (dx * dx + dy * dy > 25) {
       this.pointerDragged = true;
-      this.pendingMapLink = null;
+      this.pendingClick = null;
       this.hideMapLinkTooltip();
       this.style.cursor = "grabbing";
       this.startDragging(clientX, clientY);
@@ -829,7 +1010,12 @@ export class CanvasMap extends BaseElement {
   onPointerDown(event) {
     const link = this.getLinkAtClient(event.clientX, event.clientY);
     if (link) {
-      this.beginMapLinkPress(link, event.clientX, event.clientY);
+      this.beginPendingClick({ type: "link", link }, event.clientX, event.clientY);
+      return;
+    }
+    const marker = this.getPlayerMarkerAtClient(event.clientX, event.clientY);
+    if (marker) {
+      this.beginPendingClick({ type: "marker", marker }, event.clientX, event.clientY);
       return;
     }
     this.startDragging(event.clientX, event.clientY);
@@ -856,12 +1042,18 @@ export class CanvasMap extends BaseElement {
       const touch = event.touches[0];
       const link = this.getLinkAtClient(touch.clientX, touch.clientY);
       if (link) {
-        this.beginMapLinkPress(link, touch.clientX, touch.clientY);
+        this.beginPendingClick({ type: "link", link }, touch.clientX, touch.clientY);
+        event.preventDefault();
+        return;
+      }
+      const marker = this.getPlayerMarkerAtClient(touch.clientX, touch.clientY);
+      if (marker) {
+        this.beginPendingClick({ type: "marker", marker }, touch.clientX, touch.clientY);
         event.preventDefault();
         return;
       }
     } else if (event.touches.length === 2) {
-      this.pendingMapLink = null;
+      this.pendingClick = null;
       this.touch.startDistance = this.pinchDistance(event.touches);
       this.touch.startZoom = this.camera.zoom.current;
     }
@@ -885,11 +1077,15 @@ export class CanvasMap extends BaseElement {
   }
 
   stopDragging() {
-    if (this.pendingMapLink) {
+    if (this.pendingClick) {
       if (!this.pointerDragged) {
-        this.goToMapLink(this.pendingMapLink.destination);
+        if (this.pendingClick.type === "link") {
+          this.goToMapLink(this.pendingClick.link.destination);
+        } else if (this.pendingClick.type === "marker") {
+          this.followPlayer(this.pendingClick.marker.label);
+        }
       }
-      this.pendingMapLink = null;
+      this.pendingClick = null;
       this.pointerDragged = false;
       return;
     }
@@ -913,8 +1109,8 @@ export class CanvasMap extends BaseElement {
   }
 
   onPointerMove(event) {
-    if (this.pendingMapLink) {
-      if (this.checkMapLinkDragThreshold(event.clientX, event.clientY)) {
+    if (this.pendingClick) {
+      if (this.checkClickDragThreshold(event.clientX, event.clientY)) {
         this.processPointerMove(event.clientX, event.clientY);
       }
       return;
@@ -927,6 +1123,7 @@ export class CanvasMap extends BaseElement {
         this.hoveredMapLink = link;
         this.showMapLinkTooltip(link, event);
       }
+      this.setHoveredMarker(null);
       this.style.cursor = "pointer";
       return;
     }
@@ -934,14 +1131,28 @@ export class CanvasMap extends BaseElement {
       this.hoveredMapLink = null;
       this.hideMapLinkTooltip();
     }
+    const marker = this.getPlayerMarkerAtClient(event.clientX, event.clientY);
+    if (marker) {
+      this.setHoveredMarker(marker.label);
+      this.style.cursor = "pointer";
+      return;
+    }
+    this.setHoveredMarker(null);
     this.style.cursor = "";
+  }
+
+  setHoveredMarker(name) {
+    if (this.hoveredMarkerName !== name) {
+      this.hoveredMarkerName = name;
+      this.requestUpdate();
+    }
   }
 
   onTouchMove(event) {
     if (event.touches.length === 1) {
       const touch = event.touches[0];
-      if (this.pendingMapLink) {
-        if (this.checkMapLinkDragThreshold(touch.clientX, touch.clientY)) {
+      if (this.pendingClick) {
+        if (this.checkClickDragThreshold(touch.clientX, touch.clientY)) {
           this.processPointerMove(touch.clientX, touch.clientY);
         }
         return;
