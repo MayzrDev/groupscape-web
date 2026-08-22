@@ -21,6 +21,11 @@ export class StatBar extends BaseElement {
       this.bgColor = `rgb(${darkened.r}, ${darkened.g}, ${darkened.b})`;
     }
 
+    if (this.color.startsWith("#")) {
+      const lightened = this.lightenColor(this.hexToRgb(this.color));
+      this.brightColor = `rgb(${lightened.r}, ${lightened.g}, ${lightened.b})`;
+    }
+
     if (this.color.startsWith("hsl")) {
       const [hue, saturation, lightness] = this.color.match(/\d+/g).map(Number);
       this.color = { hue, saturation, lightness };
@@ -62,6 +67,15 @@ export class StatBar extends BaseElement {
     };
   }
 
+  lightenColor(color) {
+    const l = 0.55;
+    return {
+      r: Math.round(color.r + (255 - color.r) * l),
+      g: Math.round(color.g + (255 - color.g) * l),
+      b: Math.round(color.b + (255 - color.b) * l),
+    };
+  }
+
   getColor(ratio) {
     if (typeof this.color === "string") return this.color;
 
@@ -78,8 +92,14 @@ export class StatBar extends BaseElement {
     // bars. This does not leave gaps.
     if (ratio === 1) {
       this.style.background = color;
-    } else {
+    } else if (ratio === 0 || !this.brightColor) {
       this.style.background = `linear-gradient(90deg, ${color}, ${x}%, ${this.bgColor} ${x}%)`;
+    } else {
+      // A thin brightened band right at the fill boundary, so the bar reads as a leading edge
+      // rather than a flat cut. Two color-hints (each pinned to its own stop's position) keep
+      // both transitions instant, same trick as the color -> bgColor cut above.
+      const leadX = Math.max(x - 2, 0);
+      this.style.background = `linear-gradient(90deg, ${color}, ${leadX}%, ${this.brightColor} ${leadX}%, ${x}%, ${this.bgColor} ${x}%)`;
     }
   }
 }

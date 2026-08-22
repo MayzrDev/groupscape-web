@@ -50,6 +50,33 @@ player-stats {
   padding: 2px 0;
 }
 
+.player-stats__prayer,
+.player-stats__hitpoints {
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.18);
+  clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 8px) 100%, 0 100%);
+}
+
+.player-stats__world {
+  position: absolute;
+  right: 8px;
+  top: 2px;
+  z-index: 1;
+  font-size: 0.66em;
+  color: #c8bda3;
+  opacity: 0.55;
+  text-shadow: none;
+}
+
+.player-stats__world::before {
+  content: "[";
+  margin-right: 2px;
+}
+
+.player-stats__world::after {
+  content: "]";
+  margin-left: 2px;
+}
+
 .player-stats__prayer-bar,
 .player-stats__hitpoints-bar,
 .player-stats__energy-bar {
