@@ -15,7 +15,9 @@ player-stats {
   position: relative;
 }
 
+/* Hidden pending revisit - keep handler/pubsub logic intact, just don't show it for now */
 .player-stats__presence {
+  display: none;
   margin-left: 8px;
   z-index: 1;
   position: relative;
