@@ -84,19 +84,53 @@ export class CanvasMap extends BaseElement {
     this.getMapJson();
     this.update = this._update.bind(this);
     this.requestUpdate();
-    if (this.frameRequestId) {
-      window.cancelAnimationFrame(this.frameRequestId);
-    }
-    this.frameRequestId = window.requestAnimationFrame(this.update);
+    this.cancelScheduledFrame();
+    this.onActivityChange = this.onActivityChange.bind(this);
+    this.eventListener(document, "visibilitychange", this.onActivityChange);
+    this.eventListener(window, "focus", this.onActivityChange);
+    this.eventListener(window, "blur", this.onActivityChange);
+    this.scheduleNextFrame();
   }
 
   disconnectedCallback() {
-    if (this.frameRequestId) {
-      window.cancelAnimationFrame(this.frameRequestId);
-      this.frameRequestId = null;
-    }
+    this.cancelScheduledFrame();
     this.hideMapLinkTooltip();
     super.disconnectedCallback();
+  }
+
+  cancelScheduledFrame() {
+    if (this.frameRequestId) {
+      if (this.frameIsTimeout) {
+        window.clearTimeout(this.frameRequestId);
+      } else {
+        window.cancelAnimationFrame(this.frameRequestId);
+      }
+      this.frameRequestId = null;
+    }
+  }
+
+  isPageInactive() {
+    return document.hidden || !document.hasFocus();
+  }
+
+  scheduleNextFrame() {
+    if (this.isPageInactive()) {
+      this.frameIsTimeout = true;
+      this.frameRequestId = window.setTimeout(() => this.update(performance.now()), 3000);
+    } else {
+      this.frameIsTimeout = false;
+      this.frameRequestId = window.requestAnimationFrame(this.update);
+    }
+  }
+
+  onActivityChange() {
+    if (!this.isPageInactive()) {
+      // Switch back to the fast render loop immediately instead of waiting for the
+      // slow background timeout to elapse.
+      this.cancelScheduledFrame();
+      this.requestUpdate();
+      this.scheduleNextFrame();
+    }
   }
 
   async getMapJson() {
@@ -533,7 +567,7 @@ export class CanvasMap extends BaseElement {
       return;
     }
 
-    this.frameRequestId = window.requestAnimationFrame(this.update);
+    this.scheduleNextFrame();
   }
 
   addInteractingMarker(x, y, label) {
