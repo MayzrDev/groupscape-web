@@ -17,6 +17,7 @@ export class PlayerInteracting extends BaseElement {
 
     this.fill = this.querySelector(".player-interacting__fill");
     this.name = this.querySelector(".player-interacting__name");
+    this.hp = this.querySelector(".player-interacting__hp");
     this.map = document.querySelector("#background-worldmap");
     const playerName = this.getAttribute("player-name");
 
@@ -55,6 +56,8 @@ export class PlayerInteracting extends BaseElement {
       this.fill.style.width = isEnemy
         ? `${Math.max(0, Math.min(1, interacting.ratio / interacting.scale)) * 100}%`
         : "100%";
+
+      this.hp.textContent = isEnemy ? `${interacting.ratio}/${interacting.scale}` : "";
 
       this.name.innerHTML = interacting.name;
       this.show();
