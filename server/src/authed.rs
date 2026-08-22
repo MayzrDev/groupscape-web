@@ -19,7 +19,7 @@ use crate::progress_events;
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
-use crate::websocket::{self, GroupBroadcastRegistry, VitalsUpdatePayload, WsEnvelope};
+use crate::websocket::{self, GroupBroadcastRegistry, KillEventPayload, VitalsUpdatePayload, WsEnvelope};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
@@ -495,6 +495,25 @@ pub async fn update_group_member(
                     group_member_inner.name.clone(),
                     event.clone(),
                 );
+
+                // Kills are pushed straight to the group's connected overlays too, so other
+                // members' chat can react live - unlike vitals, this is worth a dedicated
+                // envelope rather than a value bag, and death is left off the wire since
+                // nothing consumes it yet.
+                if let GameEvent::Kill(kill) = event {
+                    if broadcast_registry.has_subscribers(auth.group_id) {
+                        let envelope = WsEnvelope::KillEvent {
+                            payload: KillEventPayload {
+                                member_name: group_member_inner.name.clone(),
+                                npc_name: kill.npc_name.clone(),
+                            },
+                            ts: Utc::now(),
+                        };
+                        if let Ok(message) = serde_json::to_string(&envelope) {
+                            broadcast_registry.publish(auth.group_id, message);
+                        }
+                    }
+                }
             }
         }
     }

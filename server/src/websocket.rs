@@ -108,6 +108,13 @@ pub struct VitalsUpdatePayload {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KillEventPayload {
+    pub member_name: String,
+    pub npc_name: String,
+}
+
+#[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEnvelope {
     RosterSnapshot {
@@ -118,6 +125,31 @@ pub enum WsEnvelope {
         payload: VitalsUpdatePayload,
         ts: DateTime<Utc>,
     },
+    KillEvent {
+        payload: KillEventPayload,
+        ts: DateTime<Utc>,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kill_event_serializes_with_snake_case_type_and_camel_case_payload() {
+        let envelope = WsEnvelope::KillEvent {
+            payload: KillEventPayload {
+                member_name: "Zezima".to_string(),
+                npc_name: "Zulrah".to_string(),
+            },
+            ts: DateTime::<Utc>::MIN_UTC,
+        };
+
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["type"], "kill_event");
+        assert_eq!(json["payload"]["memberName"], "Zezima");
+        assert_eq!(json["payload"]["npcName"], "Zulrah");
+    }
 }
 
 /// Maps the persisted/POSTed GroupMember shape onto the overlay's wire vitals.
