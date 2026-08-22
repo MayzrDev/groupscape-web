@@ -34,6 +34,7 @@ import "./permission-member/permission-member.js";
 import "./loading-screen/loading-screen.js";
 import "./logout-page/logout-page.js";
 import "./demo-page/demo-page.js";
+import "./fork-page/fork-page.js";
 import "./social-links/social-links.js";
 import "./rune-pouch/rune-pouch.js";
 import "./stat-bar/stat-bar.js";

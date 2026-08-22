@@ -1,0 +1,99 @@
+fork-page {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 100%;
+  padding: 4em 1em;
+  box-sizing: border-box;
+}
+
+.fork-page__container {
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+}
+
+.fork-page__seal {
+  width: 54px;
+  height: 54px;
+  margin: 0 auto 1em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #e8b94a, var(--pending-characters-accent) 55%, #7a5a1a 100%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "rsbold";
+  font-size: 1.2em;
+  color: var(--black);
+}
+
+.fork-page__eyebrow {
+  margin: 0 0 0.6em;
+  font-size: 0.75em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pending-characters-accent);
+}
+
+.fork-page__container h1 {
+  font-size: 1.6em;
+  margin: 0 0 0.7em;
+  text-wrap: balance;
+}
+
+.fork-page__container p {
+  font-size: 0.95em;
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.fork-page__links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  align-items: stretch;
+  margin: 1.6em 0 1.8em;
+}
+
+.fork-page__primary {
+  width: 100%;
+}
+
+.fork-page__repo-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6em;
+  padding: 0.7em 1em;
+  border: 1px solid var(--light-border);
+  border-radius: 4px;
+  background: var(--elevated);
+  color: var(--primary-text);
+  font-size: 0.85em;
+  text-decoration: none;
+}
+
+.fork-page__repo-link:hover {
+  border-color: var(--pending-characters-accent);
+  background: var(--pending-characters-accent-soft);
+}
+
+.fork-page__repo-link small {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 0.85em;
+  opacity: 0.65;
+  text-shadow: none;
+}
+
+.fork-page__back {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+.fork-page__back a {
+  text-decoration: underline;
+  color: inherit;
+  cursor: pointer;
+}

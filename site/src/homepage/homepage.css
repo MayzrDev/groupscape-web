@@ -60,3 +60,45 @@ homepage social-links {
 .homepage__secondary-links men-link + men-link {
   margin-left: 2em;
 }
+
+homepage-page men-link.homepage__fork-badge {
+  position: absolute;
+  bottom: 1em;
+  right: 1em;
+  font-size: 0.75em;
+  letter-spacing: 0.04em;
+}
+
+homepage-page men-link.homepage__fork-badge a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  color: var(--primary-text);
+  opacity: 0.7;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--light-border);
+  border-radius: 999px;
+  padding: 0.5em 0.9em 0.5em 0.6em;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+homepage-page men-link.homepage__fork-badge a:hover {
+  opacity: 1;
+  color: var(--pending-characters-accent);
+  border-color: var(--pending-characters-accent);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.homepage__fork-badge-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1em;
+  height: 1.1em;
+  border-radius: 50%;
+  background: var(--pending-characters-accent);
+  color: var(--black);
+  font-family: "rsbold";
+  font-size: 0.85em;
+}
