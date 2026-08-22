@@ -29,11 +29,7 @@ app-navigation .men-button img {
   display: flex;
   align-items: center;
   column-gap: 6px;
-  justify-content: flex-start;
-  flex-grow: 1;
-}
-
-.app-navigation__separator {
+  justify-content: flex-end;
   flex-grow: 1;
 }
 
