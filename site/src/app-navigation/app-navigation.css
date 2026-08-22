@@ -27,7 +27,7 @@ app-navigation .men-button img {
 }
 .app-navigation__nav {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   column-gap: 6px;
   justify-content: flex-end;
   flex-grow: 1;
