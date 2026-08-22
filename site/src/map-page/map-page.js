@@ -1,4 +1,5 @@
 import { BaseElement } from "../base-element/base-element";
+import { pubsub } from "../data/pubsub";
 
 export class MapPage extends BaseElement {
   constructor() {
@@ -15,13 +16,10 @@ export class MapPage extends BaseElement {
     this.worldMap = document.querySelector("#background-worldmap");
     document.querySelector(".authed-section").classList.add("no-pointer-events");
     this.worldMap.classList.add("interactable");
-    this.playerButtons = this.querySelector(".map-page__focus-player-buttons");
     this.planeSelect = this.querySelector(".map-page__plane-select");
 
     this.planeSelect.value = this.worldMap.plane || 1;
 
-    this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
-    this.eventListener(this.playerButtons, "click", this.handleFocusPlayer.bind(this));
     this.eventListener(this.planeSelect, "change", this.handlePlaneSelect.bind(this));
     this.eventListener(this.planeSelect, "wheel", this.handlePlaneWheel.bind(this), { passive: false });
     this.eventListener(this.worldMap, "plane-changed", this.handlePlaneChange.bind(this));
@@ -46,6 +44,7 @@ export class MapPage extends BaseElement {
 
   handlePlaneSelect() {
     this.worldMap.stopFollowingPlayer();
+    pubsub.publish("player-followed", null);
     this.worldMap.showPlane(this.getSelectedPlane());
   }
 
@@ -58,24 +57,6 @@ export class MapPage extends BaseElement {
       this.planeSelect.value = next;
       this.handlePlaneSelect();
     }
-  }
-
-  handleUpdatedMembers(members) {
-    let playerButtons = "";
-    for (const member of members) {
-      if (member.name === "@SHARED") continue;
-      playerButtons += `<button type="button" class="men-button" player-name="${member.name}">${member.name}</button>`;
-    }
-
-    if (this.playerButtons) {
-      this.playerButtons.innerHTML = playerButtons;
-    }
-  }
-
-  handleFocusPlayer(event) {
-    const target = event.target;
-    const playerName = target.getAttribute("player-name");
-    this.worldMap.followPlayer(playerName);
   }
 }
 customElements.define("map-page", MapPage);

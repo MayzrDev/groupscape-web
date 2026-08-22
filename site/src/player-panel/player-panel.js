@@ -1,4 +1,5 @@
 import { BaseElement } from "../base-element/base-element";
+import { pubsub } from "../data/pubsub";
 
 export class PlayerPanel extends BaseElement {
   constructor() {
@@ -46,6 +47,27 @@ export class PlayerPanel extends BaseElement {
       "click",
       this.handleCombatAchievementsClick.bind(this)
     );
+
+    this.followButton = this.querySelector(".player-panel__follow");
+    this.eventListener(this.followButton, "click", this.handleFollowClick.bind(this));
+    this.subscribe("player-followed", this.handleFollowedChanged.bind(this));
+  }
+
+  handleFollowClick() {
+    const worldMap = document.querySelector("#background-worldmap");
+    if (!worldMap) return;
+
+    if (worldMap.followingPlayer.name === this.playerName) {
+      worldMap.stopFollowingPlayer();
+      pubsub.publish("player-followed", null);
+    } else {
+      worldMap.followPlayer(this.playerName);
+      pubsub.publish("player-followed", worldMap.followingPlayer.name);
+    }
+  }
+
+  handleFollowedChanged(followedName) {
+    this.followButton.classList.toggle("player-panel__follow--active", followedName === this.playerName);
   }
 
   disconnectedCallback() {

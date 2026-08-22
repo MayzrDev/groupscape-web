@@ -2,9 +2,9 @@ side-panel {
   display: block;
   height: max-content;
   max-height: 100%;
-  width: 300px;
-  max-width: 300px;
-  min-width: 300px;
+  width: 230px;
+  max-width: 230px;
+  min-width: 230px;
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
