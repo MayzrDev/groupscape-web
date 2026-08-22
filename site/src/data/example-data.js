@@ -42,7 +42,9 @@ class ExampleData {
         quests: Quest.randomQuestStates(),
         bank: [995, Math.floor(Math.random() * 25000000)],
         stats: [99, 99, 99, 99, 100, 100, 330],
-        skills: Object.values(SkillName).map(() => Math.floor(Math.random() * 14000000)),
+        skills: Object.values(SkillName)
+          .filter((skillName) => skillName !== SkillName.Overall)
+          .map(() => Math.floor(Math.random() * 14000000)),
         equipment: Item.randomItems(14, 1),
         inventory: Item.randomItems(28),
         coordinates: [3029, 3000, 0],
@@ -56,7 +58,9 @@ class ExampleData {
         coordinates: [3029, 3000, 0],
         // coordinates: [3129, 3100, 0],
         stats: [55, 93, 13, 70, 75, 100, 330],
-        skills: Object.values(SkillName).map(() => Math.floor(Math.random() * 14000000)),
+        skills: Object.values(SkillName)
+          .filter((skillName) => skillName !== SkillName.Overall)
+          .map(() => Math.floor(Math.random() * 14000000)),
         bank: [995, Math.floor(Math.random() * 5000000)],
         diary_vars: AchievementDiary.randomDiaries(),
         potion_storage: this.randomPotionStorage(),
@@ -122,7 +126,9 @@ class ExampleData {
       },
       "Bank alt": {
         bank: [995, Math.floor(Math.random() * 5000000), ...Item.randomItems(500)],
-        skills: Object.values(SkillName).map(() => Math.floor(Math.random() * 14000000)),
+        skills: Object.values(SkillName)
+          .filter((skillName) => skillName !== SkillName.Overall)
+          .map(() => Math.floor(Math.random() * 14000000)),
         stats: [7, 10, 10, 10, 100, 100, 309],
         equipment: Item.randomItems(14, 1),
         // coordinates: [3029, 3000, 0],
@@ -192,8 +198,7 @@ class ExampleData {
   getSkillData(period, groupData) {
     const dates = SkillGraph.datesForPeriod(period);
     const result = [];
-    const skillNames = Object.values(SkillName);
-    skillNames.sort((a, b) => a.localeCompare(b));
+    const skillNames = Object.keys(SkillName).filter((skillName) => skillName !== SkillName.Overall);
 
     for (const member of groupData.members.values()) {
       if (!member.skills) continue;

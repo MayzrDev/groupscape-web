@@ -371,6 +371,9 @@ class Api {
           Authorization: this.groupToken,
         },
       });
+      if (!response.ok) {
+        return [];
+      }
       return response.json();
     }
   }
