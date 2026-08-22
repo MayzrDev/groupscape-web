@@ -63,8 +63,8 @@ player-stats {
 
 .player-stats__world {
   position: absolute;
-  right: 8px;
-  top: 2px;
+  right: 4px;
+  bottom: 1px;
   z-index: 1;
   font-size: 0.66em;
   color: #c8bda3;

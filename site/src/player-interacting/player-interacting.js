@@ -15,7 +15,7 @@ export class PlayerInteracting extends BaseElement {
     super.connectedCallback();
     this.render();
 
-    this.hitpointsBar = this.querySelector("stat-bar");
+    this.fill = this.querySelector(".player-interacting__fill");
     this.name = this.querySelector(".player-interacting__name");
     this.map = document.querySelector("#background-worldmap");
     const playerName = this.getAttribute("player-name");
@@ -47,7 +47,15 @@ export class PlayerInteracting extends BaseElement {
     if (timeUntilHide > 1000) {
       window.clearTimeout(this.hideTimeout);
       this.hideTimeout = window.setTimeout(this.hide.bind(this), this.staleTimeout);
-      this.hitpointsBar.update(interacting.ratio / interacting.scale);
+
+      // Only an attackable actor (one with a combat health bar) gets a real ratio to show;
+      // anything else (NPC/object interactions like banking) reads as a full neutral bar.
+      const isEnemy = interacting.scale > 0;
+      this.classList.toggle("player-interacting--neutral", !isEnemy);
+      this.fill.style.width = isEnemy
+        ? `${Math.max(0, Math.min(1, interacting.ratio / interacting.scale)) * 100}%`
+        : "100%";
+
       this.name.innerHTML = interacting.name;
       this.show();
     }
