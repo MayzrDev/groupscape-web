@@ -139,6 +139,15 @@ skills-graphs {
   width: 100%;
 }
 
+.skills-graphs__metric-select,
+.skills-graphs__skill-select,
+.skills-graphs__boss-select,
+.skills-graphs__metric-select option,
+.skills-graphs__skill-select option,
+.skills-graphs__boss-select option {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+}
+
 .skills-graphs__period-btn.active {
   background: rgb(66, 55, 38);
   outline: 1px solid rgb(200, 200, 200);

@@ -368,12 +368,14 @@ export class SkillGraph extends BaseElement {
     let min = Number.MAX_SAFE_INTEGER;
     let max = 0;
     for (const ds of dataSets) {
-      min = Math.min(min, ds.data[0]);
-      max = Math.max(max, ds.data[ds.data.length - 1]);
+      const first = ds.data[0];
+      const last = ds.data[ds.data.length - 1];
+      if (Number.isFinite(first)) min = Math.min(min, first);
+      if (Number.isFinite(last)) max = Math.max(max, last);
     }
-    if (dataSets.length === 0) {
+    if (!Number.isFinite(min) || min === Number.MAX_SAFE_INTEGER) {
       min = 0;
-      max = 1;
+      max = Math.max(max, 1);
     }
 
     const scales = {
@@ -469,9 +471,9 @@ export class SkillGraph extends BaseElement {
 
   dataSets(skillName) {
     const result = [];
-    for (const playerSkillData of this.skillDataForGroup) {
+    for (const playerSkillData of this.skillDataForGroup || []) {
       const member = this.currentGroupData.members.get(playerSkillData.name);
-      if (!member || !member.skills) continue;
+      if (!member || !member.skills || !member.skills[skillName]) continue;
       const currentValue = member.skills[skillName].xp;
       const completeTimeSeries = this.generateCompleteTimeSeries(
         playerSkillData.skill_data,
