@@ -71,6 +71,12 @@ export class CanvasMap extends BaseElement {
     };
     this.touch = {};
 
+    this.playerIconImage = new Image();
+    this.playerIconImage.src = "/ui/player-icon.webp";
+    this.playerIconImage.onload = () => {
+      this.requestUpdate();
+    };
+
     const [startX, startY] = this.gamePositionToCameraCenter(3103, 3095);
     this.camera.x.goTo(startX, 1);
     this.camera.y.goTo(startY, 1);
@@ -665,16 +671,16 @@ export class CanvasMap extends BaseElement {
     }
   }
 
-  // Small full-helm silhouette (dome + brim + nose guard) tinted to the member's assigned
-  // colour. Sized to stay a roughly constant screen size across zoom levels, same approach
-  // as iconCanvasSize() for location icons.
+  // Draws the same ironman-helm icon shown next to the member's name in the side panels
+  // (player-icon.js/.css), tinted with the identical hue-rotate + saturate filter, so the
+  // map marker matches the panel icon instead of a bespoke canvas-drawn shape.
   drawHelmetIcon(centerX, centerY, hue, inactive, hovered) {
+    if (!this.playerIconImage?.complete || this.playerIconImage.naturalWidth === 0) return;
+
     const scale = 1 / Math.min(this.camera.zoom.current, 3);
-    const r = 3.6 * scale;
     const alpha = inactive ? 0.45 : 1;
-    const fill = `hsla(${hue}, 68%, ${inactive ? 42 : 55}%, ${alpha})`;
-    const shade = `hsla(${hue}, 68%, ${inactive ? 28 : 36}%, ${alpha})`;
-    const outline = `rgba(0, 0, 0, ${inactive ? 0.35 : 0.85})`;
+    const width = this.playerIconImage.naturalWidth * scale * 0.9;
+    const height = this.playerIconImage.naturalHeight * scale * 0.9;
 
     this.ctx.save();
     this.ctx.translate(centerX, centerY);
@@ -683,36 +689,13 @@ export class CanvasMap extends BaseElement {
       this.ctx.strokeStyle = `hsla(${hue}, 68%, 55%, ${alpha * 0.5})`;
       this.ctx.lineWidth = scale;
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, r * 1.9, 0, Math.PI * 2);
+      this.ctx.arc(0, 0, Math.max(width, height) * 0.75, 0, Math.PI * 2);
       this.ctx.stroke();
     }
 
-    this.ctx.lineWidth = 0.7 * scale;
-    this.ctx.strokeStyle = outline;
-
-    this.ctx.fillStyle = fill;
-    this.ctx.beginPath();
-    this.ctx.arc(0, -0.5 * scale, r, Math.PI, 0, false);
-    this.ctx.lineTo(r, 1.2 * scale);
-    this.ctx.lineTo(-r, 1.2 * scale);
-    this.ctx.closePath();
-    this.ctx.fill();
-    this.ctx.stroke();
-
-    this.ctx.fillStyle = shade;
-    this.ctx.beginPath();
-    this.ctx.moveTo(-r * 1.15, 1.2 * scale);
-    this.ctx.lineTo(r * 1.15, 1.2 * scale);
-    this.ctx.lineTo(r * 0.9, 2.2 * scale);
-    this.ctx.lineTo(-r * 0.9, 2.2 * scale);
-    this.ctx.closePath();
-    this.ctx.fill();
-    this.ctx.stroke();
-
-    const noseWidth = 0.28 * r;
-    this.ctx.fillStyle = shade;
-    this.ctx.fillRect(-noseWidth / 2, -0.5 * scale, noseWidth, 3 * scale);
-    this.ctx.strokeRect(-noseWidth / 2, -0.5 * scale, noseWidth, 3 * scale);
+    this.ctx.globalAlpha = alpha;
+    this.ctx.filter = `hue-rotate(${hue}deg) saturate(75%)`;
+    this.ctx.drawImage(this.playerIconImage, -width / 2, -height / 2, width, height);
 
     this.ctx.restore();
   }
@@ -739,7 +722,7 @@ export class CanvasMap extends BaseElement {
   // close to full strength.
   trailAgeAlpha(age) {
     const t = Math.max(0, 1 - (age - 1) / 10);
-    return 0.12 + 0.6 * t;
+    return 0.35 + 0.65 * t;
   }
 
   drawTrailSegment(seg, hue, alpha, isJump, scale) {
@@ -747,10 +730,19 @@ export class CanvasMap extends BaseElement {
     const [bx, by] = this.gamePositionToCanvas(seg.b.x, seg.b.y);
     const half = this.pixelsPerGameTile / 2;
     this.ctx.save();
-    this.ctx.strokeStyle = `hsla(${hue}, 65%, 52%, ${alpha})`;
-    this.ctx.lineWidth = 1.3 * scale;
     this.ctx.lineCap = "round";
-    this.ctx.setLineDash(isJump ? [1.5 * scale, 4 * scale] : []);
+    this.ctx.setLineDash(isJump ? [2.5 * scale, 5 * scale] : []);
+
+    // Dark outline underneath so the trail reads clearly over any map tile/terrain colour.
+    this.ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.55})`;
+    this.ctx.lineWidth = 4.2 * scale;
+    this.ctx.beginPath();
+    this.ctx.moveTo(ax + half, ay + half);
+    this.ctx.lineTo(bx + half, by + half);
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = `hsla(${hue}, 80%, 62%, ${alpha})`;
+    this.ctx.lineWidth = 2.4 * scale;
     this.ctx.beginPath();
     this.ctx.moveTo(ax + half, ay + half);
     this.ctx.lineTo(bx + half, by + half);
@@ -764,11 +756,18 @@ export class CanvasMap extends BaseElement {
     const [x, y] = this.gamePositionToCanvas(point.x, point.y);
     const half = this.pixelsPerGameTile / 2;
     this.ctx.save();
-    this.ctx.strokeStyle = `hsla(${hue}, 65%, 52%, ${alpha})`;
-    this.ctx.lineWidth = 1.1 * scale;
-    this.ctx.setLineDash([scale, 3 * scale]);
+    this.ctx.setLineDash([2 * scale, 4 * scale]);
+
+    this.ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.55})`;
+    this.ctx.lineWidth = 3 * scale;
     this.ctx.beginPath();
-    this.ctx.arc(x + half, y + half, 5 * scale, 0, Math.PI * 2);
+    this.ctx.arc(x + half, y + half, 5.5 * scale, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    this.ctx.strokeStyle = `hsla(${hue}, 80%, 62%, ${alpha})`;
+    this.ctx.lineWidth = 1.8 * scale;
+    this.ctx.beginPath();
+    this.ctx.arc(x + half, y + half, 5.5 * scale, 0, Math.PI * 2);
     this.ctx.stroke();
     this.ctx.restore();
   }

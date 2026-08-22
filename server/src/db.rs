@@ -2107,6 +2107,95 @@ ALTER TABLE groupscape.members ADD COLUMN IF NOT EXISTS color TEXT
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_account_status_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD CONSTRAINT accounts_status_check CHECK (status IN ('active', 'suspended', 'banned', 'deleted'))
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT false
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ
+"#,
+                &[],
+            )
+            .await?;
+        // Backfill: the old `disabled` flag becomes `status = 'banned'` - `disabled` itself is
+        // kept around (unread from here on) rather than dropped, since dropping a column is a
+        // one-way door and nothing in this migration set needs the space back.
+        transaction
+            .execute(
+                r#"
+UPDATE groupscape.accounts SET status = 'banned' WHERE disabled = true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_account_status_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_account_sessions_ip_ua").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.account_sessions ADD COLUMN IF NOT EXISTS ip TEXT
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.account_sessions ADD COLUMN IF NOT EXISTS user_agent TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_account_sessions_ip_ua").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2116,6 +2205,26 @@ pub struct AccountForAuth {
     pub password_hash: Option<String>,
     pub disabled: bool,
     pub created_at: DateTime<Utc>,
+    pub status: String,
+    pub must_change_password: bool,
+    pub failed_login_attempts: i32,
+    pub locked_until: Option<DateTime<Utc>>,
+}
+
+const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until";
+
+fn account_for_auth_from_row(row: Row) -> Result<AccountForAuth, ApiError> {
+    Ok(AccountForAuth {
+        id: row.try_get("id")?,
+        email: row.try_get("email")?,
+        password_hash: row.try_get("password_hash")?,
+        disabled: row.try_get("disabled")?,
+        created_at: row.try_get("created_at")?,
+        status: row.try_get("status")?,
+        must_change_password: row.try_get("must_change_password")?,
+        failed_login_attempts: row.try_get("failed_login_attempts")?,
+        locked_until: row.try_get("locked_until")?,
+    })
 }
 
 impl From<AccountForAuth> for crate::models::Account {
@@ -2124,6 +2233,7 @@ impl From<AccountForAuth> for crate::models::Account {
             id: account.id,
             email: account.email,
             created_at: account.created_at,
+            must_change_password: account.must_change_password,
         }
     }
 }
@@ -2153,22 +2263,16 @@ pub async fn get_account_by_discord_id(
     discord_id: &str,
 ) -> Result<Option<AccountForAuth>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE discord_id=$1",
-        )
+        .prepare_cached(&format!(
+            "SELECT {ACCOUNT_FOR_AUTH_COLUMNS} FROM groupscape.accounts WHERE discord_id=$1"
+        ))
         .await?;
     let row = client
         .query_opt(&stmt, &[&discord_id])
         .await
         .map_err(ApiError::GetAccountError)?;
     match row {
-        Some(row) => Ok(Some(AccountForAuth {
-            id: row.try_get("id")?,
-            email: row.try_get("email")?,
-            password_hash: row.try_get("password_hash")?,
-            disabled: row.try_get("disabled")?,
-            created_at: row.try_get("created_at")?,
-        })),
+        Some(row) => Ok(Some(account_for_auth_from_row(row)?)),
         None => Ok(None),
     }
 }
