@@ -30,16 +30,10 @@
 
   <div class="account-page__card rsborder rsbackground">
     <h3>Password</h3>
-    <p class="account-page__hint">Requires your current password.</p>
+    <p class="account-page__hint account-page__password-forced-hint" hidden>
+      You must set a new password before continuing.
+    </p>
     <div class="account-page__field-row">
-      <men-input
-        class="account-page__current-password"
-        max-length="256"
-        input-id="accountCurrentPassword"
-        input-label="Current password"
-        placeholder-text="Password"
-        type-password
-      ></men-input>
       <men-input
         class="account-page__new-password"
         max-length="256"

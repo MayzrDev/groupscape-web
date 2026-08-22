@@ -18,12 +18,6 @@ const passwordValidator = (value) => {
   }
 };
 
-const fieldRequiredValidator = (value) => {
-  if (value.length === 0) {
-    return "This field is required.";
-  }
-};
-
 function initials(email) {
   if (!email) return "?";
   return email.slice(0, 2).toUpperCase();
@@ -60,13 +54,12 @@ export class AccountPage extends BaseElement {
     this.emailStatus = this.querySelector(".account-page__email-status");
     this.eventListener(this.emailSaveButton, "click", this.saveEmail.bind(this));
 
-    this.currentPasswordInput = this.querySelector(".account-page__current-password");
-    this.currentPasswordInput.validators = [fieldRequiredValidator];
     this.newPasswordInput = this.querySelector(".account-page__new-password");
     this.newPasswordInput.validators = [passwordValidator];
     this.passwordSaveButton = this.querySelector(".account-page__password-save");
     this.passwordError = this.querySelector(".account-page__password-error");
     this.passwordStatus = this.querySelector(".account-page__password-status");
+    this.passwordForcedHint = this.querySelector(".account-page__password-forced-hint");
     this.eventListener(this.passwordSaveButton, "click", this.savePassword.bind(this));
 
     this.apiKeyReveal = this.querySelector(".account-page__api-key-reveal");
@@ -128,6 +121,7 @@ export class AccountPage extends BaseElement {
     if (account.email) {
       this.emailInput.input.value = account.email;
     }
+    this.passwordForcedHint.hidden = !account.must_change_password;
   }
 
   async saveEmail() {
@@ -162,18 +156,16 @@ export class AccountPage extends BaseElement {
     this.passwordError.textContent = "";
     this.passwordStatus.textContent = "";
     this.passwordStatus.classList.remove("ok");
-    if (!this.currentPasswordInput.valid || !this.newPasswordInput.valid) return;
+    if (!this.newPasswordInput.valid) return;
 
     try {
       this.passwordSaveButton.disabled = true;
-      const response = await accountApi.changePassword(this.currentPasswordInput.value, this.newPasswordInput.value);
+      const response = await accountApi.changePassword(this.newPasswordInput.value);
       if (response.ok) {
-        this.currentPasswordInput.input.value = "";
         this.newPasswordInput.input.value = "";
         this.passwordStatus.textContent = "Password changed.";
         this.passwordStatus.classList.add("ok");
-      } else if (response.status === 401) {
-        this.passwordError.textContent = "Current password is incorrect.";
+        this.passwordForcedHint.hidden = true;
       } else if (response.status === 400) {
         this.passwordError.textContent = await response.text();
       } else {

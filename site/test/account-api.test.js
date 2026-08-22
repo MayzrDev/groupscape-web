@@ -263,17 +263,17 @@ describe("accountApi", () => {
     expect(response.ok).toBe(true);
   });
 
-  it("changePassword sends the stored token and both passwords", async () => {
+  it("changePassword sends the stored token and the new password only - no current-password re-entry", async () => {
     accountStorage.storeAccountToken("session-token");
     globalThis.fetch.mockResolvedValue({ ok: true, status: 204 });
 
-    const response = await accountApi.changePassword("oldpassword", "newpassword123");
+    const response = await accountApi.changePassword("newpassword123");
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/account/password",
       expect.objectContaining({
         method: "PUT",
-        body: JSON.stringify({ current_password: "oldpassword", new_password: "newpassword123" }),
+        body: JSON.stringify({ new_password: "newpassword123" }),
         headers: { "Content-Type": "application/json", Authorization: "session-token" },
       }),
     );

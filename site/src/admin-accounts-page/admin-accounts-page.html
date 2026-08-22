@@ -2,11 +2,80 @@
   <h1>Accounts</h1>
 </div>
 
-<div class="admin-panel admin-accounts">
-  <div class="admin-accounts__count">0</div>
-  <div class="admin-accounts__label">registered accounts</div>
-  <p class="admin-accounts__note">
-    Account management isn&rsquo;t built yet &mdash; groups are still the only login today. This tab
-    is reserved for when per-user accounts ship.
-  </p>
+<div class="admin-accounts__layout">
+  <div class="admin-accounts__list-pane admin-panel">
+    <div class="admin-toolbar">
+      <input type="search" class="admin-accounts__search" placeholder="Search by email or id&hellip;" />
+      <select class="admin-accounts__status-filter">
+        <option value="">All statuses</option>
+        <option value="active">Active</option>
+        <option value="suspended">Suspended</option>
+        <option value="banned">Banned</option>
+        <option value="deleted">Deleted</option>
+      </select>
+    </div>
+
+    <div class="admin-accounts__error admin-error"></div>
+
+    <div class="admin-table-wrap">
+      <table class="admin-accounts__table">
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Last login</th>
+          </tr>
+        </thead>
+        <tbody class="admin-accounts__rows"></tbody>
+      </table>
+    </div>
+
+    <div class="admin-accounts__pager admin-pager">
+      <button class="admin-btn admin-btn--small js-prev-page">&larr; Prev</button>
+      <span class="admin-accounts__pager-label admin-pager__label">Page 1 of 1</span>
+      <button class="admin-btn admin-btn--small js-next-page">Next &rarr;</button>
+    </div>
+  </div>
+
+  <div class="admin-accounts__detail-pane">
+    <div class="admin-accounts__empty-state admin-panel">Select an account on the left to view its details.</div>
+
+    <div class="admin-accounts__dialogue rsborder rsbackground" hidden>
+      <h2 class="admin-accounts__dialogue-title">&nbsp;</h2>
+      <div class="admin-accounts__dialogue-meta"></div>
+      <div class="admin-accounts__dialogue-error admin-error"></div>
+
+      <div class="admin-accounts__temp-password" hidden>
+        <p>Temporary password &mdash; shown once, copy it now:</p>
+        <div class="admin-accounts__temp-password-value admin-mono"></div>
+        <button class="admin-btn admin-btn--small js-dismiss-temp-password">Dismiss</button>
+      </div>
+
+      <div class="admin-accounts__email-form" hidden>
+        <input type="email" class="admin-accounts__email-input" placeholder="new-email@example.com" />
+        <button class="admin-btn admin-btn--small js-save-email">Save</button>
+        <button class="admin-btn admin-btn--small js-cancel-email">Cancel</button>
+      </div>
+
+      <div class="admin-accounts__section">
+        <h3>Groups (<span class="admin-accounts__group-count">0</span>)</h3>
+        <div class="admin-accounts__groups"></div>
+      </div>
+
+      <div class="admin-accounts__section">
+        <h3>Characters (<span class="admin-accounts__character-count">0</span>)</h3>
+        <div class="admin-accounts__characters"></div>
+      </div>
+
+      <div class="admin-accounts__section">
+        <h3>Sessions (<span class="admin-accounts__session-count">0</span>)</h3>
+        <div class="admin-accounts__sessions"></div>
+      </div>
+
+      <div class="admin-accounts__options">
+        <h3>What would you like to do?</h3>
+        <ol class="admin-accounts__options-list"></ol>
+      </div>
+    </div>
+  </div>
 </div>

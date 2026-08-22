@@ -77,6 +77,28 @@ class AccountApi {
     return `${this.baseUrl}/push/subscribe`;
   }
 
+  /**
+   * Every authed-account fetch routes through here so the forced-password-change gate is
+   * handled in exactly one place: the backend returns 403 (`MustChangePasswordError`) for any
+   * authed account endpoint other than `/me` and `/password` while `must_change_password` is
+   * set, and this redirects to the account page (whose password card is always visible) instead
+   * of making every caller special-case that status.
+   */
+  async authedFetch(url, options = {}) {
+    const accountToken = accountStorage.getAccountToken();
+    if (!accountToken) {
+      return { ok: false, status: 401 };
+    }
+    const response = await fetch(url, {
+      ...options,
+      headers: { ...(options.headers ?? {}), Authorization: accountToken },
+    });
+    if (response.status === 403 && url !== this.passwordUrl && url !== this.meUrl) {
+      window.history.pushState("", "", "/account");
+    }
+    return response;
+  }
+
   async register(email, password) {
     const response = await fetch(this.registerUrl, {
       body: JSON.stringify({ email, password }),
@@ -107,94 +129,47 @@ class AccountApi {
   }
 
   async me() {
-    const accountToken = accountStorage.getAccountToken();
-    if (!accountToken) {
-      return { ok: false, status: 401 };
-    }
-    const response = await fetch(this.meUrl, {
-      headers: { Authorization: accountToken },
-    });
-    return response;
+    return this.authedFetch(this.meUrl);
   }
 
   async listCharacters() {
-    const accountToken = accountStorage.getAccountToken();
-    if (!accountToken) {
-      return { ok: false, status: 401 };
-    }
-    const response = await fetch(this.charactersUrl, {
-      headers: { Authorization: accountToken },
-    });
-    return response;
+    return this.authedFetch(this.charactersUrl);
   }
 
   async linkCharacter(accountHash, rsn) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.linkCharacterUrl, {
+    return this.authedFetch(this.linkCharacterUrl, {
       body: JSON.stringify({ account_hash: accountHash, rsn }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+      headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    return response;
   }
 
   async linkCharacterToGroup(characterId, groupName, groupToken) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.linkCharacterToGroupUrl, {
+    return this.authedFetch(this.linkCharacterToGroupUrl, {
       body: JSON.stringify({ character_id: Number(characterId), group_name: groupName, group_token: groupToken }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+      headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    return response;
   }
 
   async leaveGroup(characterId) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.leaveGroupUrl(characterId), {
-      headers: { Authorization: accountToken },
-      method: "POST",
-    });
-    return response;
+    return this.authedFetch(this.leaveGroupUrl(characterId), { method: "POST" });
   }
 
   async unlinkCharacter(characterId) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.characterUrl(characterId), {
-      headers: { Authorization: accountToken },
-      method: "DELETE",
-    });
-    return response;
+    return this.authedFetch(this.characterUrl(characterId), { method: "DELETE" });
   }
 
   async confirmCharacter(characterId) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.confirmCharacterUrl(characterId), {
-      headers: { Authorization: accountToken },
-      method: "POST",
-    });
-    return response;
+    return this.authedFetch(this.confirmCharacterUrl(characterId), { method: "POST" });
   }
 
   async removePendingCharacter(characterId) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.pendingCharacterUrl(characterId), {
-      headers: { Authorization: accountToken },
-      method: "DELETE",
-    });
-    return response;
+    return this.authedFetch(this.pendingCharacterUrl(characterId), { method: "DELETE" });
   }
 
   async getCharacterPortrait(characterId) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.characterPortraitUrl(characterId), {
-      headers: { Authorization: accountToken },
-    });
+    const response = await this.authedFetch(this.characterPortraitUrl(characterId));
     if (!response.ok) {
       return null;
     }
@@ -202,38 +177,23 @@ class AccountApi {
   }
 
   async regenerateApiKey() {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.apiKeyUrl, {
-      headers: { Authorization: accountToken },
-      method: "POST",
-    });
-    return response;
+    return this.authedFetch(this.apiKeyUrl, { method: "POST" });
   }
 
   async updateEmail(email) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.emailUrl, {
+    return this.authedFetch(this.emailUrl, {
       body: JSON.stringify({ email }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+      headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    return response;
   }
 
-  async changePassword(currentPassword, newPassword) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.passwordUrl, {
-      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+  async changePassword(newPassword) {
+    return this.authedFetch(this.passwordUrl, {
+      body: JSON.stringify({ new_password: newPassword }),
+      headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
-    return response;
   }
 
   async vapidPublicKey() {
@@ -242,37 +202,23 @@ class AccountApi {
   }
 
   async subscribePush(subscription) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.pushSubscribeUrl, {
+    return this.authedFetch(this.pushSubscribeUrl, {
       body: JSON.stringify(subscription.toJSON()),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+      headers: { "Content-Type": "application/json" },
       method: "POST",
     });
-    return response;
   }
 
   async unsubscribePush(endpoint) {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.pushSubscribeUrl, {
+    return this.authedFetch(this.pushSubscribeUrl, {
       body: JSON.stringify({ endpoint }),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: accountToken,
-      },
+      headers: { "Content-Type": "application/json" },
       method: "DELETE",
     });
-    return response;
   }
 
   async deleteAccount() {
-    const accountToken = accountStorage.getAccountToken();
-    const response = await fetch(this.deleteAccountUrl, {
-      headers: { Authorization: accountToken },
-      method: "DELETE",
-    });
+    const response = await this.authedFetch(this.deleteAccountUrl, { method: "DELETE" });
     if (response.ok) {
       accountStorage.clearAccountToken();
     }

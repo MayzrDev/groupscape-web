@@ -1,24 +1,203 @@
-.admin-accounts {
-  text-align: center;
-  padding: 50px 20px;
+.admin-accounts__layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.3fr);
+  gap: 16px;
+  align-items: start;
 }
 
-.admin-accounts__count {
-  font-family: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
-  font-size: 40px;
+@media (max-width: 860px) {
+  .admin-accounts__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-accounts__table {
+  width: 100%;
+}
+
+.admin-accounts__row {
+  cursor: pointer;
+}
+
+.admin-accounts__row:hover {
+  background: var(--elevated);
+}
+
+.admin-accounts__row.active {
+  background: var(--elevated);
+  box-shadow: inset 3px 0 0 var(--orange);
+}
+
+.admin-accounts__row-email {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 13.5px;
+}
+
+.admin-accounts__detail-pane {
+  position: sticky;
+  top: 12px;
+}
+
+.admin-accounts__empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  opacity: 0.65;
+}
+
+.admin-accounts__dialogue {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-accounts__dialogue-title {
+  margin: 0;
+}
+
+.admin-accounts__dialogue-meta {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+  opacity: 0.75;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.admin-accounts__temp-password {
+  background: var(--elevated);
+  border: 1px solid var(--admin-accent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+}
+
+.admin-accounts__temp-password-value {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 6px 0;
+  word-break: break-all;
+}
+
+.admin-accounts__email-form {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+
+.admin-accounts__email-form input {
+  flex: 1;
+  min-width: 180px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--light-border);
+  background: var(--elevated);
+  color: var(--primary-text);
+}
+
+.admin-accounts__section {
+  margin-top: 10px;
+}
+
+.admin-accounts__section h3 {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
+  margin: 0 0 6px;
+}
+
+.admin-accounts__groups,
+.admin-accounts__characters,
+.admin-accounts__sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-accounts__row-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--elevated);
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+}
+
+.admin-accounts__row-item-meta {
+  opacity: 0.65;
+  font-size: 11.5px;
+}
+
+.admin-accounts__empty-row {
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+  opacity: 0.55;
+  padding: 4px 0;
+}
+
+.admin-accounts__options {
+  margin-top: 14px;
+  border-top: 1px solid var(--light-border);
+  padding-top: 10px;
+}
+
+.admin-accounts__options-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.admin-accounts__options-list li {
+  counter-increment: admin-accounts-option;
+}
+
+.admin-accounts__options-list {
+  counter-reset: admin-accounts-option;
+}
+
+.admin-accounts__option-btn {
+  width: 100%;
+  text-align: left;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 14px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--light-border);
+  background: var(--elevated);
+  color: var(--primary-text);
+  cursor: pointer;
+}
+
+.admin-accounts__option-btn::before {
+  content: counter(admin-accounts-option) ". ";
+  color: var(--orange);
   font-weight: 700;
 }
 
-.admin-accounts__label {
-  font-family: ui-sans-serif, Arial, sans-serif;
-  opacity: 0.65;
-  margin-top: 4px;
+.admin-accounts__option-btn:hover {
+  filter: brightness(1.15);
 }
 
-.admin-accounts__note {
-  font-family: ui-sans-serif, Arial, sans-serif;
-  opacity: 0.65;
-  max-width: 40ch;
-  margin: 18px auto 0;
-  font-size: 13px;
+.admin-accounts__option-btn--danger {
+  border-color: var(--admin-accent);
+}
+
+.admin-accounts__option-btn--danger::before {
+  color: var(--admin-accent);
 }

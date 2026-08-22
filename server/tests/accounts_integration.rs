@@ -194,11 +194,10 @@ async fn test_disabled_account_session_does_not_authenticate() {
     let account_id = db::create_account(&client, "disabled@example.com", &password_hash)
         .await
         .unwrap();
-    client
-        .execute(
-            "UPDATE groupscape.accounts SET disabled = true WHERE id = $1",
-            &[&account_id],
-        )
+    // The legacy `disabled` boolean is no longer read - `status` (set here via
+    // `admin_set_account_status`, same as an admin's suspend action) is the source of truth for
+    // whether a session can authenticate.
+    db::admin_set_account_status(&client, account_id, "suspended")
         .await
         .unwrap();
 
@@ -1694,4 +1693,419 @@ async fn test_require_group_permission_allows_admin() {
     .await
     .expect("admin should always have permission");
     assert_eq!(account_id, admin_account_id);
+}
+
+// --- Admin account management -------------------------------------------------------------
+
+#[tokio::test]
+async fn test_admin_reset_password_forces_change_and_revokes_sessions() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("original-password").unwrap();
+    let account_id = db::create_account(&client, "resetme@example.com", &password_hash)
+        .await
+        .unwrap();
+    let token_hash = crypto::session_token_hash("reset-session-token");
+    let expires_at = Utc::now() + Duration::days(1);
+    db::create_account_session(&client, account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    let temp_password = crypto::generate_temp_password();
+    let temp_hash = crypto::hash_password(&temp_password).unwrap();
+    db::admin_reset_account_password(&client, account_id, &temp_hash)
+        .await
+        .expect("reset should succeed");
+    db::admin_revoke_all_account_sessions(&client, account_id)
+        .await
+        .expect("revoke should succeed");
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert!(account.must_change_password);
+    assert!(crypto::verify_password(
+        &temp_password,
+        account.password_hash.as_deref().unwrap()
+    ));
+
+    let session = db::get_account_by_session_token_hash(&client, &token_hash)
+        .await
+        .expect("query failed");
+    assert!(session.is_none(), "old session should be revoked by the reset");
+
+    // Changing the password (self-service or otherwise) clears the forced-change flag.
+    db::clear_must_change_password(&client, account_id)
+        .await
+        .expect("clear should succeed");
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert!(!account.must_change_password);
+}
+
+#[tokio::test]
+async fn test_ban_cascade_transfers_ownership_and_removes_memberships() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let owner_hash = crypto::hash_password("hunter22").unwrap();
+    let owner_id = db::create_account(&client, "owner@example.com", &owner_hash)
+        .await
+        .unwrap();
+    let member_hash = crypto::hash_password("hunter22").unwrap();
+    let member_id = db::create_account(&client, "member@example.com", &member_hash)
+        .await
+        .unwrap();
+
+    let group_id = create_test_group(&client, "bancascadegroup").await;
+    let owner_character = db::create_character(&client, owner_id, "hash-ban-owner", "Owner")
+        .await
+        .unwrap();
+    let member_character = db::create_character(&client, member_id, "hash-ban-member", "Member")
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, owner_character.id, owner_id, group_id)
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, member_character.id, member_id, group_id)
+        .await
+        .unwrap();
+
+    let admin = db::get_group_admin_account_id(&client, group_id)
+        .await
+        .unwrap();
+    assert_eq!(admin, Some(owner_id));
+
+    // Ban cascade: transfer ownership of any owned groups, then strip this account's own
+    // memberships (mirrors `admin::set_account_status`'s "banned" branch).
+    let owned_groups = db::admin_get_owned_group_ids(&client, owner_id).await.unwrap();
+    assert_eq!(owned_groups, vec![group_id]);
+    for gid in owned_groups {
+        db::transfer_or_clear_group_ownership(&client, gid, owner_id)
+            .await
+            .unwrap();
+    }
+    db::admin_remove_all_group_memberships(&client, owner_id)
+        .await
+        .unwrap();
+    db::admin_set_account_status(&client, owner_id, "banned")
+        .await
+        .unwrap();
+
+    let new_admin = db::get_group_admin_account_id(&client, group_id)
+        .await
+        .unwrap();
+    assert_eq!(
+        new_admin,
+        Some(member_id),
+        "ownership should transfer to the remaining member"
+    );
+
+    let remaining_permissions: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM groupscape.group_permissions WHERE account_id = $1",
+            &[&owner_id],
+        )
+        .await
+        .unwrap()
+        .get(0);
+    assert_eq!(remaining_permissions, 0, "banned account's memberships should be removed");
+
+    let account = db::get_account_by_id(&client, owner_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account.status, "banned");
+}
+
+#[tokio::test]
+async fn test_ban_cascade_clears_ownership_when_last_member() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let owner_hash = crypto::hash_password("hunter22").unwrap();
+    let owner_id = db::create_account(&client, "soleowner@example.com", &owner_hash)
+        .await
+        .unwrap();
+    let group_id = create_test_group(&client, "soleownergroup").await;
+    let character = db::create_character(&client, owner_id, "hash-sole-owner", "Owner")
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, character.id, owner_id, group_id)
+        .await
+        .unwrap();
+
+    db::transfer_or_clear_group_ownership(&client, group_id, owner_id)
+        .await
+        .unwrap();
+
+    let admin = db::get_group_admin_account_id(&client, group_id)
+        .await
+        .unwrap();
+    assert_eq!(admin, None, "ownership should clear back to unclaimed when nobody's left");
+}
+
+#[tokio::test]
+async fn test_hard_delete_transfers_ownership_before_cascade_delete() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let mut client = pool.get().await.unwrap();
+
+    let owner_hash = crypto::hash_password("hunter22").unwrap();
+    let owner_id = db::create_account(&client, "harddeleteowner@example.com", &owner_hash)
+        .await
+        .unwrap();
+    let member_hash = crypto::hash_password("hunter22").unwrap();
+    let member_id = db::create_account(&client, "harddeletemember@example.com", &member_hash)
+        .await
+        .unwrap();
+
+    let group_id = create_test_group(&client, "harddeletegroup").await;
+    let owner_character = db::create_character(&client, owner_id, "hash-hd-owner", "Owner")
+        .await
+        .unwrap();
+    let member_character = db::create_character(&client, member_id, "hash-hd-member", "Member")
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, owner_character.id, owner_id, group_id)
+        .await
+        .unwrap();
+    db::link_character_to_group(&mut client, member_character.id, member_id, group_id)
+        .await
+        .unwrap();
+
+    let owned_groups = db::admin_get_owned_group_ids(&client, owner_id).await.unwrap();
+    for gid in owned_groups {
+        db::transfer_or_clear_group_ownership(&client, gid, owner_id)
+            .await
+            .unwrap();
+    }
+    db::delete_account(&client, owner_id).await.unwrap();
+
+    let new_admin = db::get_group_admin_account_id(&client, group_id)
+        .await
+        .unwrap();
+    assert_eq!(new_admin, Some(member_id));
+
+    let account = db::get_account_by_id(&client, owner_id).await.unwrap();
+    assert!(account.is_none());
+
+    let character = db::find_character_by_id(&client, owner_character.id)
+        .await
+        .unwrap();
+    assert!(character.is_none(), "owner's character should cascade-delete");
+}
+
+#[tokio::test]
+async fn test_login_lockout_triggers_after_threshold_and_admin_can_clear_it() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("correct-password").unwrap();
+    let account_id = db::create_account(&client, "lockout@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let mut locked_until = None;
+    for _ in 0..5 {
+        locked_until = db::record_failed_login(&client, account_id).await.unwrap();
+    }
+    assert!(
+        locked_until.is_some_and(|l| l > Utc::now()),
+        "5th failed attempt should trip the lockout"
+    );
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account.failed_login_attempts, 5);
+    assert!(account.locked_until.is_some());
+
+    // Admin clears the lockout.
+    db::admin_clear_account_lockout(&client, account_id)
+        .await
+        .expect("clear should succeed");
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account.failed_login_attempts, 0);
+    assert!(account.locked_until.is_none());
+
+    // A subsequent successful login also resets the counters.
+    db::record_failed_login(&client, account_id).await.unwrap();
+    db::reset_login_lockout_and_record_login(&client, account_id)
+        .await
+        .expect("reset should succeed");
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account.failed_login_attempts, 0);
+    assert!(account.locked_until.is_none());
+    assert!(account.last_login_at.is_some());
+}
+
+#[tokio::test]
+async fn test_status_backfill_from_legacy_disabled_flag() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    // `add_account_status_columns` backfills `status='banned'` for any pre-existing
+    // `disabled=true` row - simulate that by going straight at the legacy column.
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "legacydisabled@example.com", &password_hash)
+        .await
+        .unwrap();
+    client
+        .execute(
+            "UPDATE groupscape.accounts SET disabled = true, status = 'banned' WHERE id = $1",
+            &[&account_id],
+        )
+        .await
+        .unwrap();
+
+    let token_hash = crypto::session_token_hash("legacy-disabled-session-token");
+    let expires_at = Utc::now() + Duration::days(1);
+    db::create_account_session(&client, account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    let session = db::get_account_by_session_token_hash(&client, &token_hash)
+        .await
+        .expect("query failed");
+    assert!(
+        session.is_none(),
+        "a banned account's session should not authenticate, even though `disabled` is unread"
+    );
+}
+
+#[tokio::test]
+async fn test_soft_delete_scrubs_email_and_is_reversible() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "softdelete@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    db::admin_soft_delete_account(&client, account_id)
+        .await
+        .expect("soft delete should succeed");
+
+    let account = db::get_account_by_id(&client, account_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(account.status, "deleted");
+    assert_ne!(account.email.as_deref(), Some("softdelete@example.com"));
+
+    // The original email is free again for a new registration.
+    db::create_account(&client, "softdelete@example.com", &password_hash)
+        .await
+        .expect("original email should be reusable after soft delete");
+
+    // Reversible: flip status back and the account is a normal active account again.
+    db::admin_set_account_status(&client, account_id, "active")
+        .await
+        .expect("status should be restorable");
+    let account = db::get_account_by_id(&client, account_id).await.unwrap().unwrap();
+    assert_eq!(account.status, "active");
+}
+
+#[tokio::test]
+async fn test_admin_list_and_search_accounts() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "findme@example.com", &password_hash)
+        .await
+        .unwrap();
+    db::create_account(&client, "someoneelse@example.com", &password_hash)
+        .await
+        .unwrap();
+
+    let (accounts, total) = db::admin_list_accounts(&client, Some("findme"), None, None, 1, 25)
+        .await
+        .expect("list should succeed");
+    assert_eq!(total, 1);
+    assert_eq!(accounts[0].id, account_id);
+
+    let (search_accounts, _search_groups) = db::admin_search(&client, "findme")
+        .await
+        .expect("search should succeed");
+    assert_eq!(search_accounts.len(), 1);
+    assert_eq!(search_accounts[0].id, account_id);
+
+    let detail = db::admin_get_account(&client, account_id)
+        .await
+        .expect("query failed")
+        .expect("account should exist");
+    assert_eq!(detail.email.as_deref(), Some("findme@example.com"));
+    assert_eq!(detail.status, "active");
+}
+
+#[tokio::test]
+async fn test_admin_session_revocation() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+    let account_id = db::create_account(&client, "sessionmgmt@example.com", &password_hash)
+        .await
+        .unwrap();
+    let token_hash = crypto::session_token_hash("session-mgmt-token");
+    let expires_at = Utc::now() + Duration::days(1);
+    db::create_account_session(&client, account_id, &token_hash, &expires_at)
+        .await
+        .unwrap();
+
+    let sessions = db::admin_list_account_sessions(&client, account_id)
+        .await
+        .expect("list should succeed");
+    assert_eq!(sessions.len(), 1);
+    let session_id = sessions[0].session_id;
+
+    // Revoking a foreign account's session id is rejected.
+    let other_account_id = db::create_account(&client, "otheraccount@example.com", &password_hash)
+        .await
+        .unwrap();
+    let revoked_wrong_owner = db::admin_revoke_account_session(&client, other_account_id, session_id)
+        .await
+        .unwrap();
+    assert!(!revoked_wrong_owner);
+
+    let revoked = db::admin_revoke_account_session(&client, account_id, session_id)
+        .await
+        .expect("revoke should succeed");
+    assert!(revoked);
+
+    let sessions = db::admin_list_account_sessions(&client, account_id)
+        .await
+        .expect("list should succeed");
+    assert!(sessions.is_empty());
 }

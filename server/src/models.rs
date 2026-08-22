@@ -480,6 +480,10 @@ pub struct Account {
     /// `None` for a Discord-only account that has never set an email/password.
     pub email: Option<String>,
     pub created_at: DateTime<Utc>,
+    /// Set by an admin password reset; the frontend redirects to the password-change section
+    /// as soon as it sees this on any authed response, rather than waiting for the 403 the
+    /// gate returns on the next *other* authed endpoint.
+    pub must_change_password: bool,
 }
 #[derive(Serialize)]
 pub struct AuthenticatedAccount {
@@ -494,10 +498,11 @@ pub struct AuthenticatedAccount {
 pub struct UpdateAccountEmail {
     pub email: String,
 }
+/// No `current_password` field - an active session is treated as sufficient proof of identity
+/// for this mutation, same as `UpdateAccountEmail` above.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChangeAccountPassword {
-    pub current_password: String,
     pub new_password: String,
 }
 #[derive(Deserialize)]
@@ -863,6 +868,117 @@ pub struct AdminAuditLogResponse {
 #[derive(Serialize)]
 pub struct AdminAccountsSummary {
     pub count: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminAccountsQuery {
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub group_id: Option<i64>,
+    #[serde(default = "default_admin_page")]
+    pub page: i64,
+    #[serde(default = "default_admin_page_size")]
+    pub page_size: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountSummary {
+    pub id: i64,
+    pub email: Option<String>,
+    pub status: String,
+    pub must_change_password: bool,
+    pub locked_out: bool,
+    pub created_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountsResponse {
+    pub accounts: Vec<AdminAccountSummary>,
+    pub total: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountGroup {
+    pub group_id: i64,
+    pub group_name: String,
+    pub is_owner: bool,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountCharacter {
+    pub id: i64,
+    pub display_rsn: String,
+    pub status: String,
+    pub bound_at: DateTime<Utc>,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountSession {
+    pub session_id: i64,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+    pub ip: Option<String>,
+    pub user_agent: Option<String>,
+}
+
+#[derive(Serialize)]
+pub struct AdminAccountDetail {
+    pub id: i64,
+    pub email: Option<String>,
+    pub status: String,
+    pub must_change_password: bool,
+    pub locked_out: bool,
+    pub created_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+    pub groups: Vec<AdminAccountGroup>,
+    pub characters: Vec<AdminAccountCharacter>,
+    pub session_count: i64,
+}
+
+#[derive(Serialize)]
+pub struct AdminPasswordResetResponse {
+    pub temp_password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminSetAccountStatus {
+    pub status: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminSetAccountEmail {
+    pub email: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminSearchResponse {
+    pub accounts: Vec<AdminAccountSummary>,
+    pub groups: Vec<AdminGroupSummary>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminSearchQuery {
+    pub q: String,
+}
+
+#[derive(Serialize)]
+pub struct AdminDashboard {
+    pub total: i64,
+    pub active: i64,
+    pub suspended: i64,
+    pub banned: i64,
+    pub deleted: i64,
+    pub live_sessions: i64,
+    pub locked_out: i64,
+    pub recent_audit: Vec<AdminAuditLogEntry>,
 }
 
 #[cfg(test)]

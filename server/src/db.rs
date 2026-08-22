@@ -1,11 +1,13 @@
 use crate::crypto::token_hash;
 use crate::error::ApiError;
 use crate::models::{
-    ActivityEvent, AdminAuditLogEntry, AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary,
-    AggregateSkillData, BlockedMember, CreateGroup, DiscordWebhookSettings, GameEvent,
-    GroupMember, GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession,
-    GroupSkillData, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
-    PermissionFlagsPatch, PermissionKey, MEMBER_COLOR_PALETTE, SHARED_MEMBER,
+    ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
+    AdminAccountSession, AdminAccountSummary, AdminAuditLogEntry, AdminDashboard,
+    AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
+    CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember, GroupMemberPermissions,
+    GroupMetricData, GroupPermissions, GroupSession, GroupSkillData, MemberMetricData,
+    MemberSkillData, MetricDataPoint, PermissionFlags, PermissionFlagsPatch, PermissionKey,
+    MEMBER_COLOR_PALETTE, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -16,6 +18,12 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use tokio_postgres::Row;
 
 const CURRENT_GROUP_VERSION: i32 = 2;
+
+/// Regular-user login lockout: after this many consecutive bad passwords, the account is
+/// locked out for `ACCOUNT_LOCKOUT_MINUTES`. Mirrors the shape (not the numbers) of the
+/// existing admin-token rate limiter in `admin_auth_middleware.rs`.
+const ACCOUNT_LOCKOUT_THRESHOLD: i32 = 5;
+const ACCOUNT_LOCKOUT_MINUTES: i32 = 15;
 pub async fn create_group(client: &mut Client, create_group: &CreateGroup) -> Result<(), ApiError> {
     let create_group_stmt = client.prepare_cached("INSERT INTO groupscape.groups (group_name, group_token_hash, version) VALUES($1, $2, $3) RETURNING group_id").await?;
     let create_member_stmt = client
@@ -2209,9 +2217,10 @@ pub struct AccountForAuth {
     pub must_change_password: bool,
     pub failed_login_attempts: i32,
     pub locked_until: Option<DateTime<Utc>>,
+    pub last_login_at: Option<DateTime<Utc>>,
 }
 
-const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until";
+const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until, last_login_at";
 
 fn account_for_auth_from_row(row: Row) -> Result<AccountForAuth, ApiError> {
     Ok(AccountForAuth {
@@ -2224,6 +2233,7 @@ fn account_for_auth_from_row(row: Row) -> Result<AccountForAuth, ApiError> {
         must_change_password: row.try_get("must_change_password")?,
         failed_login_attempts: row.try_get("failed_login_attempts")?,
         locked_until: row.try_get("locked_until")?,
+        last_login_at: row.try_get("last_login_at")?,
     })
 }
 
@@ -2306,22 +2316,16 @@ pub async fn get_account_by_email(
     email: &str,
 ) -> Result<Option<AccountForAuth>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE email=$1",
-        )
+        .prepare_cached(&format!(
+            "SELECT {ACCOUNT_FOR_AUTH_COLUMNS} FROM groupscape.accounts WHERE email=$1"
+        ))
         .await?;
     let row = client
         .query_opt(&stmt, &[&email])
         .await
         .map_err(ApiError::GetAccountError)?;
     match row {
-        Some(row) => Ok(Some(AccountForAuth {
-            id: row.try_get("id")?,
-            email: row.try_get("email")?,
-            password_hash: row.try_get("password_hash")?,
-            disabled: row.try_get("disabled")?,
-            created_at: row.try_get("created_at")?,
-        })),
+        Some(row) => Ok(Some(account_for_auth_from_row(row)?)),
         None => Ok(None),
     }
 }
@@ -2331,24 +2335,71 @@ pub async fn get_account_by_id(
     account_id: i64,
 ) -> Result<Option<AccountForAuth>, ApiError> {
     let stmt = client
-        .prepare_cached(
-            "SELECT id, email, password_hash, disabled, created_at FROM groupscape.accounts WHERE id=$1",
-        )
+        .prepare_cached(&format!(
+            "SELECT {ACCOUNT_FOR_AUTH_COLUMNS} FROM groupscape.accounts WHERE id=$1"
+        ))
         .await?;
     let row = client
         .query_opt(&stmt, &[&account_id])
         .await
         .map_err(ApiError::GetAccountError)?;
     match row {
-        Some(row) => Ok(Some(AccountForAuth {
-            id: row.try_get("id")?,
-            email: row.try_get("email")?,
-            password_hash: row.try_get("password_hash")?,
-            disabled: row.try_get("disabled")?,
-            created_at: row.try_get("created_at")?,
-        })),
+        Some(row) => Ok(Some(account_for_auth_from_row(row)?)),
         None => Ok(None),
     }
+}
+
+/// Increments the failed-login counter and, once it crosses the threshold, sets `locked_until`
+/// 15 minutes out. Returns the row's post-update `locked_until` so the caller can tell whether
+/// this specific attempt is the one that tripped the lock.
+pub async fn record_failed_login(
+    client: &Client,
+    account_id: i64,
+) -> Result<Option<DateTime<Utc>>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+UPDATE groupscape.accounts
+SET failed_login_attempts = failed_login_attempts + 1,
+    locked_until = CASE
+      WHEN failed_login_attempts + 1 >= $2 THEN now() + ($3 || ' minutes')::interval
+      ELSE locked_until
+    END
+WHERE id = $1
+RETURNING locked_until
+"#,
+        )
+        .await?;
+    let row = client
+        .query_one(
+            &stmt,
+            &[
+                &account_id,
+                &ACCOUNT_LOCKOUT_THRESHOLD,
+                &ACCOUNT_LOCKOUT_MINUTES.to_string(),
+            ],
+        )
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    Ok(row.try_get("locked_until")?)
+}
+
+/// Clears the lockout counters and records a successful login timestamp - called on a
+/// successful password check.
+pub async fn reset_login_lockout_and_record_login(
+    client: &Client,
+    account_id: i64,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.accounts SET failed_login_attempts = 0, locked_until = NULL, last_login_at = now() WHERE id = $1",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    Ok(())
 }
 
 /// `email` is `citext UNIQUE`, so a duplicate update surfaces as a unique-violation same as
@@ -2390,6 +2441,42 @@ pub async fn update_account_password(
     Ok(())
 }
 
+/// Admin-triggered password reset: sets a fresh (temp) password hash and flips
+/// `must_change_password` so the account is forced through the change-password gate on its
+/// next authed request. Existing sessions are revoked separately via
+/// `admin_revoke_all_account_sessions`.
+pub async fn admin_reset_account_password(
+    client: &Client,
+    account_id: i64,
+    password_hash: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.accounts SET password_hash=$1, must_change_password=true WHERE id=$2",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&password_hash, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminResetAccountPasswordError".to_string(), e))?;
+    Ok(())
+}
+
+/// Clears the forced-password-change flag - set by `change_password` once the account has
+/// actually changed it (whether that change was self-service or in response to an admin reset).
+pub async fn clear_must_change_password(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.accounts SET must_change_password=false WHERE id=$1",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::UpdateAccountPasswordError)?;
+    Ok(())
+}
+
 /// Hard delete - `characters` (`ON DELETE CASCADE` from `accounts`), `character_group_links`
 /// (cascades again from `characters`), and `account_sessions` (`ON DELETE CASCADE` from
 /// `accounts`) all clean up via existing FK constraints, so a single row delete is enough.
@@ -2411,13 +2498,28 @@ pub async fn create_account_session(
     token_hash: &str,
     expires_at: &DateTime<Utc>,
 ) -> Result<(), ApiError> {
+    create_account_session_with_meta(client, account_id, token_hash, expires_at, None, None).await
+}
+
+/// Same as `create_account_session`, capturing the request's IP/user-agent for the admin
+/// per-account session list. Both are best-effort (nullable) - kept as a separate function
+/// rather than changing `create_account_session`'s signature so the many existing test call
+/// sites that don't care about IP/UA don't need touching.
+pub async fn create_account_session_with_meta(
+    client: &Client,
+    account_id: i64,
+    token_hash: &str,
+    expires_at: &DateTime<Utc>,
+    ip: Option<&str>,
+    user_agent: Option<&str>,
+) -> Result<(), ApiError> {
     let stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.account_sessions (account_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+            "INSERT INTO groupscape.account_sessions (account_id, token_hash, expires_at, ip, user_agent) VALUES ($1, $2, $3, $4, $5)",
         )
         .await?;
     client
-        .execute(&stmt, &[&account_id, &token_hash, expires_at])
+        .execute(&stmt, &[&account_id, &token_hash, expires_at, &ip, &user_agent])
         .await
         .map_err(ApiError::CreateAccountSessionError)?;
     Ok(())
@@ -2430,10 +2532,10 @@ pub async fn get_account_by_session_token_hash(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT a.id, a.email, a.created_at
+SELECT a.id, a.email, a.created_at, a.must_change_password
 FROM groupscape.account_sessions s
 INNER JOIN groupscape.accounts a ON a.id = s.account_id
-WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.disabled = false
+WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.status = 'active'
 "#,
         )
         .await?;
@@ -2446,6 +2548,7 @@ WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.disabled = false
             id: row.try_get("id")?,
             email: row.try_get("email")?,
             created_at: row.try_get("created_at")?,
+            must_change_password: row.try_get("must_change_password")?,
         })),
         None => Ok(None),
     }
@@ -2743,7 +2846,7 @@ pub async fn get_account_by_api_key_hash(
 ) -> Result<Option<crate::models::Account>, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT id, email, created_at FROM groupscape.accounts WHERE api_key_hash=$1 AND disabled=false",
+            "SELECT id, email, created_at, must_change_password FROM groupscape.accounts WHERE api_key_hash=$1 AND status='active'",
         )
         .await?;
     let row = client
@@ -2755,6 +2858,7 @@ pub async fn get_account_by_api_key_hash(
             id: row.try_get("id")?,
             email: row.try_get("email")?,
             created_at: row.try_get("created_at")?,
+            must_change_password: row.try_get("must_change_password")?,
         })),
         None => Ok(None),
     }
@@ -4585,4 +4689,410 @@ pub async fn apply_bank_value_retention(client: &mut Client) -> Result<(), ApiEr
     transaction.commit().await?;
 
     Ok(())
+}
+
+// --- Admin account management -------------------------------------------------------------
+
+/// Picks the group's next admin from its remaining `group_permissions` rows (lowest
+/// `account_id` first, matching the "first user" semantics `link_character_to_group` already
+/// uses to assign the *original* admin), or clears `admin_account_id` back to the "unclaimed"
+/// `NULL` state if nobody's left. Called wherever an account is force-removed from a group it
+/// owns (ban cascade, hard delete) so the group is never left owned by a departed account.
+pub async fn transfer_or_clear_group_ownership(
+    client: &Client,
+    group_id: i64,
+    departing_account_id: i64,
+) -> Result<(), ApiError> {
+    let next_owner_stmt = client
+        .prepare_cached(
+            "SELECT account_id FROM groupscape.group_permissions WHERE group_id=$1 AND account_id != $2 ORDER BY account_id ASC LIMIT 1",
+        )
+        .await?;
+    let next_owner: Option<i64> = client
+        .query_opt(&next_owner_stmt, &[&group_id, &departing_account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("TransferGroupOwnershipError".to_string(), e))?
+        .map(|row| row.get(0));
+
+    let update_stmt = client
+        .prepare_cached("UPDATE groupscape.groups SET admin_account_id=$1 WHERE group_id=$2")
+        .await?;
+    client
+        .execute(&update_stmt, &[&next_owner, &group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("TransferGroupOwnershipError".to_string(), e))?;
+    Ok(())
+}
+
+/// Groups this account currently owns (`groups.admin_account_id`) - the set that needs
+/// `transfer_or_clear_group_ownership` run against it before the account is banned or
+/// hard-deleted.
+pub async fn admin_get_owned_group_ids(
+    client: &Client,
+    account_id: i64,
+) -> Result<Vec<i64>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT group_id FROM groupscape.groups WHERE admin_account_id=$1")
+        .await?;
+    let rows = client
+        .query(&stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetOwnedGroupsError".to_string(), e))?;
+    Ok(rows.into_iter().map(|row| row.get(0)).collect())
+}
+
+/// Removes every group membership this account holds (`group_permissions`) - the "ban cascades
+/// to remove all group memberships" half of the ban action, run *after*
+/// `transfer_or_clear_group_ownership` has already moved ownership of any owned groups off this
+/// account.
+pub async fn admin_remove_all_group_memberships(
+    client: &Client,
+    account_id: i64,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.group_permissions WHERE account_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminRemoveGroupMembershipsError".to_string(), e))?;
+    Ok(())
+}
+
+fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiError> {
+    Ok(AdminAccountSummary {
+        id: row.try_get("id")?,
+        email: row.try_get("email")?,
+        status: row.try_get("status")?,
+        must_change_password: row.try_get("must_change_password")?,
+        locked_out: row.try_get("locked_out")?,
+        created_at: row.try_get("created_at")?,
+        last_login_at: row.try_get("last_login_at")?,
+    })
+}
+
+const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.email, a.status, a.must_change_password, a.created_at, a.last_login_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
+
+pub async fn admin_list_accounts(
+    client: &Client,
+    search: Option<&str>,
+    status: Option<&str>,
+    group_id: Option<i64>,
+    page: i64,
+    page_size: i64,
+) -> Result<(Vec<AdminAccountSummary>, i64), ApiError> {
+    let offset = (page.max(1) - 1) * page_size.max(1);
+    let search_pattern = search.map(|s| format!("%{}%", s));
+    let search_raw = search.map(|s| s.to_string());
+
+    let list_stmt = client
+        .prepare_cached(&format!(
+            r#"
+SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS}
+FROM groupscape.accounts a
+WHERE ($1::text IS NULL OR a.email ILIKE $1 OR a.id::text = $2)
+  AND ($3::text IS NULL OR a.status = $3)
+  AND ($4::bigint IS NULL OR EXISTS (SELECT 1 FROM groupscape.group_permissions gp WHERE gp.account_id = a.id AND gp.group_id = $4))
+ORDER BY a.id DESC
+LIMIT $5 OFFSET $6
+"#
+        ))
+        .await?;
+    let rows = client
+        .query(
+            &list_stmt,
+            &[
+                &search_pattern,
+                &search_raw,
+                &status,
+                &group_id,
+                &page_size.max(1),
+                &offset,
+            ],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminListAccountsError".to_string(), e))?;
+    let accounts = rows
+        .iter()
+        .map(admin_account_summary_from_row)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let count_stmt = client
+        .prepare_cached(
+            r#"
+SELECT COUNT(*)
+FROM groupscape.accounts a
+WHERE ($1::text IS NULL OR a.email ILIKE $1 OR a.id::text = $2)
+  AND ($3::text IS NULL OR a.status = $3)
+  AND ($4::bigint IS NULL OR EXISTS (SELECT 1 FROM groupscape.group_permissions gp WHERE gp.account_id = a.id AND gp.group_id = $4))
+"#,
+        )
+        .await?;
+    let total: i64 = client
+        .query_one(&count_stmt, &[&search_pattern, &search_raw, &status, &group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminCountAccountsFilteredError".to_string(), e))?
+        .try_get(0)?;
+
+    Ok((accounts, total))
+}
+
+pub async fn admin_get_account(
+    client: &Client,
+    account_id: i64,
+) -> Result<Option<AdminAccountDetail>, ApiError> {
+    let account_stmt = client
+        .prepare_cached(&format!(
+            "SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS} FROM groupscape.accounts a WHERE a.id = $1"
+        ))
+        .await?;
+    let account_row = client
+        .query_opt(&account_stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetAccountError".to_string(), e))?;
+    let Some(account_row) = account_row else {
+        return Ok(None);
+    };
+    let summary = admin_account_summary_from_row(&account_row)?;
+
+    let groups_stmt = client
+        .prepare_cached(
+            r#"
+SELECT g.group_id, g.group_name, (g.admin_account_id = $1) AS is_owner
+FROM groupscape.group_permissions gp
+JOIN groupscape.groups g ON g.group_id = gp.group_id
+WHERE gp.account_id = $1
+ORDER BY g.group_name
+"#,
+        )
+        .await?;
+    let group_rows = client
+        .query(&groups_stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetAccountGroupsError".to_string(), e))?;
+    let groups = group_rows
+        .into_iter()
+        .map(|row| {
+            Ok(AdminAccountGroup {
+                group_id: row.try_get("group_id")?,
+                group_name: row.try_get("group_name")?,
+                is_owner: row.try_get("is_owner")?,
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+
+    let characters_stmt = client
+        .prepare_cached(
+            "SELECT character_id, display_rsn, status, bound_at FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at",
+        )
+        .await?;
+    let character_rows = client
+        .query(&characters_stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetAccountCharactersError".to_string(), e))?;
+    let characters = character_rows
+        .into_iter()
+        .map(|row| {
+            Ok(AdminAccountCharacter {
+                id: row.try_get("character_id")?,
+                display_rsn: row.try_get("display_rsn")?,
+                status: row.try_get("status")?,
+                bound_at: row.try_get("bound_at")?,
+            })
+        })
+        .collect::<Result<Vec<_>, ApiError>>()?;
+
+    let session_count: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM groupscape.account_sessions WHERE account_id=$1 AND expires_at > now()",
+            &[&account_id],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetAccountSessionCountError".to_string(), e))?
+        .try_get(0)?;
+
+    Ok(Some(AdminAccountDetail {
+        id: summary.id,
+        email: summary.email,
+        status: summary.status,
+        must_change_password: summary.must_change_password,
+        locked_out: summary.locked_out,
+        created_at: summary.created_at,
+        last_login_at: summary.last_login_at,
+        groups,
+        characters,
+        session_count,
+    }))
+}
+
+pub async fn admin_set_account_status(
+    client: &Client,
+    account_id: i64,
+    status: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET status=$1 WHERE id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&status, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminSetAccountStatusError".to_string(), e))?;
+    Ok(())
+}
+
+/// Soft delete: status flips to `deleted` and the (unique, citext) email is scrubbed to a
+/// placeholder derived from the account id so the real address is freed up for re-registration.
+/// Group memberships are left untouched, unlike ban/hard-delete - this is meant to be
+/// reversible by an admin flipping status back to `active` and setting a real email again.
+pub async fn admin_soft_delete_account(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let placeholder_email = format!("deleted-account-{}@deleted.groupscape.invalid", account_id);
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET status='deleted', email=$1 WHERE id=$2")
+        .await?;
+    client
+        .execute(&stmt, &[&placeholder_email, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminSoftDeleteAccountError".to_string(), e))?;
+    Ok(())
+}
+
+pub async fn admin_list_account_sessions(
+    client: &Client,
+    account_id: i64,
+) -> Result<Vec<AdminAccountSession>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT session_id, created_at, expires_at, ip, user_agent FROM groupscape.account_sessions WHERE account_id=$1 ORDER BY created_at DESC",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminListAccountSessionsError".to_string(), e))?;
+    rows.into_iter()
+        .map(|row| {
+            Ok(AdminAccountSession {
+                session_id: row.try_get("session_id")?,
+                created_at: row.try_get("created_at")?,
+                expires_at: row.try_get("expires_at")?,
+                ip: row.try_get("ip")?,
+                user_agent: row.try_get("user_agent")?,
+            })
+        })
+        .collect()
+}
+
+/// Returns whether a matching session row existed to revoke (lets the caller 404 a
+/// wrong/foreign session id instead of silently no-oping).
+pub async fn admin_revoke_account_session(
+    client: &Client,
+    account_id: i64,
+    session_id: i64,
+) -> Result<bool, ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.account_sessions WHERE session_id=$1 AND account_id=$2")
+        .await?;
+    let deleted = client
+        .execute(&stmt, &[&session_id, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminRevokeAccountSessionError".to_string(), e))?;
+    Ok(deleted > 0)
+}
+
+pub async fn admin_revoke_all_account_sessions(
+    client: &Client,
+    account_id: i64,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.account_sessions WHERE account_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminRevokeAllAccountSessionsError".to_string(), e))?;
+    Ok(())
+}
+
+pub async fn admin_clear_account_lockout(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.accounts SET failed_login_attempts=0, locked_until=NULL WHERE id=$1",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminClearAccountLockoutError".to_string(), e))?;
+    Ok(())
+}
+
+/// Small union search for the admin global search box - up to 10 accounts (by email/id
+/// substring) and 10 groups (by name substring, delegating to `admin_list_groups`'s existing
+/// search behavior).
+pub async fn admin_search(
+    client: &Client,
+    q: &str,
+) -> Result<(Vec<AdminAccountSummary>, Vec<AdminGroupSummary>), ApiError> {
+    let (accounts, _) = admin_list_accounts(client, Some(q), None, None, 1, 10).await?;
+    let (groups, _) = admin_list_groups(client, Some(q), 1, 10).await?;
+    Ok((accounts, groups))
+}
+
+pub async fn admin_dashboard(client: &Client) -> Result<AdminDashboard, ApiError> {
+    let status_rows = client
+        .query(
+            "SELECT status, COUNT(*) AS n FROM groupscape.accounts GROUP BY status",
+            &[],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDashboardStatusCountsError".to_string(), e))?;
+
+    let mut active = 0i64;
+    let mut suspended = 0i64;
+    let mut banned = 0i64;
+    let mut deleted = 0i64;
+    let mut total = 0i64;
+    for row in status_rows {
+        let status: String = row.get("status");
+        let n: i64 = row.get("n");
+        total += n;
+        match status.as_str() {
+            "active" => active = n,
+            "suspended" => suspended = n,
+            "banned" => banned = n,
+            "deleted" => deleted = n,
+            _ => {}
+        }
+    }
+
+    let live_sessions: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM groupscape.account_sessions WHERE expires_at > now()",
+            &[],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDashboardLiveSessionsError".to_string(), e))?
+        .try_get(0)?;
+
+    let locked_out: i64 = client
+        .query_one(
+            "SELECT COUNT(*) FROM groupscape.accounts WHERE locked_until IS NOT NULL AND locked_until > now()",
+            &[],
+        )
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDashboardLockedOutError".to_string(), e))?
+        .try_get(0)?;
+
+    let (recent_audit, _) = admin_list_audit_log(client, 1, 10).await?;
+
+    Ok(AdminDashboard {
+        total,
+        active,
+        suspended,
+        banned,
+        deleted,
+        live_sessions,
+        locked_out,
+        recent_audit,
+    })
 }

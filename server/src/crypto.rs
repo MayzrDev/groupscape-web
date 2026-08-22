@@ -2,7 +2,7 @@ use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, Salt
 use argon2::Argon2;
 use blake2::{Blake2s256, Digest};
 use data_encoding::HEXLOWER;
-use rand_core::OsRng;
+use rand_core::{OsRng, RngCore};
 use std::fs;
 use std::sync::LazyLock;
 
@@ -65,6 +65,24 @@ pub fn new_api_key() -> String {
 
 pub fn api_key_hash(key: &str) -> String {
     token_hash(key, "account_api_key")
+}
+
+/// word+digits wordlist for admin-issued temporary passwords - readable enough to type/read
+/// aloud over a support channel, not meant to be memorable long-term (`must_change_password`
+/// forces it to be replaced on next login).
+const TEMP_PASSWORD_WORDS: &[&str] = &[
+    "dragon", "wyvern", "abyssal", "rune", "obsidian", "granite", "phoenix", "goblin", "kraken",
+    "serpent", "falcon", "ember", "glacier", "ironclad", "quartz", "tundra", "basilisk", "corsair",
+    "meteor", "sentinel",
+];
+
+/// Generates a temp password of the form `word-####` (e.g. `kraken-4821`) - always well within
+/// `valid_password`'s 8-256 character range.
+pub fn generate_temp_password() -> String {
+    let mut rng = OsRng;
+    let word = TEMP_PASSWORD_WORDS[(rng.next_u32() as usize) % TEMP_PASSWORD_WORDS.len()];
+    let digits = rng.next_u32() % 10000;
+    format!("{}-{:04}", word, digits)
 }
 
 /// A signed, self-verifying OAuth `state` value: `nonce.expiry.signature`. No server-side

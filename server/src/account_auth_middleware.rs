@@ -1,4 +1,5 @@
 use crate::db;
+use crate::error::ApiError;
 use crate::models::Account;
 use actix_web::{
     body::BoxBody,
@@ -57,6 +58,7 @@ impl AccountAuthenticationCache {
                 id: entry.account.id,
                 email: entry.account.email.clone(),
                 created_at: entry.account.created_at,
+                must_change_password: entry.account.must_change_password,
             })
     }
 
@@ -131,7 +133,13 @@ impl FromRequest for AccountAuthenticated {
     fn from_request(req: &HttpRequest, _payload: &mut actix_web::dev::Payload) -> Self::Future {
         let value = req.extensions().get::<AccountAuthenticationInfo>().cloned();
         let result = match value {
-            Some(v) => Ok(AccountAuthenticated(v)),
+            Some(v) => {
+                if v.must_change_password && !must_change_password_allowlisted(req.path()) {
+                    Err(ApiError::MustChangePasswordError.into())
+                } else {
+                    Ok(AccountAuthenticated(v))
+                }
+            }
             None => Err(actix_web::error::ErrorUnauthorized("")),
         };
         ready(result)
@@ -166,9 +174,18 @@ async fn authenticate_via_db(
             id: account.id,
             email: account.email.clone(),
             created_at: account.created_at,
+            must_change_password: account.must_change_password,
         },
     );
     Ok(account)
+}
+
+/// Endpoints reachable even while `must_change_password` is set - just enough for the account
+/// page to load and for the password itself to be changed. Everything else under the account
+/// scope's authed middleware gets `ApiError::MustChangePasswordError` until the password is
+/// changed, which clears the flag.
+fn must_change_password_allowlisted(path: &str) -> bool {
+    path.ends_with("/account/me") || path.ends_with("/account/password")
 }
 
 impl<S, B> Service<ServiceRequest> for AccountAuthenticateMiddleware<S>
@@ -237,6 +254,7 @@ mod tests {
             id: 42,
             email: Some("player@example.com".to_string()),
             created_at: Utc::now(),
+            must_change_password: false,
         }
     }
 

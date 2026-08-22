@@ -67,6 +67,7 @@ import "./admin-group-detail-page/admin-group-detail-page.js";
 import "./admin-feature-flags-page/admin-feature-flags-page.js";
 import "./admin-audit-log-page/admin-audit-log-page.js";
 import "./admin-accounts-page/admin-accounts-page.js";
+import "./admin-dashboard-page/admin-dashboard-page.js";
 import "./link-page/link-page.js";
 import "./account-login-page/account-login-page.js";
 import "./account-signup-page/account-signup-page.js";

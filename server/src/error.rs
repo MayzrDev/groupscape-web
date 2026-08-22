@@ -138,6 +138,8 @@ pub enum ApiError {
     MetricDataXpNotSupportedError,
     CannotRemoveSelfError,
     CannotBlockSelfError,
+    AccountLockedError,
+    MustChangePasswordError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -338,6 +340,10 @@ impl ResponseError for ApiError {
             ApiError::CannotBlockSelfError => {
                 HttpResponse::BadRequest().body("You can't block yourself from the group")
             }
+            ApiError::AccountLockedError => HttpResponse::build(actix_web::http::StatusCode::LOCKED)
+                .body("Too many failed login attempts. Try again in 15 minutes."),
+            ApiError::MustChangePasswordError => HttpResponse::Forbidden()
+                .body("You must change your password before continuing"),
         }
     }
 }

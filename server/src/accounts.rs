@@ -11,7 +11,7 @@ use crate::models::{
     RegisterAccount, UpdateAccountEmail,
 };
 use crate::validators::{valid_email, valid_name, valid_password};
-use actix_web::{delete, get, post, put, web, Error, HttpResponse};
+use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
 use deadpool_postgres::{Client, Pool};
 
@@ -20,11 +20,32 @@ use deadpool_postgres::{Client, Pool};
 /// the renewal path.
 const SESSION_TTL: Duration = Duration::days(30);
 
-async fn issue_session(client: &Client, account_id: i64) -> Result<String, ApiError> {
+fn request_ip(req: &HttpRequest) -> Option<String> {
+    req.connection_info()
+        .realip_remote_addr()
+        .map(|s| s.to_string())
+}
+
+fn request_user_agent(req: &HttpRequest) -> Option<String> {
+    req.headers()
+        .get("User-Agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+async fn issue_session(client: &Client, account_id: i64, req: &HttpRequest) -> Result<String, ApiError> {
     let token = crypto::new_session_token();
     let token_hash = crypto::session_token_hash(&token);
     let expires_at = Utc::now() + SESSION_TTL;
-    db::create_account_session(client, account_id, &token_hash, &expires_at).await?;
+    db::create_account_session_with_meta(
+        client,
+        account_id,
+        &token_hash,
+        &expires_at,
+        request_ip(req).as_deref(),
+        request_user_agent(req).as_deref(),
+    )
+    .await?;
     Ok(token)
 }
 
@@ -32,6 +53,7 @@ async fn issue_session(client: &Client, account_id: i64) -> Result<String, ApiEr
 pub async fn register(
     register_account: web::Json<RegisterAccount>,
     db_pool: web::Data<Pool>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let email = register_account.email.trim().to_string();
     if !valid_email(&email) {
@@ -53,7 +75,7 @@ pub async fn register(
         Err(err) => return Err(err.into()),
     };
 
-    let token = issue_session(&client, account_id).await?;
+    let token = issue_session(&client, account_id, &req).await?;
     let api_key = crypto::new_api_key();
     db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key)).await?;
     let account = db::get_account_by_email(&client, &email)
@@ -65,6 +87,7 @@ pub async fn register(
             id: account.id,
             email: account.email,
             created_at: account.created_at,
+            must_change_password: account.must_change_password,
         },
         token,
         api_key: Some(api_key),
@@ -75,6 +98,7 @@ pub async fn register(
 pub async fn login(
     login_account: web::Json<LoginAccount>,
     db_pool: web::Data<Pool>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     let email = login_account.email.trim().to_string();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -83,22 +107,40 @@ pub async fn login(
     let Some(account) = account else {
         return Err(ApiError::InvalidCredentialsError.into());
     };
+
+    // Lockout check happens before the password comparison so an already-locked account
+    // doesn't leak whether the presented password happens to be correct.
+    if account
+        .locked_until
+        .is_some_and(|locked_until| locked_until > Utc::now())
+    {
+        return Err(ApiError::AccountLockedError.into());
+    }
+
     let Some(password_hash) = account.password_hash.as_deref() else {
         return Err(ApiError::InvalidCredentialsError.into());
     };
     if !crypto::verify_password(&login_account.password, password_hash) {
-        return Err(ApiError::InvalidCredentialsError.into());
+        let locked_until = db::record_failed_login(&client, account.id).await?;
+        return match locked_until {
+            Some(locked_until) if locked_until > Utc::now() => {
+                Err(ApiError::AccountLockedError.into())
+            }
+            _ => Err(ApiError::InvalidCredentialsError.into()),
+        };
     }
-    if account.disabled {
+    if account.status != "active" {
         return Err(ApiError::AccountDisabledError.into());
     }
 
-    let token = issue_session(&client, account.id).await?;
+    db::reset_login_lockout_and_record_login(&client, account.id).await?;
+    let token = issue_session(&client, account.id, &req).await?;
     Ok(HttpResponse::Ok().json(AuthenticatedAccount {
         account: Account {
             id: account.id,
             email: account.email,
             created_at: account.created_at,
+            must_change_password: account.must_change_password,
         },
         token,
         api_key: None,
@@ -111,6 +153,7 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
         id: authenticated.id,
         email: authenticated.email.clone(),
         created_at: authenticated.created_at,
+        must_change_password: authenticated.must_change_password,
     }))
 }
 
@@ -142,12 +185,14 @@ pub async fn update_email(
         id: authenticated.id,
         email: Some(email),
         created_at: authenticated.created_at,
+        must_change_password: authenticated.must_change_password,
     }))
 }
 
-/// Requires the current password, same as `groupscape-old`'s change-password flow - a
-/// Discord-only account (no `password_hash` set) can't use this route to set an initial
-/// password, it can only change one that already exists.
+/// No current-password re-entry required - the bearer session token is already this API's proof
+/// of identity for every other account mutation, same reasoning as `update_email` above. Also
+/// the escape hatch for `must_change_password`: a successful change here clears the flag,
+/// whether it was set by an admin-triggered reset or is just a routine change.
 #[put("/password")]
 pub async fn change_password(
     body: web::Json<ChangeAccountPassword>,
@@ -159,19 +204,10 @@ pub async fn change_password(
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let account = db::get_account_by_id(&client, authenticated.id)
-        .await?
-        .ok_or(ApiError::InvalidCredentialsError)?;
-    let Some(password_hash) = account.password_hash.as_deref() else {
-        return Err(ApiError::AccountHasNoPasswordSetError.into());
-    };
-    if !crypto::verify_password(&body.current_password, password_hash) {
-        return Err(ApiError::IncorrectCurrentPasswordError.into());
-    }
-
     let new_password_hash =
         crypto::hash_password(&body.new_password).map_err(|_| ApiError::InvalidCredentialsError)?;
     db::update_account_password(&client, authenticated.id, &new_password_hash).await?;
+    db::clear_must_change_password(&client, authenticated.id).await?;
 
     Ok(HttpResponse::NoContent().finish())
 }
@@ -461,6 +497,7 @@ pub async fn discord_callback(
     query: web::Query<DiscordCallbackQuery>,
     config: web::Data<Config>,
     db_pool: web::Data<Pool>,
+    req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     if !config.discord.enabled {
         return Ok(HttpResponse::ServiceUnavailable().body("Discord login is not configured"));
@@ -502,11 +539,11 @@ pub async fn discord_callback(
             (account, Some(api_key))
         }
     };
-    if account.disabled {
+    if account.status != "active" {
         return Ok(redirect_to("error=account_disabled"));
     }
 
-    let token = issue_session(&client, account.id).await?;
+    let token = issue_session(&client, account.id, &req).await?;
     let fragment = match fresh_api_key {
         Some(api_key) => format!("token={}&api_key={}", token, api_key),
         None => format!("token={}", token),

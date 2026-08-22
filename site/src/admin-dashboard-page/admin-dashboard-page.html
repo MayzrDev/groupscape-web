@@ -1,0 +1,58 @@
+<div class="admin-page-head">
+  <h1>Dashboard</h1>
+</div>
+
+<div class="admin-toolbar admin-dashboard__search-bar">
+  <input type="search" class="admin-dashboard__search" placeholder="Search accounts &amp; groups&hellip;" />
+</div>
+<div class="admin-dashboard__search-results" hidden></div>
+
+<div class="admin-dashboard__error admin-error"></div>
+
+<div class="admin-stats admin-dashboard__stats">
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__total">0</span>
+    <span class="admin-stat-card__l">Total accounts</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__active">0</span>
+    <span class="admin-stat-card__l">Active</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__suspended">0</span>
+    <span class="admin-stat-card__l">Suspended</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__banned">0</span>
+    <span class="admin-stat-card__l">Banned</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__deleted">0</span>
+    <span class="admin-stat-card__l">Deleted</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__live-sessions">0</span>
+    <span class="admin-stat-card__l">Live sessions</span>
+  </div>
+  <div class="admin-stat-card">
+    <span class="admin-stat-card__n admin-dashboard__locked-out">0</span>
+    <span class="admin-stat-card__l">Locked out</span>
+  </div>
+</div>
+
+<div class="admin-panel">
+  <h3 class="admin-dashboard__audit-heading">Recent activity</h3>
+  <div class="admin-table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Action</th>
+          <th>Target</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody class="admin-dashboard__audit-rows"></tbody>
+    </table>
+  </div>
+</div>

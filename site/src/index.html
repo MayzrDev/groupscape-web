@@ -173,11 +173,17 @@
     ></app-route>
     <app-route
       route-path="/"
+      route-component="admin-dashboard-page"
+      route-outlet=".admin-section__outlet"
+      route-wrapper=".admin-section"
+    ></app-route>
+    <app-route route-path="/dashboard" alias-for="/" route-wrapper=".admin-section"></app-route>
+    <app-route
+      route-path="/groups"
       route-component="admin-groups-page"
       route-outlet=".admin-section__outlet"
       route-wrapper=".admin-section"
     ></app-route>
-    <app-route route-path="/groups" alias-for="/" route-wrapper=".admin-section"></app-route>
     <app-route
       route-path="/group-detail"
       route-component="admin-group-detail-page"

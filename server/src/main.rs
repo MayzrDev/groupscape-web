@@ -282,7 +282,20 @@ async fn main() -> std::io::Result<()> {
             .service(admin::list_feature_flags)
             .service(admin::set_feature_flag)
             .service(admin::list_audit_log)
-            .service(admin::accounts_summary);
+            .service(admin::accounts_summary)
+            .service(admin::list_accounts)
+            .service(admin::get_account)
+            .service(admin::reset_password)
+            .service(admin::set_account_status)
+            .service(admin::soft_delete_account)
+            .service(admin::hard_delete_account)
+            .service(admin::list_account_sessions)
+            .service(admin::revoke_account_session)
+            .service(admin::revoke_all_account_sessions)
+            .service(admin::set_account_email)
+            .service(admin::clear_account_lockout)
+            .service(admin::search)
+            .service(admin::dashboard);
         let json_config = web::JsonConfig::default().limit(100000);
         let cors = Cors::default()
             .allow_any_origin()
