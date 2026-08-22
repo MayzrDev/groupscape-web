@@ -21,6 +21,14 @@ const BODY_GIRTH_SCAN_BANDS = 24;
 // clears the threshold. Bridges single sparse bands — e.g. a gap between a hood and the
 // shoulders below it — that would otherwise be mistaken for the top of a held weapon.
 const BODY_GIRTH_LOOKBEHIND = 2;
+// A band can only be credited via the look-behind bridge above if its OWN girth clears this
+// (smaller) fraction of the model's max girth. Without this floor, a thin weapon held just 1-2
+// bands above the shoulders (e.g. a one-handed sword raised at an angle, rather than a two-handed
+// spear/staff held straight overhead) gets bridged the same way a genuinely sparse hood/hair band
+// does, anchoring the crop on the weapon tip instead of the head. A real head/hood band — even a
+// data-sparse one — still has a real, roughly life-sized cross-section; a weapon shaft/blade seen
+// from above is a hairline sliver by comparison.
+const BODY_GIRTH_LOOKBEHIND_MIN_FRACTION = 0.15;
 // Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
@@ -274,13 +282,16 @@ export class PlayerPortrait extends BaseElement {
     for (let band = 0; band < BODY_GIRTH_SCAN_BANDS; band++) maxGirth = Math.max(maxGirth, girth(band));
     const threshold = maxGirth * BODY_GIRTH_FRACTION;
 
+    const lookbehindFloor = maxGirth * BODY_GIRTH_LOOKBEHIND_MIN_FRACTION;
     for (let band = BODY_GIRTH_SCAN_BANDS - 1; band >= 0; band--) {
       let widestNearby = 0;
       for (let k = 0; k <= BODY_GIRTH_LOOKBEHIND; k++) {
         const nearbyBand = band - k;
         if (nearbyBand >= 0) widestNearby = Math.max(widestNearby, girth(nearbyBand));
       }
-      if (widestNearby >= threshold) return yMin + (band / BODY_GIRTH_SCAN_BANDS) * totalHeight;
+      if (widestNearby >= threshold && girth(band) >= lookbehindFloor) {
+        return yMin + (band / BODY_GIRTH_SCAN_BANDS) * totalHeight;
+      }
     }
     return box.max.y;
   }
