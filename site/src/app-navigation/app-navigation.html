@@ -1,5 +1,6 @@
 <h4 class="app-navigation__group-name">${group.groupName}</h4>
 <nav class="app-navigation__nav">
+<div class="app-navigation__panel app-navigation__panel--tabs">
   <men-link link-href="/group/map">
     <button class="men-button" type="button" route-component="map-page">
       <span class="desktop">Map</span>
@@ -42,7 +43,9 @@
       <span class="mobile"><img loading="lazy" src="${coinIconUrl}" /></span>
     </button>
   </men-link>
+  </div>
   <div class="app-navigation__separator desktop"></div>
+  <div class="app-navigation__panel app-navigation__panel--account">
   <men-link link-href="/group/settings">
     <button class="men-button" type="button" route-component="group-settings">
       <span class="desktop">Group Settings</span>
@@ -62,4 +65,5 @@
     </button>
   </men-link>
   <donate-button></donate-button>
+  </div>
 </nav>
