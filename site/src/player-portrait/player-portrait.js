@@ -9,7 +9,7 @@ const FOV_DEGREES = 30;
 const FRAMING_PADDING = 1.22;
 // Fraction of the body height (feet to top of head, see findBodyTop) treated as "head and
 // shoulders" for the bust crop.
-const BUST_HEIGHT_FRACTION = 0.32;
+const BUST_HEIGHT_FRACTION = 0.38;
 // Minimum width+depth, as a fraction of the model's widest band, for a horizontal band to count
 // as part of the body rather than a held weapon/staff.
 const BODY_GIRTH_FRACTION = 0.35;
