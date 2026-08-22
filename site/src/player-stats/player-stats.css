@@ -50,6 +50,11 @@ player-stats {
   padding: 2px 0;
 }
 
+/* Reserved so the row never resizes as prayers toggle on/off mid-fight. */
+.player-stats__prayer {
+  min-height: 24px;
+}
+
 .player-stats__prayer,
 .player-stats__hitpoints {
   border-bottom: 1px dotted rgba(255, 255, 255, 0.18);
@@ -93,6 +98,58 @@ player-stats {
 
 .player-stats__inactive stat-bar {
   filter: grayscale(100%);
+}
+
+.player-stats__prayer-slots {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 70px);
+  overflow: hidden;
+}
+
+.player-stats__prayer-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #171310;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.player-stats__prayer-icon img {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.player-stats__prayer-icon-fallback {
+  font-size: 7px;
+  font-weight: 700;
+  opacity: 0.75;
+  text-shadow: none;
+}
+
+.player-stats__prayer-overflow {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--primary-text);
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 16px;
+  text-shadow: none;
 }
 
 player-stats player-interacting {

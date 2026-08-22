@@ -57,6 +57,28 @@ describe("member-data", () => {
     expect(member.richPresence).toBe("Talking to Reldo");
   });
 
+  it("publishes active prayers on active_prayers updates", () => {
+    const member = new MemberData("Alice");
+
+    member.update({ active_prayers: ["PROTECT_FROM_MELEE", "RIGOUR"] });
+
+    const event = pubsub.getMostRecent("activePrayers:Alice");
+    expect(event).toBeDefined();
+    expect(event[0]).toBe(member.activePrayers);
+    expect(member.activePrayers).toEqual(["PROTECT_FROM_MELEE", "RIGOUR"]);
+  });
+
+  it("publishes an empty active_prayers snapshot when all prayers are deactivated", () => {
+    const member = new MemberData("Alice");
+    member.update({ active_prayers: ["PIETY"] });
+
+    member.update({ active_prayers: [] });
+
+    const event = pubsub.getMostRecent("activePrayers:Alice");
+    expect(event[0]).toEqual([]);
+    expect(member.activePrayers).toEqual([]);
+  });
+
   it("publishes interacting updates when payload explicitly clears interacting", () => {
     const member = new MemberData("Alice");
 

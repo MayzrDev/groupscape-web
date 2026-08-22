@@ -73,6 +73,13 @@ const parsedFieldMappings = [
     publishKey: "richPresence",
     updatedAttribute: "richPresence",
   },
+  {
+    sourceKey: "active_prayers",
+    targetKey: "activePrayers",
+    parser: (value) => value,
+    publishKey: "activePrayers",
+    updatedAttribute: "activePrayers",
+  },
 ];
 
 const itemFieldMappings = [
