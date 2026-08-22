@@ -51,6 +51,17 @@ export function activityMetaLabel(event) {
   return META_LABELS[event.event_type] || "";
 }
 
+// Where a toast/activity-feed row should link when clicked. Most event types don't have a
+// dedicated per-item page, so they fall back to the activity feed itself.
+const LINK_BY_EVENT_TYPE = {
+  combat_task: "/group/combat-achievements",
+  kill: "/group/loot-log",
+};
+
+export function activityLinkFor(event) {
+  return LINK_BY_EVENT_TYPE[event.event_type] || "/group/activity";
+}
+
 const identity = (value) => value;
 
 /// Phrasing convention for group-milestone copy across this app: "<member> <verb> <subject>"
