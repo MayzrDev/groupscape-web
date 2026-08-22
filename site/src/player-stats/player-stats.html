@@ -1,6 +1,5 @@
 <div class="player-stats__hitpoints">
   <stat-bar class="player-stats__hitpoints-bar" bar-color="#157145"></stat-bar>
-  <player-interacting player-name="${this.playerName}"></player-interacting>
   <div class="player-stats__hitpoints-numbers">${this.hitpoints.current} / ${this.hitpoints.max}</div>
   <div class="player-stats__name">
     <player-icon player-name="${this.playerName}"></player-icon> ${this.playerName}
@@ -15,4 +14,5 @@
 <div class="player-stats__energy">
   <stat-bar class="player-stats__energy-bar" bar-color="#a9a9a9"></stat-bar>
 </div>
+<player-interacting player-name="${this.playerName}"></player-interacting>
 <xp-dropper player-name="${this.playerName}"></xp-dropper>

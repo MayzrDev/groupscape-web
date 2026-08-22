@@ -1,15 +1,49 @@
 player-interacting {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 0;
+  margin-left: 0;
+  padding: 0 6px;
+  overflow: hidden;
   visibility: hidden;
+  box-sizing: border-box;
+  background: rgba(164, 22, 35, 0.16);
+  border: 1px solid rgba(164, 22, 35, 0.5);
+  border-radius: 3px;
+  transition: height 0.15s ease;
+}
+
+player-interacting.player-interacting--visible {
+  visibility: visible;
+  height: 15px;
+  margin-top: 3px;
+}
+
+.player-interacting__label {
+  flex: none;
+  text-transform: uppercase;
+  font-size: 0.66em;
+  letter-spacing: 0.05em;
+  color: #d98a8a;
+  opacity: 0.8;
 }
 
 .player-interacting__name {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  padding: 0 4px;
+  flex: none;
+  max-width: 45%;
   overflow: hidden;
   text-overflow: ellipsis;
-  transform: translateY(-50%);
-  max-width: 100%;
+  white-space: nowrap;
+}
+
+.player-interacting__bar {
+  flex: 1;
+  height: 5px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.player-interacting__bar stat-bar {
+  height: 100%;
 }

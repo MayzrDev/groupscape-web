@@ -96,10 +96,5 @@ player-stats {
 }
 
 player-stats player-interacting {
-  height: 45%;
-  width: 40%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -10%);
+  margin-left: 8px;
 }

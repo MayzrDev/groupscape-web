@@ -58,12 +58,12 @@ export class PlayerInteracting extends BaseElement {
   }
 
   hide() {
-    this.style.visibility = "hidden";
+    this.classList.remove("player-interacting--visible");
     this.marker.coordinates = { x: -1000000, y: -1000000, plane: 0 };
   }
 
   show() {
-    this.style.visibility = "visible";
+    this.classList.add("player-interacting--visible");
     this.marker.coordinates = this.interacting.location;
     this.marker.label = this.interacting.name;
   }
