@@ -679,8 +679,8 @@ export class CanvasMap extends BaseElement {
 
     const scale = 1 / Math.min(this.camera.zoom.current, 3);
     const alpha = inactive ? 0.45 : 1;
-    const width = this.playerIconImage.naturalWidth * scale * 0.9;
-    const height = this.playerIconImage.naturalHeight * scale * 0.9;
+    const width = this.playerIconImage.naturalWidth * scale * 0.9 * 1.6;
+    const height = this.playerIconImage.naturalHeight * scale * 0.9 * 1.6;
 
     this.ctx.save();
     this.ctx.translate(centerX, centerY);
@@ -694,6 +694,28 @@ export class CanvasMap extends BaseElement {
     }
 
     this.ctx.globalAlpha = alpha;
+
+    // Drop shadow so the marker reads clearly over any map tile/terrain colour.
+    this.ctx.save();
+    this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    this.ctx.shadowBlur = 10 * scale;
+    this.ctx.shadowOffsetY = 2.5 * scale;
+    this.ctx.filter = `hue-rotate(${hue}deg) saturate(75%)`;
+    this.ctx.drawImage(this.playerIconImage, -width / 2, -height / 2, width, height);
+    this.ctx.restore();
+
+    // White outline: draw the icon offset in a ring of directions so only the alpha edge
+    // shows, tracing the helmet's actual silhouette rather than a bounding circle.
+    const strokeWidth = 1 * scale;
+    const strokeSteps = 16;
+    this.ctx.filter = "brightness(0) invert(1)";
+    for (let i = 0; i < strokeSteps; i++) {
+      const a = (i / strokeSteps) * Math.PI * 2;
+      const ox = Math.cos(a) * strokeWidth;
+      const oy = Math.sin(a) * strokeWidth;
+      this.ctx.drawImage(this.playerIconImage, -width / 2 + ox, -height / 2 + oy, width, height);
+    }
+
     this.ctx.filter = `hue-rotate(${hue}deg) saturate(75%)`;
     this.ctx.drawImage(this.playerIconImage, -width / 2, -height / 2, width, height);
 
