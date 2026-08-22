@@ -271,12 +271,29 @@ pub async fn update_member_color(
     auth: Authenticated,
     body: web::Json<UpdateMemberColorRequest>,
     db_pool: web::Data<Pool>,
+    broadcast_registry: web::Data<GroupBroadcastRegistry>,
 ) -> Result<HttpResponse, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     let body = body.into_inner();
-    let updated =
+    let (member_name, updated) =
         db::update_member_color(&client, auth.group_id, body.account_id, &body.color).await?;
+
+    // Push the new colour straight to any connected party overlays so the plugin's accent
+    // stripe updates without waiting for a reconnect/resync of the roster snapshot.
+    if let Some(hex) = crate::models::named_color_to_hex(&body.color) {
+        let envelope = WsEnvelope::ColorUpdate {
+            payload: websocket::ColorUpdatePayload {
+                name: member_name,
+                color: hex,
+            },
+            ts: Utc::now(),
+        };
+        if let Ok(message) = serde_json::to_string(&envelope) {
+            broadcast_registry.publish(auth.group_id, message);
+        }
+    }
+
     Ok(HttpResponse::Ok().json(updated))
 }
 

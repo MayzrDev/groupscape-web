@@ -3125,7 +3125,7 @@ pub async fn update_member_color(
     group_id: i64,
     account_id: i64,
     color: &str,
-) -> Result<GroupMemberPermissions, ApiError> {
+) -> Result<(String, GroupMemberPermissions), ApiError> {
     if !MEMBER_COLOR_PALETTE.contains(&color) {
         return Err(ApiError::InvalidMemberColorError);
     }
@@ -3156,11 +3156,12 @@ pub async fn update_member_color(
         .await
         .map_err(ApiError::UpdateMemberColorError)?;
 
-    list_group_member_permissions(client, group_id)
+    let permissions = list_group_member_permissions(client, group_id)
         .await?
         .into_iter()
         .find(|permission| permission.account_id == account_id)
-        .ok_or(ApiError::MemberColorTargetNotFoundError)
+        .ok_or(ApiError::MemberColorTargetNotFoundError)?;
+    Ok((member_name, permissions))
 }
 
 /// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same

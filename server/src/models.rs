@@ -11,6 +11,63 @@ pub const MEMBER_COLOR_PALETTE: [&str; 12] = [
     "brown",
 ];
 
+/// Hue (degrees) each [`MEMBER_COLOR_PALETTE`] key renders as, mirroring the site's
+/// `MEMBER_COLOR_HUES` (member-data.js) exactly - `hsl(hue, 70%, 45%)`. Lets server code (the
+/// party overlay websocket) hand the RuneLite plugin a decoded hex colour instead of the raw key,
+/// so the overlay accent matches the site's colour picker without the plugin needing its own hue
+/// table.
+const MEMBER_COLOR_HUES: [(&str, f64); 12] = [
+    ("yellow", 41.0),
+    ("green", 151.0),
+    ("blue", 210.0),
+    ("red", 355.0),
+    ("purple", 288.0),
+    ("orange", 25.0),
+    ("cyan", 185.0),
+    ("pink", 330.0),
+    ("lime", 95.0),
+    ("teal", 170.0),
+    ("indigo", 245.0),
+    ("brown", 30.0),
+];
+
+/// Resolves a [`MEMBER_COLOR_PALETTE`] key to the hex string its `hsl(hue, 70%, 45%)` rendering
+/// works out to. `None` for a key not in [`MEMBER_COLOR_HUES`].
+pub fn named_color_to_hex(key: &str) -> Option<String> {
+    MEMBER_COLOR_HUES
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, hue)| hsl_to_hex(*hue, 0.70, 0.45))
+}
+
+fn hsl_to_hex(h: f64, s: f64, l: f64) -> String {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h / 60.0) % 2.0 - 1.0).abs());
+    let m = l - c / 2.0;
+    let (r1, g1, b1) = match h {
+        h if h < 60.0 => (c, x, 0.0),
+        h if h < 120.0 => (x, c, 0.0),
+        h if h < 180.0 => (0.0, c, x),
+        h if h < 240.0 => (0.0, x, c),
+        h if h < 300.0 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let to_byte = |v: f64| ((v + m) * 255.0).round() as u8;
+    format!("#{:02X}{:02X}{:02X}", to_byte(r1), to_byte(g1), to_byte(b1))
+}
+
+#[cfg(test)]
+mod member_color_tests {
+    use super::*;
+
+    #[test]
+    fn named_color_to_hex_matches_known_hsl_conversion() {
+        // hsl(151, 70%, 45%) -> a mid-tone green.
+        assert_eq!(named_color_to_hex("green").as_deref(), Some("#22C375"));
+        assert_eq!(named_color_to_hex("not-a-color"), None);
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct Coordinates {

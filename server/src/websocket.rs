@@ -115,6 +115,13 @@ pub struct KillEventPayload {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColorUpdatePayload {
+    pub name: String,
+    pub color: String,
+}
+
+#[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEnvelope {
     RosterSnapshot {
@@ -127,6 +134,10 @@ pub enum WsEnvelope {
     },
     KillEvent {
         payload: KillEventPayload,
+        ts: DateTime<Utc>,
+    },
+    ColorUpdate {
+        payload: ColorUpdatePayload,
         ts: DateTime<Utc>,
     },
 }
@@ -217,9 +228,14 @@ pub async fn party_overlay_ws(
         .iter()
         .map(|member| RosterMemberEntry {
             name: member.name.clone(),
-            color: colors
-                .get(&member.name)
-                .cloned()
+            // Prefer the admin-assigned helmet colour (`members.color`) over the join-order
+            // fallback palette, so the overlay stripe matches the site's colour picker. Falls
+            // back to join order for members nobody has assigned a colour to yet.
+            color: member
+                .color
+                .as_deref()
+                .and_then(crate::models::named_color_to_hex)
+                .or_else(|| colors.get(&member.name).cloned())
                 .unwrap_or_else(|| "#808080".to_string()),
             vitals: Some(to_wire_vitals(member)),
         })
