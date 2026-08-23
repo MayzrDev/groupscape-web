@@ -151,7 +151,3 @@ player-stats {
   line-height: 16px;
   text-shadow: none;
 }
-
-player-stats player-interacting {
-  margin-left: 8px;
-}
