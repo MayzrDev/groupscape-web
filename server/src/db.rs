@@ -678,7 +678,8 @@ GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
 quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
 rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
 collection_log_last_update, potion_storage_last_update, special_attack_last_update,
-active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update) as last_updated,
+active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update,
+character_mesh.mesh_last_update) as last_updated,
 CASE WHEN stats_last_update >= $1::TIMESTAMPTZ THEN stats ELSE NULL END as stats,
 CASE WHEN coordinates_last_update >= $1::TIMESTAMPTZ THEN coordinates ELSE NULL END as coordinates,
 CASE WHEN skills_last_update >= $1::TIMESTAMPTZ THEN skills ELSE NULL END as skills,
@@ -695,8 +696,12 @@ CASE WHEN potion_storage_last_update >= $1::TIMESTAMPTZ THEN potion_storage ELSE
 CASE WHEN special_attack_last_update >= $1::TIMESTAMPTZ THEN special_attack ELSE NULL END as special_attack,
 CASE WHEN active_prayers_last_update >= $1::TIMESTAMPTZ THEN active_prayers ELSE NULL END as active_prayers,
 CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence,
-CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements
-FROM groupscape.members WHERE group_id=$2
+CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements,
+CASE WHEN character_mesh.mesh_last_update >= $1::TIMESTAMPTZ THEN character_mesh.mesh_last_update ELSE NULL END as portrait_last_update
+FROM groupscape.members
+LEFT JOIN groupscape.characters ON characters.account_hash = members.account_hash
+LEFT JOIN groupscape.character_mesh ON character_mesh.character_id = characters.character_id
+WHERE group_id=$2
 "#,
         )
         .await?;
@@ -738,6 +743,7 @@ FROM groupscape.members WHERE group_id=$2
             object_interactions: None,
             alerts: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+            portrait_last_update: row.try_get("portrait_last_update").ok(),
         };
         result.push(group_member);
     }

@@ -174,6 +174,13 @@ pub struct GroupMember {
     pub rich_presence: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combat_achievements: Option<CombatAchievements>,
+    /// Timestamp of the character's most recent portrait mesh upload (`character_mesh.mesh_last_update`),
+    /// gated by the same "since timestamp" cutoff as the telemetry fields above. Never sent by the
+    /// plugin - it's server-computed in `get_group_data` so an already-open side panel knows to
+    /// refetch `/portrait/{member_name}` after a gear/appearance change instead of showing a stale mesh
+    /// until the page is reloaded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub portrait_last_update: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_updated: Option<DateTime<Utc>>,
     /// Discrete kill/death events piggybacked on the same heartbeat, matching

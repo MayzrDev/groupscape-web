@@ -3,6 +3,7 @@ import { PLYLoader } from "three/examples/jsm/loaders/PLYLoader.js";
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { accountApi } from "../data/account-api";
+import { pubsub } from "../data/pubsub";
 
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
@@ -63,11 +64,29 @@ export class PlayerPortrait extends BaseElement {
     this.squareObserver.observe(this);
     this.onResize();
 
+    // Snapshot whatever portrait-update timestamp is already known for this player before
+    // subscribing, so the replay-most-recent below (see pubsub.subscribe) doesn't trigger a
+    // redundant reload of the mesh we're about to fetch anyway.
+    if (this.playerName) {
+      const [mostRecentTimestamp] = pubsub.getMostRecent(`portraitUpdated:${this.playerName}`) || [];
+      this.lastLoadedPortraitTimestamp = mostRecentTimestamp ?? null;
+      this.subscribe(`portraitUpdated:${this.playerName}`, this.handlePortraitUpdated.bind(this));
+    }
+
     this.loadPortrait();
 
     if (this.mode === "full") {
       this.setupRotation();
     }
+  }
+
+  // Fires whenever the group-data poll reports a newer character_mesh upload (e.g. the plugin
+  // re-captured the portrait after a gear/appearance change) so an already-open panel picks up
+  // the new mesh without the user having to refresh the page.
+  handlePortraitUpdated(timestamp) {
+    if (timestamp === this.lastLoadedPortraitTimestamp) return;
+    this.lastLoadedPortraitTimestamp = timestamp;
+    this.loadPortrait();
   }
 
   disconnectedCallback() {
@@ -169,11 +188,21 @@ export class PlayerPortrait extends BaseElement {
       return;
     }
 
+    this.classList.remove("player-portrait--no-portrait");
     this.buildMesh(buffer);
     this.renderFrame();
   }
 
   buildMesh(buffer) {
+    if (this.mesh) {
+      // Replacing an already-loaded portrait (see handlePortraitUpdated) - drop the old mesh
+      // rather than leaving it in the scene alongside the new one.
+      this.scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      this.mesh.material.dispose();
+      this.mesh = null;
+    }
+
     const geometry = new PLYLoader().parse(buffer);
     // RuneLite model space is X east, Y down, Z north. Negating Y and Z (not just Y) is a
     // 180-degree rotation about X, flipping the model upright with its front facing the camera.

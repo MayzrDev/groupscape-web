@@ -80,6 +80,13 @@ const parsedFieldMappings = [
     publishKey: "activePrayers",
     updatedAttribute: "activePrayers",
   },
+  {
+    sourceKey: "portrait_last_update",
+    targetKey: "portraitLastUpdate",
+    parser: (value) => value,
+    publishKey: "portraitUpdated",
+    updatedAttribute: "portraitLastUpdate",
+  },
 ];
 
 const itemFieldMappings = [

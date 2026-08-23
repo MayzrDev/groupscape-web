@@ -659,6 +659,7 @@ mod tests {
             active_prayers: None,
             rich_presence: None,
             combat_achievements: None,
+            portrait_last_update: None,
             last_updated: None,
             events: None,
             interactions: None,
