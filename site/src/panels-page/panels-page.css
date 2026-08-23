@@ -8,6 +8,9 @@
   width: 100%;
   max-width: none;
   max-height: unset;
+  /* stacks with main-content's bottom padding once they're vertical siblings instead of
+     side-by-side flex items, doubling the gap below nav - so drop it here. */
+  padding-top: 0;
 }
 
 .panels-page .side-panel__panels {
@@ -23,6 +26,10 @@
   width: 300px;
 }
 
+/* .authed-section__main-content only stretches to the app-navigation panel's own flow
+   height here (the flex layout that stretches it to full page height on other pages is
+   overridden above), so `overflow: hidden` would clip the account panel's absolutely
+   positioned, taller-than-the-tab-row button stack - leave it unclipped. */
 .panels-page .authed-section__main-content {
-  overflow: hidden;
+  overflow: visible;
 }
