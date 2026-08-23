@@ -15,20 +15,25 @@ function loadSets() {
  * Given the item ids currently equipped, returns every curated set with its completion status:
  * `active` (every piece equipped), `partial` (some but not all pieces equipped, with
  * `missingItemIds` listing what's left), or neither (no pieces equipped at all).
+ *
+ * Each set's `pieces` is an array of pieces, and each piece is itself an array of every item id
+ * that counts as "wearing that piece" - degrade-state variants (e.g. Moon armour's New/Used ids),
+ * locked-item variants, etc. A piece is satisfied if any one of its variant ids is equipped.
  */
 export async function detectActiveSets(equippedItemIds) {
   const sets = await loadSets();
   const equipped = new Set(equippedItemIds);
 
   return sets.map((set) => {
-    const missingItemIds = set.itemIds.filter((itemId) => !equipped.has(itemId));
+    const missingPieces = set.pieces.filter((variantIds) => !variantIds.some((id) => equipped.has(id)));
+    const missingItemIds = missingPieces.map((variantIds) => variantIds[0]);
     return {
       name: set.name,
       effect: set.effect,
-      itemIds: set.itemIds,
+      pieceCount: set.pieces.length,
       missingItemIds,
-      active: missingItemIds.length === 0,
-      partial: missingItemIds.length > 0 && missingItemIds.length < set.itemIds.length,
+      active: missingPieces.length === 0,
+      partial: missingPieces.length > 0 && missingPieces.length < set.pieces.length,
     };
   });
 }

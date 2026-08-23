@@ -29,6 +29,14 @@ side-panel:has(.player-panel--equipment-active) {
   max-width: 620px;
 }
 
+/* The vitals bars and tab-icon row shouldn't stretch along with the widened side panel above -
+   they stay at the panel's normal content width while the equipment tab's content grows past
+   them on the right. */
+.player-panel--equipment-active .player-panel__header,
+.player-panel--equipment-active .player-panel__minibar {
+  width: 314px;
+}
+
 button.side-panel__move {
   width: 100%;
   padding: 0;

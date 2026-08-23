@@ -59,6 +59,12 @@ player-panel + player-panel {
   margin-top: 8px;
 }
 
+/* The equipment tab has its own inline portrait between the gear and stats - don't also show
+   the card-level one below it, or the same render would appear twice. */
+.player-panel--equipment-active .player-panel__portrait-full {
+  display: none;
+}
+
 .player-panel__minibar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);

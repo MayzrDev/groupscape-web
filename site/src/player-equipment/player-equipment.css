@@ -90,6 +90,10 @@ player-equipment {
   top: 158px;
 }
 
+.equipment-portrait {
+  flex: 0 0 130px;
+}
+
 .equipment-stats {
   display: flex;
   gap: 14px;

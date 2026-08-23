@@ -58,8 +58,8 @@ export class SetBonusDialog extends BaseElement {
           : "";
         const status = set.active ? "Active" : set.partial ? "Partial" : "Not worn";
         const missing =
-          set.partial || (!set.active && set.missingItemIds.length === set.itemIds.length)
-            ? `<p class="set-bonus-dialog__missing">Missing ${set.missingItemIds.length} of ${set.itemIds.length} pieces</p>`
+          set.partial || (!set.active && set.missingItemIds.length === set.pieceCount)
+            ? `<p class="set-bonus-dialog__missing">Missing ${set.missingItemIds.length} of ${set.pieceCount} pieces</p>`
             : "";
 
         return `

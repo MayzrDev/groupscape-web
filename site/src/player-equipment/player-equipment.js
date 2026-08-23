@@ -78,8 +78,8 @@ export class PlayerEquipment extends BaseElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.render();
     this.playerName = this.getAttribute("player-name");
+    this.render();
     this.slotEls = {
       [EquipmentSlot.Head]: this.querySelector(".equipment-head"),
       [EquipmentSlot.Back]: this.querySelector(".equipment-cape"),
