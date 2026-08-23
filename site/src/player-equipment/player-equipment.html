@@ -13,7 +13,7 @@
     <div class="equipment-ring equipment-slot"></div>
   </div>
 
-  <player-portrait mode="full" player-name="${this.playerName}" class="equipment-portrait"></player-portrait>
+  ${this.showPortrait ? `<player-portrait mode="full" player-name="${this.playerName}" class="equipment-portrait"></player-portrait>` : ""}
 
   <div class="equipment-stats rsborder-tiny">
     <div class="equipment-stats__column">

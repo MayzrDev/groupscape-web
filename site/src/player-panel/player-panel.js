@@ -30,6 +30,7 @@ export class PlayerPanel extends BaseElement {
     this.portraitMode = mode;
     this.activeComponent = null;
     this.classList.remove("expanded");
+    this.classList.remove("player-panel--equipment-active");
     this.renderPanel();
   }
 
@@ -89,7 +90,11 @@ export class PlayerPanel extends BaseElement {
   handleMiniBarClick(event) {
     const component = event.target.getAttribute("data-component");
     if (component && this.activeComponent !== component) {
-      this.contentArea.innerHTML = `<${component} player-name="${this.playerName}"></${component}>`;
+      // The equipment tab's own portrait is only worth the width on /panels, which has room for
+      // it and where portraitMode is already "full" - the side-panel's fixed width stays true to
+      // the original gear/stats layout instead.
+      const showPortrait = component === "player-equipment" && this.portraitMode === "full";
+      this.contentArea.innerHTML = `<${component} player-name="${this.playerName}" show-portrait="${showPortrait}"></${component}>`;
 
       if (this.activeComponent) {
         this.querySelector(`button[data-component="${this.activeComponent}"]`).classList.remove(
