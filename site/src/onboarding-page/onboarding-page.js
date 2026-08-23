@@ -48,6 +48,9 @@ export class OnboardingPage extends BaseElement {
     super.connectedCallback();
     this.render();
 
+    const params = new URLSearchParams(window.location.search);
+    this.addingAnother = params.get("add") === "1";
+
     this.status = this.querySelector(".onboarding-page__status");
     this.content = this.querySelector(".onboarding-page__content");
     this.linkEmptySection = this.querySelector(".onboarding-page__link-empty");
@@ -131,13 +134,22 @@ export class OnboardingPage extends BaseElement {
     const ungrouped = characters.find((character) => character.status !== "pending" && character.group_id == null);
 
     if (pending) {
+      this.addingAnother = false;
       this.showStep("link-pending", pending.id);
       this.renderPendingCharacter(pending);
     } else if (characters.length === 0) {
       this.showStep("link-empty", null);
     } else if (ungrouped) {
+      this.addingAnother = false;
       this.showStep("group", ungrouped.id);
       this.groupCharacterName.textContent = ungrouped.display_rsn;
+    } else if (this.addingAnother) {
+      // Existing characters are all confirmed and grouped, but the user explicitly asked to
+      // link another one (from character-select's "+ Link another character") — show the link
+      // step instead of bouncing back to /characters like the no-flag case below does. Stays
+      // true until the new character actually shows up above (pending/ungrouped), so this step
+      // doesn't flicker back to /characters on the next poll while waiting on the plugin.
+      this.showStep("link-empty", null);
     } else {
       // Every character is confirmed and in a group — nothing left to onboard.
       window.history.pushState("", "", "/characters");
