@@ -17,6 +17,11 @@ export class MapPage extends BaseElement {
     document.querySelector(".authed-section").classList.add("no-pointer-events");
     this.worldMap.classList.add("interactable");
     this.planeSelect = this.querySelector(".map-page__plane-select");
+    this.planeContainer = this.querySelector(".map-page__plane-container");
+    this.planeSlot = document.querySelector(".app-navigation__plane-slot");
+    if (this.planeSlot && this.planeContainer) {
+      this.planeSlot.appendChild(this.planeContainer);
+    }
 
     this.planeSelect.value = this.worldMap.plane || 1;
 
@@ -29,6 +34,9 @@ export class MapPage extends BaseElement {
     super.disconnectedCallback();
     this.worldMap.classList.remove("interactable");
     document.querySelector(".authed-section").classList.remove("no-pointer-events");
+    if (this.planeContainer && this.planeContainer.parentElement === this.planeSlot) {
+      this.planeSlot.removeChild(this.planeContainer);
+    }
   }
 
   getSelectedPlane() {

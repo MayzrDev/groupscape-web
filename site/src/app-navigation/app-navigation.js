@@ -22,6 +22,21 @@ export class AppNavigation extends BaseElement {
     super.connectedCallback();
     this.render();
     this.subscribe("route-activated", this.handleRouteActivated.bind(this));
+    this.reserveAccountPanelSpace();
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => this.reserveAccountPanelSpace());
+    }
+  }
+
+  // The account panel is absolutely positioned (see app-navigation.css) so its taller,
+  // vertically-stacked buttons don't push page content down. That takes it out of flex
+  // flow, so the tabs panel needs its rendered width reserved via margin to stay clear of it.
+  reserveAccountPanelSpace() {
+    const tabsPanel = this.querySelector(".app-navigation__panel--tabs");
+    const accountPanel = this.querySelector(".app-navigation__panel--account");
+    if (tabsPanel && accountPanel) {
+      tabsPanel.style.marginRight = `${accountPanel.offsetWidth + 6}px`;
+    }
   }
 
   handleRouteActivated(route) {
