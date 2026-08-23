@@ -140,6 +140,12 @@ pub enum ApiError {
     CannotBlockSelfError,
     AccountLockedError,
     MustChangePasswordError,
+    #[from(ignore)]
+    GetItemBonusesError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpsertItemBonusesError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ItemBonusesScrapeError(String),
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -344,6 +350,14 @@ impl ResponseError for ApiError {
                 .body("Too many failed login attempts. Try again in 15 minutes."),
             ApiError::MustChangePasswordError => HttpResponse::Forbidden()
                 .body("You must change your password before continuing"),
+            ApiError::GetItemBonusesError(ref err) => handle_pg_error(err, "GetItemBonusesError"),
+            ApiError::UpsertItemBonusesError(ref err) => {
+                handle_pg_error(err, "UpsertItemBonusesError")
+            }
+            ApiError::ItemBonusesScrapeError(ref reason) => {
+                log::warn!("ItemBonusesScrapeError: {}", reason);
+                HttpResponse::BadGateway().body("Failed to fetch item bonuses from the OSRS Wiki")
+            }
         }
     }
 }

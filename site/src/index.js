@@ -50,6 +50,7 @@ import "./activity-feed-event/activity-feed-event.js";
 import "./loot-log-page/loot-log-page.js";
 import "./loot-log-row/loot-log-row.js";
 import "./diary-dialog/diary-dialog.js";
+import "./set-bonus-dialog/set-bonus-dialog.js";
 import "./player-diaries/player-diaries.js";
 import "./diary-completion/diary-completion.js";
 import "./canvas-map/canvas-map.js";

@@ -99,6 +99,10 @@ export class PlayerPanel extends BaseElement {
       this.querySelector(`button[data-component="${component}"]`).classList.add("player-panel__tab-active");
       this.activeComponent = component;
       this.classList.add("expanded");
+      // The equipment tab's bonus-stats layout needs more room than the fixed side-panel width
+      // gives every other tab - see side-panel.css's `:has()` rule widening the whole side-panel
+      // while this class is present, rather than every tab sharing one wider width.
+      this.classList.toggle("player-panel--equipment-active", component === "player-equipment");
     } else if (this.activeComponent && this.activeComponent === component) {
       this.contentArea.innerHTML = "";
       this.querySelector(`button[data-component="${this.activeComponent}"]`).classList.remove(
@@ -106,6 +110,7 @@ export class PlayerPanel extends BaseElement {
       );
       this.activeComponent = null;
       this.classList.remove("expanded");
+      this.classList.remove("player-panel--equipment-active");
     }
   }
 }

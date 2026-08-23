@@ -4,10 +4,10 @@ use crate::models::{
     ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
     AdminAccountSession, AdminAccountSummary, AdminAuditLogEntry, AdminDashboard,
     AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
-    CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember, GroupMemberPermissions,
-    GroupMetricData, GroupPermissions, GroupSession, GroupSkillData, MemberMetricData,
-    MemberSkillData, MetricDataPoint, PermissionFlags, PermissionFlagsPatch, PermissionKey,
-    MEMBER_COLOR_PALETTE, SHARED_MEMBER,
+    CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
+    GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession, GroupSkillData,
+    ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
+    PermissionFlagsPatch, PermissionKey, MEMBER_COLOR_PALETTE, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -2210,6 +2210,139 @@ ALTER TABLE groupscape.account_sessions ADD COLUMN IF NOT EXISTS user_agent TEXT
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "create_item_bonuses_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.item_bonuses (
+  item_id INT PRIMARY KEY,
+  attack_stab INT NOT NULL,
+  attack_slash INT NOT NULL,
+  attack_crush INT NOT NULL,
+  attack_magic INT NOT NULL,
+  attack_ranged INT NOT NULL,
+  defence_stab INT NOT NULL,
+  defence_slash INT NOT NULL,
+  defence_crush INT NOT NULL,
+  defence_magic INT NOT NULL,
+  defence_ranged INT NOT NULL,
+  melee_strength INT NOT NULL,
+  ranged_strength INT NOT NULL,
+  magic_damage INT NOT NULL,
+  prayer INT NOT NULL,
+  attack_speed INT,
+  fetched_at TIMESTAMPTZ NOT NULL
+);
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_item_bonuses_table").await?;
+        transaction.commit().await?;
+    }
+
+    Ok(())
+}
+
+/// Fresh (< 30-day-old) cached equipment bonuses for `item_id`, or `None` on a cache miss/expiry
+/// - the caller (`item_bonuses::get_item_bonuses`) is responsible for re-scraping and upserting
+/// in that case.
+pub async fn get_cached_item_bonuses(
+    client: &Client,
+    item_id: i32,
+) -> Result<Option<ItemBonusesResponse>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT attack_stab, attack_slash, attack_crush, attack_magic, attack_ranged,
+       defence_stab, defence_slash, defence_crush, defence_magic, defence_ranged,
+       melee_strength, ranged_strength, magic_damage, prayer, attack_speed
+FROM groupscape.item_bonuses
+WHERE item_id=$1 AND fetched_at >= NOW() - INTERVAL '30 days'
+"#,
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&item_id])
+        .await
+        .map_err(ApiError::GetItemBonusesError)?;
+    let Some(row) = row else {
+        return Ok(None);
+    };
+
+    Ok(Some(ItemBonusesResponse {
+        item_id,
+        attack: CombatStyleBonuses {
+            stab: row.try_get("attack_stab")?,
+            slash: row.try_get("attack_slash")?,
+            crush: row.try_get("attack_crush")?,
+            magic: row.try_get("attack_magic")?,
+            ranged: row.try_get("attack_ranged")?,
+        },
+        defence: CombatStyleBonuses {
+            stab: row.try_get("defence_stab")?,
+            slash: row.try_get("defence_slash")?,
+            crush: row.try_get("defence_crush")?,
+            magic: row.try_get("defence_magic")?,
+            ranged: row.try_get("defence_ranged")?,
+        },
+        melee_strength: row.try_get("melee_strength")?,
+        ranged_strength: row.try_get("ranged_strength")?,
+        magic_damage: row.try_get("magic_damage")?,
+        prayer: row.try_get("prayer")?,
+        attack_speed: row.try_get("attack_speed")?,
+    }))
+}
+
+pub async fn upsert_item_bonuses(
+    client: &Client,
+    bonuses: &ItemBonusesResponse,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.item_bonuses (
+  item_id, attack_stab, attack_slash, attack_crush, attack_magic, attack_ranged,
+  defence_stab, defence_slash, defence_crush, defence_magic, defence_ranged,
+  melee_strength, ranged_strength, magic_damage, prayer, attack_speed, fetched_at
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, NOW())
+ON CONFLICT (item_id) DO UPDATE SET
+  attack_stab=excluded.attack_stab, attack_slash=excluded.attack_slash, attack_crush=excluded.attack_crush,
+  attack_magic=excluded.attack_magic, attack_ranged=excluded.attack_ranged,
+  defence_stab=excluded.defence_stab, defence_slash=excluded.defence_slash, defence_crush=excluded.defence_crush,
+  defence_magic=excluded.defence_magic, defence_ranged=excluded.defence_ranged,
+  melee_strength=excluded.melee_strength, ranged_strength=excluded.ranged_strength,
+  magic_damage=excluded.magic_damage, prayer=excluded.prayer, attack_speed=excluded.attack_speed,
+  fetched_at=excluded.fetched_at
+"#,
+        )
+        .await?;
+    client
+        .execute(
+            &stmt,
+            &[
+                &bonuses.item_id,
+                &bonuses.attack.stab,
+                &bonuses.attack.slash,
+                &bonuses.attack.crush,
+                &bonuses.attack.magic,
+                &bonuses.attack.ranged,
+                &bonuses.defence.stab,
+                &bonuses.defence.slash,
+                &bonuses.defence.crush,
+                &bonuses.defence.magic,
+                &bonuses.defence.ranged,
+                &bonuses.melee_strength,
+                &bonuses.ranged_strength,
+                &bonuses.magic_damage,
+                &bonuses.prayer,
+                &bonuses.attack_speed,
+            ],
+        )
+        .await
+        .map_err(ApiError::UpsertItemBonusesError)?;
     Ok(())
 }
 

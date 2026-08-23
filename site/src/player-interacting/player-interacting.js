@@ -53,11 +53,10 @@ export class PlayerInteracting extends BaseElement {
       // anything else (NPC/object interactions like banking) reads as a full neutral bar.
       const isEnemy = interacting.scale > 0;
       this.classList.toggle("player-interacting--neutral", !isEnemy);
-      this.fill.style.width = isEnemy
-        ? `${Math.max(0, Math.min(1, interacting.ratio / interacting.scale)) * 100}%`
-        : "100%";
+      const healthPercent = Math.max(0, Math.min(1, interacting.ratio / interacting.scale)) * 100;
+      this.fill.style.width = isEnemy ? `${healthPercent}%` : "100%";
 
-      this.hp.textContent = isEnemy ? `${interacting.ratio}/${interacting.scale}` : "";
+      this.hp.textContent = isEnemy ? `${Math.round(healthPercent)}%` : "";
 
       this.name.innerHTML = interacting.name;
       this.show();

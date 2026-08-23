@@ -26,6 +26,14 @@
   width: 300px;
 }
 
+/* The equipment tab's bonus-stats columns need more room than the grid's usual 300px card width
+   - matches side-panel.css's `:has()` widening of the sidebar itself for the same tab, just
+   applied directly to the card here since panels-page lays player-panels out in a wrapping flex
+   grid rather than a single fixed-width column. */
+.panels-page player-panel.player-panel--equipment-active {
+  width: 560px;
+}
+
 /* .authed-section__main-content only stretches to the app-navigation panel's own flow
    height here (the flex layout that stretches it to full page height on other pages is
    overridden above), so `overflow: hidden` would clip the account panel's absolutely

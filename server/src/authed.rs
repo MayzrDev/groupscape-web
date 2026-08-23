@@ -6,13 +6,14 @@ use crate::db;
 use crate::discord;
 use crate::drop_rates;
 use crate::error::ApiError;
+use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
-    GroupSession, GroupSkillData, IdentifyCharacter, LootSplitParticipant, LootSplitResult,
-    LootSummaryRow, MyPermissions, PermissionFlags, PermissionKey, RenameGroup, UpdateGroupPermissionsRequest,
-    UpdateMemberColorRequest, SHARED_MEMBER,
+    GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootSplitParticipant,
+    LootSplitResult, LootSummaryRow, MyPermissions, PermissionFlags, PermissionKey, RenameGroup,
+    UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
@@ -995,6 +996,24 @@ pub async fn get_metric_data(
     };
 
     Ok(web::Json(data))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetItemBonusesQuery {
+    pub item_id: i32,
+}
+/// Equipment bonuses for a single item id (equip-screen Attack/Defence/Other-bonuses columns) -
+/// global reference data, not group-scoped, but still requires the same group/character auth as
+/// every other endpoint (see main.rs's registration under both scopes). `Authenticated` is
+/// required purely as an auth gate here; `auth.group_id` is unused.
+pub async fn get_item_bonuses(
+    _auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetItemBonusesQuery>,
+) -> Result<web::Json<ItemBonusesResponse>, Error> {
+    let bonuses = item_bonuses::get_item_bonuses(db_pool.get_ref(), query.item_id).await?;
+    Ok(web::Json(bonuses))
 }
 
 pub async fn am_i_logged_in(_auth: Authenticated) -> Result<HttpResponse, Error> {

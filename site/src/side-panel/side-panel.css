@@ -19,6 +19,16 @@ side-panel {
   }
 }
 
+/* The equipment tab's Attack/Defence/Other-bonuses stat columns need more horizontal room than
+   the 330px side panel gives every other tab - widen the whole side panel (player-panel is
+   width:100% of it, so this alone is enough to un-clip the tab) only while that tab is open,
+   rather than widening the panel for every tab. See player-panel.js's
+   `player-panel--equipment-active` toggle. */
+side-panel:has(.player-panel--equipment-active) {
+  width: 620px;
+  max-width: 620px;
+}
+
 button.side-panel__move {
   width: 100%;
   padding: 0;

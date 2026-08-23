@@ -1,13 +1,66 @@
-<div class="equipment">
-  <div class="equipment-head equipment-slot"></div>
-  <div class="equipment-cape equipment-slot"></div>
-  <div class="equipment-neck equipment-slot"></div>
-  <div class="equipment-ammo equipment-slot"></div>
-  <div class="equipment-weapon equipment-slot"></div>
-  <div class="equipment-torso equipment-slot"></div>
-  <div class="equipment-shield equipment-slot"></div>
-  <div class="equipment-legs equipment-slot"></div>
-  <div class="equipment-gloves equipment-slot"></div>
-  <div class="equipment-boots equipment-slot"></div>
-  <div class="equipment-ring equipment-slot"></div>
+<div class="equipment-and-stats">
+  <div class="equipment">
+    <div class="equipment-head equipment-slot"></div>
+    <div class="equipment-cape equipment-slot"></div>
+    <div class="equipment-neck equipment-slot"></div>
+    <div class="equipment-ammo equipment-slot"></div>
+    <div class="equipment-weapon equipment-slot"></div>
+    <div class="equipment-torso equipment-slot"></div>
+    <div class="equipment-shield equipment-slot"></div>
+    <div class="equipment-legs equipment-slot"></div>
+    <div class="equipment-gloves equipment-slot"></div>
+    <div class="equipment-boots equipment-slot"></div>
+    <div class="equipment-ring equipment-slot"></div>
+  </div>
+
+  <div class="equipment-stats rsborder-tiny">
+    <div class="equipment-stats__column">
+      <h3 class="equipment-stats__heading">Attack bonus</h3>
+      <div class="equipment-stats__grid">
+        <span>Stab</span><span class="equipment-stats__value" data-stat="attackStab">+0</span>
+        <span>Slash</span><span class="equipment-stats__value" data-stat="attackSlash">+0</span>
+        <span>Crush</span><span class="equipment-stats__value" data-stat="attackCrush">+0</span>
+        <span>Magic</span><span class="equipment-stats__value" data-stat="attackMagic">+0</span>
+        <span>Ranged</span><span class="equipment-stats__value" data-stat="attackRanged">+0</span>
+      </div>
+    </div>
+
+    <div class="equipment-stats__column">
+      <h3 class="equipment-stats__heading">Defence bonus</h3>
+      <div class="equipment-stats__grid">
+        <span>Stab</span><span class="equipment-stats__value" data-stat="defenceStab">+0</span>
+        <span>Slash</span><span class="equipment-stats__value" data-stat="defenceSlash">+0</span>
+        <span>Crush</span><span class="equipment-stats__value" data-stat="defenceCrush">+0</span>
+        <span>Magic</span><span class="equipment-stats__value" data-stat="defenceMagic">+0</span>
+        <span>Ranged</span><span class="equipment-stats__value" data-stat="defenceRanged">+0</span>
+      </div>
+    </div>
+
+    <div class="equipment-stats__column">
+      <h3 class="equipment-stats__heading">Other bonuses</h3>
+      <div class="equipment-stats__grid">
+        <span>Melee Str</span><span class="equipment-stats__value" data-stat="meleeStrength">+0</span>
+        <span>Ranged Str</span><span class="equipment-stats__value" data-stat="rangedStrength">+0</span>
+        <span>Magic Dmg</span><span class="equipment-stats__value" data-stat="magicDamage">+0%</span>
+        <span>Prayer</span><span class="equipment-stats__value" data-stat="prayer">+0</span>
+      </div>
+
+      <h3 class="equipment-stats__heading">Target-specific</h3>
+      <div class="equipment-stats__grid">
+        <span>Undead</span><span class="equipment-stats__value" data-stat="undead">+0%</span>
+        <span>Slayer</span><span class="equipment-stats__value" data-stat="slayer">+0%</span>
+      </div>
+
+      <h3 class="equipment-stats__heading">Weapon speed</h3>
+      <div class="equipment-stats__grid">
+        <span>Base</span><span class="equipment-stats__value" data-stat="speedBase">-</span>
+        <span>Actual</span><span class="equipment-stats__value" data-stat="speedActual">-</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="equipment-actions">
+  <button type="button" class="men-button equipment-set-bonus-button">Set Bonus</button>
+  <button type="button" class="men-button equipment-dps-button">View DPS</button>
 </div>

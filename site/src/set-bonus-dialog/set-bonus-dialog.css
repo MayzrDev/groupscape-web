@@ -1,0 +1,78 @@
+set-bonus-dialog h2 {
+  color: var(--orange);
+}
+
+set-bonus-dialog .dialog__container {
+  padding: 0;
+  cursor: auto;
+}
+
+.set-bonus-dialog__container {
+  width: min(95%, 460px);
+}
+
+.set-bonus-dialog__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.set-bonus-dialog__title {
+  font-size: 18px;
+}
+
+.set-bonus-dialog__list {
+  padding: 12px 16px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.set-bonus-dialog__set {
+  padding: 10px 12px;
+}
+
+.set-bonus-dialog__set-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.set-bonus-dialog__set-name {
+  font-family: "rssmall";
+  color: var(--orange);
+}
+
+.set-bonus-dialog__set-status {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.set-bonus-dialog__set--active .set-bonus-dialog__set-status {
+  color: rgb(0, 200, 0);
+  opacity: 1;
+}
+
+.set-bonus-dialog__set--partial .set-bonus-dialog__set-status {
+  color: var(--orange);
+  opacity: 1;
+}
+
+.set-bonus-dialog__set--active {
+  background: rgba(0, 200, 0, 0.1);
+}
+
+.set-bonus-dialog__effect {
+  margin: 6px 0 0;
+  font-size: 0.85em;
+  opacity: 0.85;
+}
+
+.set-bonus-dialog__missing {
+  margin: 4px 0 0;
+  font-size: 0.8em;
+  color: var(--invalid);
+}

@@ -384,6 +384,35 @@ pub struct LootSummaryRow {
     pub drop_rate: Option<String>,
 }
 
+/// Wire shape for `GET .../get-item-bonuses` - the equip-screen bonus panel's Attack/Defence/
+/// Other-bonuses columns, scraped from the OSRS Wiki and cached server-side (30-day TTL, see
+/// [`crate::item_bonuses`]).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemBonusesResponse {
+    pub item_id: i32,
+    pub attack: CombatStyleBonuses,
+    pub defence: CombatStyleBonuses,
+    pub melee_strength: i32,
+    pub ranged_strength: i32,
+    /// Tenths of a percent (30 = 3.0%), so it round-trips exactly without floats.
+    pub magic_damage: i32,
+    pub prayer: i32,
+    /// Game ticks. `None` for non-weapon equipment - the wiki's `{{Infobox Bonuses}}` template
+    /// omits `speed` entirely for those.
+    pub attack_speed: Option<i32>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CombatStyleBonuses {
+    pub stab: i32,
+    pub slash: i32,
+    pub crush: i32,
+    pub magic: i32,
+    pub ranged: i32,
+}
+
 #[derive(Serialize)]
 pub struct LootSplitParticipant {
     pub member_name: String,

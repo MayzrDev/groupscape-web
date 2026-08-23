@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Void Knight Equipment",
+    "itemIds": [8842, 8839, 8840, 11665],
+    "effect": "+10% melee accuracy and damage while the full set (including a Void melee helm) is worn - swap in the Void ranger helm for the same 10% ranged bonus, or the Void mage helm for +45% magic accuracy only (no magic damage boost at base tier)."
+  },
+  {
+    "name": "Elite Void Knight Equipment",
+    "itemIds": [13072, 13073, 8842, 11664],
+    "effect": "Upgrades the base Void bonus: with the Void ranger helm, ranged damage rises from 10% to 12.5%; with the Void mage helm, magic gains +5% damage on top of the existing 45% accuracy. No additional bonus over regular Void for the melee helm."
+  },
+  {
+    "name": "Obsidian Armour",
+    "itemIds": [21298, 21301, 21304],
+    "effect": "10% boost to melee accuracy and Strength bonus when using an Obsidian melee weapon (Toktz-xil-ak, Toktz-xil-ek, Tzhaar-ket-em, or Tzhaar-ket-om) with the full set worn; stacks with the Berserker necklace's 20% damage boost for obsidian weapons."
+  },
+  {
+    "name": "Ferocious Gloves",
+    "itemIds": [22981],
+    "effect": "Flat +14 Strength bonus with no defensive bonuses and -16 Ranged/Magic attack - the best-in-slot offensive gloves for melee, surpassing Barrows gloves."
+  },
+  {
+    "name": "Ahrim's Armour Set",
+    "itemIds": [4708, 4710, 4712, 4714],
+    "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn."
+  },
+  {
+    "name": "Dharok's Armour Set",
+    "itemIds": [4716, 4718, 4720, 4722],
+    "effect": "The lower your remaining Hitpoints, the higher your melee damage - up to roughly double (about 98% extra) at 1 HP - while the full set (including the greataxe) is worn."
+  },
+  {
+    "name": "Guthan's Armour Set",
+    "itemIds": [4724, 4726, 4728, 4730],
+    "effect": "Successful melee attacks have a 25% chance to heal you for the amount of damage dealt, while the full set (including the warspear) is worn."
+  },
+  {
+    "name": "Karil's Armour Set",
+    "itemIds": [4732, 4734, 4736, 4738],
+    "effect": "Successful ranged attacks have a 25% chance to lower the target's Agility level by 20%, while the full set (including the crossbow) is worn."
+  },
+  {
+    "name": "Torag's Armour Set",
+    "itemIds": [4745, 4747, 4749, 4751],
+    "effect": "Successful melee attacks have a 25% chance to lower the target's Run energy by 20%, while the full set (including the hammers) is worn."
+  },
+  {
+    "name": "Verac's Armour Set",
+    "itemIds": [4753, 4755, 4757, 4759],
+    "effect": "Melee attacks have a 25% chance to ignore the target's Defence level and any active protection prayer, while the full set (including the flail) is worn."
+  },
+  {
+    "name": "Bandos Armour",
+    "itemIds": [11832, 11834],
+    "effect": "No mechanical set effect - a high melee Strength bonus armour set (chestplate and tassets; the boots are excluded, as they lack the Strength bonus that defines \"full Bandos\")."
+  },
+  {
+    "name": "Armadyl Armour",
+    "itemIds": [11826, 11828, 11830],
+    "effect": "No mechanical set effect - a high Ranged accuracy/Strength bonus armour set worn together for its raw stats."
+  }
+]

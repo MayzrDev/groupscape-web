@@ -156,6 +156,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/get-metric-data").route(web::get().to(authed::get_metric_data)))
             .service(web::resource("/get-leaderboard").route(web::get().to(authed::get_leaderboard)))
             .service(web::resource("/collection-log").route(web::get().to(authed::get_collection_log)))
+            .service(web::resource("/get-item-bonuses").route(web::get().to(authed::get_item_bonuses)))
             .service(authed::get_group_data)
             .service(authed::delete_group_member)
             .service(authed::block_group_member)
@@ -250,6 +251,11 @@ async fn main() -> std::io::Result<()> {
                 web::resource("/collection-log")
                     .wrap(grouped_character_middleware())
                     .route(web::get().to(authed::get_collection_log)),
+            )
+            .service(
+                web::resource("/get-item-bonuses")
+                    .wrap(grouped_character_middleware())
+                    .route(web::get().to(authed::get_item_bonuses)),
             )
             .service(
                 web::resource("/ws")

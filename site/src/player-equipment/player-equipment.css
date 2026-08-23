@@ -1,6 +1,12 @@
 player-equipment {
+  display: block;
+}
+
+.equipment-and-stats {
   display: flex;
+  align-items: flex-start;
   justify-content: center;
+  gap: 12px;
 }
 
 .equipment {
@@ -8,6 +14,7 @@ player-equipment {
   width: 175px;
   height: 200px;
   display: flex;
+  flex: none;
 }
 
 .equipment-slot {
@@ -81,4 +88,58 @@ player-equipment {
 .equipment-ring {
   left: 126px;
   top: 158px;
+}
+
+.equipment-stats {
+  display: flex;
+  gap: 14px;
+  padding: 8px 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.equipment-stats--loading {
+  opacity: 0.5;
+}
+
+.equipment-stats__column {
+  min-width: 100px;
+}
+
+.equipment-stats__heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-family: "rssmall";
+  color: var(--orange);
+  white-space: nowrap;
+}
+
+.equipment-stats__column .equipment-stats__heading:not(:first-child) {
+  margin-top: 10px;
+}
+
+.equipment-stats__grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 8px;
+  row-gap: 2px;
+  font-size: 12px;
+}
+
+.equipment-stats__grid span:first-child {
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.equipment-stats__value {
+  text-align: right;
+  color: white;
+  white-space: nowrap;
+}
+
+.equipment-actions {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
 }

@@ -13,6 +13,7 @@ pub mod diary_tiers;
 pub mod discord;
 pub mod drop_rates;
 pub mod error;
+pub mod item_bonuses;
 pub mod leaderboard;
 pub mod models;
 pub mod notable_npcs;

@@ -113,6 +113,10 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-loot-split`;
   }
 
+  get itemBonusesUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-item-bonuses`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -462,6 +466,18 @@ class Api {
     });
     if (!response.ok) {
       return null;
+    }
+    return response.json();
+  }
+
+  async getItemBonuses(itemId) {
+    const response = await fetch(`${this.itemBonusesUrl}?item_id=${itemId}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`get-item-bonuses ${itemId} failed: ${response.status}`);
     }
     return response.json();
   }
