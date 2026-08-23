@@ -8,6 +8,9 @@ import { pubsub } from "../data/pubsub";
 const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
 const FRAMING_PADDING = 1.22;
+// Extra zoom-out applied only to "bust" mode (side panel) on top of FRAMING_PADDING, so the
+// full-body "full" mode (/panels) framing is unaffected.
+const BUST_ZOOM_OUT_FACTOR = 1.25;
 // Fraction of the body height (feet to top of head, see findBodyTop) treated as "head and
 // shoulders" for the bust crop.
 const BUST_HEIGHT_FRACTION = 0.38;
@@ -243,7 +246,7 @@ export class PlayerPortrait extends BaseElement {
     if (totalHeight <= 0) return;
     const bustRadius = (totalHeight * BUST_HEIGHT_FRACTION) / 2;
     const viewY = bodyTop - bustRadius;
-    const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov);
+    const distance = PlayerPortrait.fitCameraDistance(bustRadius, this.camera.fov) * BUST_ZOOM_OUT_FACTOR;
     // Center horizontally on what's actually visible in the crop, not the whole model — a
     // weapon held out to one side pulls the model's overall x-center away from the head.
     const viewX = PlayerPortrait.findHorizontalCenter(geometry, viewY, distance, this.camera.fov);
