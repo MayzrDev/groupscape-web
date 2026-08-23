@@ -88,7 +88,7 @@ h3 {
 
 .authed-section__main-content {
   width: 100%;
-  padding: 20px 8px;
+  padding: 12px 8px 20px;
   overflow-y: auto;
   z-index: 1;
   box-sizing: border-box;
