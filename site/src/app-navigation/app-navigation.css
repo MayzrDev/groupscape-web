@@ -38,12 +38,6 @@ app-navigation .men-button img {
   align-items: center;
   column-gap: 6px;
   padding: 6px 8px;
-  border-radius: 4px;
-  background: radial-gradient(ellipse at top, #423522, #1c1710 85%);
-  border: 1px solid #a97c3a;
-  outline: 1px solid rgba(0, 0, 0, 0.6);
-  outline-offset: -4px;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 184, 77, 0.15);
   box-sizing: border-box;
 }
 
