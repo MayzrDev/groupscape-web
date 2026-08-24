@@ -42,7 +42,6 @@ import "./player-interacting/player-interacting.js";
 import "./skills-graphs/skills-graphs.js";
 import "./skill-graph/skill-graph.js";
 import "./confirm-dialog/confirm-dialog.js";
-import "./panels-page/panels-page.js";
 import "./combat-achievements-page/combat-achievements-page.js";
 import "./combat-achievements/combat-achievements.js";
 import "./activity-feed-page/activity-feed-page.js";

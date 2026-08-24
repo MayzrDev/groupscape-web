@@ -9,7 +9,7 @@ const FOV_DEGREES = 30;
 // Headroom above a tight bounding-sphere fit so the model doesn't touch the frame edges.
 const FRAMING_PADDING = 1.22;
 // Extra zoom-out applied only to "bust" mode (side panel) on top of FRAMING_PADDING, so the
-// full-body "full" mode (/panels) framing is unaffected.
+// full-body "full" mode (equipment tab) framing is unaffected.
 const BUST_ZOOM_OUT_FACTOR = 1.25;
 // Fraction of the body height (feet to top of head, see findBodyTop) treated as "head and
 // shoulders" for the bust crop.
@@ -33,7 +33,7 @@ const BODY_GIRTH_LOOKBEHIND = 2;
 // data-sparse one — still has a real, roughly life-sized cross-section; a weapon shaft/blade seen
 // from above is a hairline sliver by comparison.
 const BODY_GIRTH_LOOKBEHIND_MIN_FRACTION = 0.15;
-// Full-body ("full" mode, /panels only) auto-rotate + drag-to-rotate tuning.
+// Full-body ("full" mode, equipment tab only) auto-rotate + drag-to-rotate tuning.
 const AUTO_ROTATE_RADIANS_PER_SECOND = 0.3;
 const DRAG_RADIANS_PER_PIXEL = 0.008;
 const AUTO_ROTATE_RESUME_DELAY_MS = 3000;
@@ -108,7 +108,7 @@ export class PlayerPortrait extends BaseElement {
   }
 
   // Slow auto-rotate, pausable by a horizontal drag that resumes after a short delay.
-  // Only wired up for "full" mode (/panels) — bust portraits stay static.
+  // Only wired up for "full" mode (equipment tab) — bust portraits stay static.
   setupRotation() {
     this.dragging = false;
     this.autoRotatePaused = false;

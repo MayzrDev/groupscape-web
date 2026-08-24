@@ -13,25 +13,9 @@ export class PlayerPanel extends BaseElement {
   connectedCallback() {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
-    this.portraitMode = "bust";
-    // side-panel (and its player-panel children) lives outside the route outlet and is never
-    // remounted on navigation, so switching in/out of /panels has to be observed reactively
-    // rather than checked once here. If /panels is already active this synchronously flips
-    // portraitMode to "full" before the fallback render below runs.
-    this.subscribe("panels-page-active", this.handlePanelsPageActive.bind(this));
     if (!this.contentArea) {
       this.renderPanel();
     }
-  }
-
-  handlePanelsPageActive(isPanelsPage) {
-    const mode = isPanelsPage ? "full" : "bust";
-    if (mode === this.portraitMode) return;
-    this.portraitMode = mode;
-    this.activeComponent = null;
-    this.classList.remove("expanded");
-    this.classList.remove("player-panel--equipment-active");
-    this.renderPanel();
   }
 
   renderPanel() {
@@ -90,10 +74,7 @@ export class PlayerPanel extends BaseElement {
   handleMiniBarClick(event) {
     const component = event.target.getAttribute("data-component");
     if (component && this.activeComponent !== component) {
-      // The equipment tab's own portrait is only worth the width on /panels, which has room for
-      // it and where portraitMode is already "full" - the side-panel's fixed width stays true to
-      // the original gear/stats layout instead.
-      const showPortrait = component === "player-equipment" && this.portraitMode === "full";
+      const showPortrait = component === "player-equipment";
       this.contentArea.innerHTML = `<${component} player-name="${this.playerName}" show-portrait="${showPortrait}"></${component}>`;
 
       if (this.activeComponent) {
