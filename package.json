@@ -28,7 +28,7 @@
   "scripts": {
     "bundle": "npm run clean && node build.js --prod",
     "clean": "node scripts/clean.js",
-    "start": "concurrently \"npm run watch\" \"npm run serve -- --backend https://groupscape.mayzr.online\"",
+    "start": "concurrently \"npm run watch\" \"npm run serve -- --backend https://groupscape.online\"",
     "start:local-api": "concurrently \"npm run watch\" \"npm run serve -- --backend http://127.0.0.1:8080\"",
     "serve": "node scripts/server.js",
     "watch": "node build --watch",
