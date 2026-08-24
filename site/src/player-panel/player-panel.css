@@ -6,6 +6,10 @@ player-panel {
   box-sizing: border-box;
 }
 
+.player-panel--equipment-active {
+  width: max-content;
+}
+
 player-panel + player-panel {
   margin-top: 12px;
 }

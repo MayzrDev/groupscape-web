@@ -27,7 +27,7 @@ side-panel {
 side-panel:has(.player-panel--equipment-active) {
   width: max-content;
   max-width: max-content;
-  overflow-x: visible;
+  overflow: visible;
 }
 
 /* The vitals bars and tab-icon row shouldn't stretch along with the widened side panel above -
