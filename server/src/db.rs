@@ -3962,7 +3962,7 @@ WHERE group_id=$1
   AND event_type='kill'
   AND ($2::text IS NULL OR member_name = $2)
     AND ($3::bigint IS NULL OR session_id = $3)
-    AND ($4::text IS NULL OR payload->>'npcName' = $4)
+    AND ($4::text IS NULL OR trim(both '_' from regexp_replace(lower(payload->>'npcName'), '[^a-z0-9]+', '_', 'g')) = $4)
     AND ($5::timestamptz IS NULL OR occurred_at >= $5)
     AND ($6::timestamptz IS NULL OR occurred_at <= $6)
 ORDER BY occurred_at DESC
