@@ -1,0 +1,17 @@
+account-logout-indicator {
+  display: none;
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+account-logout-indicator.account-logout-indicator--visible {
+  display: block;
+}
+
+.account-logout-indicator__button {
+  white-space: nowrap;
+}

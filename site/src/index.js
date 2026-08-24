@@ -62,6 +62,7 @@ import "./player-icon/player-icon.js";
 import "./donate-button/donate-button.js";
 import "./admin-indicator/admin-indicator.js";
 import "./pending-characters-indicator/pending-characters-indicator.js";
+import "./account-logout-indicator/account-logout-indicator.js";
 import "./admin-navigation/admin-navigation.js";
 import "./admin-login-page/admin-login-page.js";
 import "./admin-groups-page/admin-groups-page.js";
