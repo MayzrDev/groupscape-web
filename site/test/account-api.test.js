@@ -7,12 +7,31 @@ describe("accountApi", () => {
     globalThis.fetch = vi.fn();
     accountStorage.clearAccountToken();
     sessionStorage.removeItem("freshApiKey");
+    window.history.replaceState("", "", "/");
   });
 
   it("exposes account auth urls", () => {
     expect(accountApi.registerUrl).toBe("/api/account/register");
     expect(accountApi.loginUrl).toBe("/api/account/login");
     expect(accountApi.discordRedirectUrl).toBe("/api/account/discord/redirect");
+  });
+
+  it("consumes a Discord callback and routes to onboarding", () => {
+    window.location.hash = "#token=discord-session&api_key=discord-key";
+
+    expect(accountApi.handleDiscordCallback()).toBe(true);
+    expect(accountStorage.getAccountToken()).toBe("discord-session");
+    expect(sessionStorage.getItem("freshApiKey")).toBe("discord-key");
+    expect(window.location.pathname).toBe("/welcome");
+    expect(window.location.hash).toBe("");
+  });
+
+  it("ignores callback fragments without a token", () => {
+    window.location.hash = "#error=discord_failed";
+
+    expect(accountApi.handleDiscordCallback()).toBe(false);
+    expect(accountStorage.getAccountToken()).toBeNull();
+    expect(window.location.hash).toBe("#error=discord_failed");
   });
 
   it("register stores the session token on success", async () => {

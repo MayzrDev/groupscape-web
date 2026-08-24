@@ -57,6 +57,20 @@ class AccountApi {
     return `${this.baseUrl}/discord/redirect`;
   }
 
+  handleDiscordCallback() {
+    const params = new URLSearchParams(window.location.hash.slice(1));
+    const token = params.get("token");
+    if (!token) return false;
+
+    accountStorage.storeAccountToken(token);
+    const apiKey = params.get("api_key");
+    if (apiKey) {
+      sessionStorage.setItem("freshApiKey", apiKey);
+    }
+    window.history.replaceState("", "", "/welcome");
+    return true;
+  }
+
   get emailUrl() {
     return `${this.baseUrl}/email`;
   }

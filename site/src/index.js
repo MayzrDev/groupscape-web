@@ -78,3 +78,6 @@ import "./account-page/account-page.js";
 import "./onboarding-page/onboarding-page.js";
 import "./character-select/character-select.js";
 import "./toast-stack/toast-stack.js";
+import { accountApi } from "./data/account-api";
+
+accountApi.handleDiscordCallback();
