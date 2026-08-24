@@ -20,7 +20,7 @@ export class Homepage extends BaseElement {
       // during that pass, re-enters `router.handleLocationChange` before routes further down
       // index.html (like this one's own target) have registered themselves, and blows the
       // call stack.
-      setTimeout(() => window.history.pushState("", "", "/characters"), 0);
+      setTimeout(() => window.history.pushState("", "", "/account/characters"), 0);
     }
   }
 

@@ -114,12 +114,7 @@
       route-outlet=".unauthed-section__outlet"
       route-wrapper=".unauthed-section"
     ></app-route>
-    <app-route
-      route-path="/characters"
-      route-component="character-select"
-      route-outlet=".unauthed-section__outlet"
-      route-wrapper=".unauthed-section"
-    ></app-route>
+    <app-route route-path="/characters" route-redirect="/account/characters"></app-route>
 
     <app-route
       route-path="/"

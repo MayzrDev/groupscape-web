@@ -1,48 +1,34 @@
 import { BaseElement } from "../base-element/base-element";
 import { accountApi } from "../data/account-api";
+import { accountStorage } from "../data/account-storage";
+import { storage } from "../data/storage";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 
 function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-function initials(rsn) {
-  return rsn.slice(0, 2).toUpperCase();
-}
-
 /**
- * Lists every character linked to the signed-in account, split into two groups by `status`:
- * pending characters (auto-created server-side from plugin telemetry) need explicit
- * confirmation before they can join a group, shown above as richer "confirm cards" with a live
- * 3D portrait; confirmed characters render as the existing plain grid below, unchanged.
+ * Unified account-level characters & groups page (canonical route `/account/characters`;
+ * `/characters` redirects here — see `index.html`). Merges what used to be two separate pages:
+ * the old `characters-page` (confirm/unlink characters, join/leave a group) and `character-select`
+ * (pick which group's dashboard to view). A character can only be in one group at a time
+ * (`character_group_links.character_id` is a primary key server-side — see `db.rs`), so "join"
+ * always targets a specific character, never the account as a whole.
  *
- * Also has an inline "add a character" tile that expands the plugin-linking instructions in
- * place — no separate page or modal needed for a flow this short. Reached directly or via the
- * account dashboard's "Linked characters" card (`/account`), so it does its own session check
- * rather than relying on a route wrapper, matching `link-page`.
+ * Layout is a roster sidebar (pending characters, then confirmed, then "+ Add a character") next
+ * to a detail panel. Nothing is selected by default — the detail panel shows a summary (account
+ * stats + every grouped character as an enterable/leaveable row) until a sidebar row is clicked.
+ * Selection is pure client-side state (`this.selection`), not reflected in the URL.
  *
- * Confirmed tiles show initials in place of a portrait — the live 3D character render is
- * reserved for the pending confirm cards where a positive ID before confirming matters most.
- *
- * Each confirmed tile has an unlink control (confirm dialog, then
- * `DELETE /api/account/characters/:id`) — RSN itself isn't editable here since it's derived
- * from plugin telemetry, not user-settable. Pending cards instead have Confirm
- * (`POST /api/account/characters/:id/confirm`) and Remove (confirm dialog, then
- * `DELETE /api/account/characters/:id/pending` — permanently blocks the character from
- * re-linking, unlike unlink).
- *
- * Confirmed tiles also show group status (`group_name`, only populated on this listing - see
- * `Character::group_id` doc in `models.rs`) with a Join/Leave action: Join opens
- * `.characters-page__join-dialog` to collect just the group token for
- * `POST /api/account/characters/link-group` - the group name that endpoint also wants is parsed
- * off the token's `{group_name}|{uuid}` prefix (see `db::create_group`/`rename_group`) rather
- * than asked for separately. Leave goes through the same confirm dialog as unlink, then
- * `POST /api/account/characters/:id/leave-group` (switching groups requires leaving first - the
- * backend rejects a direct switch).
+ * Reached directly or via the account dashboard's "Linked characters" card (`/account`), so it
+ * does its own session check rather than relying on a route wrapper.
  */
 export class CharactersPage extends BaseElement {
   constructor() {
     super();
+    this.characters = [];
+    this.selection = { type: "summary" };
   }
 
   html() {
@@ -54,13 +40,10 @@ export class CharactersPage extends BaseElement {
     this.render();
 
     this.status = this.querySelector(".characters-page__status");
-    this.pendingSection = this.querySelector(".characters-page__pending-section");
-    this.pendingGrid = this.querySelector(".characters-page__pending-grid");
-    this.grid = this.querySelector(".characters-page__grid");
-    this.addTile = this.querySelector(".characters-page__add-tile");
-    this.instructions = this.querySelector(".characters-page__instructions");
-    this.instructionsClose = this.querySelector(".characters-page__instructions-close");
     this.error = this.querySelector(".characters-page__error");
+    this.layout = this.querySelector(".characters-page__layout");
+    this.sidebar = this.querySelector(".characters-page__sidebar");
+    this.detail = this.querySelector(".characters-page__detail");
     this.joinDialog = this.querySelector(".characters-page__join-dialog");
     this.joinDialogSub = this.querySelector(".characters-page__join-dialog-sub");
     this.joinDialogToken = this.querySelector(".characters-page__join-dialog-token");
@@ -68,10 +51,8 @@ export class CharactersPage extends BaseElement {
     this.joinDialogSubmit = this.querySelector(".characters-page__join-dialog-submit");
     this.joinDialogCancel = this.querySelector(".characters-page__join-dialog-cancel");
 
-    this.eventListener(this.addTile, "click", this.toggleInstructions.bind(this));
-    this.eventListener(this.instructionsClose, "click", this.toggleInstructions.bind(this));
-    this.eventListener(this.grid, "click", this.handleGridClick.bind(this));
-    this.eventListener(this.pendingGrid, "click", this.handlePendingGridClick.bind(this));
+    this.eventListener(this.sidebar, "click", this.handleSidebarClick.bind(this));
+    this.eventListener(this.detail, "click", this.handleDetailClick.bind(this));
     this.eventListener(this.joinDialogSubmit, "click", this.submitJoinGroup.bind(this));
     this.eventListener(this.joinDialogCancel, "click", this.hideJoinDialog.bind(this));
 
@@ -82,12 +63,6 @@ export class CharactersPage extends BaseElement {
     super.disconnectedCallback();
   }
 
-  toggleInstructions() {
-    const showing = !this.instructions.hidden;
-    this.instructions.hidden = showing;
-    this.addTile.setAttribute("aria-expanded", String(!showing));
-  }
-
   async checkSession() {
     this.status.textContent = "Checking your session…";
     const response = await accountApi.me();
@@ -96,7 +71,6 @@ export class CharactersPage extends BaseElement {
     } else {
       this.status.innerHTML =
         'You need to be logged into a GroupScape account. <men-link link-href="/account/login">Log in</men-link>';
-      this.addTile.hidden = true;
     }
   }
 
@@ -108,122 +82,372 @@ export class CharactersPage extends BaseElement {
         this.error.textContent = "Couldn't load your characters — try again.";
         return;
       }
-      const characters = await response.json();
-      this.renderCharacters(characters);
+      this.characters = await response.json();
+      this.status.textContent = "";
+      this.error.textContent = "";
+      this.layout.hidden = false;
+
+      // Selecting a character that no longer exists (unlinked/removed/confirmed-and-gone) falls
+      // back to the summary rather than rendering a detail panel for nothing.
+      if (this.selection.type === "character" && !this.findCharacter(this.selection.id)) {
+        this.selection = { type: "summary" };
+      }
+
+      this.renderSidebar();
+      this.renderDetail();
     } catch (error) {
       this.status.textContent = "";
       this.error.textContent = "Couldn't load your characters — try again.";
     }
   }
 
-  renderCharacters(characters) {
-    this.error.textContent = "";
+  findCharacter(characterId) {
+    return this.characters.find((character) => String(character.id) === String(characterId));
+  }
 
-    const pending = characters.filter((character) => character.status === "pending");
-    const confirmed = characters.filter((character) => character.status !== "pending");
+  get pending() {
+    return this.characters.filter((character) => character.status === "pending");
+  }
 
-    this.status.textContent =
-      confirmed.length === 0
-        ? "You haven't linked any characters yet."
-        : `${confirmed.length} character${confirmed.length === 1 ? "" : "s"} linked to your account.`;
+  get confirmed() {
+    return this.characters.filter((character) => character.status !== "pending");
+  }
 
-    this.renderPendingCharacters(pending);
+  get grouped() {
+    return this.confirmed.filter((character) => character.group_name);
+  }
 
-    this.grid.innerHTML = confirmed
-      .map((character) => {
-        const boundAt = new Date(character.bound_at).toLocaleDateString();
-        const groupAction = character.group_name
+  selectSummary() {
+    this.selection = { type: "summary" };
+    this.renderDetail();
+    this.updateActiveSidebarItem();
+  }
+
+  selectCharacter(characterId) {
+    this.selection = { type: "character", id: characterId };
+    this.renderDetail();
+    this.updateActiveSidebarItem();
+  }
+
+  selectAdd() {
+    this.selection = { type: "add" };
+    this.renderDetail();
+    this.updateActiveSidebarItem();
+  }
+
+  updateActiveSidebarItem() {
+    this.sidebar.querySelectorAll("[data-select]").forEach((element) => {
+      const isActive =
+        (this.selection.type === "add" && element.dataset.select === "add") ||
+        (this.selection.type === "character" &&
+          element.dataset.select === "character" &&
+          element.dataset.characterId === String(this.selection.id));
+      element.classList.toggle("characters-page__sidebar-item--active", isActive);
+    });
+  }
+
+  renderSidebar() {
+    const pending = this.pending;
+    const confirmed = this.confirmed;
+
+    this.sidebar.innerHTML = `
+      ${
+        pending.length > 0
           ? `
-            <span class="characters-page__tile-group-pill">${escapeHtml(character.group_name)}</span>
-            <button class="characters-page__tile-leave" data-character-id="${character.id}" data-rsn="${escapeHtml(
-              character.display_rsn
-            )}">Leave group</button>
-          `
-          : `
-            <span class="characters-page__tile-group-pill characters-page__tile-group-pill--none">Not in a group</span>
-            <button class="characters-page__tile-join" data-character-id="${character.id}" data-rsn="${escapeHtml(
-              character.display_rsn
-            )}">Join group</button>
-          `;
-        return `
-          <div class="characters-page__tile">
+        <div class="characters-page__sidebar-section">
+          <div class="characters-page__sidebar-label">Pending (${pending.length})</div>
+          ${pending.map((character) => this.sidebarRow(character)).join("")}
+        </div>
+      `
+          : ""
+      }
+      <div class="characters-page__sidebar-section">
+        <div class="characters-page__sidebar-label">Characters (${confirmed.length})</div>
+        ${
+          confirmed.length > 0
+            ? confirmed.map((character) => this.sidebarRow(character)).join("")
+            : `<p class="characters-page__sidebar-empty">No confirmed characters yet.</p>`
+        }
+      </div>
+      <button class="characters-page__sidebar-add" data-select="add" type="button">
+        <span class="characters-page__sidebar-add-plus">+</span> Add a character
+      </button>
+    `;
+    this.updateActiveSidebarItem();
+  }
+
+  sidebarRow(character) {
+    const isPending = character.status === "pending";
+    return `
+      <button
+        class="characters-page__sidebar-item${isPending ? " characters-page__sidebar-item--pending" : ""}"
+        data-select="character"
+        data-character-id="${character.id}"
+        type="button"
+      >
+        <player-portrait
+          account-character-id="${character.id}"
+          mode="bust"
+          class="characters-page__sidebar-portrait"
+        ></player-portrait>
+        <span class="characters-page__sidebar-name">${escapeHtml(character.display_rsn)}</span>
+        ${isPending ? `<span class="pill pill--pending">new</span>` : ""}
+      </button>
+    `;
+  }
+
+  renderDetail() {
+    if (this.selection.type === "add") {
+      this.detail.innerHTML = this.addDetail();
+      return;
+    }
+
+    if (this.selection.type === "character") {
+      const character = this.findCharacter(this.selection.id);
+      if (!character) {
+        this.selection = { type: "summary" };
+      } else {
+        this.detail.innerHTML =
+          character.status === "pending" ? this.pendingDetail(character) : this.confirmedDetail(character);
+        return;
+      }
+    }
+
+    this.detail.innerHTML = this.summaryDetail();
+  }
+
+  summaryDetail() {
+    const confirmed = this.confirmed;
+    const pending = this.pending;
+    const grouped = this.grouped;
+
+    if (this.characters.length === 0) {
+      return `
+        <div class="characters-page__empty-state">
+          <h2>Link your first character</h2>
+          <p>GroupScape reports characters through the RuneLite plugin — no code to type in.</p>
+          <button class="men-button" data-action="add">Add a character</button>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="characters-page__summary-stats">
+        <div class="characters-page__stat"><strong>${confirmed.length}</strong> character${
+      confirmed.length === 1 ? "" : "s"
+    }</div>
+        ${
+          pending.length > 0
+            ? `<div class="characters-page__stat characters-page__stat--pending"><strong>${pending.length}</strong> pending</div>`
+            : ""
+        }
+        <div class="characters-page__stat"><strong>${grouped.length}</strong> in a group</div>
+      </div>
+      <h2 class="characters-page__section-title">Your Groups</h2>
+      ${
+        grouped.length === 0
+          ? `<p class="characters-page__summary-empty">None of your characters are in a group yet. Select a character to join one with an invite token.</p>`
+          : grouped.map((character) => this.groupRow(character)).join("")
+      }
+    `;
+  }
+
+  groupRow(character) {
+    return `
+      <div class="characters-page__group-row">
+        <player-portrait
+          account-character-id="${character.id}"
+          mode="bust"
+          class="characters-page__group-row-portrait"
+        ></player-portrait>
+        <div class="characters-page__group-row-meta">
+          <span class="characters-page__group-row-name">${escapeHtml(character.display_rsn)}</span>
+          <span class="characters-page__group-row-group">${escapeHtml(character.group_name)}</span>
+        </div>
+        <button
+          class="men-button small"
+          data-action="enter-group"
+          data-group-name="${escapeHtml(character.group_name)}"
+          type="button"
+        >Enter</button>
+        <button
+          class="characters-page__ghost-action"
+          data-action="leave-group"
+          data-character-id="${character.id}"
+          data-rsn="${escapeHtml(character.display_rsn)}"
+          data-group-name="${escapeHtml(character.group_name)}"
+          type="button"
+        >Leave</button>
+      </div>
+    `;
+  }
+
+  pendingDetail(character) {
+    return `
+      <div class="characters-page__detail-head">
+        <player-portrait
+          account-character-id="${character.id}"
+          mode="bust"
+          class="characters-page__detail-portrait"
+        ></player-portrait>
+        <div class="characters-page__detail-head-meta">
+          <h2>${escapeHtml(character.display_rsn)}</h2>
+          <p class="characters-page__detail-sub">
+            Reported by the RuneLite plugin. Confirm it before it can join a group.
+          </p>
+          <div class="characters-page__detail-actions">
+            <button class="men-button" data-action="confirm" data-character-id="${character.id}" type="button">
+              Confirm character
+            </button>
             <button
-              class="characters-page__tile-unlink"
+              class="characters-page__ghost-action characters-page__ghost-action--danger"
+              data-action="dismiss"
               data-character-id="${character.id}"
               data-rsn="${escapeHtml(character.display_rsn)}"
-              aria-label="Unlink ${escapeHtml(character.display_rsn)}"
-              title="Unlink"
-            >&times;</button>
-            <div class="characters-page__tile-badge">${escapeHtml(initials(character.display_rsn))}</div>
-            <span class="characters-page__tile-rsn">${escapeHtml(character.display_rsn)}</span>
-            <span class="characters-page__tile-meta">Linked ${boundAt}</span>
-            ${groupAction}
+              type="button"
+            >Remove</button>
           </div>
-        `;
-      })
-      .join("");
+        </div>
+      </div>
+    `;
   }
 
-  renderPendingCharacters(pending) {
-    this.pendingSection.hidden = pending.length === 0;
-    this.pendingGrid.innerHTML = pending
-      .map((character) => {
-        return `
-          <div class="characters-page__pending-card">
-            <player-portrait
-              account-character-id="${character.id}"
-              mode="bust"
-              class="characters-page__pending-portrait"
-            ></player-portrait>
-            <span class="characters-page__pending-rsn">${escapeHtml(character.display_rsn)}</span>
-            <div class="characters-page__pending-actions">
-              <button
-                class="characters-page__pending-confirm men-button small"
-                data-character-id="${character.id}"
-              >Confirm</button>
-              <button
-                class="characters-page__pending-remove"
-                data-character-id="${character.id}"
-                data-rsn="${escapeHtml(character.display_rsn)}"
-              >Remove</button>
+  confirmedDetail(character) {
+    const boundAt = new Date(character.bound_at).toLocaleDateString();
+    return `
+      <div class="characters-page__detail-head">
+        <player-portrait
+          account-character-id="${character.id}"
+          mode="bust"
+          class="characters-page__detail-portrait"
+        ></player-portrait>
+        <div class="characters-page__detail-head-meta">
+          <h2>${escapeHtml(character.display_rsn)}</h2>
+          <p class="characters-page__detail-sub">Linked ${boundAt}</p>
+          <div class="characters-page__detail-actions">
+            <button
+              class="characters-page__ghost-action characters-page__ghost-action--danger"
+              data-action="unlink"
+              data-character-id="${character.id}"
+              data-rsn="${escapeHtml(character.display_rsn)}"
+              type="button"
+            >Unlink character</button>
+          </div>
+        </div>
+      </div>
+      <div class="characters-page__detail-section">
+        <h3>Group</h3>
+        ${
+          character.group_name
+            ? `
+          <div class="characters-page__group-row">
+            <div class="characters-page__group-row-meta">
+              <span class="characters-page__group-row-group">${escapeHtml(character.group_name)}</span>
             </div>
+            <button
+              class="men-button small"
+              data-action="enter-group"
+              data-group-name="${escapeHtml(character.group_name)}"
+              type="button"
+            >Enter</button>
+            <button
+              class="characters-page__ghost-action"
+              data-action="leave-group"
+              data-character-id="${character.id}"
+              data-rsn="${escapeHtml(character.display_rsn)}"
+              data-group-name="${escapeHtml(character.group_name)}"
+              type="button"
+            >Leave</button>
           </div>
-        `;
-      })
-      .join("");
+        `
+            : `
+          <p class="characters-page__summary-empty">Not in a group yet.</p>
+          <button
+            class="men-button small"
+            data-action="join-group"
+            data-character-id="${character.id}"
+            data-rsn="${escapeHtml(character.display_rsn)}"
+            type="button"
+          >Join with a token</button>
+        `
+        }
+      </div>
+    `;
   }
 
-  handleGridClick(event) {
-    const unlinkButton = event.target.closest(".characters-page__tile-unlink");
-    if (unlinkButton) {
-      const characterId = unlinkButton.dataset.characterId;
-      const rsn = unlinkButton.dataset.rsn;
-      confirmDialogManager.confirm({
-        headline: "Unlink character?",
-        body: `${rsn} will no longer be linked to this account. You can re-link it later from RuneLite.`,
-        yesCallback: () => this.unlinkCharacter(characterId),
-        noCallback: () => {},
-      });
-      return;
-    }
+  addDetail() {
+    return `
+      <div class="characters-page__detail-head">
+        <h2>Add a character</h2>
+      </div>
+      <p>Characters are reported to GroupScape by the RuneLite plugin — there's no code to type in.</p>
+      <ol class="characters-page__instructions-list">
+        <li>Open the GroupScape panel in RuneLite's sidebar.</li>
+        <li>Click <strong>Link this character</strong> — it opens this site to confirm.</li>
+        <li>Confirm the link, then come back here and refresh.</li>
+      </ol>
+    `;
+  }
 
-    const joinButton = event.target.closest(".characters-page__tile-join");
-    if (joinButton) {
-      this.showJoinDialog(joinButton.dataset.characterId, joinButton.dataset.rsn);
-      return;
-    }
+  handleSidebarClick(event) {
+    const target = event.target.closest("[data-select]");
+    if (!target) return;
 
-    const leaveButton = event.target.closest(".characters-page__tile-leave");
-    if (leaveButton) {
-      const characterId = leaveButton.dataset.characterId;
-      const rsn = leaveButton.dataset.rsn;
-      confirmDialogManager.confirm({
-        headline: "Leave group?",
-        body: `${rsn} will leave its current group. You can join a different group afterward.`,
-        yesCallback: () => this.leaveGroup(characterId),
-        noCallback: () => {},
-      });
+    if (target.dataset.select === "add") {
+      this.selectAdd();
+    } else if (target.dataset.select === "character") {
+      this.selectCharacter(target.dataset.characterId);
     }
+  }
+
+  handleDetailClick(event) {
+    const target = event.target.closest("[data-action]");
+    if (!target) return;
+    const { action, characterId, rsn, groupName } = target.dataset;
+
+    switch (action) {
+      case "add":
+        this.selectAdd();
+        break;
+      case "confirm":
+        this.confirmCharacter(characterId);
+        break;
+      case "dismiss":
+        confirmDialogManager.confirm({
+          headline: `Remove ${rsn}?`,
+          body: "This character will be permanently blocked from linking to your account again.",
+          yesCallback: () => this.removePendingCharacter(characterId),
+          noCallback: () => {},
+        });
+        break;
+      case "unlink":
+        confirmDialogManager.confirm({
+          headline: "Unlink character?",
+          body: `${rsn} will no longer be linked to this account. You can re-link it later from RuneLite.`,
+          yesCallback: () => this.unlinkCharacter(characterId),
+          noCallback: () => {},
+        });
+        break;
+      case "join-group":
+        this.showJoinDialog(characterId, rsn);
+        break;
+      case "leave-group":
+        confirmDialogManager.confirm({
+          headline: `Leave ${groupName}?`,
+          body: `${rsn} will no longer be a member. You can join a different group afterward.`,
+          yesCallback: () => this.leaveGroup(characterId),
+          noCallback: () => {},
+        });
+        break;
+      case "enter-group":
+        this.viewGroup(groupName);
+        break;
+    }
+  }
+
+  viewGroup(groupName) {
+    storage.storeGroup(groupName, accountStorage.getAccountToken());
+    window.history.pushState("", "", "/group");
   }
 
   showJoinDialog(characterId, rsn) {
@@ -275,31 +499,12 @@ export class CharactersPage extends BaseElement {
     }
   }
 
-  handlePendingGridClick(event) {
-    const confirmButton = event.target.closest(".characters-page__pending-confirm");
-    if (confirmButton) {
-      this.confirmCharacter(confirmButton.dataset.characterId);
-      return;
-    }
-
-    const removeButton = event.target.closest(".characters-page__pending-remove");
-    if (removeButton) {
-      const characterId = removeButton.dataset.characterId;
-      const rsn = removeButton.dataset.rsn;
-      confirmDialogManager.confirm({
-        headline: `Remove ${rsn}?`,
-        body: "This character will be permanently blocked from linking to your account again.",
-        yesCallback: () => this.removePendingCharacter(characterId),
-        noCallback: () => {},
-      });
-    }
-  }
-
   async confirmCharacter(characterId) {
     this.error.textContent = "";
     try {
       const response = await accountApi.confirmCharacter(characterId);
       if (response.ok) {
+        this.selection = { type: "character", id: characterId };
         this.fetchCharacters();
       } else {
         this.error.textContent = "Couldn't confirm that character — try again.";
