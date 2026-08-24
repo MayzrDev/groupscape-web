@@ -71,8 +71,45 @@ async fn main() -> std::io::Result<()> {
         env_logger::Env::new().default_filter_or(config.logger.level.to_string()),
     );
 
-    let mut client = pool.get().await.unwrap();
-    db::update_schema(&mut client).await.unwrap();
+    // Postgres reporting healthy (pg_isready) doesn't guarantee it's ready to serve this
+    // process's first connection/migration right away, especially on a fresh `docker compose up`
+    // recreate. Retry instead of unwrap()-panicking the whole process on a transient race.
+    let mut client = {
+        let mut attempt = 0;
+        loop {
+            match pool.get().await {
+                Ok(client) => break client,
+                Err(err) if attempt < 9 => {
+                    attempt += 1;
+                    log::warn!(
+                        "Failed to get DB connection on startup (attempt {}/10): {}",
+                        attempt,
+                        err
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                }
+                Err(err) => panic!("Failed to get DB connection on startup after 10 attempts: {}", err),
+            }
+        }
+    };
+    {
+        let mut attempt = 0;
+        loop {
+            match db::update_schema(&mut client).await {
+                Ok(()) => break,
+                Err(err) if attempt < 9 => {
+                    attempt += 1;
+                    log::warn!(
+                        "Failed to run schema migrations on startup (attempt {}/10): {}",
+                        attempt,
+                        err
+                    );
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                }
+                Err(err) => panic!("Failed to run schema migrations on startup after 10 attempts: {}", err),
+            }
+        }
+    }
 
     unauthed::start_ge_updater();
     unauthed::start_skills_aggregator(pool.clone());

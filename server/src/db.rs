@@ -1813,9 +1813,16 @@ CREATE TABLE IF NOT EXISTS groupscape.location_samples (
   plane INTEGER NOT NULL,
   world_x INTEGER NOT NULL,
   world_y INTEGER NOT NULL
-);
+)
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
 CREATE INDEX IF NOT EXISTS location_samples_lookup_idx
-  ON groupscape.location_samples (group_id, member_name, sampled_at DESC);
+  ON groupscape.location_samples (group_id, member_name, sampled_at DESC)
 "#,
                 &[],
             )
@@ -3949,7 +3956,6 @@ pub async fn list_kill_events(
     group_id: i64,
     member_name: Option<&str>,
     session_id: Option<i64>,
-    npc_name: Option<&str>,
     since: Option<DateTime<Utc>>,
     until: Option<DateTime<Utc>>,
 ) -> Result<Vec<ActivityEvent>, ApiError> {
@@ -3962,19 +3968,15 @@ WHERE group_id=$1
   AND event_type='kill'
   AND ($2::text IS NULL OR member_name = $2)
     AND ($3::bigint IS NULL OR session_id = $3)
-    AND ($4::text IS NULL OR trim(both '_' from regexp_replace(lower(payload->>'npcName'), '[^a-z0-9]+', '_', 'g')) = $4)
-    AND ($5::timestamptz IS NULL OR occurred_at >= $5)
-    AND ($6::timestamptz IS NULL OR occurred_at <= $6)
+    AND ($4::timestamptz IS NULL OR occurred_at >= $4)
+    AND ($5::timestamptz IS NULL OR occurred_at <= $5)
 ORDER BY occurred_at DESC
 LIMIT 5000
 "#,
         )
         .await?;
     let rows = client
-        .query(
-            &stmt,
-            &[&group_id, &member_name, &session_id, &npc_name, &since, &until],
-        )
+        .query(&stmt, &[&group_id, &member_name, &session_id, &since, &until])
         .await
         .map_err(ApiError::ListKillEventsError)?;
     rows.iter().map(activity_event_from_row).collect()

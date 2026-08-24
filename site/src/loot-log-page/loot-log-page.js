@@ -5,6 +5,17 @@ import { utility } from "../utility";
 
 const REFRESH_INTERVAL_MS = 15000;
 
+// Mirrors the server's slugify_npc_name (server/src/drop_rates.rs) so the fallback boss list
+// (built from raw kill npc_name values when the curated boss list hasn't loaded yet) sends the
+// same slug the backend filters on.
+function slugifyNpcName(name) {
+  return name
+    .replace(/'/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 export class LootLogPage extends BaseElement {
   constructor() {
     super();
@@ -137,12 +148,14 @@ export class LootLogPage extends BaseElement {
   }
 
   renderBossOptions() {
-    const bosses = this.bosses.length ? this.bosses : [...new Set(this.rows.map((row) => row.npc_name))].sort();
+    const bosses = this.bosses.length
+      ? this.bosses
+      : [...new Set(this.rows.map((row) => row.npc_name))].sort().map((name) => ({ slug: slugifyNpcName(name), name }));
     const current = this.selectedBoss;
     this.bossSelect.innerHTML = `<option value="">All bosses</option>${bosses
-      .map((boss) => `<option value="${boss}">${boss}</option>`)
+      .map((boss) => `<option value="${boss.slug}">${boss.name}</option>`)
       .join("")}`;
-    this.bossSelect.value = bosses.includes(current) ? current : "";
+    this.bossSelect.value = bosses.some((boss) => boss.slug === current) ? current : "";
   }
 
   disconnectedCallback() {

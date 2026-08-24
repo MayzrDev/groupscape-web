@@ -102,9 +102,27 @@ pub fn is_notable(npc_name: &str) -> bool {
     NOTABLE_NPCS.contains(&slugify_npc_name(npc_name))
 }
 
-pub fn names() -> Vec<String> {
-    let mut names: Vec<String> = NOTABLE_NPCS.iter().cloned().collect();
-    names.sort();
+/// Slug -> display name for the boss filter dropdown (e.g. loot log page). [`NOTABLE_NPCS`]
+/// only stores slugs, so this reconstructs a readable label rather than showing the raw slug.
+fn humanize_slug(slug: &str) -> String {
+    slug.split('_')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+pub fn names() -> Vec<(String, String)> {
+    let mut names: Vec<(String, String)> = NOTABLE_NPCS
+        .iter()
+        .map(|slug| (slug.clone(), humanize_slug(slug)))
+        .collect();
+    names.sort_by(|a, b| a.1.cmp(&b.1));
     names
 }
 

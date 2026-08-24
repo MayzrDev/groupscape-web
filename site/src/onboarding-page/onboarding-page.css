@@ -92,10 +92,6 @@ onboarding-page {
   text-align: left;
 }
 
-.onboarding-page__reveal-key {
-  margin-bottom: 4px;
-}
-
 .onboarding-page__reveal-hint {
   font-size: 0.8em;
   opacity: 0.65;

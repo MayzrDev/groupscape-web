@@ -60,7 +60,6 @@ export class OnboardingPage extends BaseElement {
     this.apikeyBox = this.querySelector(".onboarding-page__apikey-box");
     this.apikeyValue = this.querySelector(".onboarding-page__apikey-value");
     this.apikeyCopy = this.querySelector(".onboarding-page__apikey-copy");
-    this.revealKeyButton = this.querySelector(".onboarding-page__reveal-key");
     this.revealHint = this.querySelector(".onboarding-page__reveal-hint");
     this.keyError = this.querySelector(".onboarding-page__key-error");
 
@@ -82,7 +81,6 @@ export class OnboardingPage extends BaseElement {
     this.skipLink = this.querySelector(".onboarding-page__skip-link");
 
     this.eventListener(this.apikeyCopy, "click", this.copyApiKey.bind(this));
-    this.eventListener(this.revealKeyButton, "click", this.revealApiKey.bind(this));
     this.eventListener(this.confirmButton, "click", () => this.confirmCharacter(this.pendingCharacterId));
     this.eventListener(this.removeButton, "click", () =>
       this.promptRemoveCharacter(this.pendingCharacterId, this.pendingRsnValue)
@@ -180,12 +178,11 @@ export class OnboardingPage extends BaseElement {
     if (freshApiKey) {
       this.apikeyBox.hidden = false;
       this.apikeyValue.textContent = freshApiKey;
-      this.revealKeyButton.hidden = true;
-      this.revealHint.hidden = true;
+      this.revealHint.hidden = false;
     } else {
       this.apikeyBox.hidden = true;
-      this.revealKeyButton.hidden = false;
-      this.revealHint.hidden = false;
+      this.revealHint.hidden = true;
+      this.fetchApiKey();
     }
   }
 
@@ -193,10 +190,9 @@ export class OnboardingPage extends BaseElement {
     await navigator.clipboard.writeText(this.apikeyValue.textContent);
   }
 
-  async revealApiKey() {
+  async fetchApiKey() {
     this.keyError.textContent = "";
     try {
-      this.revealKeyButton.disabled = true;
       const response = await accountApi.regenerateApiKey();
       if (response.ok) {
         const { api_key } = await response.json();
@@ -207,8 +203,6 @@ export class OnboardingPage extends BaseElement {
       }
     } catch (error) {
       this.keyError.textContent = "Couldn't generate your API key — try again.";
-    } finally {
-      this.revealKeyButton.disabled = false;
     }
   }
 

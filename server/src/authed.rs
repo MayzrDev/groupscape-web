@@ -717,8 +717,19 @@ pub async fn get_sessions(
     Ok(web::Json(sessions))
 }
 
-pub async fn get_loot_bosses() -> web::Json<Vec<String>> {
-    web::Json(crate::notable_npcs::names())
+#[derive(serde::Serialize)]
+pub struct LootBoss {
+    pub slug: String,
+    pub name: String,
+}
+
+pub async fn get_loot_bosses() -> web::Json<Vec<LootBoss>> {
+    web::Json(
+        crate::notable_npcs::names()
+            .into_iter()
+            .map(|(slug, name)| LootBoss { slug, name })
+            .collect(),
+    )
 }
 
 fn default_loot_sort() -> String {
@@ -757,7 +768,6 @@ pub async fn get_loot_summary(
         auth.group_id,
         query.member_name.as_deref(),
         query.session_id,
-        query.boss.as_deref(),
         query.since,
         query.until,
     )
@@ -770,6 +780,11 @@ pub async fn get_loot_summary(
         else {
             continue;
         };
+        if let Some(boss) = query.boss.as_deref() {
+            if drop_rates::slugify_npc_name(&kill.npc_name) != boss {
+                continue;
+            }
+        }
         let Some(loot) = kill.loot else {
             continue;
         };
@@ -853,7 +868,6 @@ pub async fn get_loot_split(
         auth.group_id,
         query.member_name.as_deref(),
         query.session_id,
-        query.boss.as_deref(),
         query.since,
         query.until,
     )
@@ -862,11 +876,17 @@ pub async fn get_loot_split(
 
     let mut per_member: HashMap<String, (i64, i64)> = HashMap::new();
     let mut total_value: i64 = 0;
-    let kill_count = events.len() as i64;
+    let mut kill_count: i64 = 0;
     for event in &events {
         if let Ok(GameEvent::Kill(kill)) =
             serde_json::from_value::<GameEvent>(event.payload.clone())
         {
+            if let Some(boss) = query.boss.as_deref() {
+                if drop_rates::slugify_npc_name(&kill.npc_name) != boss {
+                    continue;
+                }
+            }
+            kill_count += 1;
             let participants = kill
                 .participants
                 .unwrap_or_else(|| vec![event.member_name.clone()]);
