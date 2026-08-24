@@ -13,6 +13,49 @@ toast-stack {
   gap: 8px;
 }
 
+.toast-stack__clear {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px auto;
+  padding: 5px 9px 5px 7px;
+  border: 1px solid color-mix(in srgb, var(--orange) 45%, var(--light-border));
+  border-radius: 3px;
+  background: color-mix(in srgb, #171310 92%, var(--orange));
+  color: var(--primary-text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: toast-stack-enter 180ms ease-out;
+}
+
+.toast-stack__clear:hover {
+  border-color: var(--orange);
+  background: color-mix(in srgb, #171310 82%, var(--orange));
+}
+
+.toast-stack__clear:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+
+.toast-stack__clear-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--orange) 22%, transparent);
+  color: var(--orange);
+  font-size: 14px;
+  line-height: 1;
+}
+
 @media only screen and (max-width: 600px) {
   toast-stack {
     right: 8px;
@@ -87,7 +130,8 @@ toast-stack {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .toast-stack__toast {
+  .toast-stack__toast,
+  .toast-stack__clear {
     animation: none;
   }
 }

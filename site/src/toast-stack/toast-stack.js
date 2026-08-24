@@ -38,6 +38,8 @@ export class ToastStack extends BaseElement {
     super.connectedCallback();
     this.render();
     this.list = this.querySelector(".toast-stack__list");
+    this.clearButton = this.querySelector(".toast-stack__clear");
+    this.eventListener(this.clearButton, "click", () => this.clearAll());
     this.subscribe("toast", this.handleToast.bind(this));
     this.tickInterval = window.setInterval(this.tickTimestamps.bind(this), RELATIVE_TIME_TICK_MS);
   }
@@ -89,13 +91,28 @@ export class ToastStack extends BaseElement {
     );
     this.updateTimestamp(el);
     this.list.appendChild(el);
+    this.updateClearButton();
   }
 
   dismiss(el) {
     el.classList.add("toast-stack__toast--leaving");
     el.addEventListener("animationend", () => el.remove());
     // Fallback in case prefers-reduced-motion skips the leave animation entirely.
-    setTimeout(() => el.remove(), LEAVE_ANIMATION_MS);
+    setTimeout(() => {
+      el.remove();
+      this.updateClearButton();
+    }, LEAVE_ANIMATION_MS);
+  }
+
+  clearAll() {
+    this.list.querySelectorAll(".toast-stack__toast:not(.toast-stack__toast--leaving)").forEach((el) => {
+      this.dismiss(el);
+    });
+    this.updateClearButton();
+  }
+
+  updateClearButton() {
+    this.clearButton.hidden = !this.list.querySelector(".toast-stack__toast:not(.toast-stack__toast--leaving)");
   }
 
   tickTimestamps() {
