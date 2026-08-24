@@ -31,7 +31,7 @@
    applied directly to the card here since panels-page lays player-panels out in a wrapping flex
    grid rather than a single fixed-width column. */
 .panels-page player-panel.player-panel--equipment-active {
-  width: 560px;
+  width: max-content;
 }
 
 /* The vitals bars and tab-icon row shouldn't stretch along with the widened card above - they

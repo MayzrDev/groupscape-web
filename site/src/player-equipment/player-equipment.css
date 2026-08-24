@@ -5,8 +5,10 @@ player-equipment {
 .equipment-and-stats {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 12px;
+  width: max-content;
+  min-width: 100%;
 }
 
 .equipment {
@@ -98,8 +100,8 @@ player-equipment {
   display: flex;
   gap: 14px;
   padding: 8px 10px;
-  min-width: 0;
-  flex: 1 1 auto;
+  min-width: max-content;
+  flex: none;
 }
 
 .equipment-stats--loading {
