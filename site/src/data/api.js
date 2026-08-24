@@ -113,6 +113,14 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-loot-split`;
   }
 
+  get sessionsUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-sessions`;
+  }
+
+  get lootBossesUrl() {
+    return `${this.baseUrl}/group/${this.groupName}/get-loot-bosses`;
+  }
+
   get itemBonusesUrl() {
     return `${this.baseUrl}/group/${this.groupName}/get-item-bonuses`;
   }
@@ -438,9 +446,14 @@ class Api {
     return response.json();
   }
 
-  async getLootSummary({ memberName, sort } = {}) {
+  async getLootSummary({ memberName, sessionId, boss, since, until, splitMode, sort } = {}) {
     const query = new URLSearchParams();
     if (memberName) query.set("member_name", memberName);
+    if (sessionId) query.set("session_id", sessionId);
+    if (boss) query.set("boss", boss);
+    if (since) query.set("since", since);
+    if (until) query.set("until", until);
+    if (splitMode) query.set("split_mode", splitMode);
     if (sort) query.set("sort", sort);
 
     const response = await fetch(`${this.lootSummaryUrl}?${query.toString()}`, {
@@ -454,10 +467,14 @@ class Api {
     return response.json();
   }
 
-  async getLootSplit({ since, until } = {}) {
+  async getLootSplit({ memberName, sessionId, boss, since, until, splitMode } = {}) {
     const query = new URLSearchParams();
+    if (memberName) query.set("member_name", memberName);
+    if (sessionId) query.set("session_id", sessionId);
+    if (boss) query.set("boss", boss);
     if (since) query.set("since", since);
     if (until) query.set("until", until);
+    if (splitMode) query.set("split_mode", splitMode);
 
     const response = await fetch(`${this.lootSplitUrl}?${query.toString()}`, {
       headers: {
@@ -467,6 +484,20 @@ class Api {
     if (!response.ok) {
       return null;
     }
+    return response.json();
+  }
+
+  async getSessions() {
+    const response = await fetch(`${this.sessionsUrl}?limit=200`, {
+      headers: { Authorization: this.groupToken },
+    });
+    if (!response.ok) return [];
+    return response.json();
+  }
+
+  async getLootBosses() {
+    const response = await fetch(this.lootBossesUrl, { headers: { Authorization: this.groupToken } });
+    if (!response.ok) return [];
     return response.json();
   }
 

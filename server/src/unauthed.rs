@@ -187,8 +187,15 @@ pub fn start_session_idle_closer(db_pool: Pool) {
                 Ok(client) => match db::close_idle_sessions(&client, idle_after).await {
                     Ok(closed) if closed > 0 => {
                         log::info!("Closed {} idle session(s)", closed);
+                        if let Err(err) = db::prune_old_sessions(&client).await {
+                            log::error!("Failed to prune old sessions: {}", err);
+                        }
                     }
-                    Ok(_) => (),
+                    Ok(_) => {
+                        if let Err(err) = db::prune_old_sessions(&client).await {
+                            log::error!("Failed to prune old sessions: {}", err);
+                        }
+                    }
                     Err(err) => {
                         log::error!("Failed to close idle sessions: {}", err);
                     }

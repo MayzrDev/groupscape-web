@@ -220,6 +220,10 @@ pub struct KillEvent {
     pub world_y: i32,
     pub plane: i32,
     pub world: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurred_at: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participants: Option<Vec<String>>,
     /// Absent when the plugin's best-effort loot correlation (`onLoot`) never matched a
     /// pending kill before the next drain - the kill still ships without loot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -233,6 +237,8 @@ pub struct DeathEvent {
     pub world_y: i32,
     pub plane: i32,
     pub world: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurred_at: Option<DateTime<Utc>>,
     /// Best-effort, from `Actor.getInteracting()` at time of death - never a guaranteed
     /// "killed by" fact, so this is `None` rather than defaulted to any placeholder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -515,6 +521,7 @@ pub struct Account {
     pub id: i64,
     /// `None` for a Discord-only account that has never set an email/password.
     pub email: Option<String>,
+    pub discord_name: Option<String>,
     pub created_at: DateTime<Utc>,
     /// Set by an admin password reset; the frontend redirects to the password-change section
     /// as soon as it sees this on any authed response, rather than waiting for the 403 the

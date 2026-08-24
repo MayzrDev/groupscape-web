@@ -57,6 +57,24 @@ account-page {
   font-size: 1.1em;
 }
 
+.account-page__discord-display {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 2px;
+  font-size: 0.95em;
+  color: var(--primary-text);
+}
+
+.account-page__discord-display[hidden] {
+  display: none;
+}
+
+.account-page__discord-display img {
+  width: 16px;
+  height: 16px;
+}
+
 .account-page__since {
   font-size: 0.8em;
   opacity: 0.65;

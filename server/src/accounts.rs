@@ -86,6 +86,7 @@ pub async fn register(
         account: Account {
             id: account.id,
             email: account.email,
+            discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
         },
@@ -139,6 +140,7 @@ pub async fn login(
         account: Account {
             id: account.id,
             email: account.email,
+            discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
         },
@@ -152,6 +154,7 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
     Ok(HttpResponse::Ok().json(Account {
         id: authenticated.id,
         email: authenticated.email.clone(),
+        discord_name: authenticated.discord_name.clone(),
         created_at: authenticated.created_at,
         must_change_password: authenticated.must_change_password,
     }))
@@ -184,6 +187,7 @@ pub async fn update_email(
     Ok(HttpResponse::Ok().json(Account {
         id: authenticated.id,
         email: Some(email),
+        discord_name: authenticated.discord_name.clone(),
         created_at: authenticated.created_at,
         must_change_password: authenticated.must_change_password,
     }))
@@ -525,7 +529,7 @@ pub async fn discord_callback(
     };
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let (account, fresh_api_key) = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
+    let (_, fresh_api_key) = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
         Some(account) => (account, None),
         None => {
             let account_id =
@@ -539,6 +543,10 @@ pub async fn discord_callback(
             (account, Some(api_key))
         }
     };
+    db::update_account_discord_name(&client, &discord_user.id, &discord_user.name).await?;
+    let account = db::get_account_by_discord_id(&client, &discord_user.id)
+        .await?
+        .ok_or(ApiError::InvalidCredentialsError)?;
     if account.status != "active" {
         return Ok(redirect_to("error=account_disabled"));
     }

@@ -82,6 +82,8 @@ fn sample_kill() -> GameEvent {
         world_y: 3057,
         plane: 0,
         world: 420,
+        occurred_at: None,
+        participants: None,
         loot: Some(vec![LootItem {
             item_id: 12934,
             quantity: 1,
@@ -95,6 +97,7 @@ fn sample_death() -> GameEvent {
         world_y: 3200,
         plane: 0,
         world: 420,
+        occurred_at: None,
         killer_name: Some("Zulrah".to_string()),
     })
 }
@@ -280,6 +283,8 @@ async fn test_kill_event_without_loot_round_trips() {
         world_y: 0,
         plane: 0,
         world: 301,
+        occurred_at: None,
+        participants: None,
         loot: None,
     });
     db::insert_activity_event(&client, group_id, session_id, "Zezima", &kill_without_loot)
@@ -309,6 +314,8 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
         world_y: 0,
         plane: 0,
         world: 301,
+        occurred_at: None,
+        participants: None,
         loot: None,
     });
     let boss_kill = sample_kill();
@@ -317,6 +324,7 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
         world_y: 0,
         plane: 0,
         world: 301,
+        occurred_at: None,
         killer_name: Some("Cow".to_string()),
     });
 
@@ -601,6 +609,8 @@ fn metric_sample_kill(npc_name: &str, loot_item_id: i32) -> GameEvent {
         world_y: 0,
         plane: 0,
         world: 1,
+        occurred_at: None,
+        participants: None,
         loot: Some(vec![LootItem {
             item_id: loot_item_id,
             quantity: 1,

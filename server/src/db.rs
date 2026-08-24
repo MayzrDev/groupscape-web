@@ -1587,6 +1587,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS accounts_discord_id_idx ON groupscape.accounts
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_account_discord_name").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                "ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS discord_name TEXT",
+                &[],
+            )
+            .await?;
+        commit_migration(&transaction, "add_account_discord_name").await?;
+        transaction.commit().await?;
+    }
+
     if !has_migration_run(client, "create_characters_table").await? {
         let transaction = client.transaction().await?;
         transaction
@@ -1784,6 +1796,31 @@ CREATE INDEX IF NOT EXISTS activity_events_group_occurred_idx ON groupscape.acti
             .await?;
 
         commit_migration(&transaction, "create_sessions_and_activity_events_tables").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_location_samples_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.location_samples (
+  sample_id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  member_name CITEXT NOT NULL,
+  sampled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  world INTEGER NOT NULL,
+  plane INTEGER NOT NULL,
+  world_x INTEGER NOT NULL,
+  world_y INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS location_samples_lookup_idx
+  ON groupscape.location_samples (group_id, member_name, sampled_at DESC);
+"#,
+                &[],
+            )
+            .await?;
+        commit_migration(&transaction, "create_location_samples_table").await?;
         transaction.commit().await?;
     }
 
@@ -2349,6 +2386,7 @@ ON CONFLICT (item_id) DO UPDATE SET
 pub struct AccountForAuth {
     pub id: i64,
     pub email: Option<String>,
+    pub discord_name: Option<String>,
     pub password_hash: Option<String>,
     pub disabled: bool,
     pub created_at: DateTime<Utc>,
@@ -2359,12 +2397,13 @@ pub struct AccountForAuth {
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
-const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until, last_login_at";
+const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, discord_name, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until, last_login_at";
 
 fn account_for_auth_from_row(row: Row) -> Result<AccountForAuth, ApiError> {
     Ok(AccountForAuth {
         id: row.try_get("id")?,
         email: row.try_get("email")?,
+        discord_name: row.try_get("discord_name")?,
         password_hash: row.try_get("password_hash")?,
         disabled: row.try_get("disabled")?,
         created_at: row.try_get("created_at")?,
@@ -2381,6 +2420,7 @@ impl From<AccountForAuth> for crate::models::Account {
         crate::models::Account {
             id: account.id,
             email: account.email,
+            discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
         }
@@ -2405,6 +2445,21 @@ pub async fn create_account_with_discord_id(
         .await
         .map_err(ApiError::CreateAccountError)?;
     Ok(row.try_get(0)?)
+}
+
+pub async fn update_account_discord_name(
+    client: &Client,
+    discord_id: &str,
+    discord_name: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET discord_name=$2 WHERE discord_id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&discord_id, &discord_name])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    Ok(())
 }
 
 pub async fn get_account_by_discord_id(
@@ -2671,7 +2726,7 @@ pub async fn get_account_by_session_token_hash(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT a.id, a.email, a.created_at, a.must_change_password
+SELECT a.id, a.email, a.discord_name, a.created_at, a.must_change_password
 FROM groupscape.account_sessions s
 INNER JOIN groupscape.accounts a ON a.id = s.account_id
 WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.status = 'active'
@@ -2686,6 +2741,7 @@ WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.status = 'active'
         Some(row) => Ok(Some(crate::models::Account {
             id: row.try_get("id")?,
             email: row.try_get("email")?,
+            discord_name: row.try_get("discord_name")?,
             created_at: row.try_get("created_at")?,
             must_change_password: row.try_get("must_change_password")?,
         })),
@@ -2985,7 +3041,7 @@ pub async fn get_account_by_api_key_hash(
 ) -> Result<Option<crate::models::Account>, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT id, email, created_at, must_change_password FROM groupscape.accounts WHERE api_key_hash=$1 AND status='active'",
+            "SELECT id, email, discord_name, created_at, must_change_password FROM groupscape.accounts WHERE api_key_hash=$1 AND status='active'",
         )
         .await?;
     let row = client
@@ -2996,6 +3052,7 @@ pub async fn get_account_by_api_key_hash(
         Some(row) => Ok(Some(crate::models::Account {
             id: row.try_get("id")?,
             email: row.try_get("email")?,
+            discord_name: row.try_get("discord_name")?,
             created_at: row.try_get("created_at")?,
             must_change_password: row.try_get("must_change_password")?,
         })),
@@ -3644,6 +3701,16 @@ pub async fn close_idle_sessions(
     Ok(rows_affected)
 }
 
+pub async fn prune_old_sessions(client: &Client) -> Result<u64, ApiError> {
+    client
+        .execute(
+            "DELETE FROM groupscape.sessions WHERE ended_at IS NOT NULL AND ended_at < now() - interval '90 days'",
+            &[],
+        )
+        .await
+        .map_err(ApiError::PGError)
+}
+
 /// Shared insert behind [`insert_activity_event`]/[`insert_progress_event`] -
 /// `groupscape.activity_events`' `(event_type, payload)` columns are already generic enough to
 /// hold any discrete event kind, so the quest/diary/combat-task/collection-log milestones reuse
@@ -3669,6 +3736,61 @@ pub async fn insert_activity_event_payload(
         .await
         .map_err(ApiError::InsertActivityEventError)?;
     Ok(())
+}
+
+pub async fn record_location_sample(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    sampled_at: DateTime<Utc>,
+    world: i32,
+    plane: i32,
+    world_x: i32,
+    world_y: i32,
+) -> Result<(), ApiError> {
+    client
+        .execute(
+            "INSERT INTO groupscape.location_samples (group_id, member_name, sampled_at, world, plane, world_x, world_y) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            &[&group_id, &member_name, &sampled_at, &world, &plane, &world_x, &world_y],
+        )
+        .await
+        .map_err(ApiError::PGError)?;
+    client
+        .execute(
+            "DELETE FROM groupscape.location_samples WHERE sampled_at < now() - interval '120 seconds'",
+            &[],
+        )
+        .await
+        .map_err(ApiError::PGError)?;
+    Ok(())
+}
+
+pub async fn nearby_members_for_kill(
+    client: &Client,
+    group_id: i64,
+    occurred_at: DateTime<Utc>,
+    world: i32,
+    plane: i32,
+    world_x: i32,
+    world_y: i32,
+    reporter: &str,
+) -> Result<Vec<String>, ApiError> {
+    let rows = client
+        .query(
+            "SELECT DISTINCT ON (member_name) member_name FROM groupscape.location_samples WHERE group_id=$1 AND sampled_at BETWEEN $2 - interval '120 seconds' AND $2 AND world=$3 AND plane=$4 AND ((world_x-$5)*(world_x-$5) + (world_y-$6)*(world_y-$6)) <= 4096 ORDER BY member_name, sampled_at DESC",
+            &[&group_id, &occurred_at, &world, &plane, &world_x, &world_y],
+        )
+        .await
+        .map_err(ApiError::PGError)?;
+    let mut participants = rows
+        .iter()
+        .map(|row| row.try_get::<_, String>("member_name"))
+        .collect::<Result<Vec<_>, _>>()?;
+    if !participants.iter().any(|name| name == reporter) {
+        participants.push(reporter.to_string());
+    }
+    participants.sort();
+    Ok(participants)
 }
 
 /// Stores one discrete kill/death event. Scoped by `member_name` (the roster identity used
@@ -3826,6 +3948,8 @@ pub async fn list_kill_events(
     client: &Client,
     group_id: i64,
     member_name: Option<&str>,
+    session_id: Option<i64>,
+    npc_name: Option<&str>,
     since: Option<DateTime<Utc>>,
     until: Option<DateTime<Utc>>,
 ) -> Result<Vec<ActivityEvent>, ApiError> {
@@ -3837,15 +3961,20 @@ FROM groupscape.activity_events
 WHERE group_id=$1
   AND event_type='kill'
   AND ($2::text IS NULL OR member_name = $2)
-  AND ($3::timestamptz IS NULL OR occurred_at >= $3)
-  AND ($4::timestamptz IS NULL OR occurred_at <= $4)
+    AND ($3::bigint IS NULL OR session_id = $3)
+    AND ($4::text IS NULL OR payload->>'npcName' = $4)
+    AND ($5::timestamptz IS NULL OR occurred_at >= $5)
+    AND ($6::timestamptz IS NULL OR occurred_at <= $6)
 ORDER BY occurred_at DESC
 LIMIT 5000
 "#,
         )
         .await?;
     let rows = client
-        .query(&stmt, &[&group_id, &member_name, &since, &until])
+        .query(
+            &stmt,
+            &[&group_id, &member_name, &session_id, &npc_name, &since, &until],
+        )
         .await
         .map_err(ApiError::ListKillEventsError)?;
     rows.iter().map(activity_event_from_row).collect()

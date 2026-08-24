@@ -44,6 +44,8 @@ export class AccountPage extends BaseElement {
     this.status = this.querySelector(".account-page__status");
     this.content = this.querySelector(".account-page__content");
     this.avatar = this.querySelector(".account-page__avatar");
+    this.discordDisplay = this.querySelector(".account-page__discord-display");
+    this.discordName = this.discordDisplay.querySelector("span");
     this.emailDisplay = this.querySelector(".account-page__email-display");
     this.since = this.querySelector(".account-page__since");
 
@@ -113,6 +115,8 @@ export class AccountPage extends BaseElement {
   renderProfile(account) {
     this.account = account;
     this.avatar.textContent = initials(account.email);
+    this.discordDisplay.hidden = !account.discord_name;
+    this.discordName.textContent = account.discord_name || "";
     this.emailDisplay.textContent = account.email || "No email set";
     this.since.textContent = `Member since ${new Date(account.created_at).toLocaleDateString(undefined, {
       year: "numeric",

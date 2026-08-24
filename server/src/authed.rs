@@ -402,9 +402,26 @@ pub async fn update_group_member(
         "coordinates",
         &group_member_inner.coordinates,
         3,
-        4,
+        5,
         ArrayFormat::Flat,
     )?;
+
+    if let Some(coordinates) = group_member_inner.coordinates.as_deref() {
+        if coordinates.len() >= 5 {
+            let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+            db::record_location_sample(
+                &client,
+                auth.group_id,
+                &group_member_inner.name,
+                Utc::now(),
+                coordinates[4],
+                coordinates[2],
+                coordinates[0],
+                coordinates[1],
+            )
+            .await?;
+        }
+    }
     validate_member_prop_length(
         "skills",
         &group_member_inner.skills,
@@ -499,12 +516,29 @@ pub async fn update_group_member(
             let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
             let session_id = db::ensure_open_session(&client, auth.group_id).await?;
             for event in &events {
+                let mut stored_event = event.clone();
+                if let GameEvent::Kill(kill) = &mut stored_event {
+                    let occurred_at = kill.occurred_at.unwrap_or_else(Utc::now);
+                    kill.participants = Some(
+                        db::nearby_members_for_kill(
+                            &client,
+                            auth.group_id,
+                            occurred_at,
+                            kill.world,
+                            kill.plane,
+                            kill.world_x,
+                            kill.world_y,
+                            &group_member_inner.name,
+                        )
+                        .await?,
+                    );
+                }
                 db::insert_activity_event(
                     &client,
                     auth.group_id,
                     session_id,
                     &group_member_inner.name,
-                    event,
+                    &stored_event,
                 )
                 .await?;
                 discord::dispatch_event_webhook(
@@ -683,6 +717,10 @@ pub async fn get_sessions(
     Ok(web::Json(sessions))
 }
 
+pub async fn get_loot_bosses() -> web::Json<Vec<String>> {
+    web::Json(crate::notable_npcs::names())
+}
+
 fn default_loot_sort() -> String {
     "value".to_string()
 }
@@ -691,6 +729,16 @@ fn default_loot_sort() -> String {
 pub struct GetLootSummaryQuery {
     #[serde(default)]
     pub member_name: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<i64>,
+    #[serde(default)]
+    pub boss: Option<String>,
+    #[serde(default)]
+    pub since: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub until: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub split_mode: Option<String>,
     #[serde(default = "default_loot_sort")]
     pub sort: String,
 }
@@ -708,8 +756,10 @@ pub async fn get_loot_summary(
         &client,
         auth.group_id,
         query.member_name.as_deref(),
-        None,
-        None,
+        query.session_id,
+        query.boss.as_deref(),
+        query.since,
+        query.until,
     )
     .await?;
     let ge_prices = get_ge_prices_map();
@@ -724,15 +774,21 @@ pub async fn get_loot_summary(
             continue;
         };
         for item in loot {
-            let key = (
-                event.member_name.clone(),
-                kill.npc_name.clone(),
-                item.item_id,
-            );
+                let participants = kill
+                    .participants
+                    .clone()
+                    .unwrap_or_else(|| vec![event.member_name.clone()]);
+                let participant_count = participants.len().max(1) as i64;
+                let names: Vec<String> = match query.split_mode.as_deref() {
+                    Some("proximity") | Some("personal") => participants.clone(),
+                    _ => vec![event.member_name.clone()],
+                };
+                for member_name in names {
+                    let key = (member_name.clone(), kill.npc_name.clone(), item.item_id);
             let unit_value = ge_prices.get(&item.item_id).copied();
             let drop = drop_rates::lookup(&kill.npc_name, item.item_id);
             let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
-                member_name: event.member_name.clone(),
+                member_name,
                 npc_name: kill.npc_name.clone(),
                 item_id: item.item_id,
                 item_name: drop.map(|d| d.name.clone()),
@@ -744,7 +800,13 @@ pub async fn get_loot_summary(
                 drop_rate: drop.and_then(|d| d.rate.clone()),
             });
             row.quantity += item.quantity;
-            row.total_value += unit_value.unwrap_or(0) * item.quantity as i64;
+                let item_value = unit_value.unwrap_or(0) * item.quantity as i64;
+                row.total_value += if query.split_mode.as_deref() == Some("proximity") {
+                    item_value / participant_count
+                } else {
+                    item_value
+                };
+            }
         }
     }
 
@@ -764,9 +826,17 @@ pub async fn get_loot_summary(
 #[serde(deny_unknown_fields)]
 pub struct GetLootSplitQuery {
     #[serde(default)]
+    pub member_name: Option<String>,
+    #[serde(default)]
+    pub session_id: Option<i64>,
+    #[serde(default)]
+    pub boss: Option<String>,
+    #[serde(default)]
     pub since: Option<DateTime<Utc>>,
     #[serde(default)]
     pub until: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub split_mode: Option<String>,
 }
 /// Total loot GP over `[since, until]` split evenly across every member who reported a kill in
 /// that range. Unlike `groupscape-old`'s split (which credits a per-kill `actor_character_ids`
@@ -778,28 +848,48 @@ pub async fn get_loot_split(
     query: web::Query<GetLootSplitQuery>,
 ) -> Result<web::Json<LootSplitResult>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let events =
-        db::list_kill_events(&client, auth.group_id, None, query.since, query.until).await?;
+    let events = db::list_kill_events(
+        &client,
+        auth.group_id,
+        query.member_name.as_deref(),
+        query.session_id,
+        query.boss.as_deref(),
+        query.since,
+        query.until,
+    )
+    .await?;
     let ge_prices = get_ge_prices_map();
 
     let mut per_member: HashMap<String, (i64, i64)> = HashMap::new();
     let mut total_value: i64 = 0;
     let kill_count = events.len() as i64;
     for event in &events {
-        let entry = per_member
-            .entry(event.member_name.clone())
-            .or_insert((0, 0));
-        entry.0 += 1;
         if let Ok(GameEvent::Kill(kill)) =
             serde_json::from_value::<GameEvent>(event.payload.clone())
         {
-            if let Some(loot) = kill.loot {
+            let participants = kill
+                .participants
+                .unwrap_or_else(|| vec![event.member_name.clone()]);
+            let names: Vec<String> = match query.split_mode.as_deref() {
+                Some("proximity") | Some("personal") => participants.clone(),
+                _ => vec![event.member_name.clone()],
+            };
+            let participant_count = participants.len().max(1) as i64;
+            for member_name in names {
+                let entry = per_member.entry(member_name).or_insert((0, 0));
+                entry.0 += 1;
+            if let Some(loot) = &kill.loot {
                 for item in loot {
                     let value =
                         ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
-                    entry.1 += value;
+                    entry.1 += if query.split_mode.as_deref() == Some("proximity") {
+                        value / participant_count
+                    } else {
+                        value
+                    };
                     total_value += value;
                 }
+            }
             }
         }
     }

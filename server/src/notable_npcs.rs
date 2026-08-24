@@ -102,6 +102,12 @@ pub fn is_notable(npc_name: &str) -> bool {
     NOTABLE_NPCS.contains(&slugify_npc_name(npc_name))
 }
 
+pub fn names() -> Vec<String> {
+    let mut names: Vec<String> = NOTABLE_NPCS.iter().cloned().collect();
+    names.sort();
+    names
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

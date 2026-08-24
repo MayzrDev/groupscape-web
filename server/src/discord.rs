@@ -13,6 +13,7 @@ const USER_URL: &str = "https://discord.com/api/users/@me";
 
 pub struct DiscordUser {
     pub id: String,
+    pub name: String,
 }
 
 #[derive(Deserialize)]
@@ -23,6 +24,8 @@ struct TokenResponse {
 #[derive(Deserialize)]
 struct UserResponse {
     id: Option<String>,
+    username: Option<String>,
+    global_name: Option<String>,
 }
 
 /// `identify` scope only - just enough for a stable Discord user id, matching
@@ -72,9 +75,9 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
             .read_json::<UserResponse>()
             .map_err(ApiError::UreqError)?;
 
-        match user_res.id {
-            Some(id) => Ok(DiscordUser { id }),
-            None => Err(ApiError::DiscordOAuthError(
+        match (user_res.id, user_res.global_name.or(user_res.username)) {
+            (Some(id), Some(name)) => Ok(DiscordUser { id, name }),
+            _ => Err(ApiError::DiscordOAuthError(
                 "user fetch returned incomplete data".to_string(),
             )),
         }
