@@ -1507,7 +1507,7 @@ CREATE INDEX IF NOT EXISTS admin_audit_log_created_at_idx ON groupscape.admin_au
                 r#"
 CREATE TABLE IF NOT EXISTS groupscape.accounts (
   id BIGSERIAL PRIMARY KEY,
-  email CITEXT UNIQUE,
+  username CITEXT UNIQUE,
   disabled BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -2392,7 +2392,7 @@ ON CONFLICT (item_id) DO UPDATE SET
 
 pub struct AccountForAuth {
     pub id: i64,
-    pub email: Option<String>,
+    pub username: Option<String>,
     pub discord_name: Option<String>,
     pub password_hash: Option<String>,
     pub disabled: bool,
@@ -2404,12 +2404,12 @@ pub struct AccountForAuth {
     pub last_login_at: Option<DateTime<Utc>>,
 }
 
-const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, email, discord_name, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until, last_login_at";
+const ACCOUNT_FOR_AUTH_COLUMNS: &str = "id, username, discord_name, password_hash, disabled, created_at, status, must_change_password, failed_login_attempts, locked_until, last_login_at";
 
 fn account_for_auth_from_row(row: Row) -> Result<AccountForAuth, ApiError> {
     Ok(AccountForAuth {
         id: row.try_get("id")?,
-        email: row.try_get("email")?,
+        username: row.try_get("username")?,
         discord_name: row.try_get("discord_name")?,
         password_hash: row.try_get("password_hash")?,
         disabled: row.try_get("disabled")?,
@@ -2426,7 +2426,7 @@ impl From<AccountForAuth> for crate::models::Account {
     fn from(account: AccountForAuth) -> Self {
         crate::models::Account {
             id: account.id,
-            email: account.email,
+            username: account.username,
             discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
@@ -2434,12 +2434,12 @@ impl From<AccountForAuth> for crate::models::Account {
     }
 }
 
-/// One account per user - `email` is a case-insensitive (citext) UNIQUE column, so a duplicate
+/// One account per user - `username` is a case-insensitive (citext) UNIQUE column, so a duplicate
 /// registration surfaces as a Postgres unique-violation (SQLSTATE 23505) rather than needing a
-/// separate existence check that would race with a concurrent registration of the same email.
-/// Creates a Discord-only account (`email`/`password_hash` both left `NULL`) - matches
+/// separate existence check that would race with a concurrent registration of the same username.
+/// Creates a Discord-only account (`username`/`password_hash` both left `NULL`) - matches
 /// `groupscape-old`'s OAuth-first decision (grilled during that project's Slice 29): a Discord
-/// id with no matching account auto-creates one rather than requiring a prior email signup.
+/// id with no matching account auto-creates one rather than requiring a prior username signup.
 pub async fn create_account_with_discord_id(
     client: &Client,
     discord_id: &str,
@@ -2490,21 +2490,21 @@ pub async fn get_account_by_discord_id(
 
 pub async fn create_account(
     client: &Client,
-    email: &str,
+    username: &str,
     password_hash: &str,
 ) -> Result<i64, ApiError> {
     let stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.accounts (email, password_hash) VALUES ($1, $2) RETURNING id",
+            "INSERT INTO groupscape.accounts (username, password_hash) VALUES ($1, $2) RETURNING id",
         )
         .await?;
-    match client.query_one(&stmt, &[&email, &password_hash]).await {
+    match client.query_one(&stmt, &[&username, &password_hash]).await {
         Ok(row) => Ok(row.try_get(0)?),
         Err(err) => {
             if err.as_db_error().is_some_and(|db_err| {
                 db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
             }) {
-                Err(ApiError::EmailAlreadyRegisteredError)
+                Err(ApiError::UsernameAlreadyRegisteredError)
             } else {
                 Err(ApiError::CreateAccountError(err))
             }
@@ -2512,17 +2512,17 @@ pub async fn create_account(
     }
 }
 
-pub async fn get_account_by_email(
+pub async fn get_account_by_username(
     client: &Client,
-    email: &str,
+    username: &str,
 ) -> Result<Option<AccountForAuth>, ApiError> {
     let stmt = client
         .prepare_cached(&format!(
-            "SELECT {ACCOUNT_FOR_AUTH_COLUMNS} FROM groupscape.accounts WHERE email=$1"
+            "SELECT {ACCOUNT_FOR_AUTH_COLUMNS} FROM groupscape.accounts WHERE username=$1"
         ))
         .await?;
     let row = client
-        .query_opt(&stmt, &[&email])
+        .query_opt(&stmt, &[&username])
         .await
         .map_err(ApiError::GetAccountError)?;
     match row {
@@ -2603,25 +2603,25 @@ pub async fn reset_login_lockout_and_record_login(
     Ok(())
 }
 
-/// `email` is `citext UNIQUE`, so a duplicate update surfaces as a unique-violation same as
+/// `username` is `citext UNIQUE`, so a duplicate update surfaces as a unique-violation same as
 /// `create_account` above.
-pub async fn update_account_email(
+pub async fn update_account_username(
     client: &Client,
     account_id: i64,
-    email: &str,
+    username: &str,
 ) -> Result<(), ApiError> {
     let stmt = client
-        .prepare_cached("UPDATE groupscape.accounts SET email=$1 WHERE id=$2")
+        .prepare_cached("UPDATE groupscape.accounts SET username=$1 WHERE id=$2")
         .await?;
-    match client.execute(&stmt, &[&email, &account_id]).await {
+    match client.execute(&stmt, &[&username, &account_id]).await {
         Ok(_) => Ok(()),
         Err(err) => {
             if err.as_db_error().is_some_and(|db_err| {
                 db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
             }) {
-                Err(ApiError::EmailAlreadyRegisteredError)
+                Err(ApiError::UsernameAlreadyRegisteredError)
             } else {
-                Err(ApiError::UpdateAccountEmailError(err))
+                Err(ApiError::UpdateAccountUsernameError(err))
             }
         }
     }
@@ -2733,7 +2733,7 @@ pub async fn get_account_by_session_token_hash(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT a.id, a.email, a.discord_name, a.created_at, a.must_change_password
+SELECT a.id, a.username, a.discord_name, a.created_at, a.must_change_password
 FROM groupscape.account_sessions s
 INNER JOIN groupscape.accounts a ON a.id = s.account_id
 WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.status = 'active'
@@ -2747,7 +2747,7 @@ WHERE s.token_hash = $1 AND s.expires_at > NOW() AND a.status = 'active'
     match row {
         Some(row) => Ok(Some(crate::models::Account {
             id: row.try_get("id")?,
-            email: row.try_get("email")?,
+            username: row.try_get("username")?,
             discord_name: row.try_get("discord_name")?,
             created_at: row.try_get("created_at")?,
             must_change_password: row.try_get("must_change_password")?,
@@ -3048,7 +3048,7 @@ pub async fn get_account_by_api_key_hash(
 ) -> Result<Option<crate::models::Account>, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT id, email, discord_name, created_at, must_change_password FROM groupscape.accounts WHERE api_key_hash=$1 AND status='active'",
+            "SELECT id, username, discord_name, created_at, must_change_password FROM groupscape.accounts WHERE api_key_hash=$1 AND status='active'",
         )
         .await?;
     let row = client
@@ -3058,7 +3058,7 @@ pub async fn get_account_by_api_key_hash(
     match row {
         Some(row) => Ok(Some(crate::models::Account {
             id: row.try_get("id")?,
-            email: row.try_get("email")?,
+            username: row.try_get("username")?,
             discord_name: row.try_get("discord_name")?,
             created_at: row.try_get("created_at")?,
             must_change_password: row.try_get("must_change_password")?,
@@ -5032,7 +5032,7 @@ pub async fn admin_remove_all_group_memberships(
 fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiError> {
     Ok(AdminAccountSummary {
         id: row.try_get("id")?,
-        email: row.try_get("email")?,
+        username: row.try_get("username")?,
         status: row.try_get("status")?,
         must_change_password: row.try_get("must_change_password")?,
         locked_out: row.try_get("locked_out")?,
@@ -5041,7 +5041,7 @@ fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiE
     })
 }
 
-const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.email, a.status, a.must_change_password, a.created_at, a.last_login_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
+const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.username, a.status, a.must_change_password, a.created_at, a.last_login_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
 
 pub async fn admin_list_accounts(
     client: &Client,
@@ -5060,7 +5060,7 @@ pub async fn admin_list_accounts(
             r#"
 SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS}
 FROM groupscape.accounts a
-WHERE ($1::text IS NULL OR a.email ILIKE $1 OR a.id::text = $2)
+WHERE ($1::text IS NULL OR a.username ILIKE $1 OR a.id::text = $2)
   AND ($3::text IS NULL OR a.status = $3)
   AND ($4::bigint IS NULL OR EXISTS (SELECT 1 FROM groupscape.group_permissions gp WHERE gp.account_id = a.id AND gp.group_id = $4))
 ORDER BY a.id DESC
@@ -5092,7 +5092,7 @@ LIMIT $5 OFFSET $6
             r#"
 SELECT COUNT(*)
 FROM groupscape.accounts a
-WHERE ($1::text IS NULL OR a.email ILIKE $1 OR a.id::text = $2)
+WHERE ($1::text IS NULL OR a.username ILIKE $1 OR a.id::text = $2)
   AND ($3::text IS NULL OR a.status = $3)
   AND ($4::bigint IS NULL OR EXISTS (SELECT 1 FROM groupscape.group_permissions gp WHERE gp.account_id = a.id AND gp.group_id = $4))
 "#,
@@ -5183,7 +5183,7 @@ ORDER BY g.group_name
 
     Ok(Some(AdminAccountDetail {
         id: summary.id,
-        email: summary.email,
+        username: summary.username,
         status: summary.status,
         must_change_password: summary.must_change_password,
         locked_out: summary.locked_out,
@@ -5210,17 +5210,17 @@ pub async fn admin_set_account_status(
     Ok(())
 }
 
-/// Soft delete: status flips to `deleted` and the (unique, citext) email is scrubbed to a
+/// Soft delete: status flips to `deleted` and the (unique, citext) username is scrubbed to a
 /// placeholder derived from the account id so the real address is freed up for re-registration.
 /// Group memberships are left untouched, unlike ban/hard-delete - this is meant to be
-/// reversible by an admin flipping status back to `active` and setting a real email again.
+/// reversible by an admin flipping status back to `active` and setting a real username again.
 pub async fn admin_soft_delete_account(client: &Client, account_id: i64) -> Result<(), ApiError> {
-    let placeholder_email = format!("deleted-account-{}@deleted.groupscape.invalid", account_id);
+    let placeholder_username = format!("deleted-account-{}", account_id);
     let stmt = client
-        .prepare_cached("UPDATE groupscape.accounts SET status='deleted', email=$1 WHERE id=$2")
+        .prepare_cached("UPDATE groupscape.accounts SET status='deleted', username=$1 WHERE id=$2")
         .await?;
     client
-        .execute(&stmt, &[&placeholder_email, &account_id])
+        .execute(&stmt, &[&placeholder_username, &account_id])
         .await
         .map_err(|e| ApiError::AdminDbError("AdminSoftDeleteAccountError".to_string(), e))?;
     Ok(())
@@ -5296,7 +5296,7 @@ pub async fn admin_clear_account_lockout(client: &Client, account_id: i64) -> Re
     Ok(())
 }
 
-/// Small union search for the admin global search box - up to 10 accounts (by email/id
+/// Small union search for the admin global search box - up to 10 accounts (by username/id
 /// substring) and 10 groups (by name substring, delegating to `admin_list_groups`'s existing
 /// search behavior).
 pub async fn admin_search(

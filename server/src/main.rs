@@ -159,7 +159,7 @@ async fn main() -> std::io::Result<()> {
                     ))
                     .app_data(web::Data::from(character_auth_cache.clone()))
                     .service(accounts::me)
-                    .service(accounts::update_email)
+                    .service(accounts::update_username)
                     .service(accounts::change_password)
                     .service(accounts::delete_account)
                     .service(accounts::list_characters)
@@ -336,7 +336,7 @@ async fn main() -> std::io::Result<()> {
             .service(admin::list_account_sessions)
             .service(admin::revoke_account_session)
             .service(admin::revoke_all_account_sessions)
-            .service(admin::set_account_email)
+            .service(admin::set_account_username)
             .service(admin::clear_account_lockout)
             .service(admin::search)
             .service(admin::dashboard);

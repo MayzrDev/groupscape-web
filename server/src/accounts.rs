@@ -8,9 +8,9 @@ use crate::error::ApiError;
 use crate::models::{
     Account, AccountApiKey, AuthenticatedAccount, ChangeAccountPassword, Character,
     CharacterGroupLink, DiscordCallbackQuery, LinkCharacter, LinkCharacterToGroup, LoginAccount,
-    RegisterAccount, UpdateAccountEmail,
+    RegisterAccount, UpdateAccountUsername,
 };
-use crate::validators::{valid_email, valid_name, valid_password};
+use crate::validators::{valid_name, valid_password};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{Duration, Utc};
 use deadpool_postgres::{Client, Pool};
@@ -55,9 +55,9 @@ pub async fn register(
     db_pool: web::Data<Pool>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let email = register_account.email.trim().to_string();
-    if !valid_email(&email) {
-        return Ok(HttpResponse::BadRequest().body("Provided email is not valid"));
+    let username = register_account.username.trim().to_string();
+    if !valid_name(&username) {
+        return Ok(HttpResponse::BadRequest().body("Provided username is not valid"));
     }
     if !valid_password(&register_account.password) {
         return Ok(HttpResponse::BadRequest().body("Password must be between 8 and 256 characters"));
@@ -67,10 +67,10 @@ pub async fn register(
         .map_err(|_| ApiError::InvalidCredentialsError)?;
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let account_id = match db::create_account(&client, &email, &password_hash).await {
+    let account_id = match db::create_account(&client, &username, &password_hash).await {
         Ok(account_id) => account_id,
-        Err(ApiError::EmailAlreadyRegisteredError) => {
-            return Ok(HttpResponse::Conflict().body("Email already registered"));
+        Err(ApiError::UsernameAlreadyRegisteredError) => {
+            return Ok(HttpResponse::Conflict().body("Username already registered"));
         }
         Err(err) => return Err(err.into()),
     };
@@ -78,14 +78,14 @@ pub async fn register(
     let token = issue_session(&client, account_id, &req).await?;
     let api_key = crypto::new_api_key();
     db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key)).await?;
-    let account = db::get_account_by_email(&client, &email)
+    let account = db::get_account_by_username(&client, &username)
         .await?
         .ok_or(ApiError::InvalidCredentialsError)?;
 
     Ok(HttpResponse::Created().json(AuthenticatedAccount {
         account: Account {
             id: account.id,
-            email: account.email,
+            username: account.username,
             discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
@@ -101,10 +101,10 @@ pub async fn login(
     db_pool: web::Data<Pool>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let email = login_account.email.trim().to_string();
+    let username = login_account.username.trim().to_string();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
 
-    let account = db::get_account_by_email(&client, &email).await?;
+    let account = db::get_account_by_username(&client, &username).await?;
     let Some(account) = account else {
         return Err(ApiError::InvalidCredentialsError.into());
     };
@@ -139,7 +139,7 @@ pub async fn login(
     Ok(HttpResponse::Ok().json(AuthenticatedAccount {
         account: Account {
             id: account.id,
-            email: account.email,
+            username: account.username,
             discord_name: account.discord_name,
             created_at: account.created_at,
             must_change_password: account.must_change_password,
@@ -153,7 +153,7 @@ pub async fn login(
 pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().json(Account {
         id: authenticated.id,
-        email: authenticated.email.clone(),
+        username: authenticated.username.clone(),
         discord_name: authenticated.discord_name.clone(),
         created_at: authenticated.created_at,
         must_change_password: authenticated.must_change_password,
@@ -161,32 +161,32 @@ pub async fn me(authenticated: AccountAuthenticated) -> Result<HttpResponse, Err
 }
 
 /// No password re-entry required - the bearer session token is already this API's proof of
-/// identity for every other account mutation (linking characters, etc.), so email is no
+/// identity for every other account mutation (linking characters, etc.), so username is no
 /// different. Uniqueness is enforced the same way as `register`: a duplicate surfaces as a
-/// Postgres unique-violation via `db::update_account_email`.
-#[put("/email")]
-pub async fn update_email(
-    body: web::Json<UpdateAccountEmail>,
+/// Postgres unique-violation via `db::update_account_username`.
+#[put("/username")]
+pub async fn update_username(
+    body: web::Json<UpdateAccountUsername>,
     authenticated: AccountAuthenticated,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
-    let email = body.email.trim().to_string();
-    if !valid_email(&email) {
-        return Ok(HttpResponse::BadRequest().body("Provided email is not valid"));
+    let username = body.username.trim().to_string();
+    if !valid_name(&username) {
+        return Ok(HttpResponse::BadRequest().body("Provided username is not valid"));
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    match db::update_account_email(&client, authenticated.id, &email).await {
+    match db::update_account_username(&client, authenticated.id, &username).await {
         Ok(()) => {}
-        Err(ApiError::EmailAlreadyRegisteredError) => {
-            return Ok(HttpResponse::Conflict().body("Email already registered"));
+        Err(ApiError::UsernameAlreadyRegisteredError) => {
+            return Ok(HttpResponse::Conflict().body("Username already registered"));
         }
         Err(err) => return Err(err.into()),
     }
 
     Ok(HttpResponse::Ok().json(Account {
         id: authenticated.id,
-        email: Some(email),
+        username: Some(username),
         discord_name: authenticated.discord_name.clone(),
         created_at: authenticated.created_at,
         must_change_password: authenticated.must_change_password,
@@ -194,7 +194,7 @@ pub async fn update_email(
 }
 
 /// No current-password re-entry required - the bearer session token is already this API's proof
-/// of identity for every other account mutation, same reasoning as `update_email` above. Also
+/// of identity for every other account mutation, same reasoning as `update_username` above. Also
 /// the escape hatch for `must_change_password`: a successful change here clears the flag,
 /// whether it was set by an admin-triggered reset or is just a routine change.
 #[put("/password")]

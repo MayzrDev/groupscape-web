@@ -74,15 +74,6 @@ pub fn valid_name(name: &str) -> bool {
     (1..=16).contains(&len) && name.is_ascii() && !NAME_RE.is_match(name) && !name.trim().is_empty()
 }
 
-// Deliberately permissive - real validation is "did a confirmation/reset email land",
-// this just rejects obvious garbage before we bother hitting the database.
-static EMAIL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[^\s@]+@[^\s@]+\.[^\s@]+$").unwrap());
-
-pub fn valid_email(email: &str) -> bool {
-    email.len() <= 254 && EMAIL_RE.is_match(email)
-}
-
 pub fn valid_password(password: &str) -> bool {
     (8..=256).contains(&password.len())
 }
@@ -90,20 +81,6 @@ pub fn valid_password(password: &str) -> bool {
 #[cfg(test)]
 mod account_validator_tests {
     use super::*;
-
-    #[test]
-    fn valid_emails() {
-        for email in ["a@b.co", "person.name+tag@example.com", "x@sub.example.org"] {
-            assert!(valid_email(email), "{} should have been a valid email", email);
-        }
-    }
-
-    #[test]
-    fn invalid_emails() {
-        for email in ["", "no-at-sign.com", "@missing-local.com", "missing-domain@", "spaces are bad@example.com"] {
-            assert!(!valid_email(email), "{} should have been an invalid email", email);
-        }
-    }
 
     #[test]
     fn password_length_bounds() {

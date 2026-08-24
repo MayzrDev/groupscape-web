@@ -50,7 +50,7 @@ pub enum ApiError {
     GroupMemberValidationError(String),
     #[from(ignore)]
     CreateAccountError(tokio_postgres::error::Error),
-    EmailAlreadyRegisteredError,
+    UsernameAlreadyRegisteredError,
     #[from(ignore)]
     GetAccountError(tokio_postgres::error::Error),
     #[from(ignore)]
@@ -82,7 +82,7 @@ pub enum ApiError {
     #[from(ignore)]
     GetGroupAdminError(tokio_postgres::error::Error),
     #[from(ignore)]
-    UpdateAccountEmailError(tokio_postgres::error::Error),
+    UpdateAccountUsernameError(tokio_postgres::error::Error),
     #[from(ignore)]
     UpdateAccountPasswordError(tokio_postgres::error::Error),
     #[from(ignore)]
@@ -217,15 +217,15 @@ impl ResponseError for ApiError {
             ApiError::AdminNotFoundError => HttpResponse::NotFound().finish(),
             ApiError::AdminRateLimitedError => HttpResponse::TooManyRequests().finish(),
             ApiError::CreateAccountError(ref err) => handle_pg_error(err, "CreateAccountError"),
-            ApiError::EmailAlreadyRegisteredError => {
-                HttpResponse::Conflict().body("Email already registered")
+            ApiError::UsernameAlreadyRegisteredError => {
+                HttpResponse::Conflict().body("Username already registered")
             }
             ApiError::GetAccountError(ref err) => handle_pg_error(err, "GetAccountError"),
             ApiError::CreateAccountSessionError(ref err) => {
                 handle_pg_error(err, "CreateAccountSessionError")
             }
             ApiError::InvalidCredentialsError => {
-                HttpResponse::Unauthorized().body("Invalid email or password")
+                HttpResponse::Unauthorized().body("Invalid username or password")
             }
             ApiError::AccountDisabledError => HttpResponse::Forbidden().body("Account is disabled"),
             ApiError::DiscordOAuthError(ref reason) => {
@@ -255,8 +255,8 @@ impl ResponseError for ApiError {
                 handle_pg_error(err, "GetCharacterGroupLinkError")
             }
             ApiError::GetGroupAdminError(ref err) => handle_pg_error(err, "GetGroupAdminError"),
-            ApiError::UpdateAccountEmailError(ref err) => {
-                handle_pg_error(err, "UpdateAccountEmailError")
+            ApiError::UpdateAccountUsernameError(ref err) => {
+                handle_pg_error(err, "UpdateAccountUsernameError")
             }
             ApiError::UpdateAccountPasswordError(ref err) => {
                 handle_pg_error(err, "UpdateAccountPasswordError")

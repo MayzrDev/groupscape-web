@@ -56,7 +56,7 @@ impl AccountAuthenticationCache {
             .filter(|entry| entry.expires_at > Instant::now())
             .map(|entry| Account {
                 id: entry.account.id,
-                email: entry.account.email.clone(),
+                username: entry.account.username.clone(),
                 discord_name: entry.account.discord_name.clone(),
                 created_at: entry.account.created_at,
                 must_change_password: entry.account.must_change_password,
@@ -173,7 +173,7 @@ async fn authenticate_via_db(
         token_hash.to_owned(),
         Account {
             id: account.id,
-            email: account.email.clone(),
+            username: account.username.clone(),
             discord_name: account.discord_name.clone(),
             created_at: account.created_at,
             must_change_password: account.must_change_password,
@@ -254,7 +254,7 @@ mod tests {
     fn test_account() -> Account {
         Account {
             id: 42,
-            email: Some("player@example.com".to_string()),
+            username: Some("player1".to_string()),
             discord_name: None,
             created_at: Utc::now(),
             must_change_password: false,

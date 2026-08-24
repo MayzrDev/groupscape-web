@@ -6,7 +6,7 @@ use crate::models::{
     AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAuditLogResponse,
     AdminFeatureFlag, AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
     AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery, AdminSearchResponse,
-    AdminSetAccountEmail, AdminSetAccountStatus, AdminSetFeatureFlag,
+    AdminSetAccountUsername, AdminSetAccountStatus, AdminSetFeatureFlag,
 };
 use actix_web::{delete, get, post, put, web, Error, HttpResponse};
 use deadpool_postgres::{Client, Pool};
@@ -316,9 +316,9 @@ pub async fn set_account_status(
     Ok(HttpResponse::Ok().finish())
 }
 
-/// Reversible: status flips to `deleted` and the email is scrubbed, but group memberships are
+/// Reversible: status flips to `deleted` and the username is scrubbed, but group memberships are
 /// left alone (unlike ban/hard-delete) so an admin can restore the account later by flipping
-/// status back and setting a fresh email.
+/// status back and setting a fresh username.
 #[post("/accounts/{account_id}/soft-delete")]
 pub async fn soft_delete_account(
     _auth: AdminAuthenticated,
@@ -438,17 +438,17 @@ pub async fn revoke_all_account_sessions(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/accounts/{account_id}/email")]
-pub async fn set_account_email(
+#[post("/accounts/{account_id}/username")]
+pub async fn set_account_username(
     _auth: AdminAuthenticated,
     path: web::Path<i64>,
-    body: web::Json<AdminSetAccountEmail>,
+    body: web::Json<AdminSetAccountUsername>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let account_id = path.into_inner();
-    let email = body.email.trim().to_string();
-    if !crate::validators::valid_email(&email) {
-        return Ok(HttpResponse::BadRequest().body("Provided email is not valid"));
+    let username = body.username.trim().to_string();
+    if !crate::validators::valid_name(&username) {
+        return Ok(HttpResponse::BadRequest().body("Provided username is not valid"));
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -456,17 +456,17 @@ pub async fn set_account_email(
         return Err(ApiError::AdminNotFoundError.into());
     }
 
-    match db::update_account_email(&client, account_id, &email).await {
+    match db::update_account_username(&client, account_id, &username).await {
         Ok(()) => {}
-        Err(ApiError::EmailAlreadyRegisteredError) => {
-            return Ok(HttpResponse::Conflict().body("Email already registered"));
+        Err(ApiError::UsernameAlreadyRegisteredError) => {
+            return Ok(HttpResponse::Conflict().body("Username already registered"));
         }
         Err(err) => return Err(err.into()),
     }
 
     db::admin_record_audit_log(
         &client,
-        "account.email_changed",
+        "account.username_changed",
         Some("account"),
         Some(&account_id.to_string()),
         None,

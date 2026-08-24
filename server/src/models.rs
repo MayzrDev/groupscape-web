@@ -498,13 +498,13 @@ pub type GEPrices = std::collections::HashMap<i32, i64>;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RegisterAccount {
-    pub email: String,
+    pub username: String,
     pub password: String,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LoginAccount {
-    pub email: String,
+    pub username: String,
     pub password: String,
 }
 /// Discord's redirect back to `/discord/callback` - not `deny_unknown_fields` since Discord
@@ -519,8 +519,8 @@ pub struct DiscordCallbackQuery {
 #[derive(Serialize)]
 pub struct Account {
     pub id: i64,
-    /// `None` for a Discord-only account that has never set an email/password.
-    pub email: Option<String>,
+    /// `None` for a Discord-only account that has never set a username/password.
+    pub username: Option<String>,
     pub discord_name: Option<String>,
     pub created_at: DateTime<Utc>,
     /// Set by an admin password reset; the frontend redirects to the password-change section
@@ -538,11 +538,11 @@ pub struct AuthenticatedAccount {
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct UpdateAccountEmail {
-    pub email: String,
+pub struct UpdateAccountUsername {
+    pub username: String,
 }
 /// No `current_password` field - an active session is treated as sufficient proof of identity
-/// for this mutation, same as `UpdateAccountEmail` above.
+/// for this mutation, same as `UpdateAccountUsername` above.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ChangeAccountPassword {
@@ -931,7 +931,7 @@ pub struct AdminAccountsQuery {
 #[derive(Serialize)]
 pub struct AdminAccountSummary {
     pub id: i64,
-    pub email: Option<String>,
+    pub username: Option<String>,
     pub status: String,
     pub must_change_password: bool,
     pub locked_out: bool,
@@ -972,7 +972,7 @@ pub struct AdminAccountSession {
 #[derive(Serialize)]
 pub struct AdminAccountDetail {
     pub id: i64,
-    pub email: Option<String>,
+    pub username: Option<String>,
     pub status: String,
     pub must_change_password: bool,
     pub locked_out: bool,
@@ -996,8 +996,8 @@ pub struct AdminSetAccountStatus {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AdminSetAccountEmail {
-    pub email: String,
+pub struct AdminSetAccountUsername {
+    pub username: String,
 }
 
 #[derive(Serialize)]
