@@ -110,7 +110,7 @@ export class AdminDashboardPage extends BaseElement {
         .map(
           (account) => `
         <a class="admin-dashboard__search-row" href="/admin/accounts?accountId=${account.id}">
-          <span>${account.email ?? `Account #${account.id}`}</span>
+          <span>${account.username ?? `Account #${account.id}`}</span>
           <span class="admin-badge admin-badge--${
             account.status === "active" ? "good" : account.status === "suspended" ? "warn" : "bad"
           }">${account.status}</span>

@@ -123,7 +123,7 @@ export class AdminAccountsPage extends BaseElement {
         <tr class="admin-accounts__row${
           String(account.id) === String(this.selectedAccountId) ? " active" : ""
         }" data-account-id="${account.id}">
-          <td class="admin-accounts__row-email">${account.email ?? "(no email)"}</td>
+          <td class="admin-accounts__row-email">${account.username ?? "(no username)"}</td>
           <td>${this.statusBadge(account)}</td>
           <td class="admin-mono">${
             account.last_login_at ? new Date(account.last_login_at).toLocaleDateString() : "&mdash;"
@@ -193,7 +193,7 @@ export class AdminAccountsPage extends BaseElement {
     this.emptyState.hidden = true;
     this.dialogue.hidden = false;
 
-    this.dialogueTitle.textContent = account.email ?? `Account #${account.id}`;
+    this.dialogueTitle.textContent = account.username ?? `Account #${account.id}`;
     const created = new Date(account.created_at).toLocaleDateString();
     const lastLogin = account.last_login_at ? new Date(account.last_login_at).toLocaleString() : "never";
     this.dialogueMeta.innerHTML = `
@@ -296,7 +296,7 @@ export class AdminAccountsPage extends BaseElement {
       options.push({ label: "Clear login lockout", action: () => this.clearLockout() });
     }
 
-    options.push({ label: "Change email", action: () => this.showEmailForm() });
+    options.push({ label: "Change username", action: () => this.showEmailForm() });
     options.push({ label: "Revoke all sessions", action: () => this.revokeAllSessions() });
     options.push({
       label: "Hard-delete account (permanent, cannot be undone)",
@@ -326,18 +326,18 @@ export class AdminAccountsPage extends BaseElement {
   }
 
   showEmailForm() {
-    this.emailInput.value = this.detail.email ?? "";
+    this.emailInput.value = this.detail.username ?? "";
     this.emailForm.hidden = false;
   }
 
   async saveEmail() {
-    const email = this.emailInput.value.trim();
-    if (!email) return;
+    const username = this.emailInput.value.trim();
+    if (!username) return;
     await this.runAction(async () => {
-      const response = await adminApi.setAccountEmail(this.detail.id, email);
+      const response = await adminApi.setAccountUsername(this.detail.id, username);
       if (!response.ok) {
-        if (response.status === 409) throw new Error("That email is already registered.");
-        throw new Error("Failed to update email.");
+        if (response.status === 409) throw new Error("That username is already registered.");
+        throw new Error("Failed to update username.");
       }
       this.emailForm.hidden = true;
       await this.fetchDetail();
@@ -367,7 +367,7 @@ export class AdminAccountsPage extends BaseElement {
 
     if (status === "banned") {
       confirmDialogManager.confirm({
-        headline: `Ban ${this.detail.email ?? "this account"}?`,
+        headline: `Ban ${this.detail.username ?? "this account"}?`,
         body: "This removes all of their group memberships (transferring ownership of any owned group first) and revokes their sessions.",
         yesCallback: run,
         noCallback: () => {},
@@ -379,8 +379,8 @@ export class AdminAccountsPage extends BaseElement {
 
   softDelete() {
     confirmDialogManager.confirm({
-      headline: `Soft-delete ${this.detail.email ?? "this account"}?`,
-      body: "The account is deactivated and its email is freed up, but this can be undone later.",
+      headline: `Soft-delete ${this.detail.username ?? "this account"}?`,
+      body: "The account is deactivated and its username is freed up, but this can be undone later.",
       yesCallback: () =>
         this.runAction(async () => {
           const response = await adminApi.softDeleteAccount(this.detail.id);
@@ -394,7 +394,7 @@ export class AdminAccountsPage extends BaseElement {
 
   hardDelete() {
     confirmDialogManager.confirm({
-      headline: `Permanently delete ${this.detail.email ?? "this account"}?`,
+      headline: `Permanently delete ${this.detail.username ?? "this account"}?`,
       body: "This removes the account, its characters, and its group memberships forever. This cannot be undone.",
       yesCallback: () =>
         this.runAction(async () => {

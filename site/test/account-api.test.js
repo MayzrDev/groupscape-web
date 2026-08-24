@@ -38,16 +38,16 @@ describe("accountApi", () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 201,
-      json: () => Promise.resolve({ account: { id: 1, email: "a@b.com" }, token: "new-token" }),
+      json: () => Promise.resolve({ account: { id: 1, username: "player" }, token: "new-token" }),
     });
 
-    const response = await accountApi.register("a@b.com", "password123");
+    const response = await accountApi.register("player", "password123");
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/account/register",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ email: "a@b.com", password: "password123" }),
+        body: JSON.stringify({ username: "player", password: "password123" }),
       }),
     );
     expect(response.ok).toBe(true);
@@ -57,7 +57,7 @@ describe("accountApi", () => {
   it("register does not store a token on failure", async () => {
     globalThis.fetch.mockResolvedValue({ ok: false, status: 409 });
 
-    await accountApi.register("a@b.com", "password123");
+    await accountApi.register("player", "password123");
 
     expect(accountStorage.getAccountToken()).toBeNull();
   });
@@ -66,10 +66,10 @@ describe("accountApi", () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 201,
-      json: () => Promise.resolve({ account: { id: 1, email: "a@b.com" }, token: "new-token", api_key: "gsk_abc" }),
+      json: () => Promise.resolve({ account: { id: 1, username: "player" }, token: "new-token", api_key: "gsk_abc" }),
     });
 
-    await accountApi.register("a@b.com", "password123");
+    await accountApi.register("player", "password123");
 
     expect(sessionStorage.getItem("freshApiKey")).toBe("gsk_abc");
   });
@@ -78,16 +78,16 @@ describe("accountApi", () => {
     globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ account: { id: 1, email: "a@b.com" }, token: "session-token" }),
+      json: () => Promise.resolve({ account: { id: 1, username: "player" }, token: "session-token" }),
     });
 
-    const response = await accountApi.login("a@b.com", "password123");
+    const response = await accountApi.login("player", "password123");
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/account/login",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ email: "a@b.com", password: "password123" }),
+        body: JSON.stringify({ username: "player", password: "password123" }),
       }),
     );
     expect(response.ok).toBe(true);
@@ -97,7 +97,7 @@ describe("accountApi", () => {
   it("login does not store a token on failure", async () => {
     globalThis.fetch.mockResolvedValue({ ok: false, status: 401 });
 
-    await accountApi.login("a@b.com", "wrong-password");
+    await accountApi.login("player", "wrong-password");
 
     expect(accountStorage.getAccountToken()).toBeNull();
   });
@@ -256,26 +256,26 @@ describe("accountApi", () => {
   });
 
   it("exposes account settings urls", () => {
-    expect(accountApi.emailUrl).toBe("/api/account/email");
+    expect(accountApi.usernameUrl).toBe("/api/account/username");
     expect(accountApi.passwordUrl).toBe("/api/account/password");
     expect(accountApi.deleteAccountUrl).toBe("/api/account");
   });
 
-  it("updateEmail sends the stored token and new email", async () => {
+  it("updateUsername sends the stored token and new username", async () => {
     accountStorage.storeAccountToken("session-token");
     globalThis.fetch.mockResolvedValue({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ id: 1, email: "new@b.com" }),
+      json: () => Promise.resolve({ id: 1, username: "new-name" }),
     });
 
-    const response = await accountApi.updateEmail("new@b.com");
+    const response = await accountApi.updateUsername("new-name");
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      "/api/account/email",
+      "/api/account/username",
       expect.objectContaining({
         method: "PUT",
-        body: JSON.stringify({ email: "new@b.com" }),
+        body: JSON.stringify({ username: "new-name" }),
         headers: { "Content-Type": "application/json", Authorization: "session-token" },
       }),
     );

@@ -1520,6 +1520,32 @@ CREATE TABLE IF NOT EXISTS groupscape.accounts (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "rename_account_email_to_username").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='groupscape' AND table_name='accounts' AND column_name='email'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='groupscape' AND table_name='accounts' AND column_name='username'
+  ) THEN
+    ALTER TABLE groupscape.accounts RENAME COLUMN email TO username;
+  END IF;
+END$$;
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "rename_account_email_to_username").await?;
+        transaction.commit().await?;
+    }
+
     if !has_migration_run(client, "add_account_password_hash").await? {
         let transaction = client.transaction().await?;
         transaction

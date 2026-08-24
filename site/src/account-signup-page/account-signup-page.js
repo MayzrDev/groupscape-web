@@ -14,12 +14,12 @@ export class AccountSignupPage extends BaseElement {
     super.connectedCallback();
     this.render();
 
-    const emailValidator = (value) => {
+    const usernameValidator = (value) => {
       if (value.length === 0) {
         return "This field is required.";
       }
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-        return "Enter a valid email address.";
+      if (!/^[A-Za-z0-9 _-]+$/.test(value) || value.length > 16 || value.trim().length === 0) {
+        return "Enter a valid username.";
       }
     };
     const passwordValidator = (value) => {
@@ -34,8 +34,8 @@ export class AccountSignupPage extends BaseElement {
       }
     };
 
-    this.email = this.querySelector(".account-signup__email");
-    this.email.validators = [emailValidator];
+    this.username = this.querySelector(".account-signup__email");
+    this.username.validators = [usernameValidator];
     this.password = this.querySelector(".account-signup__password");
     this.password.validators = [passwordValidator];
     this.passwordConfirm = this.querySelector(".account-signup__password-confirm");
@@ -53,15 +53,15 @@ export class AccountSignupPage extends BaseElement {
   }
 
   async signup() {
-    if (!this.email.valid || !this.password.valid || !this.passwordConfirm.valid) return;
+    if (!this.username.valid || !this.password.valid || !this.passwordConfirm.valid) return;
     try {
       this.error.textContent = "";
       this.signupButton.disabled = true;
-      const response = await accountApi.register(this.email.value, this.password.value);
+      const response = await accountApi.register(this.username.value, this.password.value);
       if (response.ok) {
         window.history.pushState("", "", "/welcome");
       } else if (response.status === 409) {
-        this.error.textContent = "That email is already registered.";
+        this.error.textContent = "That username is already registered.";
       } else if (response.status === 400) {
         this.error.textContent = await response.text();
       } else {

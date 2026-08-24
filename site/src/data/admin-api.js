@@ -155,11 +155,11 @@ class AdminApi {
     return response;
   }
 
-  async setAccountEmail(accountId, email) {
-    const response = await fetch(`${this.baseUrl}/accounts/${accountId}/email`, {
+  async setAccountUsername(accountId, username) {
+    const response = await fetch(`${this.baseUrl}/accounts/${accountId}/username`, {
       method: "POST",
       headers: { ...this.authHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ username }),
     });
     return response;
   }

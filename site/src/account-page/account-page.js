@@ -3,12 +3,12 @@ import { accountApi } from "../data/account-api";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { pushNotifications } from "../data/push-notifications";
 
-const emailValidator = (value) => {
+const usernameValidator = (value) => {
   if (value.length === 0) {
     return "This field is required.";
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-    return "Enter a valid email address.";
+  if (!/^[A-Za-z0-9 _-]+$/.test(value) || value.length > 16 || value.trim().length === 0) {
+    return "Enter a valid username.";
   }
 };
 
@@ -18,13 +18,13 @@ const passwordValidator = (value) => {
   }
 };
 
-function initials(email) {
-  if (!email) return "?";
-  return email.slice(0, 2).toUpperCase();
+function initials(username) {
+  if (!username) return "?";
+  return username.slice(0, 2).toUpperCase();
 }
 
 /**
- * Account-level dashboard: profile info, email/password change, and a link out to
+ * Account-level dashboard: profile info, username/password change, and a link out to
  * `/account/characters`. Reached directly (no nav entry point yet) so it does its own session
  * check rather than relying on a route wrapper, matching `characters-page`.
  */
@@ -50,11 +50,11 @@ export class AccountPage extends BaseElement {
     this.since = this.querySelector(".account-page__since");
 
     this.emailInput = this.querySelector(".account-page__email");
-    this.emailInput.validators = [emailValidator];
+    this.emailInput.validators = [usernameValidator];
     this.emailSaveButton = this.querySelector(".account-page__email-save");
     this.emailError = this.querySelector(".account-page__email-error");
     this.emailStatus = this.querySelector(".account-page__email-status");
-    this.eventListener(this.emailSaveButton, "click", this.saveEmail.bind(this));
+    this.eventListener(this.emailSaveButton, "click", this.saveUsername.bind(this));
 
     this.newPasswordInput = this.querySelector(".account-page__new-password");
     this.newPasswordInput.validators = [passwordValidator];
@@ -114,21 +114,21 @@ export class AccountPage extends BaseElement {
 
   renderProfile(account) {
     this.account = account;
-    this.avatar.textContent = initials(account.email);
+    this.avatar.textContent = initials(account.username);
     this.discordDisplay.hidden = !account.discord_name;
     this.discordName.textContent = account.discord_name || "";
-    this.emailDisplay.textContent = account.email || "No email set";
+    this.emailDisplay.textContent = account.username || "No username set";
     this.since.textContent = `Member since ${new Date(account.created_at).toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",
     })}`;
-    if (account.email) {
-      this.emailInput.input.value = account.email;
+    if (account.username) {
+      this.emailInput.input.value = account.username;
     }
     this.passwordForcedHint.hidden = !account.must_change_password;
   }
 
-  async saveEmail() {
+  async saveUsername() {
     this.emailError.textContent = "";
     this.emailStatus.textContent = "";
     this.emailStatus.classList.remove("ok");
@@ -136,21 +136,21 @@ export class AccountPage extends BaseElement {
 
     try {
       this.emailSaveButton.disabled = true;
-      const response = await accountApi.updateEmail(this.emailInput.value);
+      const response = await accountApi.updateUsername(this.emailInput.value);
       if (response.ok) {
         const account = await response.json();
         this.renderProfile(account);
-        this.emailStatus.textContent = "Email updated.";
+        this.emailStatus.textContent = "Username updated.";
         this.emailStatus.classList.add("ok");
       } else if (response.status === 409) {
-        this.emailError.textContent = "That email is already registered.";
+        this.emailError.textContent = "That username is already registered.";
       } else if (response.status === 400) {
         this.emailError.textContent = await response.text();
       } else {
-        this.emailError.textContent = "Couldn't update your email — try again.";
+        this.emailError.textContent = "Couldn't update your username — try again.";
       }
     } catch (error) {
-      this.emailError.textContent = "Couldn't update your email — try again.";
+      this.emailError.textContent = "Couldn't update your username — try again.";
     } finally {
       this.emailSaveButton.disabled = false;
     }

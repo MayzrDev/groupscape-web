@@ -20,8 +20,8 @@ export class AccountLoginPage extends BaseElement {
       }
     };
 
-    this.email = this.querySelector(".account-login__email");
-    this.email.validators = [fieldRequiredValidator];
+    this.username = this.querySelector(".account-login__email");
+    this.username.validators = [fieldRequiredValidator];
     this.password = this.querySelector(".account-login__password");
     this.password.validators = [fieldRequiredValidator];
     this.loginButton = this.querySelector(".account-login__button");
@@ -37,17 +37,17 @@ export class AccountLoginPage extends BaseElement {
   }
 
   async login() {
-    if (!this.email.valid || !this.password.valid) return;
+    if (!this.username.valid || !this.password.valid) return;
     try {
       this.error.textContent = "";
       this.loginButton.disabled = true;
-      const response = await accountApi.login(this.email.value, this.password.value);
+      const response = await accountApi.login(this.username.value, this.password.value);
       if (response.ok) {
         window.history.pushState("", "", "/welcome");
       } else if (response.status === 403) {
         this.error.textContent = "This account has been disabled.";
       } else {
-        this.error.textContent = "Email or password is incorrect.";
+        this.error.textContent = "Username or password is incorrect.";
       }
     } catch (error) {
       this.error.textContent = "Couldn't log in — try again.";

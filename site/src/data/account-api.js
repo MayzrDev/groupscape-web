@@ -71,8 +71,8 @@ class AccountApi {
     return true;
   }
 
-  get emailUrl() {
-    return `${this.baseUrl}/email`;
+  get usernameUrl() {
+    return `${this.baseUrl}/username`;
   }
 
   get passwordUrl() {
@@ -113,9 +113,9 @@ class AccountApi {
     return response;
   }
 
-  async register(email, password) {
+  async register(username, password) {
     const response = await fetch(this.registerUrl, {
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
@@ -129,9 +129,9 @@ class AccountApi {
     return response;
   }
 
-  async login(email, password) {
+  async login(username, password) {
     const response = await fetch(this.loginUrl, {
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
     });
@@ -194,9 +194,9 @@ class AccountApi {
     return this.authedFetch(this.apiKeyUrl, { method: "POST" });
   }
 
-  async updateEmail(email) {
-    return this.authedFetch(this.emailUrl, {
-      body: JSON.stringify({ email }),
+  async updateUsername(username) {
+    return this.authedFetch(this.usernameUrl, {
+      body: JSON.stringify({ username }),
       headers: { "Content-Type": "application/json" },
       method: "PUT",
     });
