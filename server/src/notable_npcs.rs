@@ -63,6 +63,8 @@ static NOTABLE_NPCS: LazyLock<HashSet<String>> = LazyLock::new(|| {
         "The Hueycoatl",
         "Yama",
         "Araxxor",
+        "Eldric the Ice King",
+        "Verak Lith",
         // Major quest bosses.
         "Delrith",
         "Elvarg",

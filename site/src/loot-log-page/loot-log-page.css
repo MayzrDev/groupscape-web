@@ -64,19 +64,73 @@ loot-log-page {
   color: var(--green);
 }
 
-.loot-log-page__toolbar {
+.loot-log-page__toolbar-primary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.loot-log-page__field {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
 }
 
-.loot-log-page__toolbar-label {
-  font-size: 0.7em;
-  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
-  opacity: 0.7;
-  margin-right: -2px;
+.loot-log-page__field-label {
+  font-size: 0.62em;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: none;
+  opacity: 0.65;
+  white-space: nowrap;
+}
+
+.loot-log-page__field select {
+  font-size: 0.86em;
+  padding: 0;
+}
+
+.loot-log-page__toolbar-secondary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--light-border);
+}
+
+.loot-log-page__mini-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72em;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  text-shadow: none;
+  opacity: 0.75;
+}
+
+.loot-log-page__mini-field select {
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-bottom: 1px solid var(--light-border);
+  font-family: ui-sans-serif, Arial, sans-serif;
+  text-shadow: none;
+  font-size: 1em;
+  padding: 0 0 1px;
+}
+
+.loot-log-page__mini-field select:hover {
+  color: var(--primary-text);
+  opacity: 1;
 }
 
 .loot-log-page__list {

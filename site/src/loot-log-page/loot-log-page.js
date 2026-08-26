@@ -22,12 +22,10 @@ export class LootLogPage extends BaseElement {
     this.rows = [];
     this.split = null;
     this.members = [];
-    this.sessions = [];
     this.bosses = [];
     this.selectedMember = "";
-    this.selectedSession = null;
     this.selectedBoss = "";
-    this.timeWindow = "session";
+    this.timeWindow = "1h";
     this.splitMode = "reported";
     this.sort = "value";
   }
@@ -41,7 +39,6 @@ export class LootLogPage extends BaseElement {
     this.render();
 
     this.splitContainer = this.querySelector(".loot-log-page__split");
-    this.sessionSelect = this.querySelector(".loot-log-page__session-select");
     this.timeSelect = this.querySelector(".loot-log-page__time-select");
     this.customSince = this.querySelector(".loot-log-page__custom-since");
     this.customUntil = this.querySelector(".loot-log-page__custom-until");
@@ -61,11 +58,6 @@ export class LootLogPage extends BaseElement {
     this.eventListener(this.memberSelect, "change", () => {
       this.selectedMember = this.memberSelect.value;
       this.fetchLootSummary();
-    });
-    this.eventListener(this.sessionSelect, "change", () => {
-      this.selectedSession = this.sessionSelect.value ? Number(this.sessionSelect.value) : null;
-      this.selectedBoss = "";
-      this.fetchLoot();
     });
     this.eventListener(this.timeSelect, "change", () => {
       this.timeWindow = this.timeSelect.value;
@@ -89,10 +81,11 @@ export class LootLogPage extends BaseElement {
       this.fetchLootSummary();
     });
 
-    Promise.all([api.getLootBosses(), this.loadSessions()]).then(([bosses]) => {
+    Promise.all([api.getLootBosses()]).then(([bosses]) => {
       this.bosses = bosses;
       this.renderBossOptions();
     });
+    this.fetchLoot();
     this.refreshInterval = utility.callOnInterval(
       () => {
         this.fetchLoot();
@@ -102,31 +95,13 @@ export class LootLogPage extends BaseElement {
     );
   }
 
-  async loadSessions() {
-    this.sessions = await api.getSessions();
-    const [latest] = this.sessions;
-    this.selectedSession = latest?.id || null;
-    this.sessionSelect.innerHTML = `${this.sessions
-      .map((session) => `<option value="${session.id}">${this.sessionLabel(session)}</option>`)
-      .join("")}<option value="">All sessions</option>`;
-    if (this.selectedSession) this.sessionSelect.value = String(this.selectedSession);
-    await this.fetchLoot();
-  }
-
-  sessionLabel(session) {
-    const start = new Date(session.started_at).toLocaleString();
-    const end = session.ended_at ? new Date(session.ended_at).toLocaleTimeString() : "Current";
-    return `${start} - ${end}`;
-  }
-
   getScope() {
     const scope = {
       memberName: this.selectedMember || undefined,
-      sessionId: this.selectedSession || undefined,
       boss: this.selectedBoss || undefined,
       splitMode: this.splitMode,
     };
-    if (this.timeWindow !== "session" && this.timeWindow !== "all") {
+    if (this.timeWindow !== "all") {
       if (this.timeWindow === "custom") {
         if (this.customSince.value) scope.since = new Date(`${this.customSince.value}T00:00:00`).toISOString();
         if (this.customUntil.value) scope.until = new Date(`${this.customUntil.value}T23:59:59.999`).toISOString();

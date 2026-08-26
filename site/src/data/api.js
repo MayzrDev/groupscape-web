@@ -111,10 +111,6 @@ class Api {
     return `${this.baseUrl}/group/${this.groupName}/get-loot-split`;
   }
 
-  get sessionsUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-sessions`;
-  }
-
   get lootBossesUrl() {
     return `${this.baseUrl}/group/${this.groupName}/get-loot-bosses`;
   }
@@ -467,14 +463,6 @@ class Api {
     if (!response.ok) {
       return null;
     }
-    return response.json();
-  }
-
-  async getSessions() {
-    const response = await fetch(`${this.sessionsUrl}?limit=200`, {
-      headers: { Authorization: this.groupToken },
-    });
-    if (!response.ok) return [];
     return response.json();
   }
 

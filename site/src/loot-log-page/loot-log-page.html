@@ -1,16 +1,11 @@
 <div class="rsborder rsbackground loot-log-page__container">
   <div class="loot-log-page__split"></div>
-  <div class="loot-log-page__toolbar">
-    <label class="loot-log-page__toolbar-label">Session</label>
-    <div class="select-container">
-      <select class="loot-log-page__session-select"></select>
-    </div>
-    <label class="loot-log-page__toolbar-label">Window</label>
-    <div class="select-container">
+  <div class="loot-log-page__toolbar-primary">
+    <div class="loot-log-page__field">
+      <label class="loot-log-page__field-label">Window</label>
       <select class="loot-log-page__time-select">
-        <option value="session">Selected session</option>
         <option value="30m">Last 30 minutes</option>
-        <option value="1h">Last hour</option>
+        <option value="1h" selected>Last hour</option>
         <option value="2h">Last 2 hours</option>
         <option value="4h">Last 4 hours</option>
         <option value="12h">Last 12 hours</option>
@@ -23,23 +18,25 @@
     </div>
     <input class="loot-log-page__custom-since" type="date" hidden>
     <input class="loot-log-page__custom-until" type="date" hidden>
-    <label class="loot-log-page__toolbar-label">Boss</label>
-    <div class="select-container">
+    <div class="loot-log-page__field">
+      <label class="loot-log-page__field-label">Boss</label>
       <select class="loot-log-page__boss-select"><option value="">All bosses</option></select>
     </div>
-    <label class="loot-log-page__toolbar-label">Member</label>
-    <div class="select-container">
+    <div class="loot-log-page__field">
+      <label class="loot-log-page__field-label">Member</label>
       <select class="loot-log-page__member-select"></select>
     </div>
-    <label class="loot-log-page__toolbar-label">Sort</label>
-    <div class="select-container">
+  </div>
+  <div class="loot-log-page__toolbar-secondary">
+    <div class="loot-log-page__mini-field">
+      <span>Sort</span>
       <select class="loot-log-page__sort-select">
-        <option value="value">By value</option>
-        <option value="rarity">By rarity</option>
+        <option value="value">Value</option>
+        <option value="rarity">Rarity</option>
       </select>
     </div>
-    <label class="loot-log-page__toolbar-label">Accounting</label>
-    <div class="select-container">
+    <div class="loot-log-page__mini-field">
+      <span>Accounting</span>
       <select class="loot-log-page__split-mode-select">
         <option value="reported">Reported loot</option>
         <option value="proximity">Proximity split</option>
