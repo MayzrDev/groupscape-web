@@ -120,7 +120,7 @@ pub struct GroupCredentials {
     pub token: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct GroupMember {
     #[serde(skip)]
     pub group_id: Option<i64>,

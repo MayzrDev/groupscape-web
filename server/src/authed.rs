@@ -18,6 +18,7 @@ use crate::models::{
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
 use crate::push;
+use crate::update_batcher;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{
@@ -677,10 +678,20 @@ pub async fn update_group_member(
     // the batched DB writer - the batcher trades latency for write
     // efficiency, but the overlay wants these updates as fast as possible.
     if broadcast_registry.has_subscribers(auth.group_id) {
+        // `group_member_inner` only carries the fields this particular heartbeat changed (the
+        // plugin's DataState diffing skips unchanged ones), so target/spec/active-prayers are
+        // routinely absent even while the member is alive and in combat. Broadcasting it as-is
+        // would flash those fields to blank on every heartbeat that doesn't happen to touch
+        // them. Merge onto the last persisted row first so the wire payload reflects full known
+        // state, same as the `roster_snapshot` sent on connect.
+        let previous = db::get_group_member(&client, auth.group_id, &group_member_inner.name).await?;
+        let mut merged_for_broadcast = previous.unwrap_or_else(|| group_member_inner.clone());
+        update_batcher::merge_group_member(&mut merged_for_broadcast, &group_member_inner);
+
         let envelope = WsEnvelope::VitalsUpdate {
             payload: VitalsUpdatePayload {
                 name: group_member_inner.name.clone(),
-                vitals: websocket::to_wire_vitals(&group_member_inner),
+                vitals: websocket::to_wire_vitals(&merged_for_broadcast),
             },
             ts: Utc::now(),
         };

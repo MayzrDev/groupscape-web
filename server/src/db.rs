@@ -791,6 +791,79 @@ WHERE group_id=$2
     Ok(result)
 }
 
+/// Fetches one member's currently persisted full row (unlike `get_group_data`, no
+/// timestamp gating - every column comes back as its actual stored value). Used to merge
+/// a just-received partial heartbeat onto the last known state before broadcasting a
+/// `vitals_update`, so fields the plugin only sends on change (target, spec energy, active
+/// prayers) don't flicker to blank on every heartbeat that doesn't happen to touch them.
+pub async fn get_group_member(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<Option<GroupMember>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT color,
+GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
+quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
+rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
+collection_log_last_update, potion_storage_last_update, special_attack_last_update,
+active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update) as last_updated,
+stats, coordinates, skills, quests, inventory, equipment, bank, rune_pouch, interacting,
+seed_vault, diary_vars, collection_log, potion_storage, special_attack, active_prayers,
+rich_presence, combat_achievements
+FROM groupscape.members
+WHERE group_id=$1 AND member_name=$2
+"#,
+        )
+        .await?;
+
+    let row = client
+        .query_opt(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::GetGroupDataError)?;
+
+    let row = match row {
+        Some(row) => row,
+        None => return Ok(None),
+    };
+
+    let last_updated: Option<DateTime<Utc>> = row.try_get("last_updated").ok();
+    Ok(Some(GroupMember {
+        group_id: Some(group_id),
+        name: member_name.to_string(),
+        account_hash: None,
+        color: row.try_get("color").ok(),
+        last_updated,
+        stats: row.try_get("stats").ok(),
+        coordinates: row.try_get("coordinates").ok(),
+        skills: row.try_get("skills").ok(),
+        quests: row.try_get("quests")?,
+        inventory: row.try_get("inventory").ok(),
+        equipment: row.try_get("equipment").ok(),
+        bank: row.try_get("bank").ok(),
+        rune_pouch: row.try_get("rune_pouch").ok(),
+        seed_vault: row.try_get("seed_vault").ok(),
+        interacting: try_deserialize_json_column(&row, "interacting")?,
+        diary_vars: row.try_get("diary_vars").ok(),
+        shared_bank: Option::None,
+        deposited: Option::None,
+        collection_log_v2: row.try_get("collection_log").ok(),
+        potion_storage: row.try_get("potion_storage").ok(),
+        special_attack: row.try_get("special_attack").ok(),
+        active_prayers: row.try_get("active_prayers").ok(),
+        rich_presence: row.try_get("rich_presence").ok(),
+        events: None,
+        interactions: None,
+        object_interactions: None,
+        alerts: None,
+        notable_drops: None,
+        combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+        portrait_last_update: None,
+    }))
+}
+
 /// Assigns each non-shared group member a stable display color by join order
 /// (member_id ascending), matching groupscape-old's join-order palette so the
 /// overlay's ownership stripe stays consistent across sessions.

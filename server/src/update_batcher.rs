@@ -225,7 +225,7 @@ fn merge_deposited(older: &[i32], newer: &[i32]) -> Vec<i32> {
     result
 }
 
-fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
+pub(crate) fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.stats.is_some() {
         older.stats = newer.stats.clone();
     }
