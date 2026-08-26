@@ -1,7 +1,7 @@
 use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
-use crate::models::GroupMember;
+use crate::models::{GroupMember, SHARED_MEMBER};
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
@@ -243,6 +243,7 @@ pub async fn party_overlay_ws(
 
     let roster: Vec<RosterMemberEntry> = members
         .iter()
+        .filter(|member| member.name != SHARED_MEMBER)
         .map(|member| RosterMemberEntry {
             name: member.name.clone(),
             // Prefer the admin-assigned helmet colour (`members.color`) over the join-order
