@@ -13,6 +13,10 @@ toast-stack {
   gap: 8px;
 }
 
+.toast-stack__clear[hidden] {
+  display: none;
+}
+
 .toast-stack__clear {
   display: flex;
   align-items: center;
