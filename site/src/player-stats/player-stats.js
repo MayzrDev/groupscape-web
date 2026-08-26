@@ -61,7 +61,7 @@ export class PlayerStats extends BaseElement {
 
   handleWentActive(_, member) {
     this.world = undefined;
-    this.updateWorld(member.stats.world, false);
+    this.updateWorld(member.stats?.world, false);
   }
 
   updateWorld(world, isInactive, lastUpdated) {
