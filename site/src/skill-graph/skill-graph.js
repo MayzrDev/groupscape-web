@@ -486,8 +486,8 @@ export class SkillGraph extends BaseElement {
         type: "line",
         label: playerSkillData.name,
         data: cumulativeChangeData,
-        borderColor: member.color,
-        backgroundColor: hslToHsla(member.color, 0.12),
+        borderColor: `hsl(${member.hue}, 70%, 45%)`,
+        backgroundColor: `hsla(${member.hue}, 70%, 45%, 0.12)`,
         fill: true,
         tension: 0.3,
         pointBorderWidth: 0,
@@ -508,7 +508,7 @@ export class SkillGraph extends BaseElement {
     const result = [];
     for (const playerMetricData of this.metricDataForGroup || []) {
       const member = this.currentGroupData.members.get(playerMetricData.name);
-      const color = member ? member.color : "hsl(0, 0%, 60%)";
+      const color = member ? `hsl(${member.hue}, 70%, 45%)` : "hsl(0, 0%, 60%)";
       const series = playerMetricData.metric_data || [];
       const currentValue = series.length ? series[series.length - 1].value : 0;
       const completeTimeSeries = this.generateCompleteTimeSeries(series, currentValue, (dataPoint) => dataPoint.value);
