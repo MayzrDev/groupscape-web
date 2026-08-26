@@ -1027,7 +1027,7 @@ pub async fn get_skills_for_period(
 SELECT member_name, time, s.skills
 FROM groupscape.skills_{} s
 INNER JOIN groupscape.members m ON m.member_id=s.member_id
-WHERE m.group_id=$1
+WHERE m.group_id=$1 AND m.member_name != $2
 "#,
         match period {
             AggregatePeriod::Day => "day",
@@ -1037,7 +1037,7 @@ WHERE m.group_id=$1
     );
     let get_skills_stmt = client.prepare_cached(&s).await?;
     let rows = client
-        .query(&get_skills_stmt, &[&group_id])
+        .query(&get_skills_stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(ApiError::GetSkillsDataError)?;
 
@@ -4711,12 +4711,12 @@ pub async fn get_xp_leaderboard(
     use crate::leaderboard::LeaderboardWindow;
 
     let live_sql = format!(
-        "SELECT member_name, {} AS xp FROM groupscape.members WHERE group_id=$1",
+        "SELECT member_name, {} AS xp FROM groupscape.members WHERE group_id=$1 AND member_name != $2",
         xp_read_expr("skills", skill)
     );
     let live_stmt = client.prepare_cached(&live_sql).await?;
     let live_rows = client
-        .query(&live_stmt, &[&group_id])
+        .query(&live_stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
     let mut live: HashMap<String, i64> = HashMap::new();
@@ -4813,10 +4813,12 @@ ORDER BY occurred_at DESC
 /// omitted outright.
 async fn list_member_names(client: &Client, group_id: i64) -> Result<Vec<String>, ApiError> {
     let stmt = client
-        .prepare_cached("SELECT member_name FROM groupscape.members WHERE group_id=$1")
+        .prepare_cached(
+            "SELECT member_name FROM groupscape.members WHERE group_id=$1 AND member_name != $2",
+        )
         .await?;
     let rows = client
-        .query(&stmt, &[&group_id])
+        .query(&stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
     rows.iter()
@@ -4954,11 +4956,11 @@ pub async fn get_gp_earned_leaderboard(
 
     let live_stmt = client
         .prepare_cached(
-            "SELECT member_name, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank FROM groupscape.members WHERE group_id=$1",
+            "SELECT member_name, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank FROM groupscape.members WHERE group_id=$1 AND member_name != $2",
         )
         .await?;
     let live_rows = client
-        .query(&live_stmt, &[&group_id])
+        .query(&live_stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
     let mut live: HashMap<String, i64> = HashMap::new();
@@ -5144,7 +5146,7 @@ pub async fn get_bank_value_for_period(
 SELECT member_name, time, b.bank_value
 FROM groupscape.bank_value_{} b
 INNER JOIN groupscape.members m ON m.member_id=b.member_id
-WHERE m.group_id=$1
+WHERE m.group_id=$1 AND m.member_name != $2
 "#,
         match period {
             AggregatePeriod::Day => "day",
@@ -5154,7 +5156,7 @@ WHERE m.group_id=$1
     );
     let stmt = client.prepare_cached(&s).await?;
     let rows = client
-        .query(&stmt, &[&group_id])
+        .query(&stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(ApiError::GetLeaderboardSnapshotsError)?;
 

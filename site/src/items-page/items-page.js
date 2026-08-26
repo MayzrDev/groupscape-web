@@ -22,6 +22,7 @@ export class ItemsPage extends BaseElement {
 
     let playerOptions = `<option value="@ALL">All Players</option>`;
     for (const member of members) {
+      if (member.name === "@SHARED") continue;
       playerOptions += `<option value="${member.name}" ${member.name === selected ? "selected" : ""}>${
         member.name
       }</option>`;

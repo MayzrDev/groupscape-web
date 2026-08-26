@@ -163,6 +163,7 @@ export class SkillsGraphs extends BaseElement {
   }
 
   renderLeaderboard(entries) {
+    entries = entries.filter((entry) => entry.member_name !== "@SHARED");
     this.leaderboardList.innerHTML = "";
     this.leaderboardEmpty.textContent = "No data for this window yet.";
     this.leaderboardEmpty.classList.toggle("skills-graphs__leaderboard-empty--visible", entries.length === 0);
