@@ -257,6 +257,61 @@ characters-page {
   margin-bottom: 0.3em;
 }
 
+/* ---- add-a-character panel ---- */
+
+.characters-page__apikey-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 12px;
+}
+
+.characters-page__apikey-value {
+  flex: 1;
+  color: var(--orange);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.characters-page__apikey-reveal-hint {
+  font-size: 0.8em;
+  opacity: 0.65;
+  margin: 8px 0 0;
+}
+
+.characters-page__waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--elevated);
+  border: 1px dashed var(--light-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  margin-top: 1em;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+.characters-page__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--light-border);
+  border-top-color: var(--orange);
+  animation: characters-page-spin 0.8s linear infinite;
+  flex: none;
+}
+
+@keyframes characters-page-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---- summary view ---- */
 
 .characters-page__summary-stats {

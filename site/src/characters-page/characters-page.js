@@ -4,6 +4,8 @@ import { accountStorage } from "../data/account-storage";
 import { storage } from "../data/storage";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 
+const ADD_POLL_INTERVAL_MS = 5000;
+
 function escapeHtml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -61,6 +63,7 @@ export class CharactersPage extends BaseElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    this.stopAddPolling();
   }
 
   async checkSession() {
@@ -86,6 +89,16 @@ export class CharactersPage extends BaseElement {
       this.status.textContent = "";
       this.error.textContent = "";
       this.layout.hidden = false;
+
+      // While the "add" panel is up and polling, a newly-reported character jumps straight to
+      // its own detail (mirrors onboarding's auto-advance) instead of leaving the user staring
+      // at the same static instructions after the plugin has already done its part.
+      const newlyPending = this.pending[0];
+      if (this.selection.type === "add" && newlyPending) {
+        this.stopAddPolling();
+        this.selectCharacter(String(newlyPending.id));
+        return;
+      }
 
       // Selecting a character that no longer exists (unlinked/removed/confirmed-and-gone) falls
       // back to the summary rather than rendering a detail panel for nothing.
@@ -118,12 +131,14 @@ export class CharactersPage extends BaseElement {
   }
 
   selectSummary() {
+    this.stopAddPolling();
     this.selection = { type: "summary" };
     this.renderDetail();
     this.updateActiveSidebarItem();
   }
 
   selectCharacter(characterId) {
+    this.stopAddPolling();
     this.selection = { type: "character", id: characterId };
     this.renderDetail();
     this.updateActiveSidebarItem();
@@ -133,6 +148,19 @@ export class CharactersPage extends BaseElement {
     this.selection = { type: "add" };
     this.renderDetail();
     this.updateActiveSidebarItem();
+    this.startAddPolling();
+  }
+
+  startAddPolling() {
+    this.stopAddPolling();
+    this.addPollHandle = setInterval(() => this.fetchCharacters(), ADD_POLL_INTERVAL_MS);
+  }
+
+  stopAddPolling() {
+    if (this.addPollHandle) {
+      clearInterval(this.addPollHandle);
+      this.addPollHandle = null;
+    }
   }
 
   updateActiveSidebarItem() {
@@ -199,6 +227,11 @@ export class CharactersPage extends BaseElement {
   renderDetail() {
     if (this.selection.type === "add") {
       this.detail.innerHTML = this.addDetail();
+      this.apikeyBox = this.detail.querySelector(".characters-page__apikey-box");
+      this.apikeyValue = this.detail.querySelector(".characters-page__apikey-value");
+      this.apikeyRevealHint = this.detail.querySelector(".characters-page__apikey-reveal-hint");
+      this.apikeyError = this.detail.querySelector(".characters-page__key-error");
+      this.renderApiKeyBox();
       return;
     }
 
@@ -380,13 +413,59 @@ export class CharactersPage extends BaseElement {
       <div class="characters-page__detail-head">
         <h2>Add a character</h2>
       </div>
-      <p>Characters are reported to GroupScape by the RuneLite plugin — there's no code to type in.</p>
+      <p class="characters-page__detail-sub">
+        Paste this key into the RuneLite plugin so it can report your character.
+      </p>
+      <div class="characters-page__apikey-box" hidden>
+        <code class="characters-page__apikey-value"></code>
+        <button class="men-button small" data-action="copy-key" type="button">Copy</button>
+      </div>
+      <p class="characters-page__apikey-reveal-hint" hidden>
+        This invalidates any key you generated before — you'll need to re-paste it into the plugin.
+      </p>
       <ol class="characters-page__instructions-list">
-        <li>Open the GroupScape panel in RuneLite's sidebar.</li>
-        <li>Click <strong>Link this character</strong> — it opens this site to confirm.</li>
-        <li>Confirm the link, then come back here and refresh.</li>
+        <li>Install the GroupScape plugin from the RuneLite Plugin Hub.</li>
+        <li>Open its settings and paste your key above.</li>
+        <li>Log into RuneScape — this page updates automatically.</li>
       </ol>
+      <div class="characters-page__waiting">
+        <span class="characters-page__spinner"></span> Waiting for your character to check in&hellip;
+      </div>
+      <div class="characters-page__key-error validation-error"></div>
     `;
+  }
+
+  renderApiKeyBox() {
+    const freshApiKey = sessionStorage.getItem("freshApiKey");
+    if (freshApiKey) {
+      this.apikeyBox.hidden = false;
+      this.apikeyValue.textContent = freshApiKey;
+      this.apikeyRevealHint.hidden = false;
+    } else {
+      this.apikeyBox.hidden = true;
+      this.apikeyRevealHint.hidden = true;
+      this.fetchApiKey();
+    }
+  }
+
+  async copyApiKey() {
+    await navigator.clipboard.writeText(this.apikeyValue.textContent);
+  }
+
+  async fetchApiKey() {
+    this.apikeyError.textContent = "";
+    try {
+      const response = await accountApi.regenerateApiKey();
+      if (response.ok) {
+        const { api_key } = await response.json();
+        sessionStorage.setItem("freshApiKey", api_key);
+        this.renderApiKeyBox();
+      } else {
+        this.apikeyError.textContent = "Couldn't generate your API key — try again.";
+      }
+    } catch (error) {
+      this.apikeyError.textContent = "Couldn't generate your API key — try again.";
+    }
   }
 
   handleSidebarClick(event) {
@@ -408,6 +487,9 @@ export class CharactersPage extends BaseElement {
     switch (action) {
       case "add":
         this.selectAdd();
+        break;
+      case "copy-key":
+        this.copyApiKey();
         break;
       case "confirm":
         this.confirmCharacter(characterId);
