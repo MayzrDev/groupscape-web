@@ -14,6 +14,7 @@ RUN apt-get update
 RUN apt-get install -y openssl ca-certificates
 RUN rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/server ./
+COPY --from=builder /app/target/release/seed ./
 COPY ./docker-entrypoint.sh ./
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

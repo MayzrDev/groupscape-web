@@ -31,6 +31,9 @@ pub enum ApiError {
     #[from(ignore)]
     GetBlockedMembersError(tokio_postgres::error::Error),
     MemberBlockedError,
+    DemoGroupReadOnlyError,
+    #[from(ignore)]
+    SeedError(String),
     #[from(ignore)]
     RerollGroupTokenError(tokio_postgres::error::Error),
     #[from(ignore)]
@@ -195,6 +198,13 @@ impl ResponseError for ApiError {
             }
             ApiError::MemberBlockedError => {
                 HttpResponse::Forbidden().body("This player has been blocked from the group")
+            }
+            ApiError::DemoGroupReadOnlyError => {
+                HttpResponse::Forbidden().body("The demo group is read-only")
+            }
+            ApiError::SeedError(ref message) => {
+                log::error!("SeedError: {}", message);
+                HttpResponse::InternalServerError().finish()
             }
             ApiError::RerollGroupTokenError(ref err) => {
                 handle_pg_error(err, "RerollGroupTokenError")

@@ -111,6 +111,21 @@ async fn main() -> std::io::Result<()> {
         }
     }
 
+    // Opt-in only: a fresh local/dev DB has no demo group until either this runs once or
+    // someone runs `cargo run --bin seed` manually. Production never sets this - the demo group
+    // there is kept fresh by the dedicated reset sidecar (see docker-compose.prod.yml) instead.
+    if std::env::var("AUTO_SEED_DEMO_DATA").is_ok_and(|value| value == "true") {
+        if let Err(err) = server::demo_seed::run(&mut client, false).await {
+            log::warn!("AUTO_SEED_DEMO_DATA seed failed: {}", err);
+        }
+    }
+    {
+        let demo_group_id = db::get_group_id_by_name(&client, server::demo::DEMO_GROUP_NAME)
+            .await
+            .unwrap_or(None);
+        server::demo::init(demo_group_id);
+    }
+
     unauthed::start_ge_updater();
     unauthed::start_skills_aggregator(pool.clone());
     unauthed::start_session_idle_closer(pool.clone());

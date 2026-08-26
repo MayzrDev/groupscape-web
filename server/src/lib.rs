@@ -9,6 +9,8 @@ pub mod collection_log_content;
 pub mod config;
 pub mod crypto;
 pub mod db;
+pub mod demo;
+pub mod demo_seed;
 pub mod diary_tiers;
 pub mod discord;
 pub mod drop_rates;

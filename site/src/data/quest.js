@@ -102,20 +102,4 @@ export class Quest {
 
     pubsub.publish("quest-data-loaded");
   }
-
-  static randomQuestStates() {
-    if (!Quest.questData) return;
-    const result = [];
-    const states = Object.keys(QuestState);
-    let amount = 0;
-    for (const questId of Object.keys(Quest.questData)) {
-      amount = Math.max(parseInt(questId), amount);
-    }
-
-    for (let i = 0; i < amount; ++i) {
-      result.push(Math.floor(Math.random() * states.length));
-    }
-
-    return result;
-  }
 }

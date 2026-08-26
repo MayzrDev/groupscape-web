@@ -34,6 +34,32 @@ services:
     networks:
       - groupscape-web
 
+  groupscape-web-demo-reset:
+    image: groupscape-web-backend:latest
+    container_name: groupscape-web-demo-reset
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    environment:
+      PG_USER: ${PG_USER:-postgres}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_HOST: groupscape-web-db
+      PG_PORT: 5432
+      PG_DB: ${PG_DB:-groupscape_db}
+      BACKEND_SECRET: ${BACKEND_SECRET}
+    # Re-seeds the public "@EXAMPLE" demo group on a loop, so it never visibly goes stale and
+    # any write that somehow slipped past the read-only gate gets reset. Deliberately never
+    # passes --include-admin-data - that data is dev/QA-only (see seed.rs) and must never exist
+    # in production.
+    entrypoint: ["/app/docker-entrypoint.sh"]
+    command: ["sh", "-c", "while true; do /app/seed; sleep ${DEMO_RESET_INTERVAL_SECONDS:-21600}; done"]
+    restart: unless-stopped
+    depends_on:
+      groupscape-web-db:
+        condition: service_healthy
+    networks:
+      - groupscape-web
+
   groupscape-web-frontend:
     image: groupscape-web-frontend:latest
     container_name: groupscape-web-frontend

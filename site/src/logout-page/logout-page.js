@@ -1,7 +1,6 @@
 import { BaseElement } from "../base-element/base-element";
 import { storage } from "../data/storage";
 import { api } from "../data/api";
-import { exampleData } from "../data/example-data";
 import { accountStorage } from "../data/account-storage";
 
 export class LogoutPage extends BaseElement {
@@ -15,7 +14,6 @@ export class LogoutPage extends BaseElement {
 
   connectedCallback() {
     super.connectedCallback();
-    exampleData.disable();
     api.disable();
     storage.clearGroup();
     accountStorage.clearAccountToken();

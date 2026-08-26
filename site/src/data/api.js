@@ -1,14 +1,12 @@
 import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { groupData } from "./group-data";
-import { exampleData } from "./example-data";
 import { accountStorage } from "./account-storage";
 
 class Api {
   constructor() {
     this.baseUrl = "/api";
     this.createGroupUrl = `${this.baseUrl}/create-group`;
-    this.exampleDataEnabled = false;
     this.enabled = false;
   }
 
@@ -169,29 +167,23 @@ class Api {
   async getGroupData() {
     const nextCheck = this.nextCheck;
 
-    if (this.exampleDataEnabled) {
-      const newGroupData = exampleData.getGroupData();
-      groupData.update(newGroupData);
-      pubsub.publish("get-group-data", groupData);
-    } else {
-      const response = await fetch(`${this.getGroupDataUrl}?from_time=${nextCheck}`, {
-        headers: {
-          Authorization: this.groupToken,
-        },
-      });
-      if (!response.ok) {
-        if (response.status === 401) {
-          await this.disable();
-          window.history.pushState("", "", "/");
-          pubsub.publish("get-group-data");
-        }
-        return;
+    const response = await fetch(`${this.getGroupDataUrl}?from_time=${nextCheck}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      if (response.status === 401) {
+        await this.disable();
+        window.history.pushState("", "", "/");
+        pubsub.publish("get-group-data");
       }
-
-      const newGroupData = await response.json();
-      this.nextCheck = groupData.update(newGroupData).toISOString();
-      pubsub.publish("get-group-data", groupData);
+      return;
     }
+
+    const newGroupData = await response.json();
+    this.nextCheck = groupData.update(newGroupData).toISOString();
+    pubsub.publish("get-group-data", groupData);
   }
 
   async createGroup(groupName, memberNames, captchaResponse) {
@@ -374,20 +366,15 @@ class Api {
   }
 
   async getSkillData(period) {
-    if (this.exampleDataEnabled) {
-      const skillData = exampleData.getSkillData(period, groupData);
-      return skillData;
-    } else {
-      const response = await fetch(`${this.skillDataUrl}?period=${period}`, {
-        headers: {
-          Authorization: this.groupToken,
-        },
-      });
-      if (!response.ok) {
-        return [];
-      }
-      return response.json();
+    const response = await fetch(`${this.skillDataUrl}?period=${period}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return [];
     }
+    return response.json();
   }
 
   async getLeaderboard(metric, window, boss, skill) {
@@ -406,21 +393,17 @@ class Api {
   }
 
   async getMetricData(metric, period, boss) {
-    if (this.exampleDataEnabled) {
-      return exampleData.getMetricData(metric, period, groupData, boss);
-    } else {
-      const query = new URLSearchParams({ metric, period });
-      if (boss) query.set("boss", boss);
-      const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
-        headers: {
-          Authorization: this.groupToken,
-        },
-      });
-      if (!response.ok) {
-        return [];
-      }
-      return response.json();
+    const query = new URLSearchParams({ metric, period });
+    if (boss) query.set("boss", boss);
+    const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.groupToken,
+      },
+    });
+    if (!response.ok) {
+      return [];
     }
+    return response.json();
   }
 
   async getCaptchaEnabled() {

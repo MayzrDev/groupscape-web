@@ -35,6 +35,7 @@ pub async fn delete_group_member(
     group_member: web::Json<GroupMember>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
             HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
@@ -62,6 +63,7 @@ pub async fn block_group_member(
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
             HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
@@ -89,6 +91,7 @@ pub async fn unblock_group_member(
     group_member: web::Json<GroupMemberName>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(&req, &client, auth.group_id, PermissionKey::KickMembers).await?;
     db::unblock_group_member(&client, auth.group_id, &group_member.name).await?;
@@ -126,6 +129,7 @@ pub async fn rename_group(
     rename_group: web::Json<RenameGroup>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let new_name = rename_group.new_name.trim().to_string();
     if !valid_name(&new_name) {
         return Ok(HttpResponse::BadRequest().body("Provided group name is not valid"));
@@ -147,6 +151,7 @@ pub async fn reroll_group_token(
     path: web::Path<String>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let group_name = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(
@@ -169,6 +174,7 @@ pub async fn delete_group(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     db::admin_delete_group(&mut client, auth.group_id).await?;
@@ -246,6 +252,7 @@ pub async fn update_group_permissions(
     body: web::Json<UpdateGroupPermissionsRequest>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(
         &req,
@@ -274,6 +281,7 @@ pub async fn update_member_color(
     db_pool: web::Data<Pool>,
     broadcast_registry: web::Data<GroupBroadcastRegistry>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
     let body = body.into_inner();
@@ -323,6 +331,7 @@ pub async fn update_discord_settings(
     body: web::Json<DiscordWebhookSettings>,
     db_pool: web::Data<Pool>,
 ) -> Result<web::Json<DiscordWebhookSettings>, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageDiscord).await?;
 
@@ -347,6 +356,7 @@ pub async fn update_group_member(
     db_pool: web::Data<Pool>,
     config: web::Data<Config>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     if group_member.name.eq(SHARED_MEMBER) {
         return Ok(
             HttpResponse::BadRequest().body(format!("Member name {} not allowed", SHARED_MEMBER))
@@ -1183,6 +1193,7 @@ pub async fn update_portrait(
     body: web::Bytes,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    crate::demo::reject_if_demo(auth.group_id)?;
     let (_group_name, member_name) = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let member_id = db::get_member_id(&client, auth.group_id, &member_name).await?;

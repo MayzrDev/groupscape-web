@@ -260,23 +260,6 @@ DELETE FROM groupscape.skills_{} WHERE member_id=$1
     Ok(())
 }
 
-pub async fn delete_collection_log_data_for_member(
-    transaction: &Transaction<'_>,
-    member_id: i64,
-) -> Result<(), ApiError> {
-    let a = "DELETE FROM groupscape.collection_log WHERE member_id=$1";
-    let delete_collection_stmt = transaction.prepare_cached(a).await?;
-    transaction
-        .execute(&delete_collection_stmt, &[&member_id])
-        .await?;
-
-    let b = "DELETE FROM groupscape.collection_log_new WHERE member_id=$1";
-    let delete_new_stmt = transaction.prepare_cached(b).await?;
-    transaction.execute(&delete_new_stmt, &[&member_id]).await?;
-
-    Ok(())
-}
-
 pub async fn delete_bank_value_data_for_member(
     transaction: &Transaction<'_>,
     period: AggregatePeriod,
@@ -328,7 +311,6 @@ pub async fn delete_group_member(
     delete_skills_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
     delete_skills_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
     delete_skills_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
-    delete_collection_log_data_for_member(&transaction, member_id).await?;
     delete_bank_value_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
     delete_bank_value_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
     delete_bank_value_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
@@ -668,6 +650,23 @@ where
         }
         None => Ok(None),
     }
+}
+
+/// Looks up a group's id by name alone, with no token check - used at startup to resolve the
+/// seeded demo group's id for the read-only gate (see `crate::demo`), where there's no request
+/// token to check against.
+pub async fn get_group_id_by_name(
+    client: &Client,
+    group_name: &str,
+) -> Result<Option<i64>, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT group_id FROM groupscape.groups WHERE group_name=$1")
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_name])
+        .await
+        .map_err(ApiError::GetGroupError)?;
+    Ok(row.map(|row| row.try_get(0)).transpose()?)
 }
 
 pub async fn get_group(client: &Client, group_name: &str, token: &str) -> Result<i64, ApiError> {
@@ -4430,7 +4429,6 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
         delete_skills_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
         delete_skills_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
         delete_skills_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
-        delete_collection_log_data_for_member(&transaction, member_id).await?;
         delete_bank_value_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
         delete_bank_value_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
         delete_bank_value_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;

@@ -3,12 +3,10 @@ import { api } from "../src/data/api";
 import { pubsub } from "../src/data/pubsub";
 import { utility } from "../src/utility";
 import { groupData } from "../src/data/group-data";
-import { exampleData } from "../src/data/example-data";
 
 describe("api", () => {
   beforeEach(() => {
     api.enabled = false;
-    api.exampleDataEnabled = false;
     api.groupName = undefined;
     api.groupToken = undefined;
     api.getGroupInterval = undefined;
@@ -129,18 +127,6 @@ describe("api", () => {
     expect(result).toEqual([]);
     const [url] = globalThis.fetch.mock.calls[0];
     expect(url).not.toContain("boss=");
-  });
-
-  it("getMetricData uses example data when enabled", async () => {
-    api.exampleDataEnabled = true;
-    const payload = [{ name: "Example", metric_data: [] }];
-    vi.spyOn(exampleData, "getMetricData").mockReturnValue(payload);
-
-    const result = await api.getMetricData("loot_value", "Month", "");
-
-    expect(result).toBe(payload);
-    expect(exampleData.getMetricData).toHaveBeenCalledWith("loot_value", "Month", groupData, "");
-    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("getLootSummary builds the query string from provided filters and returns the parsed rows", async () => {
@@ -353,26 +339,6 @@ describe("api", () => {
 
     expect(disableSpy).not.toHaveBeenCalled();
     expect(publishSpy).not.toHaveBeenCalled();
-  });
-
-  it("uses example data path for group and skill data when enabled", async () => {
-    api.exampleDataEnabled = true;
-
-    const groupPayload = [{ name: "Example" }];
-    const skillPayload = [{ name: "Example", skill_data: [] }];
-    vi.spyOn(exampleData, "getGroupData").mockReturnValue(groupPayload);
-    vi.spyOn(exampleData, "getSkillData").mockReturnValue(skillPayload);
-    const updateSpy = vi.spyOn(groupData, "update").mockReturnValue(new Date("2026-03-30T00:00:01.000Z"));
-    const publishSpy = vi.spyOn(pubsub, "publish");
-
-    await api.getGroupData();
-    const skillData = await api.getSkillData("week");
-
-    expect(updateSpy).toHaveBeenCalledWith(groupPayload);
-    expect(publishSpy).toHaveBeenCalledWith("get-group-data", groupData);
-    expect(skillData).toBe(skillPayload);
-    expect(exampleData.getSkillData).toHaveBeenCalledWith("week", groupData);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
   it("sends expected request shapes for member and auth helper endpoints", async () => {
