@@ -373,6 +373,18 @@ deploy() {
   # startup (server/src/main.rs), so a failed migration surfaces as a failed
   # health check below, not here.
 
+  # The demo-reset sidecar (groupscape-web-demo-reset) only (re)seeds "@EXAMPLE" on its own
+  # 6h loop, so a cold DB or a sidecar that silently died leaves /demo 401ing indefinitely
+  # with nothing surfacing the failure. Run the seed synchronously once per deploy, using
+  # the same image/env as the sidecar, so every successful deploy guarantees the demo group
+  # exists — non-fatal to the overall deploy since the demo group isn't core functionality.
+  log_info "Seeding demo group (@EXAMPLE)..."
+  if docker compose "${COMPOSE_ARGS[@]}" run --rm --no-deps groupscape-web-demo-reset /app/seed 2>&1 | timestamp | tee -a "$DOCKER_LOG_FILE"; then
+    log_success "Demo group seed completed"
+  else
+    log_error "Demo group seed failed — /demo may 401 until this is fixed (deploy continues)"
+  fi
+
   # Recreate only the application containers with the new images. The DB keeps
   # running — no full teardown. The detached restarter is the safety net if this
   # process is killed mid-recreate.
