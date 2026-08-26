@@ -53,7 +53,7 @@ account-page {
   flex-shrink: 0;
 }
 
-.account-page__email-display {
+.account-page__username-display {
   font-size: 1.1em;
 }
 

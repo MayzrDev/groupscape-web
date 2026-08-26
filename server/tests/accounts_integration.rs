@@ -63,24 +63,24 @@ async fn setup(pool: &Pool) {
 }
 
 #[tokio::test]
-async fn test_create_and_find_account_by_email() {
+async fn test_create_and_find_account_by_username() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "player@example.com", &password_hash)
+    let account_id = db::create_account(&client, "player", &password_hash)
         .await
         .expect("failed to create account");
 
-    let account = db::get_account_by_email(&client, "player@example.com")
+    let account = db::get_account_by_username(&client, "player")
         .await
         .expect("query failed")
         .expect("account should exist");
 
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email.as_deref(), Some("player@example.com"));
+    assert_eq!(account.username.as_deref(), Some("player"));
     assert_eq!(
         account.password_hash.as_deref(),
         Some(password_hash.as_str())
@@ -89,40 +89,40 @@ async fn test_create_and_find_account_by_email() {
 }
 
 #[tokio::test]
-async fn test_duplicate_email_is_rejected() {
+async fn test_duplicate_username_is_rejected() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    db::create_account(&client, "dupe@example.com", &password_hash)
+    db::create_account(&client, "dupe", &password_hash)
         .await
         .expect("first registration should succeed");
 
-    let result = db::create_account(&client, "dupe@example.com", &password_hash).await;
-    assert!(matches!(result, Err(ApiError::EmailAlreadyRegisteredError)));
+    let result = db::create_account(&client, "dupe", &password_hash).await;
+    assert!(matches!(result, Err(ApiError::UsernameAlreadyRegisteredError)));
 }
 
 #[tokio::test]
-async fn test_email_uniqueness_is_case_insensitive() {
+async fn test_username_uniqueness_is_case_insensitive() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    db::create_account(&client, "Case@Example.com", &password_hash)
+    db::create_account(&client, "Case", &password_hash)
         .await
         .expect("first registration should succeed");
 
-    let result = db::create_account(&client, "case@example.com", &password_hash).await;
-    assert!(matches!(result, Err(ApiError::EmailAlreadyRegisteredError)));
+    let result = db::create_account(&client, "case", &password_hash).await;
+    assert!(matches!(result, Err(ApiError::UsernameAlreadyRegisteredError)));
 
-    let found = db::get_account_by_email(&client, "CASE@EXAMPLE.COM")
+    let found = db::get_account_by_username(&client, "CASE")
         .await
         .expect("query failed");
-    assert!(found.is_some(), "email lookup should be case-insensitive");
+    assert!(found.is_some(), "username lookup should be case-insensitive");
 }
 
 #[tokio::test]
@@ -133,7 +133,7 @@ async fn test_session_token_round_trip() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "session@example.com", &password_hash)
+    let account_id = db::create_account(&client, "session", &password_hash)
         .await
         .unwrap();
 
@@ -149,7 +149,7 @@ async fn test_session_token_round_trip() {
         .expect("query failed")
         .expect("session should resolve to the account");
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email.as_deref(), Some("session@example.com"));
+    assert_eq!(account.username.as_deref(), Some("session"));
 
     let wrong_hash = crypto::session_token_hash("not-the-real-token");
     let missing = db::get_account_by_session_token_hash(&client, &wrong_hash)
@@ -166,7 +166,7 @@ async fn test_expired_session_does_not_authenticate() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "expired@example.com", &password_hash)
+    let account_id = db::create_account(&client, "expired", &password_hash)
         .await
         .unwrap();
 
@@ -191,7 +191,7 @@ async fn test_disabled_account_session_does_not_authenticate() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "disabled@example.com", &password_hash)
+    let account_id = db::create_account(&client, "disabled", &password_hash)
         .await
         .unwrap();
     // The legacy `disabled` boolean is no longer read - `status` (set here via
@@ -234,7 +234,7 @@ async fn test_create_and_find_account_by_discord_id() {
         .expect("account should exist");
 
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email, None, "discord-only account has no email");
+    assert_eq!(account.username, None, "discord-only account has no username");
     assert_eq!(account.password_hash, None);
     assert!(!account.disabled);
 }
@@ -275,7 +275,7 @@ async fn test_link_character_creates_new_character() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "linker@example.com", &password_hash)
+    let account_id = db::create_account(&client, "linker", &password_hash)
         .await
         .unwrap();
 
@@ -320,7 +320,7 @@ async fn test_relinking_same_account_refreshes_display_rsn() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "refresher@example.com", &password_hash)
+    let account_id = db::create_account(&client, "refresher", &password_hash)
         .await
         .unwrap();
 
@@ -349,7 +349,7 @@ async fn test_update_character_display_rsn_sets_and_preserves_summary_stats() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "stats-refresher@example.com", &password_hash)
+    let account_id = db::create_account(&client, "stats-refresher", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-stats", "Zezima")
@@ -387,10 +387,10 @@ async fn test_account_hash_is_unique_across_accounts() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_a = db::create_account(&client, "a@example.com", &password_hash)
+    let account_a = db::create_account(&client, "a", &password_hash)
         .await
         .unwrap();
-    let account_b = db::create_account(&client, "b@example.com", &password_hash)
+    let account_b = db::create_account(&client, "b", &password_hash)
         .await
         .unwrap();
 
@@ -421,7 +421,7 @@ async fn test_character_cap_per_account() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "capped@example.com", &password_hash)
+    let account_id = db::create_account(&client, "capped", &password_hash)
         .await
         .unwrap();
 
@@ -445,7 +445,7 @@ async fn test_list_characters_for_account_orders_oldest_first() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "lister@example.com", &password_hash)
+    let account_id = db::create_account(&client, "lister", &password_hash)
         .await
         .unwrap();
 
@@ -474,10 +474,10 @@ async fn test_list_characters_for_account_excludes_other_accounts() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_a = db::create_account(&client, "lister-a@example.com", &password_hash)
+    let account_a = db::create_account(&client, "lister-a", &password_hash)
         .await
         .unwrap();
-    let account_b = db::create_account(&client, "lister-b@example.com", &password_hash)
+    let account_b = db::create_account(&client, "lister-b", &password_hash)
         .await
         .unwrap();
     db::create_character(&client, account_a, "hash-a", "Alt A")
@@ -503,7 +503,7 @@ async fn test_list_characters_for_account_reports_group_status() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "grouped-lister@example.com", &password_hash)
+    let account_id = db::create_account(&client, "grouped-lister", &password_hash)
         .await
         .unwrap();
     let grouped = db::create_character(&client, account_id, "hash-grouped", "Grouped")
@@ -536,7 +536,7 @@ async fn test_delete_character_removes_it() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "unlinker@example.com", &password_hash)
+    let account_id = db::create_account(&client, "unlinker", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-unlink-1", "Zezima")
@@ -561,7 +561,7 @@ async fn test_delete_character_cascades_group_link() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "unlinker-grouped@example.com", &password_hash)
+    let account_id = db::create_account(&client, "unlinker-grouped", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-unlink-2", "Zezima")
@@ -605,7 +605,7 @@ async fn test_discord_account_can_log_in_via_session_after_linking() {
         .expect("query failed")
         .expect("session should resolve to the discord account");
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email, None);
+    assert_eq!(account.username, None);
 }
 
 async fn create_test_group(client: &deadpool_postgres::Client, name: &str) -> i64 {
@@ -628,7 +628,7 @@ async fn test_link_character_to_group_creates_link() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "grouper@example.com", &password_hash)
+    let account_id = db::create_account(&client, "grouper", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-group-1", "Zezima")
@@ -666,7 +666,7 @@ async fn test_unlink_character_from_group_allows_rejoin_to_a_different_group() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "leaver@example.com", &password_hash)
+    let account_id = db::create_account(&client, "leaver", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-leaver", "Zezima")
@@ -710,10 +710,10 @@ async fn test_find_group_id_for_account_character_scopes_by_account_and_confirme
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let owner_id = db::create_account(&client, "resolver-owner@example.com", &password_hash)
+    let owner_id = db::create_account(&client, "resolver-owner", &password_hash)
         .await
         .unwrap();
-    let other_id = db::create_account(&client, "resolver-other@example.com", &password_hash)
+    let other_id = db::create_account(&client, "resolver-other", &password_hash)
         .await
         .unwrap();
     let group_id = create_test_group(&client, "resolvergroup").await;
@@ -766,7 +766,7 @@ async fn test_relinking_character_to_same_group_is_idempotent() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "regrouper@example.com", &password_hash)
+    let account_id = db::create_account(&client, "regrouper", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-group-2", "Zezima")
@@ -806,10 +806,10 @@ async fn test_second_account_joining_a_group_does_not_take_over_admin() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let first_account_id = db::create_account(&client, "firstjoiner@example.com", &password_hash)
+    let first_account_id = db::create_account(&client, "firstjoiner", &password_hash)
         .await
         .unwrap();
-    let second_account_id = db::create_account(&client, "secondjoiner@example.com", &password_hash)
+    let second_account_id = db::create_account(&client, "secondjoiner", &password_hash)
         .await
         .unwrap();
     let first_character = db::create_character(&client, first_account_id, "hash-admin-1", "Zezima")
@@ -850,7 +850,7 @@ async fn test_linking_character_to_different_group_is_conflict() {
     let mut client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "doublegrouper@example.com", &password_hash)
+    let account_id = db::create_account(&client, "doublegrouper", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-group-3", "Zezima")
@@ -887,7 +887,7 @@ async fn test_find_character_group_link_returns_none_when_unlinked() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "unlinked@example.com", &password_hash)
+    let account_id = db::create_account(&client, "unlinked", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-group-4", "Zezima")
@@ -908,7 +908,7 @@ async fn test_get_account_by_id() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "by-id@example.com", &password_hash)
+    let account_id = db::create_account(&client, "by-id", &password_hash)
         .await
         .unwrap();
 
@@ -917,7 +917,7 @@ async fn test_get_account_by_id() {
         .expect("query failed")
         .expect("account should exist");
     assert_eq!(account.id, account_id);
-    assert_eq!(account.email.as_deref(), Some("by-id@example.com"));
+    assert_eq!(account.username.as_deref(), Some("by-id"));
 
     let missing = db::get_account_by_id(&client, account_id + 999)
         .await
@@ -926,45 +926,45 @@ async fn test_get_account_by_id() {
 }
 
 #[tokio::test]
-async fn test_update_account_email() {
+async fn test_update_account_username() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "old@example.com", &password_hash)
+    let account_id = db::create_account(&client, "old", &password_hash)
         .await
         .unwrap();
 
-    db::update_account_email(&client, account_id, "new@example.com")
+    db::update_account_username(&client, account_id, "new")
         .await
-        .expect("failed to update email");
+        .expect("failed to update username");
 
     let account = db::get_account_by_id(&client, account_id)
         .await
         .expect("query failed")
         .expect("account should exist");
-    assert_eq!(account.email.as_deref(), Some("new@example.com"));
+    assert_eq!(account.username.as_deref(), Some("new"));
 }
 
 #[tokio::test]
-async fn test_update_account_email_rejects_duplicate() {
+async fn test_update_account_username_rejects_duplicate() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    db::create_account(&client, "taken@example.com", &password_hash)
+    db::create_account(&client, "taken", &password_hash)
         .await
         .unwrap();
-    let account_id = db::create_account(&client, "mine@example.com", &password_hash)
+    let account_id = db::create_account(&client, "mine", &password_hash)
         .await
         .unwrap();
 
-    let result = db::update_account_email(&client, account_id, "taken@example.com").await;
-    assert!(matches!(result, Err(ApiError::EmailAlreadyRegisteredError)));
+    let result = db::update_account_username(&client, account_id, "taken").await;
+    assert!(matches!(result, Err(ApiError::UsernameAlreadyRegisteredError)));
 }
 
 #[tokio::test]
@@ -975,7 +975,7 @@ async fn test_update_account_password() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("original-password").unwrap();
-    let account_id = db::create_account(&client, "changer@example.com", &password_hash)
+    let account_id = db::create_account(&client, "changer", &password_hash)
         .await
         .unwrap();
 
@@ -1006,7 +1006,7 @@ async fn test_delete_account_cascades_characters_and_sessions() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "deleteme@example.com", &password_hash)
+    let account_id = db::create_account(&client, "deleteme", &password_hash)
         .await
         .unwrap();
     let character = db::create_character(&client, account_id, "hash-delete-1", "Zezima")
@@ -1165,13 +1165,13 @@ async fn test_ensure_member_for_linked_character_scoped_per_group() {
 
 async fn create_linked_account(
     client: &mut deadpool_postgres::Client,
-    email: &str,
+    username: &str,
     account_hash: &str,
     rsn: &str,
     group_id: i64,
 ) -> i64 {
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(client, email, &password_hash)
+    let account_id = db::create_account(client, username, &password_hash)
         .await
         .unwrap();
     let character = db::create_character(client, account_id, account_hash, rsn)
@@ -1193,7 +1193,7 @@ async fn test_linking_a_character_creates_default_all_false_permissions() {
 
     let account_id = create_linked_account(
         &mut client,
-        "perm1@example.com",
+        "perm1",
         "hash-perm-1",
         "Zezima",
         group_id,
@@ -1223,7 +1223,7 @@ async fn test_update_group_permissions_patches_only_provided_fields() {
     // links second so it stays a plain member with real toggle-able flags.
     create_linked_account(
         &mut client,
-        "perm2admin@example.com",
+        "perm2admin",
         "hash-perm-2admin",
         "Zezima",
         group_id,
@@ -1231,7 +1231,7 @@ async fn test_update_group_permissions_patches_only_provided_fields() {
     .await;
     let account_id = create_linked_account(
         &mut client,
-        "perm2@example.com",
+        "perm2",
         "hash-perm-2",
         "Woox",
         group_id,
@@ -1278,7 +1278,7 @@ async fn test_update_group_permissions_returns_none_for_non_member() {
     let group_id = create_test_group(&client, "permtest3").await;
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "perm3@example.com", &password_hash)
+    let account_id = db::create_account(&client, "perm3", &password_hash)
         .await
         .unwrap();
 
@@ -1306,7 +1306,7 @@ async fn test_list_group_permissions_returns_every_member_in_the_group() {
 
     let account_a = create_linked_account(
         &mut client,
-        "perm4a@example.com",
+        "perm4a",
         "hash-perm-4a",
         "Zezima",
         group_id,
@@ -1314,7 +1314,7 @@ async fn test_list_group_permissions_returns_every_member_in_the_group() {
     .await;
     let account_b = create_linked_account(
         &mut client,
-        "perm4b@example.com",
+        "perm4b",
         "hash-perm-4b",
         "Woox",
         group_id,
@@ -1322,7 +1322,7 @@ async fn test_list_group_permissions_returns_every_member_in_the_group() {
     .await;
     create_linked_account(
         &mut client,
-        "perm4c@example.com",
+        "perm4c",
         "hash-perm-4c",
         "Elsewhere",
         other_group_id,
@@ -1351,7 +1351,7 @@ async fn test_list_group_member_permissions_includes_display_rsn_and_admin_flag(
     // create group").
     let admin_account = create_linked_account(
         &mut client,
-        "perm5admin@example.com",
+        "perm5admin",
         "hash-perm-5admin",
         "Zezima",
         group_id,
@@ -1359,7 +1359,7 @@ async fn test_list_group_member_permissions_includes_display_rsn_and_admin_flag(
     .await;
     let member_account = create_linked_account(
         &mut client,
-        "perm5member@example.com",
+        "perm5member",
         "hash-perm-5member",
         "Woox",
         group_id,
@@ -1397,7 +1397,7 @@ async fn test_get_effective_permission_flags_admin_returns_all_true() {
 
     let admin_account_id = create_linked_account(
         &mut client,
-        "perm4aadmin@example.com",
+        "perm4aadmin",
         "hash-perm-4aa",
         "Zezima",
         group_id,
@@ -1424,7 +1424,7 @@ async fn test_get_effective_permission_flags_non_admin_returns_stored_flags() {
 
     create_linked_account(
         &mut client,
-        "perm4badmin@example.com",
+        "perm4badmin",
         "hash-perm-4ba",
         "Zezima",
         group_id,
@@ -1432,7 +1432,7 @@ async fn test_get_effective_permission_flags_non_admin_returns_stored_flags() {
     .await;
     let member_account_id = create_linked_account(
         &mut client,
-        "perm4bmember@example.com",
+        "perm4bmember",
         "hash-perm-4bb",
         "Woox",
         group_id,
@@ -1475,7 +1475,7 @@ async fn test_has_group_permission_admin_is_always_true() {
 
     let admin_account_id = create_linked_account(
         &mut client,
-        "perm5admin@example.com",
+        "perm5admin",
         "hash-perm-5a",
         "Zezima",
         group_id,
@@ -1507,7 +1507,7 @@ async fn test_has_group_permission_non_admin_follows_stored_flags() {
     // First linked account becomes admin.
     create_linked_account(
         &mut client,
-        "perm6admin@example.com",
+        "perm6admin",
         "hash-perm-6a",
         "Zezima",
         group_id,
@@ -1515,7 +1515,7 @@ async fn test_has_group_permission_non_admin_follows_stored_flags() {
     .await;
     let member_account_id = create_linked_account(
         &mut client,
-        "perm6member@example.com",
+        "perm6member",
         "hash-perm-6b",
         "Woox",
         group_id,
@@ -1561,7 +1561,7 @@ async fn test_update_group_permissions_rejects_writes_to_the_admin() {
 
     let admin_account_id = create_linked_account(
         &mut client,
-        "perm7admin@example.com",
+        "perm7admin",
         "hash-perm-7a",
         "Zezima",
         group_id,
@@ -1622,7 +1622,7 @@ async fn test_require_group_permission_rejects_permission_denied() {
     // First linked account becomes admin; second is a plain member with no flags granted.
     create_linked_account(
         &mut client,
-        "perm8admin@example.com",
+        "perm8admin",
         "hash-perm-8a",
         "Zezima",
         group_id,
@@ -1630,7 +1630,7 @@ async fn test_require_group_permission_rejects_permission_denied() {
     .await;
     let member_account_id = create_linked_account(
         &mut client,
-        "perm8member@example.com",
+        "perm8member",
         "hash-perm-8b",
         "Woox",
         group_id,
@@ -1667,7 +1667,7 @@ async fn test_require_group_permission_allows_admin() {
 
     let admin_account_id = create_linked_account(
         &mut client,
-        "perm9admin@example.com",
+        "perm9admin",
         "hash-perm-9a",
         "Zezima",
         group_id,
@@ -1705,7 +1705,7 @@ async fn test_admin_reset_password_forces_change_and_revokes_sessions() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("original-password").unwrap();
-    let account_id = db::create_account(&client, "resetme@example.com", &password_hash)
+    let account_id = db::create_account(&client, "resetme", &password_hash)
         .await
         .unwrap();
     let token_hash = crypto::session_token_hash("reset-session-token");
@@ -1757,11 +1757,11 @@ async fn test_ban_cascade_transfers_ownership_and_removes_memberships() {
     let mut client = pool.get().await.unwrap();
 
     let owner_hash = crypto::hash_password("hunter22").unwrap();
-    let owner_id = db::create_account(&client, "owner@example.com", &owner_hash)
+    let owner_id = db::create_account(&client, "owner", &owner_hash)
         .await
         .unwrap();
     let member_hash = crypto::hash_password("hunter22").unwrap();
-    let member_id = db::create_account(&client, "member@example.com", &member_hash)
+    let member_id = db::create_account(&client, "member", &member_hash)
         .await
         .unwrap();
 
@@ -1834,7 +1834,7 @@ async fn test_ban_cascade_clears_ownership_when_last_member() {
     let mut client = pool.get().await.unwrap();
 
     let owner_hash = crypto::hash_password("hunter22").unwrap();
-    let owner_id = db::create_account(&client, "soleowner@example.com", &owner_hash)
+    let owner_id = db::create_account(&client, "soleowner", &owner_hash)
         .await
         .unwrap();
     let group_id = create_test_group(&client, "soleownergroup").await;
@@ -1863,11 +1863,11 @@ async fn test_hard_delete_transfers_ownership_before_cascade_delete() {
     let mut client = pool.get().await.unwrap();
 
     let owner_hash = crypto::hash_password("hunter22").unwrap();
-    let owner_id = db::create_account(&client, "harddeleteowner@example.com", &owner_hash)
+    let owner_id = db::create_account(&client, "harddeleteowner", &owner_hash)
         .await
         .unwrap();
     let member_hash = crypto::hash_password("hunter22").unwrap();
-    let member_id = db::create_account(&client, "harddeletemember@example.com", &member_hash)
+    let member_id = db::create_account(&client, "harddeletemember", &member_hash)
         .await
         .unwrap();
 
@@ -1915,7 +1915,7 @@ async fn test_login_lockout_triggers_after_threshold_and_admin_can_clear_it() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("correct-password").unwrap();
-    let account_id = db::create_account(&client, "lockout@example.com", &password_hash)
+    let account_id = db::create_account(&client, "lockout", &password_hash)
         .await
         .unwrap();
 
@@ -1970,7 +1970,7 @@ async fn test_status_backfill_from_legacy_disabled_flag() {
     // `add_account_status_columns` backfills `status='banned'` for any pre-existing
     // `disabled=true` row - simulate that by going straight at the legacy column.
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "legacydisabled@example.com", &password_hash)
+    let account_id = db::create_account(&client, "legacydisabled", &password_hash)
         .await
         .unwrap();
     client
@@ -1997,14 +1997,14 @@ async fn test_status_backfill_from_legacy_disabled_flag() {
 }
 
 #[tokio::test]
-async fn test_soft_delete_scrubs_email_and_is_reversible() {
+async fn test_soft_delete_scrubs_username_and_is_reversible() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "softdelete@example.com", &password_hash)
+    let account_id = db::create_account(&client, "softdelete", &password_hash)
         .await
         .unwrap();
 
@@ -2017,12 +2017,12 @@ async fn test_soft_delete_scrubs_email_and_is_reversible() {
         .unwrap()
         .unwrap();
     assert_eq!(account.status, "deleted");
-    assert_ne!(account.email.as_deref(), Some("softdelete@example.com"));
+    assert_ne!(account.username.as_deref(), Some("softdelete"));
 
-    // The original email is free again for a new registration.
-    db::create_account(&client, "softdelete@example.com", &password_hash)
+    // The original username is free again for a new registration.
+    db::create_account(&client, "softdelete", &password_hash)
         .await
-        .expect("original email should be reusable after soft delete");
+        .expect("original username should be reusable after soft delete");
 
     // Reversible: flip status back and the account is a normal active account again.
     db::admin_set_account_status(&client, account_id, "active")
@@ -2040,10 +2040,10 @@ async fn test_admin_list_and_search_accounts() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "findme@example.com", &password_hash)
+    let account_id = db::create_account(&client, "findme", &password_hash)
         .await
         .unwrap();
-    db::create_account(&client, "someoneelse@example.com", &password_hash)
+    db::create_account(&client, "someoneelse", &password_hash)
         .await
         .unwrap();
 
@@ -2063,7 +2063,7 @@ async fn test_admin_list_and_search_accounts() {
         .await
         .expect("query failed")
         .expect("account should exist");
-    assert_eq!(detail.email.as_deref(), Some("findme@example.com"));
+    assert_eq!(detail.username.as_deref(), Some("findme"));
     assert_eq!(detail.status, "active");
 }
 
@@ -2075,7 +2075,7 @@ async fn test_admin_session_revocation() {
     let client = pool.get().await.unwrap();
 
     let password_hash = crypto::hash_password("hunter22").unwrap();
-    let account_id = db::create_account(&client, "sessionmgmt@example.com", &password_hash)
+    let account_id = db::create_account(&client, "sessionmgmt", &password_hash)
         .await
         .unwrap();
     let token_hash = crypto::session_token_hash("session-mgmt-token");
@@ -2091,7 +2091,7 @@ async fn test_admin_session_revocation() {
     let session_id = sessions[0].session_id;
 
     // Revoking a foreign account's session id is rejected.
-    let other_account_id = db::create_account(&client, "otheraccount@example.com", &password_hash)
+    let other_account_id = db::create_account(&client, "otheraccount", &password_hash)
         .await
         .unwrap();
     let revoked_wrong_owner = db::admin_revoke_account_session(&client, other_account_id, session_id)

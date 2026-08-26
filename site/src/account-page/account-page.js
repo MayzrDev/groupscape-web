@@ -46,15 +46,15 @@ export class AccountPage extends BaseElement {
     this.avatar = this.querySelector(".account-page__avatar");
     this.discordDisplay = this.querySelector(".account-page__discord-display");
     this.discordName = this.discordDisplay.querySelector("span");
-    this.emailDisplay = this.querySelector(".account-page__email-display");
+    this.usernameDisplay = this.querySelector(".account-page__username-display");
     this.since = this.querySelector(".account-page__since");
 
-    this.emailInput = this.querySelector(".account-page__email");
-    this.emailInput.validators = [usernameValidator];
-    this.emailSaveButton = this.querySelector(".account-page__email-save");
-    this.emailError = this.querySelector(".account-page__email-error");
-    this.emailStatus = this.querySelector(".account-page__email-status");
-    this.eventListener(this.emailSaveButton, "click", this.saveUsername.bind(this));
+    this.usernameInput = this.querySelector(".account-page__username");
+    this.usernameInput.validators = [usernameValidator];
+    this.usernameSaveButton = this.querySelector(".account-page__username-save");
+    this.usernameError = this.querySelector(".account-page__username-error");
+    this.usernameStatus = this.querySelector(".account-page__username-status");
+    this.eventListener(this.usernameSaveButton, "click", this.saveUsername.bind(this));
 
     this.newPasswordInput = this.querySelector(".account-page__new-password");
     this.newPasswordInput.validators = [passwordValidator];
@@ -117,42 +117,42 @@ export class AccountPage extends BaseElement {
     this.avatar.textContent = initials(account.username);
     this.discordDisplay.hidden = !account.discord_name;
     this.discordName.textContent = account.discord_name || "";
-    this.emailDisplay.textContent = account.username || "No username set";
+    this.usernameDisplay.textContent = account.username || "No username set";
     this.since.textContent = `Member since ${new Date(account.created_at).toLocaleDateString(undefined, {
       year: "numeric",
       month: "long",
     })}`;
     if (account.username) {
-      this.emailInput.input.value = account.username;
+      this.usernameInput.input.value = account.username;
     }
     this.passwordForcedHint.hidden = !account.must_change_password;
   }
 
   async saveUsername() {
-    this.emailError.textContent = "";
-    this.emailStatus.textContent = "";
-    this.emailStatus.classList.remove("ok");
-    if (!this.emailInput.valid) return;
+    this.usernameError.textContent = "";
+    this.usernameStatus.textContent = "";
+    this.usernameStatus.classList.remove("ok");
+    if (!this.usernameInput.valid) return;
 
     try {
-      this.emailSaveButton.disabled = true;
-      const response = await accountApi.updateUsername(this.emailInput.value);
+      this.usernameSaveButton.disabled = true;
+      const response = await accountApi.updateUsername(this.usernameInput.value);
       if (response.ok) {
         const account = await response.json();
         this.renderProfile(account);
-        this.emailStatus.textContent = "Username updated.";
-        this.emailStatus.classList.add("ok");
+        this.usernameStatus.textContent = "Username updated.";
+        this.usernameStatus.classList.add("ok");
       } else if (response.status === 409) {
-        this.emailError.textContent = "That username is already registered.";
+        this.usernameError.textContent = "That username is already registered.";
       } else if (response.status === 400) {
-        this.emailError.textContent = await response.text();
+        this.usernameError.textContent = await response.text();
       } else {
-        this.emailError.textContent = "Couldn't update your username — try again.";
+        this.usernameError.textContent = "Couldn't update your username — try again.";
       }
     } catch (error) {
-      this.emailError.textContent = "Couldn't update your username — try again.";
+      this.usernameError.textContent = "Couldn't update your username — try again.";
     } finally {
-      this.emailSaveButton.disabled = false;
+      this.usernameSaveButton.disabled = false;
     }
   }
 

@@ -46,8 +46,8 @@ export class AdminAccountsPage extends BaseElement {
     this.dialogueError = this.querySelector(".admin-accounts__dialogue-error");
     this.tempPasswordPanel = this.querySelector(".admin-accounts__temp-password");
     this.tempPasswordValue = this.querySelector(".admin-accounts__temp-password-value");
-    this.emailForm = this.querySelector(".admin-accounts__email-form");
-    this.emailInput = this.querySelector(".admin-accounts__email-input");
+    this.usernameForm = this.querySelector(".admin-accounts__username-form");
+    this.usernameInput = this.querySelector(".admin-accounts__username-input");
     this.groupsList = this.querySelector(".admin-accounts__groups");
     this.groupCount = this.querySelector(".admin-accounts__group-count");
     this.charactersList = this.querySelector(".admin-accounts__characters");
@@ -65,8 +65,8 @@ export class AdminAccountsPage extends BaseElement {
       "click",
       () => (this.tempPasswordPanel.hidden = true)
     );
-    this.eventListener(this.querySelector(".js-save-email"), "click", this.saveEmail.bind(this));
-    this.eventListener(this.querySelector(".js-cancel-email"), "click", () => (this.emailForm.hidden = true));
+    this.eventListener(this.querySelector(".js-save-username"), "click", this.saveUsername.bind(this));
+    this.eventListener(this.querySelector(".js-cancel-username"), "click", () => (this.usernameForm.hidden = true));
 
     this.init();
   }
@@ -123,7 +123,7 @@ export class AdminAccountsPage extends BaseElement {
         <tr class="admin-accounts__row${
           String(account.id) === String(this.selectedAccountId) ? " active" : ""
         }" data-account-id="${account.id}">
-          <td class="admin-accounts__row-email">${account.username ?? "(no username)"}</td>
+          <td class="admin-accounts__row-username">${account.username ?? "(no username)"}</td>
           <td>${this.statusBadge(account)}</td>
           <td class="admin-mono">${
             account.last_login_at ? new Date(account.last_login_at).toLocaleDateString() : "&mdash;"
@@ -167,7 +167,7 @@ export class AdminAccountsPage extends BaseElement {
   async selectAccount(accountId) {
     this.selectedAccountId = accountId;
     this.tempPasswordPanel.hidden = true;
-    this.emailForm.hidden = true;
+    this.usernameForm.hidden = true;
     this.renderList();
     await this.fetchDetail();
   }
@@ -296,7 +296,7 @@ export class AdminAccountsPage extends BaseElement {
       options.push({ label: "Clear login lockout", action: () => this.clearLockout() });
     }
 
-    options.push({ label: "Change username", action: () => this.showEmailForm() });
+    options.push({ label: "Change username", action: () => this.showUsernameForm() });
     options.push({ label: "Revoke all sessions", action: () => this.revokeAllSessions() });
     options.push({
       label: "Hard-delete account (permanent, cannot be undone)",
@@ -325,13 +325,13 @@ export class AdminAccountsPage extends BaseElement {
     }
   }
 
-  showEmailForm() {
-    this.emailInput.value = this.detail.username ?? "";
-    this.emailForm.hidden = false;
+  showUsernameForm() {
+    this.usernameInput.value = this.detail.username ?? "";
+    this.usernameForm.hidden = false;
   }
 
-  async saveEmail() {
-    const username = this.emailInput.value.trim();
+  async saveUsername() {
+    const username = this.usernameInput.value.trim();
     if (!username) return;
     await this.runAction(async () => {
       const response = await adminApi.setAccountUsername(this.detail.id, username);
@@ -339,7 +339,7 @@ export class AdminAccountsPage extends BaseElement {
         if (response.status === 409) throw new Error("That username is already registered.");
         throw new Error("Failed to update username.");
       }
-      this.emailForm.hidden = true;
+      this.usernameForm.hidden = true;
       await this.fetchDetail();
       await this.fetchAccounts();
     });

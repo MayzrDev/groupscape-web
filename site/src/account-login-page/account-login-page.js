@@ -20,7 +20,7 @@ export class AccountLoginPage extends BaseElement {
       }
     };
 
-    this.username = this.querySelector(".account-login__email");
+    this.username = this.querySelector(".account-login__username");
     this.username.validators = [fieldRequiredValidator];
     this.password = this.querySelector(".account-login__password");
     this.password.validators = [fieldRequiredValidator];

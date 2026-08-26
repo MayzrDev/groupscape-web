@@ -34,7 +34,7 @@ export class AccountSignupPage extends BaseElement {
       }
     };
 
-    this.username = this.querySelector(".account-signup__email");
+    this.username = this.querySelector(".account-signup__username");
     this.username.validators = [usernameValidator];
     this.password = this.querySelector(".account-signup__password");
     this.password.validators = [passwordValidator];

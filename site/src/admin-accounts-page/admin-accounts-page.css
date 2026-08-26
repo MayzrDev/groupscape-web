@@ -28,7 +28,7 @@
   box-shadow: inset 3px 0 0 var(--orange);
 }
 
-.admin-accounts__row-email {
+.admin-accounts__row-username {
   font-family: ui-sans-serif, Arial, sans-serif;
   font-size: 13.5px;
 }
@@ -84,14 +84,14 @@
   word-break: break-all;
 }
 
-.admin-accounts__email-form {
+.admin-accounts__username-form {
   display: flex;
   gap: 6px;
   margin: 6px 0;
   flex-wrap: wrap;
 }
 
-.admin-accounts__email-form input {
+.admin-accounts__username-form input {
   flex: 1;
   min-width: 180px;
   font-family: ui-sans-serif, Arial, sans-serif;
