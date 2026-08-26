@@ -1,4 +1,5 @@
 use crate::crypto::token_hash;
+use crate::drop_rates::slugify_npc_name;
 use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
@@ -276,6 +277,29 @@ pub async fn delete_collection_log_data_for_member(
     Ok(())
 }
 
+pub async fn delete_bank_value_data_for_member(
+    transaction: &Transaction<'_>,
+    period: AggregatePeriod,
+    member_id: i64,
+) -> Result<(), ApiError> {
+    let s = format!(
+        r#"
+DELETE FROM groupscape.bank_value_{} WHERE member_id=$1
+"#,
+        match period {
+            AggregatePeriod::Day => "day",
+            AggregatePeriod::Month => "month",
+            AggregatePeriod::Year => "year",
+        }
+    );
+    let delete_bank_value_stmt = transaction.prepare_cached(&s).await?;
+    transaction
+        .execute(&delete_bank_value_stmt, &[&member_id])
+        .await?;
+
+    Ok(())
+}
+
 pub async fn get_member_id(
     client: &Client,
     group_id: i64,
@@ -305,6 +329,9 @@ pub async fn delete_group_member(
     delete_skills_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
     delete_skills_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
     delete_collection_log_data_for_member(&transaction, member_id).await?;
+    delete_bank_value_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
+    delete_bank_value_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
+    delete_bank_value_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
 
     let stmt = transaction
         .prepare_cached("DELETE FROM groupscape.members WHERE group_id=$1 AND member_name=$2")
@@ -2343,7 +2370,86 @@ CREATE UNIQUE INDEX IF NOT EXISTS characters_account_id_account_hash_idx ON grou
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_activity_events_npc_slug").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                "ALTER TABLE groupscape.activity_events ADD COLUMN IF NOT EXISTS npc_slug TEXT",
+                &[],
+            )
+            .await?;
+        // Composite indexes for the member/type-filtered branches of list_activity_events' cursor
+        // query - the existing (group_id, occurred_at DESC) index only covers the unfiltered case.
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS activity_events_group_member_occurred_idx ON groupscape.activity_events (group_id, member_name, occurred_at DESC)
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS activity_events_group_type_occurred_idx ON groupscape.activity_events (group_id, event_type, occurred_at DESC)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_activity_events_npc_slug").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "backfill_activity_events_npc_slug").await? {
+        backfill_activity_events_npc_slug(client).await?;
+
+        let transaction = client.transaction().await?;
+        commit_migration(&transaction, "backfill_activity_events_npc_slug").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
+}
+
+/// One-time backfill for existing `kill` rows written before `npc_slug` existed - computes the
+/// slug the same way [`insert_activity_event_payload`] does going forward, so
+/// `list_activity_events`' `npc_slug = ANY(...)` filter sees a consistent column for old and new
+/// rows alike. Runs in small batches (rather than one giant transaction) since this walks
+/// potentially every historical kill event.
+async fn backfill_activity_events_npc_slug(client: &mut Client) -> Result<(), ApiError> {
+    loop {
+        let rows = client
+            .query(
+                r#"
+SELECT event_id, payload FROM groupscape.activity_events
+WHERE event_type = 'kill' AND npc_slug IS NULL
+LIMIT 500
+"#,
+                &[],
+            )
+            .await?;
+        if rows.is_empty() {
+            return Ok(());
+        }
+
+        for row in &rows {
+            let event_id: i64 = row.try_get("event_id")?;
+            let payload: serde_json::Value = row.try_get("payload")?;
+            let npc_name = payload
+                .get("npcName")
+                .or_else(|| payload.get("npc_name"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let slug = slugify_npc_name(npc_name);
+            client
+                .execute(
+                    "UPDATE groupscape.activity_events SET npc_slug = $1 WHERE event_id = $2",
+                    &[&slug, &event_id],
+                )
+                .await?;
+        }
+    }
 }
 
 /// Fresh (< 30-day-old) cached equipment bonuses for `item_id`, or `None` on a cache miss/expiry
@@ -3876,15 +3982,33 @@ pub async fn insert_activity_event_payload(
     event_type: &str,
     payload: serde_json::Value,
 ) -> Result<(), ApiError> {
+    // Precomputed so `list_activity_events`' `npc_slug = ANY(...)` notable-kill gate can run in
+    // SQL instead of filtering rows after fetching them (see that function's doc comment).
+    let npc_slug = (event_type == "kill")
+        .then(|| {
+            payload
+                .get("npcName")
+                .or_else(|| payload.get("npc_name"))
+                .and_then(|v| v.as_str())
+                .map(slugify_npc_name)
+        })
+        .flatten();
     let stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload) VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload, npc_slug) VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .await?;
     client
         .execute(
             &stmt,
-            &[&session_id, &group_id, &member_name, &event_type, &payload],
+            &[
+                &session_id,
+                &group_id,
+                &member_name,
+                &event_type,
+                &payload,
+                &npc_slug,
+            ],
         )
         .await
         .map_err(ApiError::InsertActivityEventError)?;
@@ -4033,6 +4157,13 @@ fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {
 
 /// Paginated, newest-first activity feed for a group, optionally filtered by member and/or
 /// event type, with a `before` cursor (mirrors `groupscape-old`'s `GET /groups/:id/activity`).
+///
+/// The notable-kill gate (bosses/major quest bosses, see [`crate::notable_npcs`]) is applied in
+/// SQL via `npc_slug = ANY(...)` rather than as a post-fetch filter, so `LIMIT` operates on the
+/// already-filtered set - a post-fetch filter would let a page come back short of `limit` even
+/// though more matching rows exist further back, which breaks a cursor-paginated caller's
+/// "was that the last page?" check. The other allowlisted types (death, quest, diary, combat_task,
+/// collection_log) are already milestone-scoped at insert time and need no extra gate.
 #[allow(clippy::too_many_arguments)]
 pub async fn list_activity_events(
     client: &Client,
@@ -4042,6 +4173,10 @@ pub async fn list_activity_events(
     before: Option<DateTime<Utc>>,
     limit: i64,
 ) -> Result<Vec<ActivityEvent>, ApiError> {
+    let notable_slugs: Vec<String> = crate::notable_npcs::names()
+        .into_iter()
+        .map(|(slug, _)| slug)
+        .collect();
     let stmt = client
         .prepare_cached(
             r#"
@@ -4049,6 +4184,7 @@ SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
   AND event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log')
+  AND (event_type != 'kill' OR npc_slug = ANY($6))
   AND ($2::text IS NULL OR member_name = $2)
   AND ($3::text IS NULL OR event_type = $3)
   AND ($4::timestamptz IS NULL OR occurred_at < $4)
@@ -4066,31 +4202,12 @@ LIMIT $5
                 &event_type,
                 &before,
                 &limit.clamp(1, 200),
+                &notable_slugs,
             ],
         )
         .await
         .map_err(ApiError::ListActivityEventsError)?;
-    let events: Vec<ActivityEvent> = rows
-        .iter()
-        .map(activity_event_from_row)
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(events.into_iter().filter(is_feed_worthy).collect())
-}
-
-/// Second gate on top of the `event_type` allowlist in [`list_activity_events`]' SQL: kill events
-/// are only feed-worthy when they're on a curated "notable" NPC (bosses/major quest bosses, see
-/// [`crate::notable_npcs`]) - the plugin reports every kill, not just boss ones, so without this
-/// the feed/toasts would be dominated by farming spam. The other allowlisted types (death, quest,
-/// diary, combat_task, collection_log) are already milestone-scoped at insert time.
-fn is_feed_worthy(event: &ActivityEvent) -> bool {
-    if event.event_type != "kill" {
-        return true;
-    }
-    event
-        .payload
-        .get("npcName")
-        .and_then(|v| v.as_str())
-        .is_some_and(crate::notable_npcs::is_notable)
+    rows.iter().map(activity_event_from_row).collect()
 }
 
 /// All `kill` events for a group in an optional `[since, until]` range, uncapped by cursor
@@ -4314,6 +4431,9 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
         delete_skills_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
         delete_skills_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
         delete_collection_log_data_for_member(&transaction, member_id).await?;
+        delete_bank_value_data_for_member(&transaction, AggregatePeriod::Day, member_id).await?;
+        delete_bank_value_data_for_member(&transaction, AggregatePeriod::Month, member_id).await?;
+        delete_bank_value_data_for_member(&transaction, AggregatePeriod::Year, member_id).await?;
     }
 
     let delete_members_stmt = transaction

@@ -13,16 +13,18 @@ const EVENT_TYPES = [
   ["collection_log", "Collection log"],
 ];
 
-const FETCH_LIMIT = 100;
+const PAGE_LIMIT = 25;
 const REFRESH_INTERVAL_MS = 15000;
 
 export class ActivityFeedPage extends BaseElement {
   constructor() {
     super();
-    this.allEvents = [];
     this.members = [];
     this.selectedMember = null;
     this.selectedType = null;
+    this.loaded = [];
+    this.loadingMore = false;
+    this.exhausted = false;
   }
 
   html() {
@@ -36,7 +38,9 @@ export class ActivityFeedPage extends BaseElement {
     this.rail = this.querySelector(".activity-feed-page__rail");
     this.typeFilters = this.querySelector(".activity-feed-page__type-filters");
     this.list = this.querySelector(".activity-feed-page__list");
+    this.sentinel = this.querySelector(".activity-feed-page__sentinel");
     this.empty = this.querySelector(".activity-feed-page__empty");
+    this.scrollContainer = this.closest(".authed-section__main-content") || document.documentElement;
 
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
@@ -45,13 +49,21 @@ export class ActivityFeedPage extends BaseElement {
     }
 
     this.renderTypeFilters();
-    this.fetchEvents();
-    this.refreshInterval = utility.callOnInterval(this.fetchEvents.bind(this), REFRESH_INTERVAL_MS, false);
+    this.resetAndLoad();
+
+    this.intersectionObserver = new IntersectionObserver(this.handleSentinelIntersect.bind(this), {
+      root: this.scrollContainer,
+      rootMargin: "120px",
+    });
+    this.intersectionObserver.observe(this.sentinel);
+
+    this.refreshInterval = utility.callOnInterval(this.poll.bind(this), REFRESH_INTERVAL_MS, false);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this.refreshInterval) window.clearInterval(this.refreshInterval);
+    if (this.intersectionObserver) this.intersectionObserver.disconnect();
   }
 
   handleUpdatedMembers(members) {
@@ -59,25 +71,25 @@ export class ActivityFeedPage extends BaseElement {
     this.renderRail();
   }
 
-  async fetchEvents() {
-    this.allEvents = await api.getActivityEvents({ limit: FETCH_LIMIT });
-    this.renderRail();
-    this.renderList();
+  handleSentinelIntersect(entries) {
+    if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
   }
 
-  eventCountFor(memberName) {
-    return this.allEvents.filter((event) => event.member_name === memberName).length;
+  // Best-effort count over events fetched so far, not a true per-member total — there's no
+  // cheap way to get an exact total from a cursor-paginated feed without a dedicated count query.
+  loadedCountFor(memberName) {
+    return this.loaded.filter((event) => !memberName || event.member_name === memberName).length;
   }
 
   renderRail() {
     if (!this.rail) return;
     this.rail.innerHTML = "";
 
-    const allButton = this.createRailButton(null, "All members", this.allEvents.length);
+    const allButton = this.createRailButton(null, "All members", this.loadedCountFor(null));
     this.rail.appendChild(allButton);
 
     for (const member of this.members) {
-      this.rail.appendChild(this.createRailButton(member.name, member.name, this.eventCountFor(member.name)));
+      this.rail.appendChild(this.createRailButton(member.name, member.name, this.loadedCountFor(member.name)));
     }
   }
 
@@ -91,9 +103,10 @@ export class ActivityFeedPage extends BaseElement {
       <span class="activity-feed-page__rail-count">${count}</span>
     `;
     this.eventListener(button, "click", () => {
+      if (this.selectedMember === memberName) return;
       this.selectedMember = memberName;
       this.renderRail();
-      this.renderList();
+      this.resetAndLoad();
     });
     return button;
   }
@@ -107,32 +120,87 @@ export class ActivityFeedPage extends BaseElement {
       chip.classList.toggle("activity-feed-page__type-chip--active", this.selectedType === type);
       chip.textContent = label;
       this.eventListener(chip, "click", () => {
+        if (this.selectedType === type) return;
         this.selectedType = type;
         this.renderTypeFilters();
-        this.renderList();
+        this.resetAndLoad();
       });
       this.typeFilters.appendChild(chip);
     }
   }
 
-  filteredEvents() {
-    return this.allEvents.filter((event) => {
-      if (this.selectedMember && event.member_name !== this.selectedMember) return false;
-      if (this.selectedType && event.event_type !== this.selectedType) return false;
-      return true;
-    });
+  createRow(event) {
+    const row = document.createElement("activity-feed-event");
+    row.event = event;
+    return row;
   }
 
-  renderList() {
-    const events = this.filteredEvents();
+  async resetAndLoad() {
+    this.loaded = [];
+    this.exhausted = false;
     this.list.innerHTML = "";
-    this.empty.classList.toggle("activity-feed-page__empty--visible", events.length === 0);
+    this.empty.classList.remove("activity-feed-page__empty--visible");
+    await this.loadMore();
+  }
 
-    for (const event of events) {
-      const row = document.createElement("activity-feed-event");
-      row.event = event;
-      this.list.appendChild(row);
+  async loadMore() {
+    if (this.loadingMore || this.exhausted) return;
+    this.loadingMore = true;
+    this.sentinel.classList.add("activity-feed-page__sentinel--visible");
+
+    const before = this.loaded.length ? this.loaded[this.loaded.length - 1].occurred_at : undefined;
+    const page = await api.getActivityEvents({
+      memberName: this.selectedMember,
+      eventType: this.selectedType,
+      before,
+      limit: PAGE_LIMIT,
+    });
+
+    for (const event of page) {
+      this.loaded.push(event);
+      this.list.appendChild(this.createRow(event));
     }
+    this.exhausted = page.length < PAGE_LIMIT;
+    this.sentinel.classList.toggle("activity-feed-page__sentinel--visible", !this.exhausted);
+    this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
+    this.renderRail();
+    this.loadingMore = false;
+  }
+
+  // Fetches the newest page and prepends whatever is newer than what's already loaded, leaving
+  // already-loaded older pages untouched. Preserves the reader's scroll position by measuring how
+  // much content height the prepend adds and offsetting scrollTop by the same amount, so a poll
+  // firing while the user is scrolled down never yanks the viewport back to the top.
+  async poll() {
+    if (this.loadingMore || !this.loaded.length) return;
+
+    const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
+    const page = await api.getActivityEvents({
+      memberName: this.selectedMember,
+      eventType: this.selectedType,
+      limit: PAGE_LIMIT,
+    });
+    const incoming = page.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
+    if (!incoming.length) return;
+
+    const scrollTopBefore = this.scrollContainer.scrollTop;
+    const heightBefore = this.list.scrollHeight;
+
+    const fragment = document.createDocumentFragment();
+    for (const event of incoming) {
+      this.loaded.unshift(event);
+      const row = this.createRow(event);
+      row.classList.add("activity-feed-event--enter");
+      fragment.appendChild(row);
+    }
+    this.list.insertBefore(fragment, this.list.firstChild);
+
+    if (scrollTopBefore > 0) {
+      const delta = this.list.scrollHeight - heightBefore;
+      this.scrollContainer.scrollTop = scrollTopBefore + delta;
+    }
+
+    this.renderRail();
   }
 }
 

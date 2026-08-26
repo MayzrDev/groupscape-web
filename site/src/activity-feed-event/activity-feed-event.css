@@ -11,6 +11,25 @@ activity-feed-event:last-child {
   border-bottom: none;
 }
 
+activity-feed-event.activity-feed-event--enter {
+  animation: activity-feed-event-enter 0.6s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  activity-feed-event.activity-feed-event--enter {
+    animation: none;
+  }
+}
+
+@keyframes activity-feed-event-enter {
+  from {
+    background: rgba(255, 152, 31, 0.2);
+  }
+  to {
+    background: transparent;
+  }
+}
+
 .activity-feed-event__badge {
   font-size: 0.72em;
   text-transform: uppercase;
