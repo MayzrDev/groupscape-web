@@ -3,6 +3,7 @@ import { tooltipManager } from "../rs-tooltip/tooltip-manager";
 import { utility } from "../utility";
 import { Animation } from "./animation";
 import { mapTrails } from "../data/map-trails";
+import { pubsub } from "../data/pubsub";
 
 export const ICON_SPRITE_SIZE = 15;
 
@@ -252,7 +253,10 @@ export class CanvasMap extends BaseElement {
   }
 
   stopFollowingPlayer() {
-    this.followingPlayer.name = null;
+    if (this.followingPlayer.name) {
+      this.followingPlayer.name = null;
+      pubsub.publish("player-followed", null);
+    }
   }
 
   // Converts a position in the runescape world to a camera position at the center of the canvas
