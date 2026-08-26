@@ -4,11 +4,11 @@ use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAuditLogResponse,
-    AdminFeatureFlag, AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
+    AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
     AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery, AdminSearchResponse,
-    AdminSetAccountUsername, AdminSetAccountStatus, AdminSetFeatureFlag,
+    AdminSetAccountUsername, AdminSetAccountStatus,
 };
-use actix_web::{delete, get, post, put, web, Error, HttpResponse};
+use actix_web::{delete, get, post, web, Error, HttpResponse};
 use deadpool_postgres::{Client, Pool};
 use serde_json::json;
 
@@ -152,45 +152,58 @@ pub async fn delete_group(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[get("/feature-flags")]
-pub async fn list_feature_flags(
+#[delete("/characters/{character_id}")]
+pub async fn delete_character(
     _auth: AdminAuthenticated,
+    path: web::Path<i64>,
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let flags = db::admin_list_feature_flags(&client).await?;
-    Ok(HttpResponse::Ok().json(flags))
-}
+    if db::find_character_by_id(&client, character_id)
+        .await?
+        .is_none()
+    {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
 
-#[put("/feature-flags/{flag_key}")]
-pub async fn set_feature_flag(
-    _auth: AdminAuthenticated,
-    path: web::Path<String>,
-    body: web::Json<AdminSetFeatureFlag>,
-    db_pool: web::Data<Pool>,
-) -> Result<HttpResponse, Error> {
-    let flag_key = path.into_inner();
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    db::admin_set_feature_flag(
-        &client,
-        &flag_key,
-        body.enabled,
-        body.description.as_deref(),
-    )
-    .await?;
+    db::delete_character(&client, character_id).await?;
     db::admin_record_audit_log(
         &client,
-        "flag.toggle",
-        Some("flag"),
-        Some(&flag_key),
-        Some(json!({ "enabled": body.enabled })),
+        "character.delete",
+        Some("character"),
+        Some(&character_id.to_string()),
+        None,
     )
     .await?;
-    Ok(HttpResponse::Ok().json(AdminFeatureFlag {
-        flag_key,
-        enabled: body.enabled,
-        description: body.description.clone(),
-    }))
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[delete("/characters/{character_id}/group-link")]
+pub async fn unlink_character_from_group(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let character_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::find_character_by_id(&client, character_id)
+        .await?
+        .is_none()
+    {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    db::unlink_character_from_group(&client, character_id).await?;
+    db::admin_record_audit_log(
+        &client,
+        "character.unlink_group",
+        Some("character"),
+        Some(&character_id.to_string()),
+        None,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[get("/audit-log")]

@@ -44,10 +44,14 @@ export class AccountPage extends BaseElement {
     this.status = this.querySelector(".account-page__status");
     this.content = this.querySelector(".account-page__content");
     this.avatar = this.querySelector(".account-page__avatar");
-    this.discordDisplay = this.querySelector(".account-page__discord-display");
-    this.discordName = this.discordDisplay.querySelector("span");
     this.usernameDisplay = this.querySelector(".account-page__username-display");
     this.since = this.querySelector(".account-page__since");
+
+    this.discordNameValue = this.querySelector(".account-page__discord-name-value");
+    this.discordBadge = this.querySelector(".account-page__discord-badge");
+    this.discordConnectButton = this.querySelector(".account-page__discord-connect");
+    this.discordStatus = this.querySelector(".account-page__discord-status");
+    this.eventListener(this.discordConnectButton, "click", this.connectDiscord.bind(this));
 
     this.usernameInput = this.querySelector(".account-page__username");
     this.usernameInput.validators = [usernameValidator];
@@ -80,6 +84,7 @@ export class AccountPage extends BaseElement {
 
     this.checkSession();
     this.refreshNotificationsState();
+    this.showDiscordLinkedStatusIfPresent();
   }
 
   disconnectedCallback() {
@@ -115,8 +120,7 @@ export class AccountPage extends BaseElement {
   renderProfile(account) {
     this.account = account;
     this.avatar.textContent = initials(account.username);
-    this.discordDisplay.hidden = !account.discord_name;
-    this.discordName.textContent = account.discord_name || "";
+    this.renderDiscordCard(account);
     this.usernameDisplay.textContent = account.username || "No username set";
     this.since.textContent = `Member since ${new Date(account.created_at).toLocaleDateString(undefined, {
       year: "numeric",
@@ -126,6 +130,33 @@ export class AccountPage extends BaseElement {
       this.usernameInput.input.value = account.username;
     }
     this.passwordForcedHint.hidden = !account.must_change_password;
+  }
+
+  renderDiscordCard(account) {
+    const linked = Boolean(account.discord_name);
+    this.discordNameValue.textContent = linked ? account.discord_name : "Not connected";
+    this.discordNameValue.classList.toggle("account-page__discord-name-value--unlinked", !linked);
+    this.discordBadge.hidden = !linked;
+    this.discordConnectButton.hidden = linked;
+  }
+
+  showDiscordLinkedStatusIfPresent() {
+    if (!sessionStorage.getItem("discordLinked")) return;
+    sessionStorage.removeItem("discordLinked");
+    this.discordStatus.textContent = "Discord connected.";
+    this.discordStatus.classList.add("ok");
+  }
+
+  async connectDiscord() {
+    this.discordStatus.textContent = "";
+    this.discordStatus.classList.remove("ok");
+    this.discordConnectButton.disabled = true;
+    const response = await accountApi.discordLinkRedirect();
+    if (!response.ok) {
+      this.discordStatus.textContent = "Couldn't connect Discord — try again.";
+      this.discordConnectButton.disabled = false;
+    }
+    // On success the page navigates away to Discord, so there's nothing left to reset here.
   }
 
   async saveUsername() {

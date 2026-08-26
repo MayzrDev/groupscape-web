@@ -60,16 +60,18 @@ class AdminApi {
     return response;
   }
 
-  async listFeatureFlags() {
-    const response = await fetch(`${this.baseUrl}/feature-flags`, { headers: this.authHeaders });
+  async deleteCharacter(characterId) {
+    const response = await fetch(`${this.baseUrl}/characters/${characterId}`, {
+      method: "DELETE",
+      headers: this.authHeaders,
+    });
     return response;
   }
 
-  async setFeatureFlag(flagKey, enabled, description) {
-    const response = await fetch(`${this.baseUrl}/feature-flags/${encodeURIComponent(flagKey)}`, {
-      method: "PUT",
-      headers: { ...this.authHeaders, "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled, description: description || null }),
+  async unlinkCharacterFromGroup(characterId) {
+    const response = await fetch(`${this.baseUrl}/characters/${characterId}/group-link`, {
+      method: "DELETE",
+      headers: this.authHeaders,
     });
     return response;
   }

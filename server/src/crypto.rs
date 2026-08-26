@@ -85,34 +85,51 @@ pub fn generate_temp_password() -> String {
     format!("{}-{:04}", word, digits)
 }
 
-/// A signed, self-verifying OAuth `state` value: `nonce.expiry.signature`. No server-side
-/// storage needed to validate it on callback, which matters here because the account API is
-/// stateless bearer-token auth (no session store to stash a pending-OAuth nonce in between the
-/// redirect to Discord and the callback).
+/// A signed, self-verifying OAuth `state` value: `nonce.expiry.link_account_id.signature`. No
+/// server-side storage needed to validate it on callback, which matters here because the account
+/// API is stateless bearer-token auth (no session store to stash a pending-OAuth nonce in between
+/// the redirect to Discord and the callback). `link_account_id` rides along the same way so the
+/// callback can tell a plain login apart from "link this Discord identity to my already-logged-in
+/// account" without needing the original request's Authorization header, which a Discord-issued
+/// redirect can never carry.
 const OAUTH_STATE_TTL_SECONDS: i64 = 600;
 
-pub fn new_oauth_state() -> String {
+/// The outcome of a verified OAuth `state`: either a plain login, or a request to link the
+/// Discord identity to the given already-authenticated account.
+pub enum OAuthStateIntent {
+    Login,
+    Link(i64),
+}
+
+pub fn new_oauth_state(link_account_id: Option<i64>) -> String {
     let nonce = uuid::Uuid::new_v4().hyphenated().to_string();
     let expires_at = chrono::Utc::now().timestamp() + OAUTH_STATE_TTL_SECONDS;
-    let payload = format!("{}.{}", nonce, expires_at);
+    let account_part = link_account_id.map_or_else(|| "-".to_string(), |id| id.to_string());
+    let payload = format!("{}.{}.{}", nonce, expires_at, account_part);
     let sig = token_hash(&payload, "oauth_state");
     format!("{}.{}", payload, sig)
 }
 
-pub fn verify_oauth_state(state: &str) -> bool {
-    let mut parts = state.splitn(3, '.');
-    let (Some(nonce), Some(expires_at), Some(sig)) = (parts.next(), parts.next(), parts.next())
+pub fn verify_oauth_state(state: &str) -> Option<OAuthStateIntent> {
+    let mut parts = state.splitn(4, '.');
+    let (Some(nonce), Some(expires_at), Some(account_part), Some(sig)) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
     else {
-        return false;
+        return None;
     };
-    let payload = format!("{}.{}", nonce, expires_at);
+    let payload = format!("{}.{}.{}", nonce, expires_at, account_part);
     let expected_sig = token_hash(&payload, "oauth_state");
     if sig != expected_sig {
-        return false;
+        return None;
     }
-    match expires_at.parse::<i64>() {
-        Ok(expires_at) => chrono::Utc::now().timestamp() < expires_at,
-        Err(_) => false,
+    let expires_at = expires_at.parse::<i64>().ok()?;
+    if chrono::Utc::now().timestamp() >= expires_at {
+        return None;
+    }
+    if account_part == "-" {
+        Some(OAuthStateIntent::Login)
+    } else {
+        account_part.parse::<i64>().ok().map(OAuthStateIntent::Link)
     }
 }
 
@@ -163,46 +180,52 @@ mod password_tests {
     }
 
     #[test]
-    fn oauth_state_round_trips() {
-        let state = new_oauth_state();
-        assert!(verify_oauth_state(&state));
+    fn oauth_state_round_trips_as_login() {
+        let state = new_oauth_state(None);
+        assert!(matches!(verify_oauth_state(&state), Some(OAuthStateIntent::Login)));
+    }
+
+    #[test]
+    fn oauth_state_round_trips_as_link() {
+        let state = new_oauth_state(Some(42));
+        assert!(matches!(verify_oauth_state(&state), Some(OAuthStateIntent::Link(42))));
     }
 
     #[test]
     fn oauth_states_are_unique() {
-        assert_ne!(new_oauth_state(), new_oauth_state());
+        assert_ne!(new_oauth_state(None), new_oauth_state(None));
     }
 
     #[test]
     fn oauth_state_rejects_tampered_signature() {
-        let mut state = new_oauth_state();
+        let mut state = new_oauth_state(None);
         state.push('x');
-        assert!(!verify_oauth_state(&state));
+        assert!(verify_oauth_state(&state).is_none());
     }
 
     #[test]
     fn oauth_state_rejects_tampered_expiry() {
-        let state = new_oauth_state();
-        let mut parts: Vec<&str> = state.splitn(3, '.').collect();
+        let state = new_oauth_state(None);
+        let mut parts: Vec<&str> = state.splitn(4, '.').collect();
         let tampered_expiry = (chrono::Utc::now().timestamp() + 999_999).to_string();
         parts[1] = &tampered_expiry;
         let tampered = parts.join(".");
-        assert!(!verify_oauth_state(&tampered));
+        assert!(verify_oauth_state(&tampered).is_none());
     }
 
     #[test]
     fn oauth_state_rejects_garbage() {
-        assert!(!verify_oauth_state("not-a-real-state"));
-        assert!(!verify_oauth_state(""));
+        assert!(verify_oauth_state("not-a-real-state").is_none());
+        assert!(verify_oauth_state("").is_none());
     }
 
     #[test]
     fn oauth_state_rejects_expired() {
         let nonce = uuid::Uuid::new_v4().hyphenated().to_string();
         let expired_at = chrono::Utc::now().timestamp() - 1;
-        let payload = format!("{}.{}", nonce, expired_at);
+        let payload = format!("{}.{}.-", nonce, expired_at);
         let sig = token_hash(&payload, "oauth_state");
         let state = format!("{}.{}", payload, sig);
-        assert!(!verify_oauth_state(&state));
+        assert!(verify_oauth_state(&state).is_none());
     }
 }

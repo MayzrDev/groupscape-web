@@ -1,6 +1,13 @@
 import { BaseElement } from "../base-element/base-element";
 import { accountApi } from "../data/account-api";
 
+const DISCORD_ERROR_MESSAGES = {
+  discord_state_mismatch: "Discord login expired before it finished. Please try again.",
+  discord_failed: "Discord login failed. Please try again.",
+  discord_already_linked: "That Discord account is already linked to a different GroupScape account.",
+  account_disabled: "This account has been disabled.",
+};
+
 export class AccountLoginPage extends BaseElement {
   constructor() {
     super();
@@ -30,6 +37,15 @@ export class AccountLoginPage extends BaseElement {
 
     this.eventListener(this.loginButton, "click", this.login.bind(this));
     this.eventListener(this.discordButton, "click", this.discordLogin.bind(this));
+
+    this.showDiscordErrorIfPresent();
+  }
+
+  showDiscordErrorIfPresent() {
+    const errorCode = sessionStorage.getItem("discordError");
+    if (!errorCode) return;
+    sessionStorage.removeItem("discordError");
+    this.error.textContent = DISCORD_ERROR_MESSAGES[errorCode] || "Discord login failed. Please try again.";
   }
 
   disconnectedCallback() {

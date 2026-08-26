@@ -24,7 +24,7 @@
   border-radius: 8px;
   margin-bottom: 18px;
   border: 1px solid var(--light-border);
-  background: var(--elevated);
+  background: var(--darken);
 }
 
 .admin-status-banner--suspended {

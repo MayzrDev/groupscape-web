@@ -206,12 +206,11 @@ async fn authenticate_via_db(
         .map_err(|_| actix_web::error::ErrorInternalServerError(""))?
         .ok_or_else(|| actix_web::error::ErrorUnauthorized(""))?;
 
-    let character = match db::find_character_by_account_hash(&client, account_hash)
+    let character = match db::find_character_by_account_and_hash(&client, account.id, account_hash)
         .await
         .map_err(|_| actix_web::error::ErrorInternalServerError(""))?
     {
-        Some(character) if character.account_id == account.id => character,
-        Some(_) => return Err(actix_web::error::ErrorUnauthorized("")),
+        Some(character) => character,
         None => {
             let denylisted = db::is_character_denylisted(&client, account.id, account_hash)
                 .await
@@ -312,6 +311,7 @@ where
                 let authentication_result = AuthenticationResult {
                     group_id: resolved.group_id.expect("checked above"),
                     account_hash: Some(account_hash.clone()),
+                    character_id: Some(resolved.character_id),
                 };
                 req.extensions_mut()
                     .insert::<Rc<AuthenticationResult>>(Rc::new(authentication_result));

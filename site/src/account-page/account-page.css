@@ -57,22 +57,74 @@ account-page {
   font-size: 1.1em;
 }
 
-.account-page__discord-display {
+.account-page__discord-row {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 2px;
-  font-size: 0.95em;
-  color: var(--primary-text);
+  gap: 12px;
 }
 
-.account-page__discord-display[hidden] {
+.account-page__discord-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #5865f2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.account-page__discord-icon img {
+  width: 17px;
+  height: 17px;
+}
+
+.account-page__discord-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-page__discord-name-value {
+  font-size: 0.95em;
+}
+
+.account-page__discord-name-value--unlinked {
+  opacity: 0.6;
+}
+
+.account-page__discord-badge {
+  font-size: 0.75em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(13, 193, 13, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(13, 193, 13, 0.35);
+  white-space: nowrap;
+}
+
+.account-page__discord-badge[hidden] {
   display: none;
 }
 
-.account-page__discord-display img {
-  width: 16px;
-  height: 16px;
+/* Overrides `button.men-button`'s carved-stone `border-image` with a flat Discord-blurple
+   button, so this reads as a third-party connect action rather than a regular RS-styled button -
+   needs the extra `button` in the selector to out-specificity the base rule it's overriding. */
+button.account-page__discord-connect,
+.dark-mode button.account-page__discord-connect {
+  border-image: none;
+  border-color: #4a54d6;
+  background: #5865f2;
+  color: white;
+}
+
+button.account-page__discord-connect:hover,
+.dark-mode button.account-page__discord-connect:hover {
+  background: #4a54d6;
+  border-color: #3c45b0;
+}
+
+.account-page__discord-connect[hidden] {
+  display: none;
 }
 
 .account-page__since {

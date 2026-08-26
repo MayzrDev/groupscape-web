@@ -271,7 +271,10 @@ pub async fn unlink_character(
 /// hands the browser its account hash and an RSN, and the browser's already-authenticated
 /// session is the proof of which account it links to. Re-linking the same account_hash to the
 /// same account is treated as an idempotent RSN refresh (the RSN can change via a name change
-/// while the underlying game account, identified by its stable hash, stays the same).
+/// while the underlying game account, identified by its stable hash, stays the same). The same
+/// account_hash can be linked to more than one account at once - each gets its own character row
+/// (see `find_character_by_account_and_hash`) - since telemetry sync is gated by which account's
+/// API key submits it, not by exclusive ownership of the account_hash.
 #[post("/characters/link")]
 pub async fn link_character(
     link_character: web::Json<LinkCharacter>,
@@ -288,18 +291,16 @@ pub async fn link_character(
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let existing = db::find_character_by_account_hash(&client, &account_hash).await?;
+    let existing =
+        db::find_character_by_account_and_hash(&client, authenticated.id, &account_hash).await?;
 
     if let Some(existing) = existing {
-        if existing.account_id != authenticated.id {
-            return Err(ApiError::CharacterLinkedToAnotherAccountError.into());
-        }
         let refreshed = db::update_character_display_rsn(&client, existing.id, &rsn, None, None).await?;
         return Ok(HttpResponse::Ok().json(Character::from(refreshed)));
     }
 
     if db::is_character_denylisted(&client, authenticated.id, &account_hash).await? {
-        return Err(ApiError::CharacterLinkedToAnotherAccountError.into());
+        return Err(ApiError::CharacterDenylistedError.into());
     }
 
     let character_count = db::count_characters_for_account(&client, authenticated.id).await?;
@@ -484,10 +485,30 @@ pub async fn discord_redirect(config: web::Data<Config>) -> Result<HttpResponse,
         return Ok(HttpResponse::ServiceUnavailable().body("Discord login is not configured"));
     }
 
-    let state = crypto::new_oauth_state();
+    let state = crypto::new_oauth_state(None);
     Ok(HttpResponse::Found()
         .append_header(("Location", discord::authorize_url(&config.discord, &state)))
         .finish())
+}
+
+/// Lets an already-logged-in account attach their Discord identity instead of creating a second,
+/// disconnected account (the bug `discord_callback` used to hit for any existing user who tried
+/// Discord login). Returns the authorize URL as JSON rather than a redirect, since this is an
+/// authenticated bearer-token request the browser can't just navigate to directly - the SPA
+/// fetches this, then does the top-level navigation itself.
+#[get("/discord/link/redirect")]
+pub async fn discord_link_redirect(
+    authenticated: AccountAuthenticated,
+    config: web::Data<Config>,
+) -> Result<HttpResponse, Error> {
+    if !config.discord.enabled {
+        return Ok(HttpResponse::ServiceUnavailable().body("Discord login is not configured"));
+    }
+
+    let state = crypto::new_oauth_state(Some(authenticated.id));
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "redirect_url": discord::authorize_url(&config.discord, &state)
+    })))
 }
 
 /// §8: Discord OAuth, `identify` scope only - a standalone login method ported from
@@ -519,9 +540,9 @@ pub async fn discord_callback(
     let (Some(code), Some(state)) = (query.code.as_deref(), query.state.as_deref()) else {
         return Ok(redirect_to("error=discord_state_mismatch"));
     };
-    if !crypto::verify_oauth_state(state) {
+    let Some(intent) = crypto::verify_oauth_state(state) else {
         return Ok(redirect_to("error=discord_state_mismatch"));
-    }
+    };
 
     let discord_user = match discord::exchange_code(&config.discord, code).await {
         Ok(user) => user,
@@ -529,19 +550,43 @@ pub async fn discord_callback(
     };
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let (_, fresh_api_key) = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
-        Some(account) => (account, None),
-        None => {
-            let account_id =
-                db::create_account_with_discord_id(&client, &discord_user.id).await?;
-            let api_key = crypto::new_api_key();
-            db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key))
-                .await?;
-            let account = db::get_account_by_discord_id(&client, &discord_user.id)
-                .await?
-                .ok_or(ApiError::InvalidCredentialsError)?;
-            (account, Some(api_key))
-        }
+
+    // Linking an already-authenticated account to this Discord identity, rather than logging in.
+    // Doesn't re-issue a session token - the caller is already logged in, so the existing session
+    // stays valid; the SPA just needs to know to refresh its view of `/account/me`.
+    if let crypto::OAuthStateIntent::Link(account_id) = intent {
+        return match db::link_discord_id_to_account(
+            &client,
+            account_id,
+            &discord_user.id,
+            &discord_user.name,
+        )
+        .await
+        {
+            Ok(()) => Ok(redirect_to("discord_linked=1")),
+            Err(ApiError::DiscordIdAlreadyLinkedError) => {
+                Ok(redirect_to("error=discord_already_linked"))
+            }
+            Err(err) => Err(err.into()),
+        };
+    }
+
+    // `get_account_by_discord_id` is checked again after a failed create (rather than treating
+    // that failure as fatal) so a concurrent request for the same never-seen-before Discord user -
+    // two tabs, a double click, a prefetching client - resolves to the account the other request
+    // just created instead of surfacing the unique-violation as a 500.
+    let fresh_api_key = match db::get_account_by_discord_id(&client, &discord_user.id).await? {
+        Some(_) => None,
+        None => match db::create_account_with_discord_id(&client, &discord_user.id).await {
+            Ok(account_id) => {
+                let api_key = crypto::new_api_key();
+                db::set_account_api_key_hash(&client, account_id, &crypto::api_key_hash(&api_key))
+                    .await?;
+                Some(api_key)
+            }
+            Err(ApiError::DiscordIdAlreadyLinkedError) => None,
+            Err(err) => return Err(err.into()),
+        },
     };
     db::update_account_discord_name(&client, &discord_user.id, &discord_user.name).await?;
     let account = db::get_account_by_discord_id(&client, &discord_user.id)

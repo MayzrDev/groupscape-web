@@ -66,7 +66,6 @@ import "./admin-navigation/admin-navigation.js";
 import "./admin-login-page/admin-login-page.js";
 import "./admin-groups-page/admin-groups-page.js";
 import "./admin-group-detail-page/admin-group-detail-page.js";
-import "./admin-feature-flags-page/admin-feature-flags-page.js";
 import "./admin-audit-log-page/admin-audit-log-page.js";
 import "./admin-accounts-page/admin-accounts-page.js";
 import "./admin-dashboard-page/admin-dashboard-page.js";
@@ -79,4 +78,9 @@ import "./onboarding-page/onboarding-page.js";
 import "./toast-stack/toast-stack.js";
 import { accountApi } from "./data/account-api";
 
-accountApi.handleDiscordCallback();
+const discordCallbackResult = accountApi.handleDiscordCallback();
+if (discordCallbackResult.status === "error") {
+  sessionStorage.setItem("discordError", discordCallbackResult.error);
+} else if (discordCallbackResult.status === "linked") {
+  sessionStorage.setItem("discordLinked", "1");
+}

@@ -19,19 +19,52 @@ describe("accountApi", () => {
   it("consumes a Discord callback and routes to onboarding", () => {
     window.location.hash = "#token=discord-session&api_key=discord-key";
 
-    expect(accountApi.handleDiscordCallback()).toBe(true);
+    expect(accountApi.handleDiscordCallback()).toEqual({ status: "logged_in" });
     expect(accountStorage.getAccountToken()).toBe("discord-session");
     expect(sessionStorage.getItem("freshApiKey")).toBe("discord-key");
     expect(window.location.pathname).toBe("/welcome");
     expect(window.location.hash).toBe("");
   });
 
-  it("ignores callback fragments without a token", () => {
+  it("surfaces a Discord error and routes back to login", () => {
     window.location.hash = "#error=discord_failed";
 
-    expect(accountApi.handleDiscordCallback()).toBe(false);
+    expect(accountApi.handleDiscordCallback()).toEqual({ status: "error", error: "discord_failed" });
     expect(accountStorage.getAccountToken()).toBeNull();
-    expect(window.location.hash).toBe("#error=discord_failed");
+    expect(window.location.pathname).toBe("/account/login");
+    expect(window.location.hash).toBe("");
+  });
+
+  it("reports a completed Discord link and routes to the account page", () => {
+    window.location.hash = "#discord_linked=1";
+
+    expect(accountApi.handleDiscordCallback()).toEqual({ status: "linked" });
+    expect(window.location.pathname).toBe("/account");
+    expect(window.location.hash).toBe("");
+  });
+
+  it("ignores callback fragments with none of token/error/discord_linked", () => {
+    window.location.hash = "#foo=bar";
+
+    expect(accountApi.handleDiscordCallback()).toEqual({ status: "none" });
+    expect(window.location.hash).toBe("#foo=bar");
+  });
+
+  it("discordLinkRedirect fetches a signed authorize url and navigates to it", async () => {
+    accountStorage.storeAccountToken("session-token");
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ redirect_url: "https://discord.com/oauth2/authorize?state=abc" }),
+    });
+
+    await accountApi.discordLinkRedirect();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/account/discord/link/redirect",
+      expect.objectContaining({ headers: { Authorization: "session-token" } }),
+    );
+    expect(window.location.href).toContain("https://discord.com/oauth2/authorize");
   });
 
   it("register stores the session token on success", async () => {

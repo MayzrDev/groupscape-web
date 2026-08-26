@@ -128,6 +128,11 @@ pub struct AuthenticationResult {
     /// URL + API key. `None` for the group-token dashboard scope, which has no notion of an
     /// individual account.
     pub account_hash: Option<String>,
+    /// The specific character row the character-key auth middleware resolved this request to -
+    /// always `Some` alongside `account_hash`. Since the same `account_hash` can now be linked to
+    /// more than one account, this is what disambiguates which account's row a caller should use
+    /// (re-deriving from `account_hash` alone would be ambiguous).
+    pub character_id: Option<i64>,
 }
 type AuthenticationInfo = Rc<AuthenticationResult>;
 pub struct Authenticated(AuthenticationInfo);
@@ -292,6 +297,7 @@ where
                 let authentication_result = AuthenticationResult {
                     group_id,
                     account_hash: None,
+                    character_id: None,
                 };
                 req.extensions_mut()
                     .insert::<AuthenticationInfo>(Rc::new(authentication_result));

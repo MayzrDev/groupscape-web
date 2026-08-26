@@ -380,7 +380,17 @@ pub async fn update_group_member(
         .or_else(|| group_member_inner.account_hash.clone())
     {
         let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-        if let Some(character) = db::find_character_by_account_hash(&client, &account_hash).await? {
+        let character = match auth.character_id {
+            Some(character_id) => db::find_character_by_id(&client, character_id).await?,
+            // Legacy plugin builds and the client-supplied JSON fallback don't carry a resolved
+            // character_id, so fall back to whichever account has this account_hash linked to
+            // this specific group (unambiguous even if multiple accounts share the account_hash).
+            None => {
+                db::find_character_by_account_hash_and_group(&client, &account_hash, auth.group_id)
+                    .await?
+            }
+        };
+        if let Some(character) = character {
             linked_account_id = Some(character.account_id);
             let linked_to_this_group = db::find_character_group_link(&client, character.id)
                 .await?

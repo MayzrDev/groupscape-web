@@ -64,13 +64,14 @@ pub enum ApiError {
     AdminRateLimitedError,
     #[from(ignore)]
     DiscordOAuthError(String),
+    DiscordIdAlreadyLinkedError,
     #[from(ignore)]
     CreateCharacterError(tokio_postgres::error::Error),
     #[from(ignore)]
     GetCharacterError(tokio_postgres::error::Error),
     #[from(ignore)]
     DeleteCharacterError(tokio_postgres::error::Error),
-    CharacterLinkedToAnotherAccountError,
+    CharacterDenylistedError,
     CharacterCapReachedError,
     CharacterNotFoundError,
     CharacterAlreadyInGroupError,
@@ -232,11 +233,13 @@ impl ResponseError for ApiError {
                 log::error!("DiscordOAuthError: {}", reason);
                 HttpResponse::BadGateway().body("Discord login failed")
             }
+            ApiError::DiscordIdAlreadyLinkedError => HttpResponse::Conflict()
+                .body("That Discord account is already linked to a different GroupScape account"),
             ApiError::CreateCharacterError(ref err) => handle_pg_error(err, "CreateCharacterError"),
             ApiError::GetCharacterError(ref err) => handle_pg_error(err, "GetCharacterError"),
             ApiError::DeleteCharacterError(ref err) => handle_pg_error(err, "DeleteCharacterError"),
-            ApiError::CharacterLinkedToAnotherAccountError => HttpResponse::Conflict()
-                .body("Character already linked to another account. Unlink it there first."),
+            ApiError::CharacterDenylistedError => HttpResponse::Conflict()
+                .body("This character was removed from your account and can't be re-linked."),
             ApiError::CharacterCapReachedError => {
                 HttpResponse::Forbidden().body("Character cap reached")
             }

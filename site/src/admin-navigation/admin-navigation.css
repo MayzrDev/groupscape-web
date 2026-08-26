@@ -5,6 +5,7 @@ admin-navigation {
   flex-wrap: wrap;
   padding: 10px 16px;
   border-bottom: 3px solid var(--admin-accent);
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.55));
 }
 
 .admin-navigation__brand {
@@ -53,5 +54,6 @@ admin-navigation {
 
 .admin-navigation__tab.active {
   opacity: 1;
+  color: var(--orange);
   box-shadow: inset 0 -3px var(--admin-accent);
 }

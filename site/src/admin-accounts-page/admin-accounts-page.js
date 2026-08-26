@@ -223,14 +223,29 @@ export class AdminAccountsPage extends BaseElement {
         ? account.characters
             .map(
               (c) => `
-        <div class="admin-accounts__row-item">
+        <div class="admin-accounts__row-item" data-character-id="${c.id}">
           <span>${c.display_rsn}</span>
-          <span class="admin-accounts__row-item-meta">${c.status}</span>
+          <span class="admin-accounts__row-item-meta">${c.group_name ? `in ${c.group_name}` : c.status}</span>
+          ${
+            c.group_id
+              ? `<button class="admin-btn admin-btn--small js-unlink-character" data-character-id="${c.id}">Unlink</button>`
+              : ""
+          }
+          <button class="admin-btn admin-btn--small admin-btn--danger js-delete-character" data-character-id="${
+            c.id
+          }">Delete</button>
         </div>
       `
             )
             .join("")
         : `<div class="admin-accounts__empty-row">No linked characters.</div>`;
+
+    for (const button of this.charactersList.querySelectorAll(".js-unlink-character")) {
+      this.eventListener(button, "click", () => this.unlinkCharacter(button.dataset.characterId));
+    }
+    for (const button of this.charactersList.querySelectorAll(".js-delete-character")) {
+      this.eventListener(button, "click", () => this.deleteCharacter(button.dataset.characterId));
+    }
 
     this.sessionCount.textContent = account.session_count;
     this.renderSessions();
@@ -424,6 +439,29 @@ export class AdminAccountsPage extends BaseElement {
       const response = await adminApi.revokeAccountSession(this.detail.id, sessionId);
       if (!response.ok) throw new Error("Failed to revoke session.");
       await this.fetchDetail();
+    });
+  }
+
+  async unlinkCharacter(characterId) {
+    await this.runAction(async () => {
+      const response = await adminApi.unlinkCharacterFromGroup(characterId);
+      if (!response.ok) throw new Error("Failed to unlink character from group.");
+      await this.fetchDetail();
+    });
+  }
+
+  deleteCharacter(characterId) {
+    const character = this.detail.characters.find((c) => String(c.id) === String(characterId));
+    confirmDialogManager.confirm({
+      headline: `Delete ${character?.display_rsn ?? "this character"}?`,
+      body: "This permanently removes the character and any group membership it holds. This cannot be undone.",
+      yesCallback: () =>
+        this.runAction(async () => {
+          const response = await adminApi.deleteCharacter(characterId);
+          if (!response.ok) throw new Error("Failed to delete character.");
+          await this.fetchDetail();
+        }),
+      noCallback: () => {},
     });
   }
 

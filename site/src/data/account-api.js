@@ -57,18 +57,40 @@ class AccountApi {
     return `${this.baseUrl}/discord/redirect`;
   }
 
+  get discordLinkRedirectUrl() {
+    return `${this.baseUrl}/discord/link/redirect`;
+  }
+
+  /**
+   * Discord's callback lands the browser back on `/#token=...` (or `#error=...` /
+   * `#discord_linked=1`) as a URL fragment - see `handleDiscordCallback` for why it's a fragment
+   * rather than a query string. Reads whichever of those three outcomes is present and always
+   * clears the fragment, so this is safe to call unconditionally on every page load.
+   */
   handleDiscordCallback() {
     const params = new URLSearchParams(window.location.hash.slice(1));
     const token = params.get("token");
-    if (!token) return false;
+    const error = params.get("error");
+    const linked = params.get("discord_linked");
+    if (!token && !error && !linked) return { status: "none" };
 
-    accountStorage.storeAccountToken(token);
-    const apiKey = params.get("api_key");
-    if (apiKey) {
-      sessionStorage.setItem("freshApiKey", apiKey);
+    if (token) {
+      accountStorage.storeAccountToken(token);
+      const apiKey = params.get("api_key");
+      if (apiKey) {
+        sessionStorage.setItem("freshApiKey", apiKey);
+      }
+      window.history.replaceState("", "", "/welcome");
+      return { status: "logged_in" };
     }
-    window.history.replaceState("", "", "/welcome");
-    return true;
+
+    if (linked) {
+      window.history.replaceState("", "", "/account");
+      return { status: "linked" };
+    }
+
+    window.history.replaceState("", "", "/account/login");
+    return { status: "error", error };
   }
 
   get usernameUrl() {
@@ -188,6 +210,20 @@ class AccountApi {
       return null;
     }
     return response.arrayBuffer();
+  }
+
+  /**
+   * Fetches a signed Discord authorize URL bound to the logged-in account (see
+   * `discord_link_redirect` on the server), then navigates the whole page there - Discord's own
+   * redirect can't carry an Authorization header, so the account id has to ride along inside the
+   * OAuth `state` instead of being read from a header when Discord calls back.
+   */
+  async discordLinkRedirect() {
+    const response = await this.authedFetch(this.discordLinkRedirectUrl);
+    if (!response.ok) return response;
+    const { redirect_url } = await response.json();
+    window.location.href = redirect_url;
+    return response;
   }
 
   async regenerateApiKey() {

@@ -731,7 +731,7 @@ pub enum PermissionKey {
 }
 
 /// Partial update over [`PermissionFlags`] - `None` per field leaves the stored value
-/// untouched, same "only touch what's provided" shape as [`AdminSetFeatureFlag`].
+/// untouched.
 #[derive(Deserialize, Clone, Copy, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PermissionFlagsPatch {
@@ -877,20 +877,6 @@ pub struct AdminModerationRequest {
     pub reason: Option<String>,
 }
 
-#[derive(Serialize)]
-pub struct AdminFeatureFlag {
-    pub flag_key: String,
-    pub enabled: bool,
-    pub description: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct AdminSetFeatureFlag {
-    pub enabled: bool,
-    #[serde(default)]
-    pub description: Option<String>,
-}
 
 #[derive(Serialize)]
 pub struct AdminAuditLogEntry {
@@ -958,6 +944,8 @@ pub struct AdminAccountCharacter {
     pub display_rsn: String,
     pub status: String,
     pub bound_at: DateTime<Utc>,
+    pub group_id: Option<i64>,
+    pub group_name: Option<String>,
 }
 
 #[derive(Serialize)]

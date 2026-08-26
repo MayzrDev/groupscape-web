@@ -69,7 +69,7 @@ export class LinkPage extends BaseElement {
         this.status.textContent = `Linked ${this.rsn} to your account.`;
         this.actions.innerHTML = `<men-link link-href="/account/characters">View your characters</men-link>`;
       } else if (response.status === 409) {
-        this.error.textContent = "That character is already linked to a different account.";
+        this.error.textContent = "That character was removed from your account and can't be re-linked.";
       } else if (response.status === 403) {
         this.error.textContent = "You've already linked the maximum number of characters.";
       } else {

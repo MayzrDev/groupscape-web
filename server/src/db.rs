@@ -3,7 +3,7 @@ use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
     AdminAccountSession, AdminAccountSummary, AdminAuditLogEntry, AdminDashboard,
-    AdminFeatureFlag, AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
+    AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
     CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
     GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession, GroupSkillData,
     ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
@@ -615,6 +615,8 @@ SELECT cm.mesh FROM groupscape.character_mesh cm
 INNER JOIN groupscape.characters c ON c.character_id=cm.character_id
 INNER JOIN groupscape.members m ON m.account_hash=c.account_hash
 WHERE m.group_id=$1 AND m.member_name=$2
+ORDER BY cm.mesh_last_update DESC
+LIMIT 1
 "#,
         )
         .await?;
@@ -699,7 +701,14 @@ CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE N
 CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements,
 CASE WHEN character_mesh.mesh_last_update >= $1::TIMESTAMPTZ THEN character_mesh.mesh_last_update ELSE NULL END as portrait_last_update
 FROM groupscape.members
-LEFT JOIN groupscape.characters ON characters.account_hash = members.account_hash
+LEFT JOIN LATERAL (
+  SELECT c.character_id
+  FROM groupscape.characters c
+  LEFT JOIN groupscape.character_mesh cm ON cm.character_id = c.character_id
+  WHERE c.account_hash = members.account_hash
+  ORDER BY cm.mesh_last_update DESC NULLS LAST
+  LIMIT 1
+) characters ON true
 LEFT JOIN groupscape.character_mesh ON character_mesh.character_id = characters.character_id
 WHERE group_id=$2
 "#,
@@ -1633,7 +1642,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS accounts_discord_id_idx ON groupscape.accounts
 CREATE TABLE IF NOT EXISTS groupscape.characters (
   character_id BIGSERIAL PRIMARY KEY,
   account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
-  account_hash TEXT NOT NULL UNIQUE,
+  account_hash TEXT NOT NULL,
   display_rsn TEXT NOT NULL,
   bound_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -2313,6 +2322,27 @@ CREATE TABLE IF NOT EXISTS groupscape.item_bonuses (
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "allow_character_multi_account_link").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                "ALTER TABLE groupscape.characters DROP CONSTRAINT IF EXISTS characters_account_hash_key",
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS characters_account_id_account_hash_idx ON groupscape.characters (account_id, account_hash)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "allow_character_multi_account_link").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -2473,11 +2503,47 @@ pub async fn create_account_with_discord_id(
     let stmt = client
         .prepare_cached("INSERT INTO groupscape.accounts (discord_id) VALUES ($1) RETURNING id")
         .await?;
-    let row = client
-        .query_one(&stmt, &[&discord_id])
+    match client.query_one(&stmt, &[&discord_id]).await {
+        Ok(row) => Ok(row.try_get(0)?),
+        Err(err) => {
+            if err.as_db_error().is_some_and(|db_err| {
+                db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
+            }) {
+                Err(ApiError::DiscordIdAlreadyLinkedError)
+            } else {
+                Err(ApiError::CreateAccountError(err))
+            }
+        }
+    }
+}
+
+/// Attaches a Discord identity to an *already-existing* account (the "link Discord" flow for a
+/// user who registered with a username/password first) rather than creating a second, empty
+/// account the way `create_account_with_discord_id` does for a brand-new Discord login. The
+/// partial unique index on `discord_id` still enforces one account per Discord identity, so a
+/// Discord account already linked elsewhere surfaces as `DiscordIdAlreadyLinkedError`.
+pub async fn link_discord_id_to_account(
+    client: &Client,
+    account_id: i64,
+    discord_id: &str,
+    discord_name: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET discord_id=$2, discord_name=$3 WHERE id=$1")
+        .await?;
+    client
+        .execute(&stmt, &[&account_id, &discord_id, &discord_name])
         .await
-        .map_err(ApiError::CreateAccountError)?;
-    Ok(row.try_get(0)?)
+        .map_err(|err| {
+            if err.as_db_error().is_some_and(|db_err| {
+                db_err.code() == &tokio_postgres::error::SqlState::UNIQUE_VIOLATION
+            }) {
+                ApiError::DiscordIdAlreadyLinkedError
+            } else {
+                ApiError::GetAccountError(err)
+            }
+        })?;
+    Ok(())
 }
 
 pub async fn update_account_discord_name(
@@ -2813,6 +2879,12 @@ fn character_from_row(row: Row) -> Result<Character, ApiError> {
     })
 }
 
+/// Any account's row for this `account_hash` - since a character can now be linked to more than
+/// one account, this returns an arbitrary match and should only be used where the caller doesn't
+/// care which account it belongs to (e.g. denylist-adjacent checks). Prefer
+/// `find_character_by_account_and_hash` (single account) or
+/// `find_character_by_account_hash_and_group` (this group's linked account) wherever the caller
+/// needs a specific one.
 pub async fn find_character_by_account_hash(
     client: &Client,
     account_hash: &str,
@@ -2824,6 +2896,55 @@ pub async fn find_character_by_account_hash(
         .await?;
     let row = client
         .query_opt(&stmt, &[&account_hash])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    match row {
+        Some(row) => Ok(Some(character_from_row(row)?)),
+        None => Ok(None),
+    }
+}
+
+/// This account's own row for `account_hash`, if it has linked this character - distinct from
+/// `find_character_by_account_hash`, since the same `account_hash` can now have a row under
+/// multiple accounts.
+pub async fn find_character_by_account_and_hash(
+    client: &Client,
+    account_id: i64,
+    account_hash: &str,
+) -> Result<Option<Character>, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT {CHARACTER_COLUMNS} FROM groupscape.characters WHERE account_id=$1 AND account_hash=$2"
+        ))
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_id, &account_hash])
+        .await
+        .map_err(ApiError::GetCharacterError)?;
+    match row {
+        Some(row) => Ok(Some(character_from_row(row)?)),
+        None => Ok(None),
+    }
+}
+
+/// The specific account's character row for `account_hash` that is linked to `group_id` - used
+/// where multiple accounts may have linked the same `account_hash` and the caller needs the one
+/// tied to this particular group's roster.
+pub async fn find_character_by_account_hash_and_group(
+    client: &Client,
+    account_hash: &str,
+    group_id: i64,
+) -> Result<Option<Character>, ApiError> {
+    let stmt = client
+        .prepare_cached(&format!(
+            "SELECT c.character_id, c.account_id, c.account_hash, c.display_rsn, c.bound_at, c.status, c.combat_level, c.total_level \
+             FROM groupscape.characters c \
+             JOIN groupscape.character_group_links cgl ON cgl.character_id = c.character_id \
+             WHERE c.account_hash=$1 AND cgl.group_id=$2"
+        ))
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&account_hash, &group_id])
         .await
         .map_err(ApiError::GetCharacterError)?;
     match row {
@@ -3601,9 +3722,8 @@ pub async fn update_member_color(
     Ok((member_name, permissions))
 }
 
-/// Partial update - each `None` field leaves its current DB value untouched (COALESCE), same
-/// pattern as `admin_set_feature_flag`'s upsert. Returns `None` if the account has no
-/// permissions row for this group (not a member).
+/// Partial update - each `None` field leaves its current DB value untouched (COALESCE).
+/// Returns `None` if the account has no permissions row for this group (not a member).
 ///
 /// The group admin's permission row is never writable through this path - their all-permissions
 /// access is implicit (see [`has_group_permission`]) and not stored as toggles, so a patch
@@ -4204,6 +4324,14 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
         .await
         .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupMembersError".to_string(), e))?;
 
+    let delete_character_links_stmt = transaction
+        .prepare_cached("DELETE FROM groupscape.character_group_links WHERE group_id = $1")
+        .await?;
+    transaction
+        .execute(&delete_character_links_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupCharacterLinksError".to_string(), e))?;
+
     let delete_moderation_stmt = transaction
         .prepare_cached("DELETE FROM groupscape.group_moderation WHERE group_id = $1")
         .await?;
@@ -4225,48 +4353,6 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
         .await
         .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupCommitError".to_string(), e))?;
 
-    Ok(())
-}
-
-pub async fn admin_list_feature_flags(client: &Client) -> Result<Vec<AdminFeatureFlag>, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            "SELECT flag_key, enabled, description FROM groupscape.feature_flags ORDER BY flag_key",
-        )
-        .await?;
-    let rows = client
-        .query(&stmt, &[])
-        .await
-        .map_err(|e| ApiError::AdminDbError("AdminListFeatureFlagsError".to_string(), e))?;
-    Ok(rows
-        .into_iter()
-        .map(|row| AdminFeatureFlag {
-            flag_key: row.get("flag_key"),
-            enabled: row.get("enabled"),
-            description: row.get("description"),
-        })
-        .collect())
-}
-
-pub async fn admin_set_feature_flag(
-    client: &Client,
-    flag_key: &str,
-    enabled: bool,
-    description: Option<&str>,
-) -> Result<(), ApiError> {
-    let stmt = client
-        .prepare_cached(
-            r#"
-INSERT INTO groupscape.feature_flags (flag_key, enabled, description, updated_at)
-VALUES ($1, $2, $3, now())
-ON CONFLICT (flag_key) DO UPDATE SET enabled = $2, description = COALESCE($3, groupscape.feature_flags.description), updated_at = now()
-"#,
-        )
-        .await?;
-    client
-        .execute(&stmt, &[&flag_key, &enabled, &description])
-        .await
-        .map_err(|e| ApiError::AdminDbError("AdminSetFeatureFlagError".to_string(), e))?;
     Ok(())
 }
 
@@ -5179,7 +5265,11 @@ ORDER BY g.group_name
 
     let characters_stmt = client
         .prepare_cached(
-            "SELECT character_id, display_rsn, status, bound_at FROM groupscape.characters WHERE account_id=$1 ORDER BY bound_at",
+            "SELECT c.character_id, c.display_rsn, c.status, c.bound_at, l.group_id, g.group_name \
+             FROM groupscape.characters c \
+             LEFT JOIN groupscape.character_group_links l ON l.character_id = c.character_id \
+             LEFT JOIN groupscape.groups g ON g.group_id = l.group_id \
+             WHERE c.account_id=$1 ORDER BY c.bound_at",
         )
         .await?;
     let character_rows = client
@@ -5194,6 +5284,8 @@ ORDER BY g.group_name
                 display_rsn: row.try_get("display_rsn")?,
                 status: row.try_get("status")?,
                 bound_at: row.try_get("bound_at")?,
+                group_id: row.try_get("group_id")?,
+                group_name: row.try_get("group_name")?,
             })
         })
         .collect::<Result<Vec<_>, ApiError>>()?;

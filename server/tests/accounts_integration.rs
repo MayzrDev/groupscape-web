@@ -268,6 +268,50 @@ async fn test_discord_id_is_unique() {
 }
 
 #[tokio::test]
+async fn test_link_discord_id_attaches_to_existing_account() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+
+    let account_id = db::create_account(&client, "linkable", &password_hash)
+        .await
+        .unwrap();
+
+    db::link_discord_id_to_account(&client, account_id, "999000111", "Zezima")
+        .await
+        .expect("linking discord to an existing account should succeed");
+
+    let account = db::get_account_by_discord_id(&client, "999000111")
+        .await
+        .expect("query failed")
+        .expect("account should be found by its newly-linked discord id");
+    assert_eq!(account.id, account_id);
+    assert_eq!(account.username.as_deref(), Some("linkable"));
+    assert_eq!(account.discord_name.as_deref(), Some("Zezima"));
+}
+
+#[tokio::test]
+async fn test_link_discord_id_rejects_id_already_linked_elsewhere() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let password_hash = crypto::hash_password("hunter22").unwrap();
+
+    db::create_account_with_discord_id(&client, "222333444")
+        .await
+        .expect("failed to create discord account");
+    let account_id = db::create_account(&client, "linkable-two", &password_hash)
+        .await
+        .unwrap();
+
+    let result = db::link_discord_id_to_account(&client, account_id, "222333444", "Zezima").await;
+    assert!(matches!(result, Err(ApiError::DiscordIdAlreadyLinkedError)));
+}
+
+#[tokio::test]
 async fn test_link_character_creates_new_character() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
@@ -380,7 +424,7 @@ async fn test_update_character_display_rsn_sets_and_preserves_summary_stats() {
 }
 
 #[tokio::test]
-async fn test_account_hash_is_unique_across_accounts() {
+async fn test_account_hash_can_be_linked_to_multiple_accounts() {
     let _guard = TEST_MUTEX.lock().await;
     let pool = create_test_pool().await;
     setup(&pool).await;
@@ -397,20 +441,30 @@ async fn test_account_hash_is_unique_across_accounts() {
     db::create_character(&client, account_a, "shared-hash", "PlayerA")
         .await
         .expect("first link should succeed");
+    db::create_character(&client, account_b, "shared-hash", "PlayerB")
+        .await
+        .expect("second account should also be able to link the same account_hash");
 
-    let result = db::create_character(&client, account_b, "shared-hash", "PlayerB").await;
-    assert!(
-        result.is_err(),
-        "the same account_hash should not be linkable to two accounts"
-    );
-
-    // Confirms the endpoint handler's own conflict check has something real to compare
-    // against: the existing row still belongs to account_a, not account_b.
-    let found = db::find_character_by_account_hash(&client, "shared-hash")
+    // Each account gets its own row, disambiguated by find_character_by_account_and_hash.
+    let found_a = db::find_character_by_account_and_hash(&client, account_a, "shared-hash")
         .await
         .expect("query failed")
-        .expect("character should exist");
-    assert_eq!(found.account_id, account_a);
+        .expect("account_a's character should exist");
+    assert_eq!(found_a.account_id, account_a);
+    let found_b = db::find_character_by_account_and_hash(&client, account_b, "shared-hash")
+        .await
+        .expect("query failed")
+        .expect("account_b's character should exist");
+    assert_eq!(found_b.account_id, account_b);
+
+    // Re-linking the same account_hash to the same account is still an idempotent no-op at the
+    // DB uniqueness level (account_id, account_hash) - it's `link_character`'s job to route a
+    // repeat into an RSN refresh instead of calling create_character again.
+    let result = db::create_character(&client, account_a, "shared-hash", "PlayerA2").await;
+    assert!(
+        result.is_err(),
+        "the same account should not get a second row for the same account_hash"
+    );
 }
 
 #[tokio::test]
