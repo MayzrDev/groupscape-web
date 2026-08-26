@@ -53,8 +53,8 @@ class AdminApi {
   }
 
   async deleteGroup(groupId) {
-    const response = await fetch(`${this.baseUrl}/groups/${groupId}`, {
-      method: "DELETE",
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/delete`, {
+      method: "POST",
       headers: this.authHeaders,
     });
     return response;

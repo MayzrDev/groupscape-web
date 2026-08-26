@@ -128,7 +128,7 @@ pub async fn unban_group(
     set_group_moderation(&db_pool, path.into_inner(), "active", None, "group.unban").await
 }
 
-#[delete("/groups/{group_id}")]
+#[post("/groups/{group_id}/delete")]
 pub async fn delete_group(
     _auth: AdminAuthenticated,
     path: web::Path<i64>,
