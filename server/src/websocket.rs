@@ -116,6 +116,14 @@ pub struct KillEventPayload {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DropEventPayload {
+    pub member_name: String,
+    /// Pre-built by `NotableDropEvent::to_message` - the plugin relays this verbatim.
+    pub message: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ColorUpdatePayload {
     pub name: String,
     pub color: String,
@@ -134,6 +142,10 @@ pub enum WsEnvelope {
     },
     KillEvent {
         payload: KillEventPayload,
+        ts: DateTime<Utc>,
+    },
+    DropEvent {
+        payload: DropEventPayload,
         ts: DateTime<Utc>,
     },
     ColorUpdate {
@@ -221,7 +233,12 @@ pub async fn party_overlay_ws(
 
     let client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let colors = db::get_member_color_map(&client, group_id).await?;
-    let members = db::get_group_data(&client, group_id, &DateTime::<Utc>::MIN_UTC).await?;
+    let members = db::get_group_data(
+        &client,
+        group_id,
+        &DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
+    )
+    .await?;
     drop(client);
 
     let roster: Vec<RosterMemberEntry> = members

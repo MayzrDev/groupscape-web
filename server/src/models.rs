@@ -200,6 +200,12 @@ pub struct GroupMember {
     /// its own "alerts" upload key. Consumed once to trigger a web push, never stored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alerts: Option<Vec<AlertEvent>>,
+    /// Drops crossing the plugin-configured value threshold, from the plugin's
+    /// `NotableDropEvents` accumulator, under its own "notableDrops" upload key. Consumed once
+    /// to broadcast a chat message (and optionally a Discord post), never stored - same
+    /// ephemeral handling as `alerts`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notable_drops: Option<Vec<NotableDropEvent>>,
 }
 
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
@@ -362,6 +368,64 @@ pub struct WildernessEntryAlert {
     pub world_y: i32,
     pub plane: i32,
     pub world: i32,
+}
+
+/// Discriminates a [`NotableDropEvent`]'s loot source, matching the plugin's own
+/// `LootRecordType`-derived tag verbatim (`groupscape-plugin`'s `notableDropSourceType`).
+/// Drives which chat-message flavor [`NotableDropEvent::to_message`] picks.
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DropSourceType {
+    Kill,
+    Pvp,
+    Chest,
+    Pickpocket,
+    Unknown,
+}
+
+/// One notable-drop event, field names matching the plugin's `NotableDropEvents.onNotableDrop`
+/// transport shape verbatim (`groupscape-plugin`'s "notableDrops" upload key). `item_name`/
+/// `item_value` describe the single highest-value item in the drop (the chat message highlights
+/// one item rather than listing everything); `total_value` is the full drop's combined GE value,
+/// which is what actually gates whether this event exists at all (the plugin only emits one once
+/// the total crosses its configured threshold).
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct NotableDropEvent {
+    pub source_type: DropSourceType,
+    pub source_name: String,
+    pub item_name: String,
+    pub item_value: i64,
+    pub total_value: i64,
+}
+impl NotableDropEvent {
+    /// Builds the chat/Discord message text server-side (rather than in the plugin) so wording
+    /// can change without a plugin release, and so the same string can be relayed verbatim to
+    /// both the roster websocket and a Discord embed.
+    pub fn to_message(&self, member_name: &str) -> String {
+        match self.source_type {
+            DropSourceType::Kill => format!(
+                "{} received a drop from {}: {} ({} gp) — total {} gp",
+                member_name, self.source_name, self.item_name, self.item_value, self.total_value
+            ),
+            DropSourceType::Chest => format!(
+                "{} opened {} and got a drop: {} ({} gp) — total {} gp",
+                member_name, self.source_name, self.item_name, self.item_value, self.total_value
+            ),
+            DropSourceType::Pickpocket => format!(
+                "{} pickpocketed a drop from {}: {} ({} gp) — total {} gp",
+                member_name, self.source_name, self.item_name, self.item_value, self.total_value
+            ),
+            DropSourceType::Pvp => format!(
+                "{} got a drop from killing {}: {} ({} gp) — total {} gp",
+                member_name, self.source_name, self.item_name, self.item_value, self.total_value
+            ),
+            DropSourceType::Unknown => format!(
+                "{} got a drop: {} ({} gp) — total {} gp",
+                member_name, self.item_name, self.item_value, self.total_value
+            ),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -808,6 +872,7 @@ pub struct DiscordWebhookSettings {
     pub notify_kills: bool,
     pub notify_deaths: bool,
     pub notify_loot: bool,
+    pub notify_notable_drops: bool,
 }
 
 #[derive(Deserialize)]

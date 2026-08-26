@@ -89,6 +89,7 @@ pub async fn exchange_code(config: &DiscordConfig, code: &str) -> Result<Discord
 const KILL_COLOR: u32 = 0x2ECC71;
 const DEATH_COLOR: u32 = 0xE74C3C;
 const LOOT_COLOR: u32 = 0xF1C40F;
+const DROP_COLOR: u32 = 0x9B59B6;
 const TEST_COLOR: u32 = 0x5865F2;
 
 fn send_webhook_embed_sync(url: &str, title: &str, description: &str, color: u32) -> Result<(), ureq::Error> {
@@ -194,5 +195,39 @@ pub fn dispatch_event_webhook(
                 }
             }
         }
+    });
+}
+
+/// Fire-and-forget, mirroring `dispatch_event_webhook` above - posts the same message text
+/// already built for the roster-websocket broadcast (`NotableDropEvent::to_message`) as a
+/// Discord embed, when the group has a webhook configured and `notify_notable_drops` is on.
+/// Notable drops aren't a `GameEvent` (they're never stored, see `update_group_member`), so this
+/// takes the pre-built message directly rather than matching over the enum like the function
+/// above.
+pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String) {
+    tokio::spawn(async move {
+        let client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                log::warn!("discord: failed to get db client: {}", err);
+                return;
+            }
+        };
+        let settings = match db::get_discord_webhook_settings(&client, group_id).await {
+            Ok(settings) => settings,
+            Err(err) => {
+                log::warn!("discord: failed to load webhook settings: {}", err);
+                return;
+            }
+        };
+        drop(client);
+        let Some(webhook_url) = settings.webhook_url else {
+            return;
+        };
+        if !settings.notify_notable_drops {
+            return;
+        }
+
+        send_webhook_embed(webhook_url, "Drop", message, DROP_COLOR).await;
     });
 }

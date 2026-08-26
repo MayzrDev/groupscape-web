@@ -468,6 +468,7 @@ async fn test_discord_webhook_settings_round_trip() {
         notify_kills: true,
         notify_deaths: false,
         notify_loot: true,
+        notify_notable_drops: true,
     };
     db::update_discord_webhook_settings(&client, group_id, &updated)
         .await
@@ -498,6 +499,7 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_kills: true,
             notify_deaths: true,
             notify_loot: true,
+            notify_notable_drops: true,
         },
     )
     .await
@@ -511,6 +513,7 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_kills: true,
             notify_deaths: true,
             notify_loot: true,
+            notify_notable_drops: true,
         },
     )
     .await
@@ -539,6 +542,7 @@ async fn test_discord_webhook_settings_scoped_per_group() {
             notify_kills: true,
             notify_deaths: true,
             notify_loot: true,
+            notify_notable_drops: true,
         },
     )
     .await

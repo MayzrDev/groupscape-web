@@ -20,7 +20,9 @@ use crate::progress_events;
 use crate::push;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
-use crate::websocket::{self, GroupBroadcastRegistry, KillEventPayload, VitalsUpdatePayload, WsEnvelope};
+use crate::websocket::{
+    self, DropEventPayload, GroupBroadcastRegistry, KillEventPayload, VitalsUpdatePayload, WsEnvelope,
+};
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
@@ -643,6 +645,31 @@ pub async fn update_group_member(
                     alert,
                 );
             }
+        }
+    }
+
+    // Notable-drop events (loot crossing the plugin's configured value threshold) broadcast a
+    // chat message to every connected group member - including the dropper themselves, unlike
+    // `KillEvent` above, since nothing else tells them their own drop was notable - and
+    // optionally post to Discord. Never stored, matching `alerts`' ephemeral handling above.
+    if let Some(notable_drops) = group_member_inner.notable_drops.take() {
+        for drop in notable_drops {
+            let message = drop.to_message(&group_member_inner.name);
+
+            if broadcast_registry.has_subscribers(auth.group_id) {
+                let envelope = WsEnvelope::DropEvent {
+                    payload: DropEventPayload {
+                        member_name: group_member_inner.name.clone(),
+                        message: message.clone(),
+                    },
+                    ts: Utc::now(),
+                };
+                if let Ok(json) = serde_json::to_string(&envelope) {
+                    broadcast_registry.publish(auth.group_id, json);
+                }
+            }
+
+            discord::dispatch_drop_webhook(db_pool.get_ref().clone(), auth.group_id, message);
         }
     }
 

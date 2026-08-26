@@ -484,7 +484,8 @@ pub async fn get_discord_webhook_settings(
 ) -> Result<DiscordWebhookSettings, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_loot \
+            "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_loot, \
+             discord_notify_notable_drops \
              FROM groupscape.groups WHERE group_id=$1",
         )
         .await?;
@@ -497,6 +498,7 @@ pub async fn get_discord_webhook_settings(
         notify_kills: row.try_get("discord_notify_kills")?,
         notify_deaths: row.try_get("discord_notify_deaths")?,
         notify_loot: row.try_get("discord_notify_loot")?,
+        notify_notable_drops: row.try_get("discord_notify_notable_drops")?,
     })
 }
 
@@ -508,7 +510,8 @@ pub async fn update_discord_webhook_settings(
     let stmt = client
         .prepare_cached(
             "UPDATE groupscape.groups SET \
-             discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_loot=$5 \
+             discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_loot=$5, \
+             discord_notify_notable_drops=$6 \
              WHERE group_id=$1",
         )
         .await?;
@@ -521,6 +524,7 @@ pub async fn update_discord_webhook_settings(
                 &settings.notify_kills,
                 &settings.notify_deaths,
                 &settings.notify_loot,
+                &settings.notify_notable_drops,
             ],
         )
         .await
@@ -777,6 +781,7 @@ WHERE group_id=$2
             interactions: None,
             object_interactions: None,
             alerts: None,
+            notable_drops: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
             portrait_last_update: row.try_get("portrait_last_update").ok(),
         };
@@ -2405,6 +2410,22 @@ CREATE INDEX IF NOT EXISTS activity_events_group_type_occurred_idx ON groupscape
 
         let transaction = client.transaction().await?;
         commit_migration(&transaction, "backfill_activity_events_npc_slug").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_groups_discord_notify_notable_drops_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_notify_notable_drops BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_notify_notable_drops_column").await?;
         transaction.commit().await?;
     }
 

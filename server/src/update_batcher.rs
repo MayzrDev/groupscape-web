@@ -665,6 +665,7 @@ mod tests {
             interactions: None,
             object_interactions: None,
             alerts: None,
+            notable_drops: None,
         }
     }
 

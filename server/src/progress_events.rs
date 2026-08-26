@@ -348,6 +348,7 @@ mod tests {
             interactions: None,
             object_interactions: None,
             alerts: None,
+            notable_drops: None,
         };
 
         assert!(diff_progress(&previous, &current).is_empty());
