@@ -231,8 +231,16 @@ button.account-page__discord-connect:hover,
   margin-bottom: 12px;
 }
 
+.account-page__api-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .account-page__api-key-value {
   display: block;
+  flex: 1;
+  min-width: 0;
   padding: 10px 12px;
   background: var(--darken);
   border: 1px solid var(--light-border);
@@ -241,6 +249,10 @@ button.account-page__discord-connect:hover,
   font-size: 0.95em;
   word-break: break-all;
   user-select: all;
+}
+
+.account-page__api-key-copy {
+  flex-shrink: 0;
 }
 
 .account-page__api-key-note {

@@ -70,10 +70,12 @@ export class AccountPage extends BaseElement {
 
     this.apiKeyReveal = this.querySelector(".account-page__api-key-reveal");
     this.apiKeyValue = this.querySelector(".account-page__api-key-value");
+    this.apiKeyCopyButton = this.querySelector(".account-page__api-key-copy");
     this.apiKeyRegenerateButton = this.querySelector(".account-page__api-key-regenerate");
     this.apiKeyError = this.querySelector(".account-page__api-key-error");
     this.apiKeyStatus = this.querySelector(".account-page__api-key-status");
     this.eventListener(this.apiKeyRegenerateButton, "click", this.confirmRegenerateApiKey.bind(this));
+    this.eventListener(this.apiKeyCopyButton, "click", this.copyApiKey.bind(this));
 
     this.deleteButton = this.querySelector(".account-page__delete-button");
     this.eventListener(this.deleteButton, "click", this.confirmDeleteAccount.bind(this));
@@ -257,6 +259,19 @@ export class AccountPage extends BaseElement {
       return;
     }
     await this.refreshNotificationsState();
+  }
+
+  async copyApiKey() {
+    try {
+      await navigator.clipboard.writeText(this.apiKeyValue.textContent);
+      const original = this.apiKeyCopyButton.textContent;
+      this.apiKeyCopyButton.textContent = "Copied!";
+      setTimeout(() => {
+        this.apiKeyCopyButton.textContent = original;
+      }, 1500);
+    } catch (error) {
+      this.apiKeyError.textContent = "Couldn't copy to clipboard.";
+    }
   }
 
   confirmRegenerateApiKey() {
