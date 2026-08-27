@@ -228,7 +228,7 @@ export class AdminAccountsPage extends BaseElement {
         : `<div class="admin-accounts__empty-row">No groups.</div>`;
 
     for (const button of this.groupsList.querySelectorAll(".js-remove-group")) {
-      this.eventListener(button, "click", () => this.removeFromGroup(button.dataset.groupId));
+      this.eventListener(button, "click", () => this.removeFromGroup(Number(button.dataset.groupId)));
     }
 
     this.characterCount.textContent = account.characters.length;
@@ -410,7 +410,7 @@ export class AdminAccountsPage extends BaseElement {
           : `<div class="admin-accounts__empty-row">No matching groups.</div>`;
 
       for (const row of this.addGroupResults.querySelectorAll(".admin-accounts__add-group-result")) {
-        this.eventListener(row, "click", () => this.addToGroup(row.dataset.groupId));
+        this.eventListener(row, "click", () => this.addToGroup(Number(row.dataset.groupId)));
       }
     }, 300);
   }
