@@ -1070,6 +1070,7 @@ pub struct AdminAccountSummary {
     pub locked_out: bool,
     pub created_at: DateTime<Utc>,
     pub last_login_at: Option<DateTime<Utc>>,
+    pub is_online: bool,
 }
 
 #[derive(Serialize)]

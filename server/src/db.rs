@@ -5733,10 +5733,28 @@ fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiE
         locked_out: row.try_get("locked_out")?,
         created_at: row.try_get("created_at")?,
         last_login_at: row.try_get("last_login_at")?,
+        is_online: row.try_get("is_online")?,
     })
 }
 
 const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.username, a.status, a.must_change_password, a.created_at, a.last_login_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
+
+/// Mirrors the 60s "online" threshold used for the live online badge in the group view
+/// (`get_homepage_stats`), scoped to a single account via its characters' `account_hash`.
+fn admin_account_is_online_column() -> String {
+    format!(
+        r#"EXISTS (
+    SELECT 1 FROM groupscape.characters c
+    JOIN groupscape.members m ON m.account_hash = c.account_hash
+    WHERE c.account_id = a.id AND m.member_name != '{SHARED_MEMBER}' AND GREATEST(
+        m.stats_last_update, m.coordinates_last_update, m.skills_last_update,
+        m.quests_last_update, m.inventory_last_update, m.equipment_last_update, m.bank_last_update,
+        m.rune_pouch_last_update, m.interacting_last_update, m.seed_vault_last_update, m.diary_vars_last_update,
+        m.collection_log_last_update, m.potion_storage_last_update
+    ) >= NOW() - INTERVAL '60 seconds'
+) AS is_online"#
+    )
+}
 
 pub async fn admin_list_accounts(
     client: &Client,
@@ -5750,10 +5768,11 @@ pub async fn admin_list_accounts(
     let search_pattern = search.map(|s| format!("%{}%", s));
     let search_raw = search.map(|s| s.to_string());
 
+    let is_online_column = admin_account_is_online_column();
     let list_stmt = client
         .prepare_cached(&format!(
             r#"
-SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS}
+SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS}, {is_online_column}
 FROM groupscape.accounts a
 WHERE ($1::text IS NULL OR a.username ILIKE $1 OR a.id::text = $2)
   AND ($3::text IS NULL OR a.status = $3)
@@ -5806,9 +5825,10 @@ pub async fn admin_get_account(
     client: &Client,
     account_id: i64,
 ) -> Result<Option<AdminAccountDetail>, ApiError> {
+    let is_online_column = admin_account_is_online_column();
     let account_stmt = client
         .prepare_cached(&format!(
-            "SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS} FROM groupscape.accounts a WHERE a.id = $1"
+            "SELECT {ADMIN_ACCOUNT_SUMMARY_COLUMNS}, {is_online_column} FROM groupscape.accounts a WHERE a.id = $1"
         ))
         .await?;
     let account_row = client

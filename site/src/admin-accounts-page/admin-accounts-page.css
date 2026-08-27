@@ -33,6 +33,33 @@
   font-size: 13.5px;
 }
 
+.admin-accounts__online-col {
+  width: 18px;
+  padding-right: 0;
+}
+
+.admin-accounts__online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3dbc3d;
+  box-shadow: 0 0 4px #3dbc3d;
+  animation: admin-accounts-online-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes admin-accounts-online-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.8);
+  }
+}
+
 .admin-accounts__detail-pane {
   position: sticky;
   top: 12px;

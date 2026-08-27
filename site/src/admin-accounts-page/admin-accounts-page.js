@@ -120,7 +120,7 @@ export class AdminAccountsPage extends BaseElement {
 
   renderList() {
     if (this.accounts.length === 0) {
-      this.rows.innerHTML = `<tr><td colspan="3" class="admin-accounts__empty-row">No accounts found.</td></tr>`;
+      this.rows.innerHTML = `<tr><td colspan="4" class="admin-accounts__empty-row">No accounts found.</td></tr>`;
     } else {
       this.rows.innerHTML = this.accounts
         .map(
@@ -128,6 +128,9 @@ export class AdminAccountsPage extends BaseElement {
         <tr class="admin-accounts__row${
           String(account.id) === String(this.selectedAccountId) ? " active" : ""
         }" data-account-id="${account.id}">
+          <td class="admin-accounts__online-col" title="${account.is_online ? "Online in RuneScape" : "Offline"}">${
+            account.is_online ? '<span class="admin-accounts__online-dot"></span>' : ""
+          }</td>
           <td class="admin-accounts__row-username">${account.username ?? "(no username)"}</td>
           <td>${this.statusBadge(account)}</td>
           <td class="admin-mono">${
