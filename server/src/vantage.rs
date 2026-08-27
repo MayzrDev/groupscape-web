@@ -74,8 +74,10 @@ pub async fn homepage_stats(
     let stats = db::get_homepage_stats(&client).await?;
 
     Ok(HttpResponse::Ok().json(json!([
-        { "label": "Active groups", "value": stats.active_groups },
-        { "label": "Bound characters", "value": stats.bound_characters },
         { "label": "Online characters", "value": stats.online_characters },
+        { "label": "Active groups", "value": stats.active_groups },
+        { "label": "Bound accounts", "value": stats.bound_accounts },
+        { "label": "Bound characters", "value": stats.bound_characters },
+        { "label": "Telemetry pushes (24h)", "value": stats.telemetry_pushes_24h },
     ])))
 }

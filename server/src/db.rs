@@ -534,9 +534,18 @@ pub async fn update_discord_webhook_settings(
 
 pub struct HomepageStats {
     pub active_groups: i64,
+    pub bound_accounts: i64,
     pub bound_characters: i64,
     pub online_characters: i64,
+    pub telemetry_pushes_24h: i64,
 }
+
+const MEMBER_LAST_UPDATE_GREATEST: &str = r#"GREATEST(
+    stats_last_update, coordinates_last_update, skills_last_update,
+    quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
+    rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
+    collection_log_last_update, potion_storage_last_update
+)"#;
 
 pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiError> {
     let active_groups: i64 = client
@@ -544,10 +553,15 @@ pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiErr
         .await?
         .try_get(0)?;
 
+    let bound_accounts: i64 = client
+        .query_one("SELECT COUNT(*) FROM groupscape.accounts", &[])
+        .await?
+        .try_get(0)?;
+
     let bound_characters: i64 = client
         .query_one(
-            "SELECT COUNT(*) FROM groupscape.members WHERE member_name != $1",
-            &[&SHARED_MEMBER],
+            "SELECT COUNT(*) FROM groupscape.characters WHERE status = 'confirmed'",
+            &[],
         )
         .await?
         .try_get(0)?;
@@ -555,15 +569,22 @@ pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiErr
     // Mirrors the 60s "online" threshold used for the live online badge in the group view.
     let online_characters: i64 = client
         .query_one(
-            r#"
-SELECT COUNT(*) FROM groupscape.members
-WHERE member_name != $1 AND GREATEST(
-    stats_last_update, coordinates_last_update, skills_last_update,
-    quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
-    rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
-    collection_log_last_update, potion_storage_last_update
-) >= NOW() - INTERVAL '60 seconds'
-"#,
+            &format!(
+                "SELECT COUNT(*) FROM groupscape.members \
+                 WHERE member_name != $1 AND {MEMBER_LAST_UPDATE_GREATEST} >= NOW() - INTERVAL '60 seconds'"
+            ),
+            &[&SHARED_MEMBER],
+        )
+        .await?
+        .try_get(0)?;
+
+    // Distinct characters that have pushed telemetry at all in the last 24h.
+    let telemetry_pushes_24h: i64 = client
+        .query_one(
+            &format!(
+                "SELECT COUNT(*) FROM groupscape.members \
+                 WHERE member_name != $1 AND {MEMBER_LAST_UPDATE_GREATEST} >= NOW() - INTERVAL '24 hours'"
+            ),
             &[&SHARED_MEMBER],
         )
         .await?
@@ -571,8 +592,10 @@ WHERE member_name != $1 AND GREATEST(
 
     Ok(HomepageStats {
         active_groups,
+        bound_accounts,
         bound_characters,
         online_characters,
+        telemetry_pushes_24h,
     })
 }
 
