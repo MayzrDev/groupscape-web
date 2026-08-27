@@ -713,6 +713,7 @@ ul {
   bottom: 10px;
   right: 10px;
   z-index: 1000;
+  pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
