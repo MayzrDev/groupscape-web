@@ -21,6 +21,20 @@ admin-navigation {
   opacity: 0.5;
 }
 
+.admin-navigation__back {
+  font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+  color: var(--admin-accent);
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  padding: 5px 10px;
+  border-radius: 9px 3px 3px 9px;
+}
+
+.admin-navigation__back:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .admin-navigation__ribbon {
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   font-size: 13px;
