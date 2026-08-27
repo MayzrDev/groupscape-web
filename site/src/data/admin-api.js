@@ -182,6 +182,23 @@ class AdminApi {
     return response;
   }
 
+  async addAccountToGroup(accountId, groupId) {
+    const response = await fetch(`${this.baseUrl}/accounts/${accountId}/groups`, {
+      method: "POST",
+      headers: { ...this.authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ group_id: groupId }),
+    });
+    return response;
+  }
+
+  async removeAccountFromGroup(accountId, groupId) {
+    const response = await fetch(`${this.baseUrl}/accounts/${accountId}/groups/${groupId}`, {
+      method: "DELETE",
+      headers: this.authHeaders,
+    });
+    return response;
+  }
+
   async search(q) {
     const params = new URLSearchParams({ q });
     const response = await fetch(`${this.baseUrl}/search?${params}`, { headers: this.authHeaders });

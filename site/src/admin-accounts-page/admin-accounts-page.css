@@ -103,6 +103,52 @@
   color: var(--primary-text);
 }
 
+.admin-accounts__add-group-form {
+  margin: 6px 0;
+}
+
+.admin-accounts__add-group-search-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-accounts__add-group-input {
+  flex: 1;
+  min-width: 180px;
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--light-border);
+  background: var(--darken);
+  color: var(--primary-text);
+}
+
+.admin-accounts__add-group-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.admin-accounts__add-group-result {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--darken);
+  font-family: ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.admin-accounts__add-group-result:hover {
+  outline: 1px solid var(--admin-accent);
+}
+
 .admin-accounts__section {
   margin-top: 10px;
 }

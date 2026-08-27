@@ -48,6 +48,9 @@ export class AdminAccountsPage extends BaseElement {
     this.tempPasswordValue = this.querySelector(".admin-accounts__temp-password-value");
     this.usernameForm = this.querySelector(".admin-accounts__username-form");
     this.usernameInput = this.querySelector(".admin-accounts__username-input");
+    this.addGroupForm = this.querySelector(".admin-accounts__add-group-form");
+    this.addGroupInput = this.querySelector(".admin-accounts__add-group-input");
+    this.addGroupResults = this.querySelector(".admin-accounts__add-group-results");
     this.groupsList = this.querySelector(".admin-accounts__groups");
     this.groupCount = this.querySelector(".admin-accounts__group-count");
     this.charactersList = this.querySelector(".admin-accounts__characters");
@@ -67,6 +70,8 @@ export class AdminAccountsPage extends BaseElement {
     );
     this.eventListener(this.querySelector(".js-save-username"), "click", this.saveUsername.bind(this));
     this.eventListener(this.querySelector(".js-cancel-username"), "click", () => (this.usernameForm.hidden = true));
+    this.eventListener(this.addGroupInput, "input", this.handleAddGroupSearch.bind(this));
+    this.eventListener(this.querySelector(".js-cancel-add-group"), "click", () => (this.addGroupForm.hidden = true));
 
     this.init();
   }
@@ -168,6 +173,7 @@ export class AdminAccountsPage extends BaseElement {
     this.selectedAccountId = accountId;
     this.tempPasswordPanel.hidden = true;
     this.usernameForm.hidden = true;
+    this.addGroupForm.hidden = true;
     this.renderList();
     await this.fetchDetail();
   }
@@ -209,13 +215,18 @@ export class AdminAccountsPage extends BaseElement {
         ? account.groups
             .map(
               (g) => `
-        <div class="admin-accounts__row-item">
+        <div class="admin-accounts__row-item" data-group-id="${g.group_id}">
           <span>${g.group_name}${g.is_owner ? " &middot; owner" : ""}</span>
+          <button class="admin-btn admin-btn--small js-remove-group" data-group-id="${g.group_id}">Remove</button>
         </div>
       `
             )
             .join("")
         : `<div class="admin-accounts__empty-row">No groups.</div>`;
+
+    for (const button of this.groupsList.querySelectorAll(".js-remove-group")) {
+      this.eventListener(button, "click", () => this.removeFromGroup(button.dataset.groupId));
+    }
 
     this.characterCount.textContent = account.characters.length;
     this.charactersList.innerHTML =
@@ -312,6 +323,7 @@ export class AdminAccountsPage extends BaseElement {
     }
 
     options.push({ label: "Change username", action: () => this.showUsernameForm() });
+    options.push({ label: "Add to group", action: () => this.showAddGroupForm() });
     options.push({ label: "Revoke all sessions", action: () => this.revokeAllSessions() });
     options.push({
       label: "Hard-delete account (permanent, cannot be undone)",
@@ -355,6 +367,65 @@ export class AdminAccountsPage extends BaseElement {
         throw new Error("Failed to update username.");
       }
       this.usernameForm.hidden = true;
+      await this.fetchDetail();
+      await this.fetchAccounts();
+    });
+  }
+
+  showAddGroupForm() {
+    this.addGroupInput.value = "";
+    this.addGroupResults.innerHTML = "";
+    this.addGroupForm.hidden = false;
+    this.addGroupInput.focus();
+  }
+
+  handleAddGroupSearch() {
+    clearTimeout(this.addGroupSearchDebounce);
+    const q = this.addGroupInput.value.trim();
+    if (!q) {
+      this.addGroupResults.innerHTML = "";
+      return;
+    }
+    this.addGroupSearchDebounce = setTimeout(async () => {
+      const response = await adminApi.search(q);
+      if (!response.ok) return;
+      const { groups } = await response.json();
+      const memberGroupIds = new Set(this.detail.groups.map((g) => String(g.group_id)));
+      const results = groups.filter((g) => !memberGroupIds.has(String(g.group_id)));
+      this.addGroupResults.innerHTML =
+        results.length > 0
+          ? results
+              .map(
+                (g) => `
+        <div class="admin-accounts__add-group-result" data-group-id="${g.group_id}">
+          <span>${g.group_name}</span>
+          <span class="admin-accounts__row-item-meta">#${g.group_id}</span>
+        </div>
+      `
+              )
+              .join("")
+          : `<div class="admin-accounts__empty-row">No matching groups.</div>`;
+
+      for (const row of this.addGroupResults.querySelectorAll(".admin-accounts__add-group-result")) {
+        this.eventListener(row, "click", () => this.addToGroup(row.dataset.groupId));
+      }
+    }, 300);
+  }
+
+  async addToGroup(groupId) {
+    await this.runAction(async () => {
+      const response = await adminApi.addAccountToGroup(this.detail.id, groupId);
+      if (!response.ok) throw new Error("Failed to add account to group.");
+      this.addGroupForm.hidden = true;
+      await this.fetchDetail();
+      await this.fetchAccounts();
+    });
+  }
+
+  async removeFromGroup(groupId) {
+    await this.runAction(async () => {
+      const response = await adminApi.removeAccountFromGroup(this.detail.id, groupId);
+      if (!response.ok) throw new Error("Failed to remove account from group.");
       await this.fetchDetail();
       await this.fetchAccounts();
     });
