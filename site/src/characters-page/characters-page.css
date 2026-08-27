@@ -186,8 +186,8 @@ characters-page {
 }
 
 .characters-page__detail-portrait {
-  width: 84px !important;
-  height: 84px !important;
+  width: 126px !important;
+  height: 126px !important;
   flex: none !important;
   border-radius: 50%;
   overflow: hidden;
