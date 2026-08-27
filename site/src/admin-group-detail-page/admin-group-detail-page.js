@@ -1,5 +1,7 @@
 import { BaseElement } from "../base-element/base-element";
 import { adminApi } from "../data/admin-api";
+import { adminStorage } from "../data/admin-storage";
+import { adminViewSession } from "../data/admin-view-session";
 import { requireAdmin } from "../data/admin-guard";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { loadingScreenManager } from "../loading-screen/loading-screen-manager";
@@ -26,7 +28,30 @@ export class AdminGroupDetailPage extends BaseElement {
       this.querySelector(".admin-group-detail__error").textContent = "No group selected.";
       return;
     }
+    this.eventListener(
+      this.querySelector(".admin-group-detail__view-as-member"),
+      "click",
+      this.viewAsMember.bind(this)
+    );
     await this.fetchGroup();
+  }
+
+  // Opens the group's real dashboard as a read-only observer - see `admin-view-session.js` and
+  // the server's `/api/admin/group-view/{group_id}` scope. Deliberately doesn't touch the
+  // group's own token/session state, so members never see that an admin looked.
+  async viewAsMember() {
+    const error = this.querySelector(".admin-group-detail__error");
+    try {
+      const response = await adminApi.viewGroup(this.groupId);
+      if (!response.ok) {
+        error.textContent = "Failed to open group view.";
+        return;
+      }
+      adminViewSession.start(this.groupId, this.group?.group_name ?? "", adminStorage.getAdminToken());
+      window.history.pushState("", "", "/group");
+    } catch (e) {
+      error.textContent = `Failed to open group view: ${e}`;
+    }
   }
 
   async fetchGroup() {

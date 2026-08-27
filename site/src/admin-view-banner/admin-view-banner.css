@@ -1,0 +1,36 @@
+admin-view-banner {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px 12px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 14px;
+  color: white;
+  background: var(--admin-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+admin-view-banner.admin-view-banner--visible {
+  display: flex;
+}
+
+.admin-view-banner__exit {
+  font-family: inherit;
+  font-size: 13px;
+  color: white;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.admin-view-banner__exit:hover {
+  background: rgba(0, 0, 0, 0.4);
+}

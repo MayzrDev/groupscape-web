@@ -2,77 +2,97 @@ import { pubsub } from "./pubsub";
 import { utility } from "../utility";
 import { groupData } from "./group-data";
 import { accountStorage } from "./account-storage";
+import { adminViewSession } from "./admin-view-session";
 
 class Api {
   constructor() {
     this.baseUrl = "/api";
     this.createGroupUrl = `${this.baseUrl}/create-group`;
     this.enabled = false;
+    this.adminView = false;
   }
 
   // Permission-gated group actions (member removal, group settings) need to identify the
   // *account* performing them, not just the group - the shared group token proves membership
   // in the group but carries no account identity. Undefined when no account is logged in;
-  // the server rejects those requests with 401 rather than silently no-op'ing.
+  // the server rejects those requests with 401 rather than silently no-op'ing. Not applicable
+  // in admin-view mode, where there's no account behind the request at all.
   get accountAuthHeaders() {
+    if (this.adminView) return {};
     const accountToken = accountStorage.getAccountToken();
     return accountToken ? { "X-Account-Authorization": accountToken } : {};
   }
 
+  // Every group-scoped request goes to a group-token-authed `/api/group/{name}` route normally,
+  // or, in admin-view mode, to the admin-bearer-authed `/api/admin/group-view/{id}` route
+  // instead - which only mounts read handlers, so mutating calls fail closed with a 404 rather
+  // than silently no-op'ing. This is the single seam that makes every dashboard page reusable
+  // read-only for an admin without touching the pages themselves.
+  get groupScopeUrl() {
+    if (this.adminView) {
+      return `${this.baseUrl}/admin/group-view/${this.adminViewGroupId}`;
+    }
+    return `${this.baseUrl}/group/${this.groupName}`;
+  }
+
+  get authHeader() {
+    return this.adminView ? `Bearer ${this.adminToken}` : this.groupToken;
+  }
+
   get getGroupDataUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-group-data`;
+    return `${this.groupScopeUrl}/get-group-data`;
   }
 
   get deleteMemberUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/delete-group-member`;
+    return `${this.groupScopeUrl}/delete-group-member`;
   }
 
   get blockMemberUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/block-group-member`;
+    return `${this.groupScopeUrl}/block-group-member`;
   }
 
   get unblockMemberUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/unblock-group-member`;
+    return `${this.groupScopeUrl}/unblock-group-member`;
   }
 
   get blockedMembersUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-blocked-members`;
+    return `${this.groupScopeUrl}/get-blocked-members`;
   }
 
   get canKickMembersUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/can-kick-members`;
+    return `${this.groupScopeUrl}/can-kick-members`;
   }
 
   get amILoggedInUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/am-i-logged-in`;
+    return `${this.groupScopeUrl}/am-i-logged-in`;
   }
 
   get groupPermissionsUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-group-permissions`;
+    return `${this.groupScopeUrl}/get-group-permissions`;
   }
 
   get myPermissionsUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-my-permissions`;
+    return `${this.groupScopeUrl}/get-my-permissions`;
   }
 
   get updateGroupPermissionsUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/update-group-permissions`;
+    return `${this.groupScopeUrl}/update-group-permissions`;
   }
 
   get updateMemberColorUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/update-member-color`;
+    return `${this.groupScopeUrl}/update-member-color`;
   }
 
   get renameGroupUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/rename-group`;
+    return `${this.groupScopeUrl}/rename-group`;
   }
 
   get rerollGroupTokenUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/reroll-group-token`;
+    return `${this.groupScopeUrl}/reroll-group-token`;
   }
 
   get deleteGroupUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/delete-group`;
+    return `${this.groupScopeUrl}/delete-group`;
   }
 
   get gePricesUrl() {
@@ -80,15 +100,15 @@ class Api {
   }
 
   get skillDataUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-skill-data`;
+    return `${this.groupScopeUrl}/get-skill-data`;
   }
 
   get leaderboardUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-leaderboard`;
+    return `${this.groupScopeUrl}/get-leaderboard`;
   }
 
   get metricDataUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-metric-data`;
+    return `${this.groupScopeUrl}/get-metric-data`;
   }
 
   get captchaEnabledUrl() {
@@ -96,27 +116,27 @@ class Api {
   }
 
   get portraitUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/portrait`;
+    return `${this.groupScopeUrl}/portrait`;
   }
 
   get activityEventsUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-activity-events`;
+    return `${this.groupScopeUrl}/get-activity-events`;
   }
 
   get lootSummaryUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-loot-summary`;
+    return `${this.groupScopeUrl}/get-loot-summary`;
   }
 
   get lootSplitUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-loot-split`;
+    return `${this.groupScopeUrl}/get-loot-split`;
   }
 
   get lootBossesUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-loot-bosses`;
+    return `${this.groupScopeUrl}/get-loot-bosses`;
   }
 
   get itemBonusesUrl() {
-    return `${this.baseUrl}/group/${this.groupName}/get-item-bonuses`;
+    return `${this.groupScopeUrl}/get-item-bonuses`;
   }
 
   setCredentials(groupName, groupToken) {
@@ -127,14 +147,33 @@ class Api {
   async restart() {
     const groupName = this.groupName;
     const groupToken = this.groupToken;
-    await this.enable(groupName, groupToken);
+    if (this.adminView) {
+      await this.enableAdminView(this.adminViewGroupId, groupName, this.adminToken);
+    } else {
+      await this.enable(groupName, groupToken);
+    }
   }
 
   async enable(groupName, groupToken) {
     await this.disable();
-    this.nextCheck = new Date(0).toISOString();
+    this.adminView = false;
     this.setCredentials(groupName, groupToken);
+    await this.startPolling();
+  }
 
+  // Same startup as `enable()`, but authenticated as a global admin viewing this group
+  // read-only rather than as a member holding the group's token - see `groupScopeUrl`.
+  async enableAdminView(groupId, groupName, adminToken) {
+    await this.disable();
+    this.adminView = true;
+    this.adminViewGroupId = groupId;
+    this.groupName = groupName;
+    this.adminToken = adminToken;
+    await this.startPolling();
+  }
+
+  async startPolling() {
+    this.nextCheck = new Date(0).toISOString();
     if (!this.enabled) {
       this.enabled = true;
       // getGroupInterval is a Promise so we can make sure this method does not leak
@@ -150,6 +189,9 @@ class Api {
 
   async disable() {
     this.enabled = false;
+    this.adminView = false;
+    this.adminViewGroupId = undefined;
+    this.adminToken = undefined;
     this.groupName = undefined;
     this.groupToken = undefined;
     groupData.members = new Map();
@@ -165,13 +207,15 @@ class Api {
 
     const response = await fetch(`${this.getGroupDataUrl}?from_time=${nextCheck}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
       if (response.status === 401) {
+        const wasAdminView = this.adminView;
         await this.disable();
-        window.history.pushState("", "", "/");
+        if (wasAdminView) adminViewSession.clear();
+        window.history.pushState("", "", wasAdminView ? "/admin/groups" : "/");
         pubsub.publish("get-group-data");
       }
       return;
@@ -199,7 +243,7 @@ class Api {
       body: JSON.stringify({ name: memberName }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "DELETE",
@@ -213,7 +257,7 @@ class Api {
       body: JSON.stringify({ name: memberName }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "POST",
@@ -227,7 +271,7 @@ class Api {
       body: JSON.stringify({ name: memberName }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "POST",
@@ -239,7 +283,7 @@ class Api {
   async getBlockedMembers() {
     const response = await fetch(this.blockedMembersUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
 
@@ -252,7 +296,7 @@ class Api {
   async canKickMembers() {
     const response = await fetch(this.canKickMembersUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
     });
@@ -263,7 +307,7 @@ class Api {
   async getGroupPermissions() {
     const response = await fetch(this.groupPermissionsUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
     });
@@ -274,7 +318,7 @@ class Api {
   async getMyPermissions() {
     const response = await fetch(this.myPermissionsUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
     });
@@ -287,7 +331,7 @@ class Api {
       body: JSON.stringify({ account_id: accountId, ...patch }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "PUT",
@@ -301,7 +345,7 @@ class Api {
       body: JSON.stringify({ account_id: accountId, color }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "PUT",
@@ -315,7 +359,7 @@ class Api {
       body: JSON.stringify({ new_name: newName }),
       headers: {
         "Content-Type": "application/json",
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "PUT",
@@ -327,7 +371,7 @@ class Api {
   async rerollGroupToken() {
     const response = await fetch(this.rerollGroupTokenUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "POST",
@@ -339,7 +383,7 @@ class Api {
   async deleteGroup() {
     const response = await fetch(this.deleteGroupUrl, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
         ...this.accountAuthHeaders,
       },
       method: "DELETE",
@@ -350,7 +394,7 @@ class Api {
 
   async amILoggedIn() {
     const response = await fetch(this.amILoggedInUrl, {
-      headers: { Authorization: this.groupToken },
+      headers: { Authorization: this.authHeader },
     });
 
     return response;
@@ -364,7 +408,7 @@ class Api {
   async getSkillData(period) {
     const response = await fetch(`${this.skillDataUrl}?period=${period}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -379,7 +423,7 @@ class Api {
     if (skill && metric === "xp") query.set("skill", skill);
     const response = await fetch(`${this.leaderboardUrl}?${query.toString()}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -393,7 +437,7 @@ class Api {
     if (boss) query.set("boss", boss);
     const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -416,7 +460,7 @@ class Api {
 
     const response = await fetch(`${this.activityEventsUrl}?${query.toString()}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -438,7 +482,7 @@ class Api {
 
     const response = await fetch(`${this.lootSummaryUrl}?${query.toString()}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -459,7 +503,7 @@ class Api {
 
     const response = await fetch(`${this.lootSplitUrl}?${query.toString()}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -469,7 +513,7 @@ class Api {
   }
 
   async getLootBosses() {
-    const response = await fetch(this.lootBossesUrl, { headers: { Authorization: this.groupToken } });
+    const response = await fetch(this.lootBossesUrl, { headers: { Authorization: this.authHeader } });
     if (!response.ok) return [];
     return response.json();
   }
@@ -477,7 +521,7 @@ class Api {
   async getItemBonuses(itemId) {
     const response = await fetch(`${this.itemBonusesUrl}?item_id=${itemId}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
@@ -489,7 +533,7 @@ class Api {
   async getPortrait(memberName) {
     const response = await fetch(`${this.portraitUrl}/${encodeURIComponent(memberName)}`, {
       headers: {
-        Authorization: this.groupToken,
+        Authorization: this.authHeader,
       },
     });
     if (!response.ok) {

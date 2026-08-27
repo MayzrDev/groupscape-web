@@ -5669,6 +5669,61 @@ pub async fn admin_remove_all_group_memberships(
     Ok(())
 }
 
+/// Grants an account membership in a group the same way `link_character_to_group` does for its
+/// own default row - all permission flags off - but without requiring a character or the group's
+/// join credentials, since this is the admin support path for accounts that can't self-serve.
+/// Idempotent: adding an account that's already a member is a no-op.
+pub async fn admin_add_account_to_group(
+    client: &Client,
+    account_id: i64,
+    group_id: i64,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.group_permissions (group_id, account_id) VALUES ($1, $2) ON CONFLICT (group_id, account_id) DO NOTHING",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminAddAccountToGroupError".to_string(), e))?;
+    Ok(())
+}
+
+/// Removes a single group membership, transferring ownership first if this account happens to be
+/// that group's current owner (mirrors the ban cascade's per-group step, but scoped to one group
+/// instead of every group the account owns). Returns `false` if the account wasn't a member.
+pub async fn admin_remove_account_from_group(
+    client: &Client,
+    account_id: i64,
+    group_id: i64,
+) -> Result<bool, ApiError> {
+    let owner_stmt = client
+        .prepare_cached("SELECT admin_account_id FROM groupscape.groups WHERE group_id=$1")
+        .await?;
+    let owner_row = client
+        .query_opt(&owner_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminGetGroupOwnerError".to_string(), e))?;
+    let is_owner = owner_row
+        .and_then(|row| row.get::<_, Option<i64>>(0))
+        .is_some_and(|owner_id| owner_id == account_id);
+    if is_owner {
+        transfer_or_clear_group_ownership(client, group_id, account_id).await?;
+    }
+
+    let delete_stmt = client
+        .prepare_cached(
+            "DELETE FROM groupscape.group_permissions WHERE group_id=$1 AND account_id=$2",
+        )
+        .await?;
+    let affected = client
+        .execute(&delete_stmt, &[&group_id, &account_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminRemoveAccountFromGroupError".to_string(), e))?;
+    Ok(affected > 0)
+}
+
 fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiError> {
     Ok(AdminAccountSummary {
         id: row.try_get("id")?,

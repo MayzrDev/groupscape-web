@@ -52,6 +52,14 @@ class AdminApi {
     return response;
   }
 
+  async viewGroup(groupId) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/view`, {
+      method: "POST",
+      headers: this.authHeaders,
+    });
+    return response;
+  }
+
   async deleteGroup(groupId) {
     const response = await fetch(`${this.baseUrl}/groups/${groupId}/delete`, {
       method: "POST",

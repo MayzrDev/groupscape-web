@@ -368,6 +368,8 @@ async fn main() -> std::io::Result<()> {
             .service(admin::revoke_all_account_sessions)
             .service(admin::set_account_username)
             .service(admin::clear_account_lockout)
+            .service(admin::add_account_to_group)
+            .service(admin::remove_account_from_group)
             .service(admin::search)
             .service(admin::dashboard)
             .service(admin::view_group);

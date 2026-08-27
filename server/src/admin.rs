@@ -3,8 +3,8 @@ use crate::crypto;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
-    AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAuditLogResponse,
-    AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
+    AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAddAccountToGroup,
+    AdminAuditLogResponse, AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
     AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery, AdminSearchResponse,
     AdminSetAccountUsername, AdminSetAccountStatus,
 };
@@ -526,6 +526,58 @@ pub async fn clear_account_lockout(
         Some("account"),
         Some(&account_id.to_string()),
         None,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/accounts/{account_id}/groups")]
+pub async fn add_account_to_group(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    body: web::Json<AdminAddAccountToGroup>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let account_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_account(&client, account_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+    if db::admin_get_group(&client, body.group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    db::admin_add_account_to_group(&client, account_id, body.group_id).await?;
+    db::admin_record_audit_log(
+        &client,
+        "account.added_to_group",
+        Some("account"),
+        Some(&account_id.to_string()),
+        Some(json!({ "group_id": body.group_id })),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[delete("/accounts/{account_id}/groups/{group_id}")]
+pub async fn remove_account_from_group(
+    _auth: AdminAuthenticated,
+    path: web::Path<(i64, i64)>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let (account_id, group_id) = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let removed = db::admin_remove_account_from_group(&client, account_id, group_id).await?;
+    if !removed {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    db::admin_record_audit_log(
+        &client,
+        "account.removed_from_group",
+        Some("account"),
+        Some(&account_id.to_string()),
+        Some(json!({ "group_id": group_id })),
     )
     .await?;
     Ok(HttpResponse::Ok().finish())

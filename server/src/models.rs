@@ -1135,6 +1135,12 @@ pub struct AdminSetAccountUsername {
     pub username: String,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminAddAccountToGroup {
+    pub group_id: i64,
+}
+
 #[derive(Serialize)]
 pub struct AdminSearchResponse {
     pub accounts: Vec<AdminAccountSummary>,

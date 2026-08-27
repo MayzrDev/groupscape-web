@@ -61,6 +61,7 @@ import "./collection-log-item/collection-log-item.js";
 import "./player-icon/player-icon.js";
 import "./donate-button/donate-button.js";
 import "./admin-indicator/admin-indicator.js";
+import "./admin-view-banner/admin-view-banner.js";
 import "./pending-characters-indicator/pending-characters-indicator.js";
 import "./account-logout-indicator/account-logout-indicator.js";
 import "./admin-navigation/admin-navigation.js";
