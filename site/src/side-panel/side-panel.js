@@ -43,11 +43,16 @@ export class SidePanel extends BaseElement {
     this.emptyError = this.querySelector(".side-panel__empty-error");
     this.picker = this.querySelector(".side-panel__picker");
     this.pickerList = this.querySelector(".side-panel__picker-list");
+    this.mobileToggle = this.querySelector(".side-panel__mobile-toggle");
+    this.backdrop = this.querySelector(".side-panel__backdrop");
 
     this.eventListener(this.emptyAction, "click", this.togglePicker.bind(this));
     this.eventListener(this.pickerList, "click", this.handlePickerClick.bind(this));
+    this.eventListener(this.mobileToggle, "click", this.toggleMobilePanel.bind(this));
+    this.eventListener(this.backdrop, "click", this.closeMobilePanel.bind(this));
 
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
+    this.subscribe("route-activated", this.closeMobilePanel.bind(this));
   }
 
   disconnectedCallback() {
@@ -119,6 +124,18 @@ export class SidePanel extends BaseElement {
       this.emptyTitle.textContent = "No characters linked";
       this.emptyText.textContent = "Couldn't load your characters — try again.";
     }
+  }
+
+  toggleMobilePanel() {
+    const open = this.classList.toggle("side-panel--open");
+    this.mobileToggle.setAttribute("aria-expanded", String(open));
+    this.mobileToggle.setAttribute("aria-label", open ? "Hide player stats" : "Show player stats");
+  }
+
+  closeMobilePanel() {
+    this.classList.remove("side-panel--open");
+    this.mobileToggle.setAttribute("aria-expanded", "false");
+    this.mobileToggle.setAttribute("aria-label", "Show player stats");
   }
 
   togglePicker() {

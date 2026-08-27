@@ -13,9 +13,79 @@ side-panel {
   pointer-events: auto;
 }
 
+.side-panel__mobile-toggle {
+  display: none;
+}
+
+.side-panel__backdrop {
+  display: none;
+}
+
 @media only screen and (max-width: 1000px) {
   side-panel {
-    display: none;
+    display: block;
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100%;
+    max-height: 100%;
+    width: min(330px, 85vw);
+    max-width: min(330px, 85vw);
+    min-width: 0;
+    padding: 20px 8px;
+    /* Slide via `right`, not `transform` - a transform on this element would make it the
+       containing block for its position:fixed descendants (the toggle button and backdrop
+       below), pinning them inside its own box instead of the viewport. */
+    right: calc(-1 * min(330px, 85vw));
+    transition: right 0.2s ease-out;
+    background: var(--rsbackground);
+    background-repeat: repeat;
+    border-image: url(/ui/border.png) 32 32 / 32px / 3px 4px 4px 3px round;
+    border-style: solid;
+    border-width: 4px 3px 3px 4px;
+    z-index: 30;
+  }
+
+  .dark-mode side-panel {
+    background: var(--rsbackground-dark);
+  }
+
+  side-panel.side-panel--open {
+    right: 0;
+  }
+
+  .side-panel__mobile-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    z-index: 31;
+    pointer-events: auto;
+    transition: right 0.2s ease-out;
+  }
+
+  .side-panel__mobile-toggle img {
+    width: 24px;
+    height: 24px;
+  }
+
+  side-panel.side-panel--open .side-panel__mobile-toggle {
+    right: calc(min(330px, 85vw) + 12px);
+  }
+
+  .side-panel--open .side-panel__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 29;
+    pointer-events: auto;
   }
 }
 
@@ -24,10 +94,12 @@ side-panel {
    width:100% of it, so this alone is enough to un-clip the tab) only while that tab is open,
    rather than widening the panel for every tab. See player-panel.js's
    `player-panel--equipment-active` toggle. */
-side-panel:has(.player-panel--equipment-active) {
-  width: max-content;
-  max-width: max-content;
-  overflow: visible;
+@media only screen and (min-width: 1001px) {
+  side-panel:has(.player-panel--equipment-active) {
+    width: max-content;
+    max-width: max-content;
+    overflow: visible;
+  }
 }
 
 /* The vitals bars and tab-icon row shouldn't stretch along with the widened side panel above -
