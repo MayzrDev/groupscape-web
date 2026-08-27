@@ -1,7 +1,9 @@
 use server::account_auth_middleware::AccountAuthenticateMiddlewareFactory;
 use server::accounts;
 use server::admin;
-use server::admin_auth_middleware::{AdminAuthenticateMiddlewareFactory, AdminLoginRateLimiter};
+use server::admin_auth_middleware::{
+    AdminAuthenticateMiddlewareFactory, AdminGroupViewMiddlewareFactory, AdminLoginRateLimiter,
+};
 use server::auth_middleware::AuthenticateMiddlewareFactory;
 use server::authed;
 use server::character_auth_middleware::CharacterAuthenticateMiddlewareFactory;
@@ -131,6 +133,7 @@ async fn main() -> std::io::Result<()> {
     unauthed::start_session_idle_closer(pool.clone());
     unauthed::start_bank_value_snapshotter(pool.clone());
     unauthed::start_bank_value_aggregator(pool.clone());
+    unauthed::start_farming_timer_notifier(pool.clone(), config.push.clone());
 
     let update_batcher_pool = config.pg.create_pool(None, NoTls).unwrap();
     let (tx, rx) = mpsc::channel::<models::GroupMember>(10000);
@@ -356,7 +359,31 @@ async fn main() -> std::io::Result<()> {
             .service(admin::set_account_username)
             .service(admin::clear_account_lockout)
             .service(admin::search)
-            .service(admin::dashboard);
+            .service(admin::dashboard)
+            .service(admin::view_group);
+        // Lets a global admin read a group's live dashboard as a read-only observer, keyed by
+        // `{group_id}` and gated by the admin bearer token instead of the group's own token - see
+        // `AdminGroupViewMiddlewareFactory`. Only mounts the read handlers from
+        // `group_dashboard_scope` above; deliberately excludes every mutating route (member
+        // removal, permissions, settings, portraits) so this can never be used to change group
+        // state.
+        let admin_group_view_scope = web::scope("/api/admin/group-view/{group_id}")
+            .wrap(AdminGroupViewMiddlewareFactory::new(
+                config_data.clone(),
+                admin_rate_limiter.clone(),
+            ))
+            .service(web::resource("/get-activity-events").route(web::get().to(authed::get_activity_events)))
+            .service(web::resource("/get-sessions").route(web::get().to(authed::get_sessions)))
+            .service(web::resource("/get-loot-bosses").route(web::get().to(authed::get_loot_bosses)))
+            .service(web::resource("/get-loot-summary").route(web::get().to(authed::get_loot_summary)))
+            .service(web::resource("/get-loot-split").route(web::get().to(authed::get_loot_split)))
+            .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
+            .service(web::resource("/get-metric-data").route(web::get().to(authed::get_metric_data)))
+            .service(web::resource("/get-leaderboard").route(web::get().to(authed::get_leaderboard)))
+            .service(web::resource("/collection-log").route(web::get().to(authed::get_collection_log)))
+            .service(web::resource("/get-item-bonuses").route(web::get().to(authed::get_item_bonuses)))
+            .service(authed::get_group_data)
+            .service(authed::get_portrait);
         let json_config = web::JsonConfig::default().limit(100000);
         let cors = Cors::default()
             .allow_any_origin()
@@ -385,6 +412,7 @@ async fn main() -> std::io::Result<()> {
             .service(group_dashboard_scope)
             .service(character_scope)
             .service(admin_scope)
+            .service(admin_group_view_scope)
             .service(account_scope)
             .service(unauthed_scope)
     })

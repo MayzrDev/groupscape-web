@@ -531,6 +531,23 @@ pub async fn update_group_member(
         ArrayFormat::ItemPairs,
     )?;
 
+    // Herb/tree patches (16 in the v1 table) + 4 bird house spaces = 20 possible rows; a
+    // generous cap well above that guards against a malformed/malicious payload without needing
+    // to track the exact table size here.
+    if group_member_inner.farming_timers.as_ref().is_some_and(|v| v.len() > 64) {
+        return Ok(HttpResponse::BadRequest().body("farming_timers exceeds max length"));
+    }
+
+    // Farming/bird house timers live in their own table (not the batcher's coalesced columns) so
+    // the completion-push job can query by ready_at - written straight through here, same as
+    // `events` below. `.take()` so the batcher's merge/dedupe logic doesn't have to carry a field
+    // it has no notion of.
+    if let Some(farming_timers) = group_member_inner.farming_timers.take() {
+        let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+        db::replace_farming_timers(&mut client, auth.group_id, &group_member_inner.name, &farming_timers)
+            .await?;
+    }
+
     // Discrete kill/death events are written straight through (not routed via the batcher,
     // which only knows latest-value-wins upserts) before the vitals fields hand off to it.
     // `.take()` since the batcher's `GroupMember` merge/dedupe logic has no notion of this

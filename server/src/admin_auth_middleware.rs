@@ -129,6 +129,40 @@ fn client_key(req: &HttpRequest) -> String {
         .to_string()
 }
 
+/// Shared by every admin-gated middleware: validates the `Authorization: Bearer <admin token>`
+/// header against `config.admin.token_hash`, honoring the same IP lockout as the admin panel
+/// login. Returns an error response to return directly on failure.
+fn authorize_admin_bearer(
+    req: &ServiceRequest,
+    config: &Config,
+    rate_limiter: &AdminLoginRateLimiter,
+) -> Result<(), actix_web::Error> {
+    if !config.admin.enabled {
+        return Err(actix_web::error::ErrorNotFound(""));
+    }
+
+    let key = client_key(req.request());
+    if rate_limiter.is_locked_out(&key) {
+        return Err(actix_web::error::ErrorTooManyRequests(""));
+    }
+
+    let token = bearer_token(req.request());
+    let presented_hash = token
+        .as_deref()
+        .map(|t| crate::crypto::token_hash(t, "admin"));
+
+    let authorized = presented_hash
+        .as_deref()
+        .is_some_and(|hash| hash == config.admin.token_hash && !config.admin.token_hash.is_empty());
+
+    if !authorized {
+        rate_limiter.record_failure(&key);
+        return Err(actix_web::error::ErrorUnauthorized(""));
+    }
+    rate_limiter.record_success(&key);
+    Ok(())
+}
+
 pub struct AdminAuthenticateMiddlewareFactory {
     config: web::Data<Config>,
     rate_limiter: Arc<AdminLoginRateLimiter>,
@@ -205,32 +239,111 @@ where
         let rate_limiter = Arc::clone(&self.rate_limiter);
 
         async move {
-            if !config.admin.enabled {
-                return Ok(req.error_response(actix_web::error::ErrorNotFound("")));
+            if let Err(e) = authorize_admin_bearer(&req, &config, &rate_limiter) {
+                return Ok(req.error_response(e));
             }
-
-            let key = client_key(req.request());
-            if rate_limiter.is_locked_out(&key) {
-                return Ok(req.error_response(actix_web::error::ErrorTooManyRequests("")));
-            }
-
-            let token = bearer_token(req.request());
-            let presented_hash = token
-                .as_deref()
-                .map(|t| crate::crypto::token_hash(t, "admin"));
-
-            let authorized = presented_hash
-                .as_deref()
-                .is_some_and(|hash| hash == config.admin.token_hash && !config.admin.token_hash.is_empty());
-
-            if !authorized {
-                rate_limiter.record_failure(&key);
-                return Ok(req.error_response(actix_web::error::ErrorUnauthorized("")));
-            }
-            rate_limiter.record_success(&key);
 
             req.extensions_mut()
                 .insert::<AdminAuthenticationInfo>(Rc::new(AdminAuthenticationResult));
+
+            let res = srv.call(req).await?;
+            Ok(res.map_into_boxed_body())
+        }
+        .boxed_local()
+    }
+}
+
+/// Lets a global admin read a group's live dashboard exactly as a member would, without ever
+/// holding (or needing) that group's token. Gated by the same admin bearer token as the rest of
+/// `/api/admin`, keyed by `{group_id}` (admin panel already deals in ids, not names). On success
+/// this inserts the same `Authenticated` extension the group-token dashboard scope produces, so
+/// the read-only `authed::` handlers mounted under it are reused completely unchanged - they only
+/// ever read `auth.group_id` and never write session/activity rows, so a visit here leaves no
+/// trace the group's members can see.
+pub struct AdminGroupViewMiddlewareFactory {
+    config: web::Data<Config>,
+    rate_limiter: Arc<AdminLoginRateLimiter>,
+}
+impl AdminGroupViewMiddlewareFactory {
+    pub fn new(config: web::Data<Config>, rate_limiter: Arc<AdminLoginRateLimiter>) -> Self {
+        AdminGroupViewMiddlewareFactory {
+            config,
+            rate_limiter,
+        }
+    }
+}
+impl<S, B> Transform<S, ServiceRequest> for AdminGroupViewMiddlewareFactory
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: actix_web::body::MessageBody + 'static,
+{
+    type Response = ServiceResponse<BoxBody>;
+    type Error = Error;
+    type InitError = ();
+    type Transform = AdminGroupViewMiddleware<S>;
+    type Future = Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        ready(Ok(AdminGroupViewMiddleware {
+            service: Rc::new(service),
+            config: self.config.clone(),
+            rate_limiter: Arc::clone(&self.rate_limiter),
+        }))
+    }
+}
+
+pub struct AdminGroupViewMiddleware<S> {
+    service: Rc<S>,
+    config: web::Data<Config>,
+    rate_limiter: Arc<AdminLoginRateLimiter>,
+}
+
+impl<S, B> Service<ServiceRequest> for AdminGroupViewMiddleware<S>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse<B>, Error = Error> + 'static,
+    B: actix_web::body::MessageBody + 'static,
+{
+    type Response = ServiceResponse<BoxBody>;
+    type Error = Error;
+    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    fn poll_ready(
+        &self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.service.poll_ready(cx)
+    }
+
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        let srv = Rc::clone(&self.service);
+        let config = self.config.clone();
+        let rate_limiter = Arc::clone(&self.rate_limiter);
+
+        async move {
+            if let Err(e) = authorize_admin_bearer(&req, &config, &rate_limiter) {
+                return Ok(req.error_response(e));
+            }
+
+            let group_id = match req
+                .match_info()
+                .get("group_id")
+                .and_then(|v| v.parse::<i64>().ok())
+            {
+                Some(group_id) => group_id,
+                None => {
+                    return Ok(req.error_response(actix_web::error::ErrorBadRequest(
+                        "Missing or invalid group id",
+                    )));
+                }
+            };
+
+            req.extensions_mut()
+                .insert::<Rc<crate::auth_middleware::AuthenticationResult>>(Rc::new(
+                    crate::auth_middleware::AuthenticationResult {
+                        group_id,
+                        account_hash: None,
+                        character_id: None,
+                    },
+                ));
 
             let res = srv.call(req).await?;
             Ok(res.map_into_boxed_body())

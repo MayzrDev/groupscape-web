@@ -206,6 +206,30 @@ pub struct GroupMember {
     /// ephemeral handling as `alerts`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notable_drops: Option<Vec<NotableDropEvent>>,
+    /// Herb/tree farming patch and bird house timers, bridged from RuneLite's own Time Tracking
+    /// plugin config by the plugin's `TimeTrackingState`. A full snapshot each tick (like every
+    /// other field here), not a delta - `db::replace_farming_timers` swaps the member's rows
+    /// wholesale on each update.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub farming_timers: Option<Vec<FarmingTimerEntry>>,
+}
+
+/// One farming/bird house timer row, field names matching the plugin's `PatchTimerEntry` output
+/// verbatim (`readyAt` etc.).
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct FarmingTimerEntry {
+    /// "herb" | "tree" | "birdhouse"
+    pub category: String,
+    pub label: String,
+    /// "growing" | "harvestable" | "diseased" | "dead" | "seeded" | "built" | "empty" | "unknown"
+    pub status: String,
+    /// Epoch seconds, absent when not applicable (already ready with no regrow timer, dead, etc).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ready_at: Option<i64>,
+    /// True when Time Tracking has no (or stale/undecodable) data for this patch - surfaced as an
+    /// "Unknown - check patch" badge rather than hidden, per the product decision.
+    pub unconfirmed: bool,
 }
 
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's
@@ -344,22 +368,28 @@ pub struct ObjectInteractionEvent {
 pub enum AlertEvent {
     LowHp(LowHpAlert),
     WildernessEntry(WildernessEntryAlert),
+    /// Unlike the other two variants, never sent by the plugin - constructed server-side by the
+    /// background job in `unauthed.rs` when a farming/bird house timer's `ready_at` passes (see
+    /// `db::claim_ready_farming_timers`). Time-based rather than telemetry-diff-based, so it can't
+    /// arrive on the heartbeat like the others.
+    TimerReady(TimerReadyAlert),
 }
 impl AlertEvent {
-    /// Matches the enum's own serde tag ("low_hp"/"wilderness_entry") - used as both the push
-    /// payload's `type` field and its notification `tag` (so a fresh low-HP alert replaces a
-    /// stale one instead of stacking, per `groupscape-web#39`'s design review).
+    /// Matches the enum's own serde tag ("low_hp"/"wilderness_entry"/"timer_ready") - used as both
+    /// the push payload's `type` field and its notification `tag` (so a fresh low-HP alert
+    /// replaces a stale one instead of stacking, per `groupscape-web#39`'s design review).
     pub fn alert_type(&self) -> &'static str {
         match self {
             AlertEvent::LowHp(_) => "low_hp",
             AlertEvent::WildernessEntry(_) => "wilderness_entry",
+            AlertEvent::TimerReady(_) => "timer_ready",
         }
     }
 
     /// Low-HP alerts stay on screen until dismissed - unlike the other alert/toast copy in this
     /// app, this one exists specifically for when the player isn't looking at the tab, so letting
-    /// it auto-vanish after a few seconds defeats the point. Wilderness entry is informational
-    /// and auto-dismisses like a normal OS notification.
+    /// it auto-vanish after a few seconds defeats the point. Wilderness entry and timer-ready are
+    /// informational and auto-dismiss like a normal OS notification.
     pub fn requires_interaction(&self) -> bool {
         matches!(self, AlertEvent::LowHp(_))
     }
@@ -375,6 +405,13 @@ impl AlertEvent {
             AlertEvent::WildernessEntry(alert) => (
                 format!("Wilderness entry — {}", member_name),
                 format!("Entered level {} wilderness", alert.wilderness_level),
+            ),
+            AlertEvent::TimerReady(alert) => (
+                format!("{} ready — {}", alert.label, member_name),
+                match alert.category.as_str() {
+                    "birdhouse" => "Bird house is ready to dismantle".to_string(),
+                    _ => "Patch is ready to harvest".to_string(),
+                },
             ),
         }
     }
@@ -399,6 +436,14 @@ pub struct WildernessEntryAlert {
     pub world_y: i32,
     pub plane: i32,
     pub world: i32,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TimerReadyAlert {
+    /// "herb" | "tree" | "birdhouse"
+    pub category: String,
+    pub label: String,
 }
 
 /// Discriminates a [`NotableDropEvent`]'s loot source, matching the plugin's own

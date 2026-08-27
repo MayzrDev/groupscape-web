@@ -41,6 +41,7 @@ player-interacting.player-interacting--visible {
 .player-interacting__fill {
   position: absolute;
   inset: 0;
+  width: 0;
   background: #a41623;
 }
 
@@ -85,12 +86,14 @@ player-interacting.player-interacting--neutral .player-interacting__label {
 
 .player-interacting__hp {
   flex: none;
+  min-width: 28px;
   padding: 0 6px;
   font-size: 9px;
   font-variant-numeric: tabular-nums;
   color: #d98a8a;
   opacity: 0.7;
   white-space: nowrap;
+  text-align: right;
 }
 
 player-interacting.player-interacting--neutral .player-interacting__hp {

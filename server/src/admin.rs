@@ -61,6 +61,25 @@ pub async fn get_group(
     }
 }
 
+/// Records that a global admin opened the read-only "view as member" dashboard for a group.
+/// Called once by the frontend when that view opens (not on every poll) so the admin panel's own
+/// audit log - never anything the group's members can see - has a trail of who looked at what.
+#[post("/groups/{group_id}/view")]
+pub async fn view_group(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let group_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_group(&client, group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+    db::admin_record_audit_log(&client, "view_group", Some("group"), Some(&group_id.to_string()), None)
+        .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
 async fn set_group_moderation(
     db_pool: &web::Data<Pool>,
     group_id: i64,
