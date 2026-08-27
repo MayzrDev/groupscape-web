@@ -1,8 +1,11 @@
+/* global hcaptcha */
 import { BaseElement } from "../base-element/base-element";
 import { accountApi } from "../data/account-api";
 import { accountStorage } from "../data/account-storage";
+import { api } from "../data/api";
 import { storage } from "../data/storage";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
+import { validCharacters, validLength } from "../validators";
 
 const ADD_POLL_INTERVAL_MS = 5000;
 
@@ -53,10 +56,33 @@ export class CharactersPage extends BaseElement {
     this.joinDialogSubmit = this.querySelector(".characters-page__join-dialog-submit");
     this.joinDialogCancel = this.querySelector(".characters-page__join-dialog-cancel");
 
+    this.createDialog = this.querySelector(".characters-page__create-dialog");
+    this.createDialogForm = this.querySelector(".characters-page__create-dialog-form");
+    this.createDialogSuccess = this.querySelector(".characters-page__create-dialog-success");
+    this.createDialogSub = this.querySelector(".characters-page__create-dialog-sub");
+    this.createDialogName = this.querySelector(".characters-page__create-dialog-name");
+    this.createDialogName.validators = [
+      (value) => (!validCharacters(value) ? "Group name has some unsupported special characters." : null),
+      (value) => (!validLength(value) ? "Group name must be between 1 and 16 characters." : null),
+    ];
+    this.createDialogError = this.querySelector(".characters-page__create-dialog-error");
+    this.createDialogSubmit = this.querySelector(".characters-page__create-dialog-submit");
+    this.createDialogCancel = this.querySelector(".characters-page__create-dialog-cancel");
+    this.createSuccessSub = this.querySelector(".characters-page__create-success-sub");
+    this.createTokenValue = this.querySelector(".characters-page__create-token-value");
+    this.createTokenCopy = this.querySelector(".characters-page__create-token-copy");
+    this.createEnterButton = this.querySelector(".characters-page__create-enter");
+    this.createStayButton = this.querySelector(".characters-page__create-stay");
+
     this.eventListener(this.sidebar, "click", this.handleSidebarClick.bind(this));
     this.eventListener(this.detail, "click", this.handleDetailClick.bind(this));
     this.eventListener(this.joinDialogSubmit, "click", this.submitJoinGroup.bind(this));
     this.eventListener(this.joinDialogCancel, "click", this.hideJoinDialog.bind(this));
+    this.eventListener(this.createDialogSubmit, "click", this.submitCreateGroup.bind(this));
+    this.eventListener(this.createDialogCancel, "click", this.hideCreateDialog.bind(this));
+    this.eventListener(this.createTokenCopy, "click", this.copyCreatedToken.bind(this));
+    this.eventListener(this.createEnterButton, "click", () => this.viewGroup(this.createdGroupName));
+    this.eventListener(this.createStayButton, "click", this.hideCreateDialog.bind(this));
 
     this.checkSession();
   }
@@ -64,6 +90,14 @@ export class CharactersPage extends BaseElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.stopAddPolling();
+
+    // Mirrors create-group.js's cleanup: hcaptcha only renders reliably on the first widget it's
+    // ever given, so the script + global have to be torn down whenever this page unmounts rather
+    // than left around for a stale render to reuse.
+    if (this.captchaInitialized && this.captchaEnabled) {
+      document.getElementById("hcaptcha")?.remove();
+      window.hcaptcha = undefined;
+    }
   }
 
   async checkSession() {
@@ -395,13 +429,22 @@ export class CharactersPage extends BaseElement {
         `
             : `
           <p class="characters-page__summary-empty">Not in a group yet.</p>
-          <button
-            class="men-button small"
-            data-action="join-group"
-            data-character-id="${character.id}"
-            data-rsn="${escapeHtml(character.display_rsn)}"
-            type="button"
-          >Join with a token</button>
+          <div class="characters-page__detail-actions">
+            <button
+              class="men-button small"
+              data-action="create-group"
+              data-character-id="${character.id}"
+              data-rsn="${escapeHtml(character.display_rsn)}"
+              type="button"
+            >Create a group</button>
+            <button
+              class="men-button small"
+              data-action="join-group"
+              data-character-id="${character.id}"
+              data-rsn="${escapeHtml(character.display_rsn)}"
+              type="button"
+            >Join with a token</button>
+          </div>
         `
         }
       </div>
@@ -513,6 +556,9 @@ export class CharactersPage extends BaseElement {
       case "join-group":
         this.showJoinDialog(characterId, rsn);
         break;
+      case "create-group":
+        this.showCreateDialog(characterId, rsn);
+        break;
       case "leave-group":
         confirmDialogManager.confirm({
           headline: `Leave ${groupName}?`,
@@ -565,6 +611,123 @@ export class CharactersPage extends BaseElement {
     } catch (error) {
       this.joinDialogError.textContent = "Couldn't find that group — check the token.";
     }
+  }
+
+  showCreateDialog(characterId, rsn) {
+    this.createDialogCharacterId = characterId;
+    this.createDialogRsn = rsn;
+    this.createDialogSub.textContent = `${rsn} will lead this group. You'll get a token to invite the rest of your team.`;
+    this.createDialogName.input.value = "";
+    this.createDialogError.textContent = "";
+    this.createDialogSubmit.disabled = false;
+    this.createDialogForm.hidden = false;
+    this.createDialogSuccess.hidden = true;
+    this.createDialog.classList.add("dialog__visible");
+    this.ensureCaptcha();
+  }
+
+  hideCreateDialog() {
+    this.createDialog.classList.remove("dialog__visible");
+  }
+
+  /**
+   * Lazily loads the hCaptcha widget the first time the create-group dialog is opened, rather
+   * than on every page load — most visits to this page never touch group creation. Renders the
+   * widget once and resets it between opens (see `submitCreateGroup`'s finally block) instead of
+   * re-rendering, since hCaptcha only behaves reliably for the first widget it's given.
+   */
+  async ensureCaptcha() {
+    if (this.captchaInitialized) return;
+    this.captchaInitialized = true;
+
+    const captchaConfig = await api.getCaptchaEnabled();
+    this.captchaEnabled = captchaConfig.enabled;
+    if (!this.captchaEnabled || !this.isConnected) return;
+
+    this.sitekey = captchaConfig.sitekey;
+    await this.waitForCaptchaScript();
+    if (!this.isConnected) return;
+
+    this.createCaptchaWidgetId = hcaptcha.render("charactersPageCreateGroupCaptcha", {
+      sitekey: this.sitekey,
+      theme: "dark",
+    });
+  }
+
+  waitForCaptchaScript() {
+    return new Promise((resolve) => {
+      if (document.getElementById("hcaptcha")) {
+        resolve();
+        return;
+      }
+      window.menCaptchaLoaded = () => resolve();
+      const script = document.createElement("script");
+      script.id = "hcaptcha";
+      script.src = "https://js.hcaptcha.com/1/api.js?render=explicit&onload=menCaptchaLoaded";
+      document.body.appendChild(script);
+    });
+  }
+
+  async submitCreateGroup() {
+    this.createDialogError.textContent = "";
+    if (!this.createDialogName.valid) {
+      return;
+    }
+
+    let captchaResponse = "";
+    if (this.captchaEnabled) {
+      captchaResponse = hcaptcha.getResponse(this.createCaptchaWidgetId);
+      if (!captchaResponse) {
+        this.createDialogError.textContent = "Complete the captcha";
+        return;
+      }
+    }
+
+    const groupName = this.createDialogName.value;
+    this.createDialogSubmit.disabled = true;
+    try {
+      const createResponse = await api.createGroup(groupName, [], captchaResponse);
+      if (!createResponse.ok) {
+        const message = await createResponse.text();
+        this.createDialogError.textContent = `Error creating group: ${message}`;
+        return;
+      }
+
+      const createdGroup = await createResponse.json();
+      const linkResponse = await accountApi.linkCharacterToGroup(
+        this.createDialogCharacterId,
+        createdGroup.name,
+        createdGroup.token
+      );
+      this.showCreateSuccess(createdGroup, this.createDialogRsn, linkResponse.ok);
+      this.fetchCharacters();
+    } catch (error) {
+      this.createDialogError.textContent = "Couldn't create that group — try again.";
+    } finally {
+      this.createDialogSubmit.disabled = false;
+      if (this.captchaEnabled) {
+        hcaptcha.reset(this.createCaptchaWidgetId);
+      }
+    }
+  }
+
+  showCreateSuccess(group, rsn, linked) {
+    this.createdGroupName = group.name;
+    this.createDialogForm.hidden = true;
+    this.createDialogSuccess.hidden = false;
+    this.createSuccessSub.textContent = linked
+      ? `${rsn} joined ${group.name} automatically.`
+      : `${group.name} was created, but linking ${rsn} failed — use "Join with a token" below to finish.`;
+    this.createTokenValue.textContent = group.token;
+  }
+
+  async copyCreatedToken() {
+    await navigator.clipboard.writeText(this.createTokenValue.textContent);
+    const originalText = this.createTokenCopy.textContent;
+    this.createTokenCopy.textContent = "Copied";
+    setTimeout(() => {
+      this.createTokenCopy.textContent = originalText;
+    }, 1400);
   }
 
   async leaveGroup(characterId) {

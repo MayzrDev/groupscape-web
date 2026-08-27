@@ -29,4 +29,46 @@
       </div>
     </div>
   </div>
+
+  <div class="dialog characters-page__create-dialog">
+    <div class="dialog__container characters-page__create-dialog-container rsborder rsbackground">
+      <div class="characters-page__create-dialog-form">
+        <h2>Create a group</h2>
+        <p class="characters-page__create-dialog-sub"></p>
+        <men-input
+          class="characters-page__create-dialog-name"
+          max-length="16"
+          input-id="createGroupName"
+          placeholder-text="Group name"
+          input-label="Group name"
+        ></men-input>
+        <div class="characters-page__create-dialog-captcha" id="charactersPageCreateGroupCaptcha"></div>
+        <p class="characters-page__create-dialog-error validation-error"></p>
+        <div class="characters-page__create-dialog-buttons">
+          <button class="characters-page__create-dialog-submit men-button">Create group</button>
+          <button class="characters-page__create-dialog-cancel men-button">Cancel</button>
+        </div>
+      </div>
+      <div class="characters-page__create-dialog-success" hidden>
+        <div class="characters-page__create-success-head">
+          <div class="characters-page__create-success-icon">&check;</div>
+          <div>
+            <h2>Group created</h2>
+            <p class="characters-page__create-success-sub"></p>
+          </div>
+        </div>
+        <div class="characters-page__create-token-box">
+          <code class="characters-page__create-token-value"></code>
+          <button class="characters-page__create-token-copy men-button small">Copy</button>
+        </div>
+        <p class="characters-page__create-token-hint">
+          Share this token with friends so they can join from their own account.
+        </p>
+        <div class="characters-page__create-dialog-buttons">
+          <button class="characters-page__create-enter men-button">Enter group</button>
+          <button class="characters-page__create-stay men-button">Stay here</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>

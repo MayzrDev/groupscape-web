@@ -1,6 +1,6 @@
 {
   "name": "groupscape",
-  "version": "1.0.182",
+  "version": "1.0.183",
   "description": "",
   "dependencies": {
     "three": "^0.169.0"
