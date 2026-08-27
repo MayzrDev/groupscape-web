@@ -539,7 +539,7 @@ pub async fn add_account_to_group(
     db_pool: web::Data<Pool>,
 ) -> Result<HttpResponse, Error> {
     let account_id = path.into_inner();
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     if db::admin_get_account(&client, account_id).await?.is_none() {
         return Err(ApiError::AdminNotFoundError.into());
     }
@@ -547,7 +547,7 @@ pub async fn add_account_to_group(
         return Err(ApiError::AdminNotFoundError.into());
     }
 
-    db::admin_add_account_to_group(&client, account_id, body.group_id).await?;
+    db::admin_add_account_to_group(&mut client, account_id, body.group_id).await?;
     db::admin_record_audit_log(
         &client,
         "account.added_to_group",

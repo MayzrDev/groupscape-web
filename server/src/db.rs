@@ -5711,23 +5711,62 @@ pub async fn admin_remove_all_group_memberships(
 }
 
 /// Grants an account membership in a group the same way `link_character_to_group` does for its
-/// own default row - all permission flags off - but without requiring a character or the group's
-/// join credentials, since this is the admin support path for accounts that can't self-serve.
+/// own default row - all permission flags off - but without requiring the group's join
+/// credentials, since this is the admin support path for accounts that can't self-serve.
 /// Idempotent: adding an account that's already a member is a no-op.
+///
+/// Also links every character the account owns that isn't already linked to a group
+/// (`character_group_links`), so the account's character(s) actually appear in the group's
+/// roster instead of just being permitted to view it - mirroring what `link_character_to_group`
+/// does for the self-serve join flow. A character already linked to a *different* group is left
+/// alone rather than moved, since this endpoint only takes a group_id and has no way to know that
+/// reassignment (as opposed to just granting access) was intended.
 pub async fn admin_add_account_to_group(
-    client: &Client,
+    client: &mut Client,
     account_id: i64,
     group_id: i64,
 ) -> Result<(), ApiError> {
-    let stmt = client
+    let transaction = client.transaction().await?;
+
+    let permissions_stmt = transaction
         .prepare_cached(
             "INSERT INTO groupscape.group_permissions (group_id, account_id) VALUES ($1, $2) ON CONFLICT (group_id, account_id) DO NOTHING",
         )
         .await?;
-    client
-        .execute(&stmt, &[&group_id, &account_id])
+    transaction
+        .execute(&permissions_stmt, &[&group_id, &account_id])
         .await
         .map_err(|e| ApiError::AdminDbError("AdminAddAccountToGroupError".to_string(), e))?;
+
+    let link_stmt = transaction
+        .prepare_cached(
+            "INSERT INTO groupscape.character_group_links (character_id, group_id) \
+             SELECT c.character_id, $2 FROM groupscape.characters c \
+             WHERE c.account_id=$1 \
+             AND NOT EXISTS ( \
+                 SELECT 1 FROM groupscape.character_group_links l WHERE l.character_id = c.character_id \
+             )",
+        )
+        .await?;
+    transaction
+        .execute(&link_stmt, &[&account_id, &group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminLinkCharacterToGroupError".to_string(), e))?;
+
+    let admin_stmt = transaction
+        .prepare_cached(
+            "UPDATE groupscape.groups SET admin_account_id=$1 WHERE group_id=$2 AND admin_account_id IS NULL",
+        )
+        .await?;
+    transaction
+        .execute(&admin_stmt, &[&account_id, &group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminSetGroupOwnerError".to_string(), e))?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminAddAccountToGroupCommitError".to_string(), e))?;
     Ok(())
 }
 
