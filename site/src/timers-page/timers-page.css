@@ -66,7 +66,15 @@ timers-page {
 .timers-page__slot-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
+}
+
+.timers-page__slot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 72px;
+  flex-shrink: 0;
 }
 
 .timers-page__slot {
@@ -84,6 +92,18 @@ timers-page {
   box-sizing: border-box;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: optimizequality;
+}
+
+.timers-page__slot-label {
+  margin-top: 4px;
+  font-size: 0.72em;
+  text-align: center;
+  line-height: 1.15;
+  opacity: 0.85;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .timers-page__slot--ready .timers-page__slot-img {
@@ -128,26 +148,28 @@ timers-page {
 }
 
 .timers-page__slot-overlay {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 1px;
+  margin-top: 2px;
   text-align: center;
   color: yellow;
-  font-size: 0.62em;
+  font-size: 0.85em;
+  font-weight: bold;
   line-height: 1.1;
-  pointer-events: none;
   font-variant-numeric: tabular-nums;
   text-shadow: 1px 1px var(--black);
 }
 
-.timers-page__slot--diseased .timers-page__slot-overlay {
+.timers-page__slot-overlay--ready {
+  color: var(--green);
+}
+
+.timers-page__slot-overlay--diseased {
   color: var(--red);
 }
 
-.timers-page__slot--unknown .timers-page__slot-overlay {
+.timers-page__slot-overlay--unknown {
   color: #a99d8c;
   font-style: italic;
+  font-weight: normal;
 }
 
 .timers-page__empty {

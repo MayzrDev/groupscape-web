@@ -810,7 +810,7 @@ pub async fn get_farming_timers_for_group(
     let stmt = client
         .prepare_cached(
             r#"
-SELECT member_name, category, label, status, ready_at, unconfirmed
+SELECT member_name, category, label, status, ready_at, unconfirmed, produce_item_id
 FROM groupscape.farming_timers
 WHERE group_id = $1
 ORDER BY member_name, category, label
@@ -834,6 +834,7 @@ ORDER BY member_name, category, label
             status: row.try_get("status")?,
             ready_at: ready_at.map(|dt| dt.timestamp()),
             unconfirmed: row.try_get("unconfirmed")?,
+            produce_item_id: row.try_get("produce_item_id").ok(),
         };
         result.entry(member_name).or_default().push(entry);
     }
@@ -867,8 +868,8 @@ pub async fn replace_farming_timers(
         .prepare_cached(
             r#"
 INSERT INTO groupscape.farming_timers
-  (group_id, member_name, category, label, status, ready_at, unconfirmed, notified, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
+  (group_id, member_name, category, label, status, ready_at, unconfirmed, produce_item_id, notified, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, now())
 "#,
         )
         .await?;
@@ -888,6 +889,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, false, now())
                     &entry.status,
                     &ready_at,
                     &entry.unconfirmed,
+                    &entry.produce_item_id,
                 ],
             )
             .await
@@ -960,6 +962,7 @@ RETURNING group_id, member_name, category, label, status, ready_at
             status: row.try_get("status")?,
             ready_at: ready_at.map(|dt| dt.timestamp()),
             unconfirmed: false,
+            produce_item_id: None,
         };
         result.push((group_id, member_name, entry));
     }
@@ -2717,6 +2720,21 @@ WHERE notified = false AND unconfirmed = false
             .await?;
 
         commit_migration(&transaction, "create_farming_timers_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_farming_timers_produce_item_id_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.farming_timers ADD COLUMN IF NOT EXISTS produce_item_id INTEGER
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_farming_timers_produce_item_id_column").await?;
         transaction.commit().await?;
     }
 

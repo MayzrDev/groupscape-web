@@ -219,7 +219,7 @@ pub struct GroupMember {
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct FarmingTimerEntry {
-    /// "herb" | "tree" | "birdhouse"
+    /// "herb" | "tree" | "fruit_tree" | "hardwood_tree" | "birdhouse"
     pub category: String,
     pub label: String,
     /// "growing" | "harvestable" | "diseased" | "dead" | "seeded" | "built" | "empty" | "unknown"
@@ -230,6 +230,9 @@ pub struct FarmingTimerEntry {
     /// True when Time Tracking has no (or stale/undecodable) data for this patch - surfaced as an
     /// "Unknown - check patch" badge rather than hidden, per the product decision.
     pub unconfirmed: bool,
+    /// Item id of the planted crop's produce, absent for bird houses and unconfirmed/empty patches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub produce_item_id: Option<i32>,
 }
 
 /// One item entry in a [`GameEvent::Kill`]'s loot, field names matching the plugin's

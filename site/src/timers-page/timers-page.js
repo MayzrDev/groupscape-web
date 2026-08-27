@@ -4,11 +4,23 @@ import { utility } from "../utility";
 
 const COUNTDOWN_REFRESH_MS = 30000;
 
-const CATEGORY_LABEL = { herb: "Herb Patches", tree: "Tree Patches", birdhouse: "Bird Houses" };
-// Time Tracking has no notion of separate icons per category - both farming patch types share
-// the Farming skill icon, bird houses use the Hunter skill icon (they're placed via Hunter).
-const CATEGORY_ICON = { herb: "/ui/217-0.png", tree: "/ui/217-0.png", birdhouse: "/ui/220-0.png" };
-const CATEGORY_ORDER = ["herb", "tree", "birdhouse"];
+const CATEGORY_LABEL = {
+  herb: "Herb Patches",
+  tree: "Tree Patches",
+  fruit_tree: "Fruit Tree Patches",
+  hardwood_tree: "Hardwood Tree Patches",
+  birdhouse: "Bird Houses",
+};
+// Fallback icon when a slot has no known produce item yet (empty/unconfirmed patch, or a
+// birdhouse - Time Tracking doesn't identify birdhouse "produce" the way it does crops).
+const CATEGORY_ICON = {
+  herb: "/ui/217-0.png",
+  tree: "/ui/217-0.png",
+  fruit_tree: "/ui/217-0.png",
+  hardwood_tree: "/ui/217-0.png",
+  birdhouse: "/ui/220-0.png",
+};
+const CATEGORY_ORDER = ["herb", "tree", "fruit_tree", "hardwood_tree", "birdhouse"];
 
 function formatCountdown(readyAt) {
   const diffMs = readyAt * 1000 - Date.now();
@@ -73,7 +85,8 @@ function escapeAttribute(value) {
 }
 
 function groupByCategory(entries) {
-  const grouped = { herb: [], tree: [], birdhouse: [] };
+  const grouped = {};
+  for (const category of CATEGORY_ORDER) grouped[category] = [];
   for (const entry of entries) {
     if (grouped[entry.category]) grouped[entry.category].push(entry);
   }
@@ -168,11 +181,22 @@ export class TimersPage extends BaseElement {
   renderSlot(entry) {
     const state = slotState(entry);
     const tooltip = `${entry.label} — ${statusText(entry)}`;
+    const fallbackIcon = CATEGORY_ICON[entry.category];
+    const iconSrc = entry.produceItemId != null ? `/icons/items/${entry.produceItemId}.webp` : fallbackIcon;
     return `
-      <div class="timers-page__slot timers-page__slot--${state}" title="${escapeAttribute(tooltip)}">
-        <img class="timers-page__slot-img" loading="lazy" src="${CATEGORY_ICON[entry.category]}" alt="" />
-        <span class="timers-page__slot-dot"></span>
-        <span class="timers-page__slot-overlay">${slotOverlayText(entry)}</span>
+      <div class="timers-page__slot-wrap" title="${escapeAttribute(tooltip)}">
+        <div class="timers-page__slot timers-page__slot--${state}">
+          <img
+            class="timers-page__slot-img"
+            loading="lazy"
+            src="${iconSrc}"
+            alt=""
+            onerror="this.onerror=null;this.src='${fallbackIcon}';"
+          />
+          <span class="timers-page__slot-dot"></span>
+        </div>
+        <span class="timers-page__slot-label">${entry.label}</span>
+        <span class="timers-page__slot-overlay timers-page__slot-overlay--${state}">${slotOverlayText(entry)}</span>
       </div>
     `;
   }
