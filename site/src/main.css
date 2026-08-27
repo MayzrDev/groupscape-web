@@ -468,6 +468,7 @@ ul {
    background bleed through. */
 .admin-section {
   overflow: auto;
+  flex-direction: column;
 }
 
 .admin-section__outlet {
