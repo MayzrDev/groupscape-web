@@ -25,6 +25,7 @@ export class LootLogPage extends BaseElement {
     this.bosses = [];
     this.selectedMember = "";
     this.selectedBoss = "";
+    this.selectedClueTier = "";
     this.timeWindow = "1h";
     this.splitMode = "reported";
     this.sort = "value";
@@ -43,6 +44,7 @@ export class LootLogPage extends BaseElement {
     this.customSince = this.querySelector(".loot-log-page__custom-since");
     this.customUntil = this.querySelector(".loot-log-page__custom-until");
     this.bossSelect = this.querySelector(".loot-log-page__boss-select");
+    this.clueTierSelect = this.querySelector(".loot-log-page__clue-tier-select");
     this.memberSelect = this.querySelector(".loot-log-page__member-select");
     this.sortSelect = this.querySelector(".loot-log-page__sort-select");
     this.splitModeSelect = this.querySelector(".loot-log-page__split-mode-select");
@@ -72,6 +74,10 @@ export class LootLogPage extends BaseElement {
       this.selectedBoss = this.bossSelect.value;
       this.fetchLoot();
     });
+    this.eventListener(this.clueTierSelect, "change", () => {
+      this.selectedClueTier = this.clueTierSelect.value;
+      this.fetchLoot();
+    });
     this.eventListener(this.splitModeSelect, "change", () => {
       this.splitMode = this.splitModeSelect.value;
       this.fetchLoot();
@@ -99,6 +105,7 @@ export class LootLogPage extends BaseElement {
     const scope = {
       memberName: this.selectedMember || undefined,
       boss: this.selectedBoss || undefined,
+      clueTier: this.selectedClueTier || undefined,
       splitMode: this.splitMode,
     };
     if (this.timeWindow !== "all") {
@@ -123,14 +130,25 @@ export class LootLogPage extends BaseElement {
   }
 
   renderBossOptions() {
-    const bosses = this.bosses.length
+    const sources = this.bosses.length
       ? this.bosses
-      : [...new Set(this.rows.map((row) => row.npc_name))].sort().map((name) => ({ slug: slugifyNpcName(name), name }));
+      : [...new Set(this.rows.filter((row) => row.source_type !== "clue").map((row) => row.source_name))]
+          .sort()
+          .map((name) => ({ slug: slugifyNpcName(name), name, source_type: "kill" }));
     const current = this.selectedBoss;
-    this.bossSelect.innerHTML = `<option value="">All bosses</option>${bosses
-      .map((boss) => `<option value="${boss.slug}">${boss.name}</option>`)
-      .join("")}`;
-    this.bossSelect.value = bosses.some((boss) => boss.slug === current) ? current : "";
+    const bossOptions = sources.filter((source) => source.source_type === "kill");
+    const chestOptions = sources.filter((source) => source.source_type === "chest");
+    const optgroup = (label, options) =>
+      options.length
+        ? `<optgroup label="${label}">${options
+            .map((source) => `<option value="${source.slug}">${source.name}</option>`)
+            .join("")}</optgroup>`
+        : "";
+    this.bossSelect.innerHTML = `<option value="">All sources</option>${optgroup("Bosses", bossOptions)}${optgroup(
+      "Chests & Minigames",
+      chestOptions
+    )}`;
+    this.bossSelect.value = sources.some((source) => source.slug === current) ? current : "";
   }
 
   disconnectedCallback() {
@@ -174,8 +192,8 @@ export class LootLogPage extends BaseElement {
           <div class="loot-log-page__split-l">Total Value</div>
         </div>
         <div class="loot-log-page__split-card">
-          <div class="loot-log-page__split-n">${this.split.kill_count.toLocaleString()}</div>
-          <div class="loot-log-page__split-l">Kills</div>
+          <div class="loot-log-page__split-n">${this.split.event_count.toLocaleString()}</div>
+          <div class="loot-log-page__split-l">Events</div>
         </div>
         <div class="loot-log-page__split-card">
           <div class="loot-log-page__split-n">${this.split.per_person_gp.toLocaleString()}</div>
@@ -188,8 +206,8 @@ export class LootLogPage extends BaseElement {
             (participant) => `
           <div class="loot-log-page__participant-chip">
             ${participant.member_name} — <b>${
-              participant.kill_count
-            }</b> kills · ${participant.loot_value.toLocaleString()}
+              participant.event_count
+            }</b> events · ${participant.loot_value.toLocaleString()}
           </div>
         `
           )

@@ -11,7 +11,9 @@ use crate::db;
 use crate::demo::DEMO_GROUP_NAME;
 use crate::drop_rates::slugify_npc_name;
 use crate::error::ApiError;
-use crate::models::{CreateGroup, DeathEvent, GameEvent, KillEvent, LootItem};
+use crate::models::{
+    CreateGroup, DeathEvent, GameEvent, KillEvent, LootEvent, LootItem, LootSourceType,
+};
 use chrono::{DateTime, Duration, Utc};
 use deadpool_postgres::Client;
 use rand_core::{OsRng, RngCore};
@@ -173,6 +175,8 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
 
     let session_id = db::ensure_open_session(client, group_id).await?;
     let bosses = ["Vorkath", "Zulrah", "Cerberus", "General Graardor", "Giant Mole"];
+    let chests = ["Chambers of Xeric", "Theatre of Blood", "Barrows", "Tombs of Amascut"];
+    let clue_tiers = ["beginner", "easy", "medium", "hard", "elite", "master"];
     let now = Utc::now();
 
     for day_offset in (0..HISTORY_DAYS).rev() {
@@ -195,6 +199,47 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                         item_id: 536,
                         quantity: rand_range(1, 4) as i32,
                     }]),
+                });
+                insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
+                    .await?;
+            }
+            // 0-1 chest openings for this member on this day.
+            if rand_below(3) == 0 {
+                let occurred_at = day - Duration::minutes(rand_range(0, 1439));
+                let event = GameEvent::Loot(LootEvent {
+                    source_type: LootSourceType::Chest,
+                    source_name: choose(&chests).to_string(),
+                    clue_tier: None,
+                    world_x: 3200,
+                    world_y: 3200,
+                    plane: 0,
+                    world: 420,
+                    occurred_at: Some(occurred_at),
+                    loot: vec![LootItem {
+                        item_id: 536,
+                        quantity: rand_range(1, 4) as i32,
+                    }],
+                });
+                insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
+                    .await?;
+            }
+            // An occasional clue scroll casket, rarer still.
+            if rand_below(6) == 0 {
+                let occurred_at = day - Duration::minutes(rand_range(0, 1439));
+                let tier = choose(&clue_tiers);
+                let event = GameEvent::Loot(LootEvent {
+                    source_type: LootSourceType::Clue,
+                    source_name: format!("Clue Scroll ({})", tier),
+                    clue_tier: Some(tier.to_string()),
+                    world_x: 3200,
+                    world_y: 3200,
+                    plane: 0,
+                    world: 420,
+                    occurred_at: Some(occurred_at),
+                    loot: vec![LootItem {
+                        item_id: 536,
+                        quantity: rand_range(1, 4) as i32,
+                    }],
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;

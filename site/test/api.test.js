@@ -155,7 +155,7 @@ describe("api", () => {
   it("getLootSplit builds the query string from provided filters and returns the parsed result", async () => {
     api.setCredentials("iron-team", "secret-token");
 
-    const split = { total_value: 100, kill_count: 1, participants: [], per_person_gp: 100, remainder_gp: 0 };
+    const split = { total_value: 100, event_count: 1, participants: [], per_person_gp: 100, remainder_gp: 0 };
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(split) });
 
     const result = await api.getLootSplit({ since: "2026-01-01T00:00:00Z", until: "2026-02-01T00:00:00Z" });

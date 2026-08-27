@@ -194,6 +194,29 @@ pub fn dispatch_event_webhook(
                     send_webhook_embed(webhook_url, "Death", description, DEATH_COLOR).await;
                 }
             }
+            GameEvent::Loot(loot_event) => {
+                if settings.notify_loot && !loot_event.loot.is_empty() {
+                    let lines: Vec<String> = loot_event
+                        .loot
+                        .iter()
+                        .map(|item| {
+                            let name = (loot_event.clue_tier.is_none())
+                                .then(|| drop_rates::lookup(&loot_event.source_name, item.item_id))
+                                .flatten()
+                                .map(|drop| drop.name.clone())
+                                .unwrap_or_else(|| format!("item #{}", item.item_id));
+                            format!("{}x {}", item.quantity, name)
+                        })
+                        .collect();
+                    let description = format!(
+                        "{} received {} from {}",
+                        member_name,
+                        lines.join(", "),
+                        loot_event.source_name
+                    );
+                    send_webhook_embed(webhook_url, "Loot", description, LOOT_COLOR).await;
+                }
+            }
         }
     });
 }

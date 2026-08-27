@@ -48,6 +48,9 @@ export class PlayerPanel extends BaseElement {
     } else {
       worldMap.followPlayer(this.playerName);
       pubsub.publish("player-followed", worldMap.followingPlayer.name);
+      if (window.location.pathname !== "/group/map") {
+        window.history.pushState("", "", "/group/map");
+      }
     }
   }
 

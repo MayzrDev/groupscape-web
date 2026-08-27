@@ -62,6 +62,10 @@ export function activityLinkFor(event) {
   return LINK_BY_EVENT_TYPE[event.event_type] || "/group/activity";
 }
 
+export function npcWikiUrl(npcName) {
+  return `https://oldschool.runescape.wiki/w/Special:Lookup?type=npc&name=${encodeURIComponent(npcName)}`;
+}
+
 const identity = (value) => value;
 
 /// Phrasing convention for group-milestone copy across this app: "<member> <verb> <subject>"
@@ -79,13 +83,15 @@ export function activityEventDescription(event, format = {}) {
     case "kill": {
       // `npcName` is the server's camelCase `KillEvent` serialization; `npc_name` is accepted
       // too so either casing renders.
-      const npc = payload.npcName || payload.npc_name || "an NPC";
+      const npc = payload.npcName || payload.npc_name;
       const noLoot = !payload.loot || payload.loot.length === 0;
-      return `${member} killed ${wrapSubject(npc)}${noLoot ? " — no loot" : ""}`;
+      return `${member} killed ${wrapSubject(npc || "an NPC", "monster", npc && npcWikiUrl(npc))}${
+        noLoot ? " — no loot" : ""
+      }`;
     }
     case "death": {
       const killer = payload.killerName || payload.killer_name;
-      return killer ? `${member} died to ${wrapSubject(killer, "death")}` : `${member} died`;
+      return killer ? `${member} died to ${wrapSubject(killer, "death", npcWikiUrl(killer))}` : `${member} died`;
     }
     case "quest":
       return `${member} completed ${wrapSubject(questNameFor(payload))}`;

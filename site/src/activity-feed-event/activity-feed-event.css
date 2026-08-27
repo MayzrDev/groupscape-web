@@ -81,6 +81,14 @@ activity-feed-event.activity-feed-event--enter {
   font-weight: 600;
 }
 
+a.activity-feed-event__subject {
+  text-decoration: none;
+}
+
+a.activity-feed-event__subject:hover {
+  text-decoration: underline;
+}
+
 .activity-feed-event__subject--death {
   color: var(--red);
 }

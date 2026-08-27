@@ -11,8 +11,9 @@ use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
-    GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootSplitParticipant,
-    LootSplitResult, LootSummaryRow, MyPermissions, PermissionFlags, PermissionKey, RenameGroup,
+    GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem,
+    LootSplitParticipant, LootSplitResult, LootSummaryRow, MyPermissions, PermissionFlags,
+    PermissionKey, RenameGroup,
     UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
@@ -779,15 +780,26 @@ pub async fn get_sessions(
 pub struct LootBoss {
     pub slug: String,
     pub name: String,
+    /// "kill" | "chest" - lets the site group/icon bosses separately from chest sources.
+    pub source_type: &'static str,
 }
 
 pub async fn get_loot_bosses() -> web::Json<Vec<LootBoss>> {
-    web::Json(
-        crate::notable_npcs::names()
-            .into_iter()
-            .map(|(slug, name)| LootBoss { slug, name })
-            .collect(),
-    )
+    let bosses = crate::notable_npcs::names()
+        .into_iter()
+        .map(|(slug, name)| LootBoss {
+            slug,
+            name,
+            source_type: "kill",
+        });
+    let chests = crate::loot_sources::names()
+        .into_iter()
+        .map(|(slug, name)| LootBoss {
+            slug,
+            name,
+            source_type: "chest",
+        });
+    web::Json(bosses.chain(chests).collect())
 }
 
 fn default_loot_sort() -> String {
@@ -803,6 +815,8 @@ pub struct GetLootSummaryQuery {
     #[serde(default)]
     pub boss: Option<String>,
     #[serde(default)]
+    pub clue_tier: Option<String>,
+    #[serde(default)]
     pub since: Option<DateTime<Utc>>,
     #[serde(default)]
     pub until: Option<DateTime<Utc>>,
@@ -811,17 +825,50 @@ pub struct GetLootSummaryQuery {
     #[serde(default = "default_loot_sort")]
     pub sort: String,
 }
-/// Query-time pivot over `kill` activity events into per-(member, npc, item) rows, joining GE
-/// value (in-process price cache, no live wiki refetch) and rarity/uniqueness (curated
-/// `drop_rates` table) at read time - mirrors `groupscape-old`'s `GET /loot-summary`, adapted
-/// to this server's flat `npc_name` (no `contentKey` slug exists here).
+/// One normalized (source_name, source_type, clue_tier, loot, participants) view over either a
+/// `GameEvent::Kill` or `GameEvent::Loot` payload, so the summary/split endpoints below don't
+/// need parallel match arms for every field they read.
+struct LootSourceEvent {
+    source_name: String,
+    source_type: &'static str,
+    clue_tier: Option<String>,
+    loot: Vec<LootItem>,
+    participants: Option<Vec<String>>,
+}
+fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
+    match event {
+        GameEvent::Kill(kill) => Some(LootSourceEvent {
+            source_name: kill.npc_name.clone(),
+            source_type: "kill",
+            clue_tier: None,
+            loot: kill.loot.clone().unwrap_or_default(),
+            participants: kill.participants.clone(),
+        }),
+        GameEvent::Loot(loot_event) => Some(LootSourceEvent {
+            source_name: loot_event.source_name.clone(),
+            source_type: match loot_event.source_type {
+                crate::models::LootSourceType::Chest => "chest",
+                crate::models::LootSourceType::Clue => "clue",
+            },
+            clue_tier: loot_event.clue_tier.clone(),
+            loot: loot_event.loot.clone(),
+            participants: None,
+        }),
+        GameEvent::Death(_) => None,
+    }
+}
+/// Query-time pivot over `kill`/`loot` activity events into per-(member, source, item) rows,
+/// joining GE value (in-process price cache, no live wiki refetch) and rarity/uniqueness
+/// (curated `drop_rates` table, skipped for clue sources - see `LootSourceEvent`) at read time -
+/// mirrors `groupscape-old`'s `GET /loot-summary`, adapted to this server's flat source name (no
+/// `contentKey` slug exists here).
 pub async fn get_loot_summary(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
     query: web::Query<GetLootSummaryQuery>,
 ) -> Result<web::Json<Vec<LootSummaryRow>>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let events = db::list_kill_events(
+    let events = db::list_loot_and_kill_events(
         &client,
         auth.group_id,
         query.member_name.as_deref(),
@@ -834,45 +881,53 @@ pub async fn get_loot_summary(
 
     let mut rows: HashMap<(String, String, i32), LootSummaryRow> = HashMap::new();
     for event in &events {
-        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
-        else {
+        let Ok(parsed) = serde_json::from_value::<GameEvent>(event.payload.clone()) else {
+            continue;
+        };
+        let Some(source) = as_loot_source_event(&parsed) else {
             continue;
         };
         if let Some(boss) = query.boss.as_deref() {
-            if drop_rates::slugify_npc_name(&kill.npc_name) != boss {
+            if drop_rates::slugify_npc_name(&source.source_name) != boss {
                 continue;
             }
         }
-        let Some(loot) = kill.loot else {
-            continue;
-        };
-        for item in loot {
-                let participants = kill
-                    .participants
-                    .clone()
-                    .unwrap_or_else(|| vec![event.member_name.clone()]);
-                let participant_count = participants.len().max(1) as i64;
-                let names: Vec<String> = match query.split_mode.as_deref() {
-                    Some("proximity") | Some("personal") => participants.clone(),
-                    _ => vec![event.member_name.clone()],
-                };
-                for member_name in names {
-                    let key = (member_name.clone(), kill.npc_name.clone(), item.item_id);
-            let unit_value = ge_prices.get(&item.item_id).copied();
-            let drop = drop_rates::lookup(&kill.npc_name, item.item_id);
-            let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
-                member_name,
-                npc_name: kill.npc_name.clone(),
-                item_id: item.item_id,
-                item_name: drop.map(|d| d.name.clone()),
-                quantity: 0,
-                unit_value,
-                total_value: 0,
-                rarity: drop.map(|d| d.rarity.clone()),
-                is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
-                drop_rate: drop.and_then(|d| d.rate.clone()),
-            });
-            row.quantity += item.quantity;
+        if let Some(tier) = query.clue_tier.as_deref() {
+            if source.clue_tier.as_deref() != Some(tier) {
+                continue;
+            }
+        }
+        for item in &source.loot {
+            let participants = source
+                .participants
+                .clone()
+                .unwrap_or_else(|| vec![event.member_name.clone()]);
+            let participant_count = participants.len().max(1) as i64;
+            let names: Vec<String> = match query.split_mode.as_deref() {
+                Some("proximity") | Some("personal") => participants.clone(),
+                _ => vec![event.member_name.clone()],
+            };
+            for member_name in names {
+                let key = (member_name.clone(), source.source_name.clone(), item.item_id);
+                let unit_value = ge_prices.get(&item.item_id).copied();
+                let drop = (source.clue_tier.is_none())
+                    .then(|| drop_rates::lookup(&source.source_name, item.item_id))
+                    .flatten();
+                let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
+                    member_name,
+                    source_name: source.source_name.clone(),
+                    source_type: source.source_type.to_string(),
+                    clue_tier: source.clue_tier.clone(),
+                    item_id: item.item_id,
+                    item_name: drop.map(|d| d.name.clone()),
+                    quantity: 0,
+                    unit_value,
+                    total_value: 0,
+                    rarity: drop.map(|d| d.rarity.clone()),
+                    is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
+                    drop_rate: drop.and_then(|d| d.rate.clone()),
+                });
+                row.quantity += item.quantity;
                 let item_value = unit_value.unwrap_or(0) * item.quantity as i64;
                 row.total_value += if query.split_mode.as_deref() == Some("proximity") {
                     item_value / participant_count
@@ -905,23 +960,25 @@ pub struct GetLootSplitQuery {
     #[serde(default)]
     pub boss: Option<String>,
     #[serde(default)]
+    pub clue_tier: Option<String>,
+    #[serde(default)]
     pub since: Option<DateTime<Utc>>,
     #[serde(default)]
     pub until: Option<DateTime<Utc>>,
     #[serde(default)]
     pub split_mode: Option<String>,
 }
-/// Total loot GP over `[since, until]` split evenly across every member who reported a kill in
-/// that range. Unlike `groupscape-old`'s split (which credits a per-kill `actor_character_ids`
-/// list), this server has no multi-actor kill co-attribution, so "participants" here is the set
-/// of reporting members rather than a raid roster.
+/// Total loot GP over `[since, until]` split evenly across every member who reported a kill,
+/// chest, or clue event in that range. Unlike `groupscape-old`'s split (which credits a per-kill
+/// `actor_character_ids` list), this server has no multi-actor kill co-attribution, so
+/// "participants" here is the set of reporting members rather than a raid roster.
 pub async fn get_loot_split(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
     query: web::Query<GetLootSplitQuery>,
 ) -> Result<web::Json<LootSplitResult>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let events = db::list_kill_events(
+    let events = db::list_loot_and_kill_events(
         &client,
         auth.group_id,
         query.member_name.as_deref(),
@@ -934,49 +991,54 @@ pub async fn get_loot_split(
 
     let mut per_member: HashMap<String, (i64, i64)> = HashMap::new();
     let mut total_value: i64 = 0;
-    let mut kill_count: i64 = 0;
+    let mut event_count: i64 = 0;
     for event in &events {
-        if let Ok(GameEvent::Kill(kill)) =
-            serde_json::from_value::<GameEvent>(event.payload.clone())
-        {
-            if let Some(boss) = query.boss.as_deref() {
-                if drop_rates::slugify_npc_name(&kill.npc_name) != boss {
-                    continue;
-                }
+        let Ok(parsed) = serde_json::from_value::<GameEvent>(event.payload.clone()) else {
+            continue;
+        };
+        let Some(source) = as_loot_source_event(&parsed) else {
+            continue;
+        };
+        if let Some(boss) = query.boss.as_deref() {
+            if drop_rates::slugify_npc_name(&source.source_name) != boss {
+                continue;
             }
-            kill_count += 1;
-            let participants = kill
-                .participants
-                .unwrap_or_else(|| vec![event.member_name.clone()]);
-            let names: Vec<String> = match query.split_mode.as_deref() {
-                Some("proximity") | Some("personal") => participants.clone(),
-                _ => vec![event.member_name.clone()],
-            };
-            let participant_count = participants.len().max(1) as i64;
-            for member_name in names {
-                let entry = per_member.entry(member_name).or_insert((0, 0));
-                entry.0 += 1;
-            if let Some(loot) = &kill.loot {
-                for item in loot {
-                    let value =
-                        ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
-                    entry.1 += if query.split_mode.as_deref() == Some("proximity") {
-                        value / participant_count
-                    } else {
-                        value
-                    };
-                    total_value += value;
-                }
+        }
+        if let Some(tier) = query.clue_tier.as_deref() {
+            if source.clue_tier.as_deref() != Some(tier) {
+                continue;
             }
+        }
+        event_count += 1;
+        let participants = source
+            .participants
+            .unwrap_or_else(|| vec![event.member_name.clone()]);
+        let names: Vec<String> = match query.split_mode.as_deref() {
+            Some("proximity") | Some("personal") => participants.clone(),
+            _ => vec![event.member_name.clone()],
+        };
+        let participant_count = participants.len().max(1) as i64;
+        for member_name in names {
+            let entry = per_member.entry(member_name).or_insert((0, 0));
+            entry.0 += 1;
+            for item in &source.loot {
+                let value =
+                    ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
+                entry.1 += if query.split_mode.as_deref() == Some("proximity") {
+                    value / participant_count
+                } else {
+                    value
+                };
+                total_value += value;
             }
         }
     }
 
     let mut participants: Vec<LootSplitParticipant> = per_member
         .into_iter()
-        .map(|(member_name, (kills, loot_value))| LootSplitParticipant {
+        .map(|(member_name, (events, loot_value))| LootSplitParticipant {
             member_name,
-            kill_count: kills,
+            event_count: events,
             loot_value,
         })
         .collect();
@@ -994,7 +1056,7 @@ pub async fn get_loot_split(
 
     Ok(web::Json(LootSplitResult {
         total_value,
-        kill_count,
+        event_count,
         participants,
         per_person_gp,
         remainder_gp,

@@ -63,6 +63,18 @@ impl AccountAuthenticationCache {
             })
     }
 
+    /// Clears every cached entry for an account, regardless of which session token cached it.
+    /// Needed after `link_discord_id_to_account` commits: that update goes straight to the DB
+    /// with no session token in hand (the discord callback is state-verified, not bearer-authed),
+    /// so a stale pre-link entry would otherwise keep serving the old `discord_name` for up to
+    /// `ACCOUNT_AUTH_CACHE_TTL` after the link succeeds.
+    pub fn invalidate_account(&self, account_id: i64) {
+        let Ok(mut inner) = self.inner.write() else {
+            return;
+        };
+        inner.entries.retain(|_, entry| entry.account.id != account_id);
+    }
+
     fn insert(&self, token_hash: String, account: Account) {
         let Ok(mut inner) = self.inner.write() else {
             return;

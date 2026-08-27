@@ -1,4 +1,4 @@
-use crate::account_auth_middleware::AccountAuthenticated;
+use crate::account_auth_middleware::{AccountAuthenticated, AccountAuthenticationCache};
 use crate::character_auth_middleware::CharacterAuthenticationCache;
 use crate::config::Config;
 use crate::crypto;
@@ -522,6 +522,7 @@ pub async fn discord_callback(
     query: web::Query<DiscordCallbackQuery>,
     config: web::Data<Config>,
     db_pool: web::Data<Pool>,
+    account_auth_cache: web::Data<AccountAuthenticationCache>,
     req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
     if !config.discord.enabled {
@@ -563,7 +564,10 @@ pub async fn discord_callback(
         )
         .await
         {
-            Ok(()) => Ok(redirect_to("discord_linked=1")),
+            Ok(()) => {
+                account_auth_cache.invalidate_account(account_id);
+                Ok(redirect_to("discord_linked=1"))
+            }
             Err(ApiError::DiscordIdAlreadyLinkedError) => {
                 Ok(redirect_to("error=discord_already_linked"))
             }

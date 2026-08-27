@@ -4,7 +4,10 @@
     ${this.itemName}
     ${this.row.is_unique ? `<span class="loot-log-row__unique-tag">Unique</span>` : ""}
   </div>
-  <div class="loot-log-row__meta">from ${this.row.npc_name} · dropped by ${this.row.member_name}</div>
+  <div class="loot-log-row__meta">
+    <span class="loot-log-row__source-chip"><span class="loot-log-row__source-dot"></span>${this.sourceLabel}</span>
+    <span>· dropped by ${this.row.member_name}</span>
+  </div>
 </div>
 ${
   this.rarityLabel
@@ -12,6 +15,8 @@ ${
         <span class="loot-log-row__rarity-badge">${this.rarityLabel}</span>
         ${this.dropRateLabel ? `<span class="loot-log-row__rate">${this.dropRateLabel}</span>` : ""}
       </div>`
+    : this.row.source_type === "clue"
+    ? `<div class="loot-log-row__rarity"><span class="loot-log-row__no-rarity">no rarity data</span></div>`
     : ""
 }
 <div class="loot-log-row__value">

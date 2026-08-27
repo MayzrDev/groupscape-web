@@ -4338,6 +4338,40 @@ LIMIT 5000
     rows.iter().map(activity_event_from_row).collect()
 }
 
+/// All `kill` and `loot` (chest/clue) events for a group in an optional `[since, until]` range -
+/// the loot summary/split endpoints' source, unlike [`list_kill_events`] (still kill-only, used
+/// by the boss-KC leaderboard where a chest/clue has no "kill" concept).
+pub async fn list_loot_and_kill_events(
+    client: &Client,
+    group_id: i64,
+    member_name: Option<&str>,
+    session_id: Option<i64>,
+    since: Option<DateTime<Utc>>,
+    until: Option<DateTime<Utc>>,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type IN ('kill', 'loot')
+  AND ($2::text IS NULL OR member_name = $2)
+    AND ($3::bigint IS NULL OR session_id = $3)
+    AND ($4::timestamptz IS NULL OR occurred_at >= $4)
+    AND ($5::timestamptz IS NULL OR occurred_at <= $5)
+ORDER BY occurred_at DESC
+LIMIT 5000
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &member_name, &session_id, &since, &until])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
 fn group_session_from_row(row: &Row) -> Result<GroupSession, ApiError> {
     Ok(GroupSession {
         id: row.try_get("session_id")?,
@@ -4808,6 +4842,33 @@ ORDER BY occurred_at DESC
     rows.iter().map(activity_event_from_row).collect()
 }
 
+/// All `loot` (chest/clue) activity events for a group since `since` - the loot-value
+/// leaderboard's additive complement to [`list_kill_events_since`] (kills and chest/clue loot
+/// are summed together there; boss-KC stays kill-only via `list_kill_events_since` alone).
+async fn list_loot_events_since(
+    client: &Client,
+    group_id: i64,
+    since: Option<DateTime<Utc>>,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type='loot'
+  AND ($2::timestamptz IS NULL OR occurred_at >= $2)
+ORDER BY occurred_at DESC
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &since])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
 /// Every member's name in a group - used to zero-fill leaderboard metrics computed from
 /// `activity_events` so a member with no matching events still ranks (at 0) rather than being
 /// omitted outright.
@@ -4862,7 +4923,8 @@ pub async fn get_boss_kc_leaderboard(
 }
 
 /// Cumulative per-member loot value (GE price at read time) over the window, mirroring
-/// `get_loot_summary`'s value lookup.
+/// `get_loot_summary`'s value lookup. Includes both NPC-kill loot and chest/clue loot (see
+/// [`list_loot_events_since`]) - unlike boss-KC, "loot value" isn't a kill-only concept.
 pub async fn get_loot_value_leaderboard(
     client: &Client,
     group_id: i64,
@@ -4870,21 +4932,35 @@ pub async fn get_loot_value_leaderboard(
     now: DateTime<Utc>,
     ge_prices: &crate::models::GEPrices,
 ) -> Result<Vec<(String, i64)>, ApiError> {
-    let events =
-        list_kill_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+    let since = leaderboard_window_cutoff(window, now);
+    let kill_events = list_kill_events_since(client, group_id, since).await?;
+    let loot_events = list_loot_events_since(client, group_id, since).await?;
 
     let mut totals: HashMap<String, i64> = list_member_names(client, group_id)
         .await?
         .into_iter()
         .map(|name| (name, 0))
         .collect();
-    for event in &events {
+    for event in &kill_events {
         let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
         else {
             continue;
         };
         let Some(loot) = kill.loot else { continue };
         let value: i64 = loot
+            .iter()
+            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+            .sum();
+        *totals.entry(event.member_name.clone()).or_insert(0) += value;
+    }
+    for event in &loot_events {
+        let Ok(GameEvent::Loot(loot_event)) =
+            serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        let value: i64 = loot_event
+            .loot
             .iter()
             .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
             .sum();
@@ -5100,24 +5176,44 @@ pub async fn get_boss_kc_metric_data(
 }
 
 /// Cumulative per-member loot-value time series (GE price at read time), bucketed at `period`'s
-/// granularity - the chart counterpart to `get_loot_value_leaderboard`.
+/// granularity - the chart counterpart to `get_loot_value_leaderboard`. Includes chest/clue loot
+/// alongside NPC-kill loot, same as the leaderboard.
 pub async fn get_loot_value_metric_data(
     client: &Client,
     group_id: i64,
     period: AggregatePeriod,
     ge_prices: &crate::models::GEPrices,
 ) -> Result<GroupMetricData, ApiError> {
-    let events = list_kill_events_since(client, group_id, None).await?;
+    let kill_events = list_kill_events_since(client, group_id, None).await?;
+    let loot_events = list_loot_events_since(client, group_id, None).await?;
     let granularity = bucket_granularity(period);
 
     let mut per_member: HashMap<String, BTreeMap<DateTime<Utc>, i64>> = HashMap::new();
-    for event in &events {
+    for event in &kill_events {
         let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
         else {
             continue;
         };
         let Some(loot) = kill.loot else { continue };
         let value: i64 = loot
+            .iter()
+            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+            .sum();
+        let bucket = truncate_datetime(event.occurred_at, granularity);
+        *per_member
+            .entry(event.member_name.clone())
+            .or_default()
+            .entry(bucket)
+            .or_insert(0) += value;
+    }
+    for event in &loot_events {
+        let Ok(GameEvent::Loot(loot_event)) =
+            serde_json::from_value::<GameEvent>(event.payload.clone())
+        else {
+            continue;
+        };
+        let value: i64 = loot_event
+            .loot
             .iter()
             .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
             .sum();

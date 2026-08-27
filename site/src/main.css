@@ -35,6 +35,18 @@
   --rarity-very-rare: #a855f7;
   --rarity-unique: #ffd700;
 
+  /* Loot log source-type accents (kill/chest/clue) - chest reuses the same warm brass as the
+     quest/pending-character accents (family resemblance, not a new hue); clue tiers use their
+     in-game casket colors since that's already how players read clue tier at a glance. */
+  --loot-source-chest: #c9962b;
+  --loot-source-kill: var(--rarity-common);
+  --clue-beginner: #b0b0b0;
+  --clue-easy: #f2f2f2;
+  --clue-medium: #4fa8e0;
+  --clue-hard: #e0574f;
+  --clue-elite: #b565e8;
+  --clue-master: #d4af37;
+
   --helmet-cut: #241a10;
 }
 

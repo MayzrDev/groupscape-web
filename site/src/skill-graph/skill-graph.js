@@ -366,15 +366,19 @@ export class SkillGraph extends BaseElement {
     if (this.chart) this.chart.destroy();
 
     let min = Number.MAX_SAFE_INTEGER;
-    let max = 0;
+    let max = -Number.MAX_SAFE_INTEGER;
     for (const ds of dataSets) {
-      const first = ds.data[0];
-      const last = ds.data[ds.data.length - 1];
-      if (Number.isFinite(first)) min = Math.min(min, first);
-      if (Number.isFinite(last)) max = Math.max(max, last);
+      for (const value of ds.data) {
+        if (!Number.isFinite(value)) continue;
+        min = Math.min(min, value);
+        max = Math.max(max, value);
+      }
     }
-    if (!Number.isFinite(min) || min === Number.MAX_SAFE_INTEGER) {
+    if (min === Number.MAX_SAFE_INTEGER) {
       min = 0;
+      max = 1;
+    } else {
+      min = Math.min(min, 0);
       max = Math.max(max, 1);
     }
 

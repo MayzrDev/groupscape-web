@@ -19,8 +19,8 @@
     <input class="loot-log-page__custom-since" type="date" hidden>
     <input class="loot-log-page__custom-until" type="date" hidden>
     <div class="loot-log-page__field">
-      <label class="loot-log-page__field-label">Boss</label>
-      <select class="loot-log-page__boss-select"><option value="">All bosses</option></select>
+      <label class="loot-log-page__field-label">Source</label>
+      <select class="loot-log-page__boss-select"><option value="">All sources</option></select>
     </div>
     <div class="loot-log-page__field">
       <label class="loot-log-page__field-label">Member</label>
@@ -28,6 +28,18 @@
     </div>
   </div>
   <div class="loot-log-page__toolbar-secondary">
+    <div class="loot-log-page__mini-field">
+      <span>Clue tier</span>
+      <select class="loot-log-page__clue-tier-select">
+        <option value="">All tiers</option>
+        <option value="beginner">Beginner</option>
+        <option value="easy">Easy</option>
+        <option value="medium">Medium</option>
+        <option value="hard">Hard</option>
+        <option value="elite">Elite</option>
+        <option value="master">Master</option>
+      </select>
+    </div>
     <div class="loot-log-page__mini-field">
       <span>Sort</span>
       <select class="loot-log-page__sort-select">
@@ -45,5 +57,5 @@
     </div>
   </div>
   <div class="loot-log-page__list"></div>
-  <p class="loot-log-page__empty">No loot yet — kills with tracked drops will show up here.</p>
+  <p class="loot-log-page__empty">No loot yet — kills, chest openings, and clue caskets will show up here.</p>
 </div>

@@ -236,6 +236,35 @@ pub struct KillEvent {
     pub loot: Option<Vec<LootItem>>,
 }
 
+/// Distinguishes a chest/instance reward (e.g. Chambers of Xeric, Barrows) from a clue scroll
+/// casket - both arrive from the plugin as RuneLite's `LootRecordType.EVENT`, uncorrelated to
+/// any kill, unlike [`KillEvent::loot`].
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LootSourceType {
+    Chest,
+    Clue,
+}
+
+/// A chest/instance reward or clue scroll casket opening - has no `npc_id`/participant-split
+/// semantics the way [`KillEvent`] does, since there's no "kill" to attach to.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct LootEvent {
+    pub source_type: LootSourceType,
+    pub source_name: String,
+    /// "beginner".."master" - only set when `source_type` is `Clue`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clue_tier: Option<String>,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurred_at: Option<DateTime<Utc>>,
+    pub loot: Vec<LootItem>,
+}
+
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct DeathEvent {
@@ -258,12 +287,14 @@ pub struct DeathEvent {
 pub enum GameEvent {
     Kill(KillEvent),
     Death(DeathEvent),
+    Loot(LootEvent),
 }
 impl GameEvent {
     pub fn event_type(&self) -> &'static str {
         match self {
             GameEvent::Kill(_) => "kill",
             GameEvent::Death(_) => "death",
+            GameEvent::Loot(_) => "loot",
         }
     }
 }
@@ -438,12 +469,16 @@ pub struct ActivityEvent {
     pub payload: serde_json::Value,
 }
 
-/// One aggregated (member, npc, item) row for the loot summary endpoint - a query-time pivot
-/// over `kill` activity events, mirroring `groupscape-old`'s `LootSummaryRow`.
+/// One aggregated (member, source, item) row for the loot summary endpoint - a query-time
+/// pivot over `kill`/`loot` activity events, mirroring `groupscape-old`'s `LootSummaryRow`.
 #[derive(Serialize)]
 pub struct LootSummaryRow {
     pub member_name: String,
-    pub npc_name: String,
+    pub source_name: String,
+    /// "kill" | "chest" | "clue"
+    pub source_type: String,
+    /// "beginner".."master" - only set when `source_type` is "clue".
+    pub clue_tier: Option<String>,
     pub item_id: i32,
     pub item_name: Option<String>,
     pub quantity: i32,
@@ -486,17 +521,19 @@ pub struct CombatStyleBonuses {
 #[derive(Serialize)]
 pub struct LootSplitParticipant {
     pub member_name: String,
-    pub kill_count: i64,
+    /// Count of loot-granting events (kills, chest openings, or clue caskets) this member
+    /// reported in the range - not literally "kills" now that chest/clue sources are included.
+    pub event_count: i64,
     pub loot_value: i64,
 }
 
-/// This server has no multi-actor kill co-attribution (each kill event belongs to exactly one
-/// reporting member), so unlike `groupscape-old`'s split, participants here are every member who
-/// reported a kill in the range, not a per-kill actor list.
+/// This server has no multi-actor kill co-attribution (each kill/loot event belongs to exactly
+/// one reporting member), so unlike `groupscape-old`'s split, participants here are every member
+/// who reported a kill/chest/clue event in the range, not a per-event actor list.
 #[derive(Serialize)]
 pub struct LootSplitResult {
     pub total_value: i64,
-    pub kill_count: i64,
+    pub event_count: i64,
     pub participants: Vec<LootSplitParticipant>,
     pub per_person_gp: i64,
     pub remainder_gp: i64,

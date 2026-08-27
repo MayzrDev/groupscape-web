@@ -57,10 +57,12 @@ export class ActivityFeedEvent extends BaseElement {
   descriptionHtml() {
     return activityEventDescription(this.event, {
       member: (name) => `<span class="activity-feed-event__member">${name}</span>`,
-      subject: (text, variant) =>
-        `<span class="activity-feed-event__subject${
-          variant === "death" ? " activity-feed-event__subject--death" : ""
-        }">${text}</span>`,
+      subject: (text, variant, wikiUrl) => {
+        const cls = `activity-feed-event__subject${variant === "death" ? " activity-feed-event__subject--death" : ""}`;
+        return wikiUrl
+          ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="${cls}">${text}</a>`
+          : `<span class="${cls}">${text}</span>`;
+      },
     });
   }
 }

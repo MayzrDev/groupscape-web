@@ -20,6 +20,10 @@ export class LootLogRow extends BaseElement {
     super.connectedCallback();
     if (this.row?.rarity) this.setAttribute("data-rarity", this.row.rarity);
     if (this.row?.is_unique) this.setAttribute("data-unique", "true");
+    if (this.row?.source_type) this.setAttribute("data-source", this.row.source_type);
+    if (this.row?.source_type === "clue" && this.row.clue_tier) {
+      this.style.setProperty("--clue-tier-color", `var(--clue-${this.row.clue_tier})`);
+    }
     this.render();
   }
 
@@ -29,6 +33,19 @@ export class LootLogRow extends BaseElement {
 
   get itemName() {
     return this.row.item_name || `Item #${this.row.item_id}`;
+  }
+
+  get sourceLabel() {
+    switch (this.row.source_type) {
+      case "chest":
+        return `opened ${this.row.source_name}`;
+      case "clue": {
+        const tier = this.row.clue_tier ? this.row.clue_tier[0].toUpperCase() + this.row.clue_tier.slice(1) : "";
+        return `${tier} clue casket`.trim();
+      }
+      default:
+        return `from ${this.row.source_name}`;
+    }
   }
 
   get rarityLabel() {

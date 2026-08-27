@@ -162,6 +162,7 @@ async fn main() -> std::io::Result<()> {
         // reachable. That's what made every authed account endpoint (`/me`, `/characters`, ...)
         // 404 in production regardless of token validity.
         let account_scope = web::scope("/api/account")
+            .app_data(web::Data::from(account_auth_cache.clone()))
             .service(accounts::register)
             .service(accounts::login)
             .service(accounts::discord_redirect)
