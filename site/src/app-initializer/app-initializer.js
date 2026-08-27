@@ -27,6 +27,13 @@ export class AppInitializer extends BaseElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     this.cleanup();
+    // This only unmounts when navigating out of the whole `/group` wrapper (see `wrap-routes`),
+    // never for in-place navigation between dashboard subpages - so leaving here is exactly the
+    // "done with this view" signal. Without this, a lingering admin view session would keep
+    // outranking a real member's own credentials in `initializeApp` the next time they came back
+    // to `/group`, e.g. via account/characters pages, showing them the last group an admin viewed
+    // instead of their own.
+    adminViewSession.clear();
   }
 
   cleanup() {

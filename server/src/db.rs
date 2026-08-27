@@ -808,6 +808,7 @@ WHERE group_id=$2
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
             portrait_last_update: row.try_get("portrait_last_update").ok(),
             farming_timers: None,
+            pending: false,
         };
         result.push(group_member);
     }
@@ -821,7 +822,69 @@ WHERE group_id=$2
         group_member.farming_timers = timers_by_member.remove(&group_member.name);
     }
 
+    result.extend(get_pending_group_members(client, group_id).await?);
+
     Ok(result)
+}
+
+/// Characters an admin has linked to the group (`admin_add_account_to_group`,
+/// `link_character_to_group`) whose account_hash has no `groupscape.members` row yet - i.e.
+/// their RuneLite plugin hasn't sent a first telemetry update, so `ensure_group_member` hasn't
+/// provisioned them. Surfaced in `get_group_data` as pending placeholders so an added member
+/// isn't simply absent from the roster until they log in.
+async fn get_pending_group_members(client: &Client, group_id: i64) -> Result<Vec<GroupMember>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT c.display_rsn FROM groupscape.characters c \
+             JOIN groupscape.character_group_links l ON l.character_id = c.character_id \
+             WHERE l.group_id = $1 \
+             AND NOT EXISTS ( \
+                 SELECT 1 FROM groupscape.members m WHERE m.group_id = $1 AND m.account_hash = c.account_hash \
+             )",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetGroupDataError)?;
+    rows.iter()
+        .map(|row| {
+            Ok(GroupMember {
+                group_id: Some(group_id),
+                name: row.try_get("display_rsn")?,
+                account_hash: None,
+                color: None,
+                last_updated: None,
+                stats: None,
+                coordinates: None,
+                skills: None,
+                quests: None,
+                inventory: None,
+                equipment: None,
+                bank: None,
+                rune_pouch: None,
+                seed_vault: None,
+                interacting: None,
+                diary_vars: None,
+                shared_bank: None,
+                deposited: None,
+                collection_log_v2: None,
+                potion_storage: None,
+                special_attack: None,
+                active_prayers: None,
+                rich_presence: None,
+                events: None,
+                interactions: None,
+                object_interactions: None,
+                alerts: None,
+                notable_drops: None,
+                combat_achievements: None,
+                portrait_last_update: None,
+                farming_timers: None,
+                pending: true,
+            })
+        })
+        .collect()
 }
 
 /// Fetches every stored farming/bird house timer row for a group, grouped by member name.
@@ -1064,6 +1127,7 @@ WHERE group_id=$1 AND member_name=$2
         combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         portrait_last_update: None,
         farming_timers: None,
+        pending: false,
     }))
 }
 

@@ -423,8 +423,12 @@ async fn main() -> std::io::Result<()> {
             .app_data(broadcast_registry.clone())
             .service(group_dashboard_scope)
             .service(character_scope)
-            .service(admin_scope)
+            // Must be registered before `admin_scope`: both scopes share the "/api/admin"
+            // prefix, and actix commits routing into whichever matching-prefix scope it tries
+            // first, so the more specific "/api/admin/group-view/{group_id}" scope has to come
+            // first or every request into it 404s inside `admin_scope` instead.
             .service(admin_group_view_scope)
+            .service(admin_scope)
             .service(account_scope)
             .service(unauthed_scope)
     })

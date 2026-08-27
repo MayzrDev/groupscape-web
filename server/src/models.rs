@@ -212,6 +212,12 @@ pub struct GroupMember {
     /// wholesale on each update.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub farming_timers: Option<Vec<FarmingTimerEntry>>,
+    /// True for a character that's linked to the group (`character_group_links`) but has no
+    /// `members` row yet - i.e. an admin added them (`admin_add_account_to_group`) but their
+    /// RuneLite plugin hasn't sent a first telemetry update. Server-computed only, in
+    /// `get_group_data`; never sent by the plugin.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub pending: bool,
 }
 
 /// One farming/bird house timer row, field names matching the plugin's `PatchTimerEntry` output

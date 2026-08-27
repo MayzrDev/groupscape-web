@@ -129,6 +129,8 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         object_interactions: None,
         alerts: None,
         notable_drops: None,
+        farming_timers: None,
+        pending: false,
     }
 }
 

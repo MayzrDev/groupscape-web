@@ -58,6 +58,12 @@ describe("accountApi", () => {
       json: () => Promise.resolve({ redirect_url: "https://discord.com/oauth2/authorize?state=abc" }),
     });
 
+    // jsdom doesn't implement cross-origin navigation, so window.location.href assignment
+    // to an external URL is silently swallowed. Swap in a stub location to observe it.
+    const originalLocation = window.location;
+    delete window.location;
+    window.location = { ...originalLocation, href: "" };
+
     await accountApi.discordLinkRedirect();
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -65,6 +71,8 @@ describe("accountApi", () => {
       expect.objectContaining({ headers: { Authorization: "session-token" } }),
     );
     expect(window.location.href).toContain("https://discord.com/oauth2/authorize");
+
+    window.location = originalLocation;
   });
 
   it("register stores the session token on success", async () => {

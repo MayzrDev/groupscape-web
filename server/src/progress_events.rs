@@ -350,6 +350,7 @@ mod tests {
             alerts: None,
             notable_drops: None,
             farming_timers: None,
+            pending: false,
         };
 
         assert!(diff_progress(&previous, &current).is_empty());
