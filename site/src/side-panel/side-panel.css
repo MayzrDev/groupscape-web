@@ -13,8 +13,10 @@ side-panel {
   pointer-events: auto;
 }
 
-.side-panel__mobile-toggle {
-  display: none;
+/* !important: button.men-button's own `display: flex` (element+class) otherwise outranks
+   this class-only selector and wins the cascade regardless of source order. */
+button.side-panel__mobile-toggle {
+  display: none !important;
 }
 
 .side-panel__backdrop {
@@ -54,8 +56,8 @@ side-panel {
     right: 0;
   }
 
-  .side-panel__mobile-toggle {
-    display: flex;
+  button.side-panel__mobile-toggle {
+    display: flex !important;
     align-items: center;
     justify-content: center;
     position: fixed;
@@ -86,6 +88,15 @@ side-panel {
     background: rgba(0, 0, 0, 0.5);
     z-index: 29;
     pointer-events: auto;
+  }
+
+  /* The backdrop above is a positioned sibling with a z-index, which paints above any
+     non-positioned in-flow content regardless of DOM order - without this, the backdrop
+     would sit on top of the panel's own content and swallow every click/tap inside it. */
+  .side-panel__panels,
+  .side-panel__empty {
+    position: relative;
+    z-index: 1;
   }
 }
 
