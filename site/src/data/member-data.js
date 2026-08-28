@@ -87,13 +87,6 @@ const parsedFieldMappings = [
     publishKey: "portraitUpdated",
     updatedAttribute: "portraitLastUpdate",
   },
-  {
-    sourceKey: "farming_timers",
-    targetKey: "farmingTimers",
-    parser: (value) => value,
-    publishKey: "farmingTimers",
-    updatedAttribute: "farmingTimers",
-  },
 ];
 
 const itemFieldMappings = [

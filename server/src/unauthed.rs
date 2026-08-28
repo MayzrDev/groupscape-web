@@ -1,8 +1,7 @@
-use crate::config::{Config, PushConfig};
+use crate::config::Config;
 use crate::db;
 use crate::error::ApiError;
-use crate::models::{AlertEvent, CaptchaVerifyResponse, CreateGroup, GEPrices, TimerReadyAlert, WikiGEPrices};
-use crate::push;
+use crate::models::{CaptchaVerifyResponse, CreateGroup, GEPrices, WikiGEPrices};
 use crate::validators::valid_name;
 use actix_web::{get, post, web, Error, HttpResponse};
 use arc_swap::{ArcSwap, ArcSwapAny};
@@ -168,61 +167,6 @@ pub fn start_bank_value_aggregator(db_pool: Pool) {
                 Err(err) => {
                     log::error!("Failed to get db client: {}", err);
                 }
-            }
-        }
-    });
-}
-
-/// Farming/bird house timers are time-based rather than telemetry-diff-based (unlike the other
-/// `AlertEvent` variants, which fire off a heartbeat's own field changes), so nothing else in the
-/// request path would ever notice one becoming ready - this job is what closes that gap. Modeled
-/// on `start_bank_value_aggregator` above: `task::spawn` + a fixed interval, log-and-continue on
-/// error. 30s cadence trades a small worst-case notification delay for not hammering the DB with
-/// the `claim_ready_farming_timers` UPDATE...RETURNING every tick.
-pub fn start_farming_timer_notifier(db_pool: Pool, push_config: PushConfig) {
-    task::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(30));
-
-        loop {
-            interval.tick().await;
-
-            let client: Client = match db_pool.get().await {
-                Ok(client) => client,
-                Err(err) => {
-                    log::error!("farming timer notifier: failed to get db client: {}", err);
-                    continue;
-                }
-            };
-
-            let ready = match db::claim_ready_farming_timers(&client).await {
-                Ok(ready) => ready,
-                Err(err) => {
-                    log::error!("farming timer notifier: failed to claim ready timers: {}", err);
-                    continue;
-                }
-            };
-
-            for (group_id, member_name, entry) in ready {
-                let account_id =
-                    match db::find_account_id_for_member(&client, group_id, &member_name).await {
-                        Ok(account_id) => account_id,
-                        Err(err) => {
-                            log::error!("farming timer notifier: failed to resolve account for {}: {}", member_name, err);
-                            continue;
-                        }
-                    };
-                let Some(account_id) = account_id else { continue };
-
-                push::dispatch_alert_push(
-                    push_config.clone(),
-                    db_pool.clone(),
-                    account_id,
-                    member_name,
-                    AlertEvent::TimerReady(TimerReadyAlert {
-                        category: entry.category,
-                        label: entry.label,
-                    }),
-                );
             }
         }
     });

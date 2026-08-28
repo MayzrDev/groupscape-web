@@ -349,7 +349,6 @@ mod tests {
             object_interactions: None,
             alerts: None,
             notable_drops: None,
-            farming_timers: None,
             pending: false,
         };
 

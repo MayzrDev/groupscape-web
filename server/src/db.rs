@@ -5,7 +5,7 @@ use crate::models::{
     ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
     AdminAccountSession, AdminAccountSummary, AdminAuditLogEntry, AdminDashboard,
     AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
-    CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, FarmingTimerEntry, GameEvent, GroupMember,
+    CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
     GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession, GroupSkillData,
     ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
     PermissionFlagsPatch, PermissionKey, MEMBER_COLOR_PALETTE, SHARED_MEMBER,
@@ -807,19 +807,9 @@ WHERE group_id=$2
             notable_drops: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
             portrait_last_update: row.try_get("portrait_last_update").ok(),
-            farming_timers: None,
             pending: false,
         };
         result.push(group_member);
-    }
-
-    // farming_timers lives in its own table (not one of the members columns above, since the
-    // completion-push job in unauthed.rs needs to query rows by ready_at efficiently) - attach it
-    // here in one extra query rather than gating it by the $1 staleness cutoff like the fields
-    // above, since it has no per-field last_update column to compare against.
-    let mut timers_by_member = get_farming_timers_for_group(client, group_id).await?;
-    for group_member in &mut result {
-        group_member.farming_timers = timers_by_member.remove(&group_member.name);
     }
 
     result.extend(get_pending_group_members(client, group_id).await?);
@@ -880,180 +870,10 @@ async fn get_pending_group_members(client: &Client, group_id: i64) -> Result<Vec
                 notable_drops: None,
                 combat_achievements: None,
                 portrait_last_update: None,
-                farming_timers: None,
                 pending: true,
             })
         })
         .collect()
-}
-
-/// Fetches every stored farming/bird house timer row for a group, grouped by member name.
-/// Backs `get_group_data`'s attachment step above.
-pub async fn get_farming_timers_for_group(
-    client: &Client,
-    group_id: i64,
-) -> Result<HashMap<String, Vec<FarmingTimerEntry>>, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            r#"
-SELECT member_name, category, label, status, ready_at, unconfirmed, produce_item_id
-FROM groupscape.farming_timers
-WHERE group_id = $1
-ORDER BY member_name, category, label
-"#,
-        )
-        .await?;
-
-    let rows = client
-        .query(&stmt, &[&group_id])
-        .await
-        .map_err(ApiError::GetGroupDataError)?;
-
-    let mut result: HashMap<String, Vec<FarmingTimerEntry>> =
-        HashMap::new();
-    for row in rows {
-        let member_name: String = row.try_get("member_name")?;
-        let ready_at: Option<DateTime<Utc>> = row.try_get("ready_at").ok();
-        let entry = FarmingTimerEntry {
-            category: row.try_get("category")?,
-            label: row.try_get("label")?,
-            status: row.try_get("status")?,
-            ready_at: ready_at.map(|dt| dt.timestamp()),
-            unconfirmed: row.try_get("unconfirmed")?,
-            produce_item_id: row.try_get("produce_item_id").ok(),
-        };
-        result.entry(member_name).or_default().push(entry);
-    }
-
-    Ok(result)
-}
-
-/// Replaces one member's farming/bird house timer rows wholesale - the plugin always sends a
-/// full snapshot each tick (never a delta, matching every other telemetry field), so the simplest
-/// correct write is delete-then-reinsert inside one transaction rather than diffing.
-/// `notified` is preserved across the replace for rows whose (category, label) key is unchanged,
-/// so an already-fired push doesn't re-fire just because the next heartbeat re-sent the same
-/// still-ready patch.
-pub async fn replace_farming_timers(
-    client: &mut Client,
-    group_id: i64,
-    member_name: &str,
-    entries: &[FarmingTimerEntry],
-) -> Result<(), ApiError> {
-    let transaction = client.transaction().await?;
-
-    transaction
-        .execute(
-            "DELETE FROM groupscape.farming_timers WHERE group_id = $1 AND member_name = $2",
-            &[&group_id, &member_name],
-        )
-        .await
-        .map_err(ApiError::GetGroupDataError)?;
-
-    let insert_stmt = transaction
-        .prepare_cached(
-            r#"
-INSERT INTO groupscape.farming_timers
-  (group_id, member_name, category, label, status, ready_at, unconfirmed, produce_item_id, notified, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false, now())
-"#,
-        )
-        .await?;
-
-    for entry in entries {
-        let ready_at: Option<DateTime<Utc>> = entry
-            .ready_at
-            .and_then(|ts| DateTime::<Utc>::from_timestamp(ts, 0));
-        transaction
-            .execute(
-                &insert_stmt,
-                &[
-                    &group_id,
-                    &member_name,
-                    &entry.category,
-                    &entry.label,
-                    &entry.status,
-                    &ready_at,
-                    &entry.unconfirmed,
-                    &entry.produce_item_id,
-                ],
-            )
-            .await
-            .map_err(ApiError::GetGroupDataError)?;
-    }
-
-    transaction.commit().await?;
-    Ok(())
-}
-
-/// Resolves the account a member's completed-timer push should go to, by joining the group's
-/// `members.account_hash` (set once a character telemetry-links, see `authed::update_group_member`)
-/// to `characters.account_id`. `None` if the member isn't linked to any account yet - the
-/// background job in `unauthed.rs` just skips the push in that case.
-pub async fn find_account_id_for_member(
-    client: &Client,
-    group_id: i64,
-    member_name: &str,
-) -> Result<Option<i64>, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            r#"
-SELECT c.account_id
-FROM groupscape.members m
-JOIN groupscape.characters c ON c.account_hash = m.account_hash
-WHERE m.group_id = $1 AND m.member_name = $2 AND m.account_hash IS NOT NULL
-"#,
-        )
-        .await?;
-    let row = client
-        .query_opt(&stmt, &[&group_id, &member_name])
-        .await
-        .map_err(ApiError::GetGroupDataError)?;
-    match row {
-        Some(row) => Ok(row.try_get("account_id").ok()),
-        None => Ok(None),
-    }
-}
-
-/// Finds every farming/bird house timer that has become ready since it was last checked and
-/// hasn't already triggered a push, marking each as notified in the same query (`RETURNING`) so a
-/// concurrent call can't double-fire. Backs the background job in `unauthed.rs`.
-pub async fn claim_ready_farming_timers(
-    client: &Client,
-) -> Result<Vec<(i64, String, FarmingTimerEntry)>, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            r#"
-UPDATE groupscape.farming_timers
-SET notified = true
-WHERE notified = false AND ready_at IS NOT NULL AND ready_at <= now() AND NOT unconfirmed
-RETURNING group_id, member_name, category, label, status, ready_at
-"#,
-        )
-        .await?;
-
-    let rows = client
-        .query(&stmt, &[])
-        .await
-        .map_err(ApiError::GetGroupDataError)?;
-
-    let mut result = Vec::with_capacity(rows.len());
-    for row in rows {
-        let group_id: i64 = row.try_get("group_id")?;
-        let member_name: String = row.try_get("member_name")?;
-        let ready_at: Option<DateTime<Utc>> = row.try_get("ready_at").ok();
-        let entry = FarmingTimerEntry {
-            category: row.try_get("category")?,
-            label: row.try_get("label")?,
-            status: row.try_get("status")?,
-            ready_at: ready_at.map(|dt| dt.timestamp()),
-            unconfirmed: false,
-            produce_item_id: None,
-        };
-        result.push((group_id, member_name, entry));
-    }
-
-    Ok(result)
 }
 
 /// Fetches one member's currently persisted full row (unlike `get_group_data`, no
@@ -1126,7 +946,6 @@ WHERE group_id=$1 AND member_name=$2
         notable_drops: None,
         combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         portrait_last_update: None,
-        farming_timers: None,
         pending: false,
     }))
 }
@@ -2769,59 +2588,13 @@ ADD COLUMN IF NOT EXISTS discord_notify_notable_drops BOOLEAN NOT NULL DEFAULT t
         transaction.commit().await?;
     }
 
-    if !has_migration_run(client, "create_farming_timers_table").await? {
+    if !has_migration_run(client, "drop_farming_timers_table").await? {
         let transaction = client.transaction().await?;
         transaction
-            .execute(
-                r#"
--- Herb/tree farming patch and bird house timers, bridged from RuneLite's own Time Tracking
--- plugin config (see the farming-timers plan). A dedicated table rather than a JSONB column on
--- an existing snapshot table, since the completion-push background job needs to query rows by
--- ready_at efficiently. (category, label) identifies a patch/space within a member; the plugin
--- always sends a full snapshot each tick, so rows are replaced wholesale per member on each
--- update (see replace_farming_timers), not diffed.
-CREATE TABLE IF NOT EXISTS groupscape.farming_timers (
-  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
-  member_name CITEXT NOT NULL,
-  category TEXT NOT NULL,
-  label TEXT NOT NULL,
-  status TEXT NOT NULL,
-  ready_at TIMESTAMPTZ,
-  unconfirmed BOOLEAN NOT NULL DEFAULT false,
-  notified BOOLEAN NOT NULL DEFAULT false,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (group_id, member_name, category, label)
-);
-"#,
-                &[],
-            )
-            .await?;
-        transaction
-            .execute(
-                r#"
-CREATE INDEX IF NOT EXISTS farming_timers_ready_notify_idx ON groupscape.farming_timers (ready_at)
-WHERE notified = false AND unconfirmed = false
-"#,
-                &[],
-            )
+            .execute("DROP TABLE IF EXISTS groupscape.farming_timers", &[])
             .await?;
 
-        commit_migration(&transaction, "create_farming_timers_table").await?;
-        transaction.commit().await?;
-    }
-
-    if !has_migration_run(client, "add_farming_timers_produce_item_id_column").await? {
-        let transaction = client.transaction().await?;
-        transaction
-            .execute(
-                r#"
-ALTER TABLE groupscape.farming_timers ADD COLUMN IF NOT EXISTS produce_item_id INTEGER
-"#,
-                &[],
-            )
-            .await?;
-
-        commit_migration(&transaction, "add_farming_timers_produce_item_id_column").await?;
+        commit_migration(&transaction, "drop_farming_timers_table").await?;
         transaction.commit().await?;
     }
 
