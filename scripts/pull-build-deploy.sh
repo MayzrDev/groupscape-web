@@ -438,10 +438,26 @@ RESUME
   log_success "Deployment completed — $VERSION in ${DEPLOY_DURATION}s"
 }
 
+# Prints the topmost "## <date>" block of CHANGELOG.md, wrapped in markers Vantage
+# scrapes out of the deploy log to build the #patch-notes embed (see
+# server/lib/poller.js::notifyDeployWebhooks in the vantage repo). Silent no-op if
+# the file is missing or has no dated block yet — deploy still succeeds either way.
+emit_changelog() {
+  local FILE="$REPO_DIR/CHANGELOG.md"
+  [ -f "$FILE" ] || return 0
+  local BLOCK
+  BLOCK=$(awk '/^## /{n++} n==1' "$FILE")
+  [ -n "$BLOCK" ] || return 0
+  echo "[VANTAGE_CHANGELOG_START]"
+  echo "$BLOCK"
+  echo "[VANTAGE_CHANGELOG_END]"
+}
+
 record_deploy_success() {
   git rev-parse HEAD > "$STATE_FILE"
   FAILED_HASH=""
   FAILED_COUNT=0
+  emit_changelog
 }
 
 record_deploy_failure() {
