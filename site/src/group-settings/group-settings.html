@@ -16,12 +16,16 @@
 
   <div class="group-settings__credential-row">
     <h4>Group Token</h4>
+    ${showToken ? `
     <div class="setup__credential rsborder-tiny rsbackground group-settings__token-value">
       <div class="setup__credential-hide">Click to show</div>
       ${group.groupToken}
     </div>
+    ` : `
+    <p class="group-settings__hint">This device doesn't have your group's invite token saved. Reroll to generate a new one you can share.</p>
+    `}
     <div class="group-settings__token-actions">
-      <button class="group-settings__copy-token-button men-button small">Copy</button>
+      <button class="group-settings__copy-token-button men-button small" ${showToken ? "" : "disabled"}>Copy</button>
       <button class="group-settings__reroll-button men-button small">Reroll token</button>
     </div>
   </div>

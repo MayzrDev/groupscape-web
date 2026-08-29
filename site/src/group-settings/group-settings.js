@@ -8,6 +8,15 @@ import { validCharacters, validLength } from "../validators";
 import { pubsub } from "../data/pubsub";
 import { mapTrails, DEFAULT_MAP_TRAIL_SETTINGS } from "../data/map-trails";
 
+// A real invite token always looks like `${groupName}|${uuid}` (see `db::rename_group` /
+// `db::reroll_group_token` on the server). When this group was reached by clicking into it
+// from the account characters page, `storage.groupToken` instead holds the account's session
+// token as a fallback auth credential (see `characters-page.viewGroup`) - the server never
+// stores the plaintext invite token, so there's no way to recover the real one for display.
+function hasRealToken(group) {
+  return !!group.groupToken && group.groupToken.startsWith(`${group.groupName}|`);
+}
+
 export class GroupSettings extends BaseElement {
   constructor() {
     super();
@@ -17,6 +26,7 @@ export class GroupSettings extends BaseElement {
   /* eslint-disable no-unused-vars */
   html() {
     const group = storage.getGroup();
+    const showToken = hasRealToken(group);
     const selectedPanelDockSide = appearance.getLayout();
     const style = appearance.getTheme();
     const mapTrailSettings = mapTrails.settings;
@@ -65,9 +75,9 @@ export class GroupSettings extends BaseElement {
     this.eventListener(renameButton, "click", this.renameGroup.bind(this));
 
     const tokenHide = this.querySelector(".setup__credential-hide");
-    this.eventListener(tokenHide, "click", () => tokenHide.remove());
+    if (tokenHide) this.eventListener(tokenHide, "click", () => tokenHide.remove());
     const copyTokenButton = this.querySelector(".group-settings__copy-token-button");
-    this.eventListener(copyTokenButton, "click", this.copyToken.bind(this));
+    if (copyTokenButton) this.eventListener(copyTokenButton, "click", this.copyToken.bind(this));
     const rerollButton = this.querySelector(".group-settings__reroll-button");
     this.eventListener(rerollButton, "click", this.confirmRerollToken.bind(this));
 
@@ -142,6 +152,7 @@ export class GroupSettings extends BaseElement {
 
   copyToken() {
     const group = storage.getGroup();
+    if (!hasRealToken(group)) return;
     navigator.clipboard.writeText(group.groupToken);
   }
 

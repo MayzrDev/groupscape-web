@@ -2,6 +2,8 @@ import { Quest } from "./quest";
 import { Item } from "./item";
 import { combatAchievement } from "./combat-achievement";
 
+const COLLECTION_LOG_WIKI_URL = "https://oldschool.runescape.wiki/w/Collection_log";
+
 // The activity feed and the toast stack render the same six milestone event types, so the copy
 // lives here once and each surface just supplies its own member/subject wrappers.
 export const ACTIVITY_EVENT_TYPES = ["kill", "death", "quest", "diary", "combat_task", "collection_log"];
@@ -66,6 +68,25 @@ export function npcWikiUrl(npcName) {
   return `https://oldschool.runescape.wiki/w/Special:Lookup?type=npc&name=${encodeURIComponent(npcName)}`;
 }
 
+// Category icons for the milestone event types - saved locally from the OSRS wiki's own
+// icons for Quests, Achievement Diaries, Combat Achievements and the Collection log.
+const ACTIVITY_ICONS = {
+  quest: "/icons/activity/quest.png",
+  diary: "/icons/activity/diary.png",
+  combat_task: "/icons/activity/combat-task.png",
+  collection_log: "/icons/activity/collection-log.png",
+};
+
+export function questWikiUrl(questName) {
+  return `https://oldschool.runescape.wiki/w/${questName.replaceAll(" ", "_")}/Quick_guide`;
+}
+
+// Matches the wiki's own diary page naming, e.g. https://oldschool.runescape.wiki/w/Ardougne_Diary#Hard
+// (same pattern already used by diary-dialog.js for the per-tier section link).
+export function diaryWikiUrl(region, tier) {
+  return `https://oldschool.runescape.wiki/w/${region.replace(/ /g, "_")}_Diary#${tier}`;
+}
+
 const identity = (value) => value;
 
 /// Phrasing convention for group-milestone copy across this app: "<member> <verb> <subject>"
@@ -93,19 +114,41 @@ export function activityEventDescription(event, format = {}) {
       const killer = payload.killerName || payload.killer_name;
       return killer ? `${member} died to ${wrapSubject(killer, "death", npcWikiUrl(killer))}` : `${member} died`;
     }
-    case "quest":
-      return `${member} completed ${wrapSubject(questNameFor(payload))}`;
+    case "quest": {
+      const questName = questNameFor(payload);
+      return `${member} completed ${wrapSubject(questName, "quest", questWikiUrl(questName), ACTIVITY_ICONS.quest)}`;
+    }
     case "diary":
-      return `${member} completed the ${wrapSubject(`${payload.region} ${payload.tier}`)} diary`;
+      return `${member} completed the ${wrapSubject(
+        `${payload.region} ${payload.tier}`,
+        "diary",
+        diaryWikiUrl(payload.region, payload.tier),
+        ACTIVITY_ICONS.diary
+      )} diary`;
     case "combat_task": {
       const { name, tierLabel } = combatTaskFor(payload);
-      return `${member} completed ${wrapSubject(name)}${tierLabel ? ` (${tierLabel})` : ""}`;
+      return `${member} completed ${wrapSubject(
+        name,
+        "combat_task",
+        combatAchievement.taskWikiUrl(name),
+        ACTIVITY_ICONS.combat_task
+      )}${tierLabel ? ` (${tierLabel})` : ""}`;
     }
     case "collection_log":
       if (payload.kind === "page") {
-        return `${member} completed the ${wrapSubject(payload.page)} collection log`;
+        return `${member} completed the ${wrapSubject(
+          payload.page,
+          "collection_log",
+          COLLECTION_LOG_WIKI_URL,
+          ACTIVITY_ICONS.collection_log
+        )} collection log`;
       }
-      return `${member} added ${wrapSubject(collectionLogItemNameFor(payload))} to their collection log`;
+      return `${member} added ${wrapSubject(
+        collectionLogItemNameFor(payload),
+        "collection_log",
+        new Item(payload.item_id).wikiLink,
+        Item.itemDetails?.[payload.item_id] ? Item.imageUrl(payload.item_id) : ACTIVITY_ICONS.collection_log
+      )} to their collection log`;
     default:
       return `${member} — ${event.event_type}`;
   }

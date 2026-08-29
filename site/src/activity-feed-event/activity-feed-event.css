@@ -89,6 +89,14 @@ a.activity-feed-event__subject:hover {
   text-decoration: underline;
 }
 
+.activity-feed-event__subject-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  vertical-align: -4px;
+  margin-right: 2px;
+}
+
 .activity-feed-event__subject--death {
   color: var(--red);
 }
