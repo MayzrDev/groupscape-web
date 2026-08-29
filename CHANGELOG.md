@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.66] - 2026-08-29
 
+### Added
+- Activity feed now shows icons for quest completions, combat achievement tiers, diary entries, and collection log additions.
+
 ### Changed
 - Combat Achievements tab now fills the full page width like Graphs does, with bigger progress bars, per-tier percentages, and a group-average summary row.
 - Character avatars and text on the Account > Characters page are bigger and easier to read.
@@ -11,6 +14,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Fixed
 - Fixed group members incorrectly showing as offline while idle (standing still, AFK skilling, etc.) even though RuneLite was still connected and sending updates fine.
 - Added logging around the live party-overlay connection so future connection drops are easier to diagnose (no user-facing change).
+- Group Settings no longer shows your personal account token in place of your group's real invite token when you open it via Account > Characters — the Copy button is disabled with an explanation until you reroll for a real, shareable one.
 
 ## [1.0.65] - 2026-08-28
 
