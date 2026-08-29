@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Changed
 - Combat Achievements tab now fills the full page width like Graphs does, with bigger progress bars, per-tier percentages, and a group-average summary row.
+- Character avatars and text on the Account > Characters page are bigger and easier to read.
 
 ### Fixed
 - Fixed group members incorrectly showing as offline while idle (standing still, AFK skilling, etc.) even though RuneLite was still connected and sending updates fine.

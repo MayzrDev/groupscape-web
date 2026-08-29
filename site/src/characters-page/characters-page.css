@@ -83,7 +83,7 @@ characters-page {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 6px;
+  padding: 10px;
   background: none;
   border: 1px solid transparent;
   border-radius: 3px;
@@ -108,8 +108,8 @@ characters-page {
 }
 
 .characters-page__sidebar-portrait {
-  width: 30px !important;
-  height: 30px !important;
+  width: 60px !important;
+  height: 60px !important;
   flex: none !important;
   border-radius: 50%;
   overflow: hidden;
@@ -123,7 +123,7 @@ characters-page {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 17px;
 }
 
 .characters-page__sidebar-add {
@@ -322,7 +322,7 @@ characters-page {
 }
 
 .characters-page__stat {
-  font-size: 0.85em;
+  font-size: 0.95em;
   opacity: 0.8;
 }
 
@@ -368,7 +368,7 @@ characters-page {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px;
+  padding: 14px;
   background: var(--elevated);
   border: 1px solid var(--light-border);
   border-radius: 4px;
@@ -376,8 +376,8 @@ characters-page {
 }
 
 .characters-page__group-row-portrait {
-  width: 34px !important;
-  height: 34px !important;
+  width: 68px !important;
+  height: 68px !important;
   flex: none !important;
   border-radius: 50%;
   overflow: hidden;
@@ -394,11 +394,11 @@ characters-page {
 
 .characters-page__group-row-name {
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
-  font-size: 14px;
+  font-size: 19px;
 }
 
 .characters-page__group-row-group {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--green);
 }
 
