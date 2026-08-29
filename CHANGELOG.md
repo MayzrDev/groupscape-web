@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Fixed group members incorrectly showing as offline while idle (standing still, AFK skilling, etc.) even though RuneLite was still connected and sending updates fine.
+- Added logging around the live party-overlay connection so future connection drops are easier to diagnose (no user-facing change).
 
 ## [1.0.65] - 2026-08-28
 

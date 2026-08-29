@@ -266,23 +266,34 @@ pub async fn party_overlay_ws(
     let snapshot_json = serde_json::to_string(&snapshot).map_err(ApiError::SerdeJsonError)?;
 
     let mut receiver = registry.subscribe(group_id);
+    let account_hash = auth.account_hash.clone().unwrap_or_default();
+    log::info!(
+        "Party overlay WebSocket connected (group_id={}, account_hash={})",
+        group_id,
+        account_hash
+    );
 
     rt::spawn(async move {
         if session.text(snapshot_json).await.is_err() {
+            log::info!(
+                "Party overlay WebSocket closed: failed to send initial snapshot (group_id={}, account_hash={})",
+                group_id, account_hash
+            );
             return;
         }
 
-        loop {
+        let close_reason = loop {
             tokio::select! {
                 incoming = msg_stream.next() => {
                     match incoming {
                         Some(Ok(actix_ws::Message::Ping(bytes))) => {
                             if session.pong(&bytes).await.is_err() {
-                                break;
+                                break "failed to send pong";
                             }
                         }
-                        Some(Ok(actix_ws::Message::Close(_))) | None => break,
-                        Some(Err(_)) => break,
+                        Some(Ok(actix_ws::Message::Close(_))) => break "client sent close",
+                        None => break "client stream ended",
+                        Some(Err(_)) => break "client stream error",
                         _ => {}
                     }
                 }
@@ -290,15 +301,25 @@ pub async fn party_overlay_ws(
                     match update {
                         Ok(message) => {
                             if session.text(message).await.is_err() {
-                                break;
+                                break "failed to send update";
                             }
                         }
-                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
-                        Err(broadcast::error::RecvError::Closed) => break,
+                        Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                            log::warn!(
+                                "Party overlay WebSocket receiver lagged, dropped {} messages (group_id={}, account_hash={})",
+                                skipped, group_id, account_hash
+                            );
+                            continue;
+                        }
+                        Err(broadcast::error::RecvError::Closed) => break "broadcast channel closed",
                     }
                 }
             }
-        }
+        };
+        log::info!(
+            "Party overlay WebSocket disconnected: {} (group_id={}, account_hash={})",
+            close_reason, group_id, account_hash
+        );
 
         let _ = session.close(None).await;
     });
