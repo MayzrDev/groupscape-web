@@ -49,7 +49,7 @@ export class Quest {
   get wikiLink() {
     const name = this.name;
     const wikiName = name.replaceAll(" ", "_");
-    return `https://oldschool.runescape.wiki/w/${wikiName}/Quick_guide`;
+    return `https://oldschool.runescape.wiki/w/${wikiName}`;
   }
 
   get points() {

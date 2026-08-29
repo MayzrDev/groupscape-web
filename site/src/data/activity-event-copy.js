@@ -78,7 +78,7 @@ const ACTIVITY_ICONS = {
 };
 
 export function questWikiUrl(questName) {
-  return `https://oldschool.runescape.wiki/w/${questName.replaceAll(" ", "_")}/Quick_guide`;
+  return `https://oldschool.runescape.wiki/w/${questName.replaceAll(" ", "_")}`;
 }
 
 // Matches the wiki's own diary page naming, e.g. https://oldschool.runescape.wiki/w/Ardougne_Diary#Hard
