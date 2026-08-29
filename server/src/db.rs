@@ -567,12 +567,14 @@ pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiErr
         .try_get(0)?;
 
     // Mirrors the 60s "online" threshold used for the live online badge in the group view.
+    // Uses last_seen_at (stamped on every accepted telemetry update, changed or not) rather than
+    // the per-field *_last_update columns, which only advance when that field's value actually
+    // changes - an idle-but-connected player (unchanging stats/position/inventory) would
+    // otherwise read as offline after 60s despite uploads continuing to arrive fine.
     let online_characters: i64 = client
         .query_one(
-            &format!(
-                "SELECT COUNT(*) FROM groupscape.members \
-                 WHERE member_name != $1 AND {MEMBER_LAST_UPDATE_GREATEST} >= NOW() - INTERVAL '60 seconds'"
-            ),
+            "SELECT COUNT(*) FROM groupscape.members \
+             WHERE member_name != $1 AND last_seen_at >= NOW() - INTERVAL '60 seconds'",
             &[&SHARED_MEMBER],
         )
         .await?
@@ -581,10 +583,8 @@ pub async fn get_homepage_stats(client: &Client) -> Result<HomepageStats, ApiErr
     // Distinct characters that have pushed telemetry at all in the last 24h.
     let telemetry_pushes_24h: i64 = client
         .query_one(
-            &format!(
-                "SELECT COUNT(*) FROM groupscape.members \
-                 WHERE member_name != $1 AND {MEMBER_LAST_UPDATE_GREATEST} >= NOW() - INTERVAL '24 hours'"
-            ),
+            "SELECT COUNT(*) FROM groupscape.members \
+             WHERE member_name != $1 AND last_seen_at >= NOW() - INTERVAL '24 hours'",
             &[&SHARED_MEMBER],
         )
         .await?
@@ -729,12 +729,7 @@ pub async fn get_group_data(
         .prepare_cached(
             r#"
 SELECT member_name, color,
-GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
-quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
-rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
-collection_log_last_update, potion_storage_last_update, special_attack_last_update,
-active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update,
-character_mesh.mesh_last_update) as last_updated,
+GREATEST(members.last_seen_at, character_mesh.mesh_last_update) as last_updated,
 CASE WHEN stats_last_update >= $1::TIMESTAMPTZ THEN stats ELSE NULL END as stats,
 CASE WHEN coordinates_last_update >= $1::TIMESTAMPTZ THEN coordinates ELSE NULL END as coordinates,
 CASE WHEN skills_last_update >= $1::TIMESTAMPTZ THEN skills ELSE NULL END as skills,
@@ -890,11 +885,7 @@ pub async fn get_group_member(
         .prepare_cached(
             r#"
 SELECT color,
-GREATEST(stats_last_update, coordinates_last_update, skills_last_update,
-quests_last_update, inventory_last_update, equipment_last_update, bank_last_update,
-rune_pouch_last_update, interacting_last_update, seed_vault_last_update, diary_vars_last_update,
-collection_log_last_update, potion_storage_last_update, special_attack_last_update,
-active_prayers_last_update, rich_presence_last_update, combat_achievements_last_update) as last_updated,
+last_seen_at as last_updated,
 stats, coordinates, skills, quests, inventory, equipment, bank, rune_pouch, interacting,
 seed_vault, diary_vars, collection_log, potion_storage, special_attack, active_prayers,
 rich_presence, combat_achievements
@@ -2595,6 +2586,32 @@ ADD COLUMN IF NOT EXISTS discord_notify_notable_drops BOOLEAN NOT NULL DEFAULT t
             .await?;
 
         commit_migration(&transaction, "drop_farming_timers_table").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_members_last_seen_at_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members
+ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ
+"#,
+                &[],
+            )
+            .await?;
+        // Backfill so already-online members don't read as stale the instant this ships.
+        transaction
+            .execute(
+                &format!(
+                    "UPDATE groupscape.members SET last_seen_at = {MEMBER_LAST_UPDATE_GREATEST} \
+                     WHERE last_seen_at IS NULL"
+                ),
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_members_last_seen_at_column").await?;
         transaction.commit().await?;
     }
 

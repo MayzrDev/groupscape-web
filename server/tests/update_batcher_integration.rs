@@ -1136,9 +1136,16 @@ async fn test_potion_storage_idempotent_resend() {
     let alice_after_2 = get_member_from_db(&client, group_id, "alice").await;
     let ts2 = alice_after_2.last_updated.unwrap();
 
+    assert!(
+        ts2 > ts1,
+        "last_updated (last_seen_at) should advance on every accepted update, even when the \
+         resent value is unchanged - it's the online/offline heartbeat, not a per-field change \
+         marker, so an idle-but-connected member must not read as stale"
+    );
     assert_eq!(
-        ts1, ts2,
-        "timestamp should not change when identical potion_storage is resent"
+        alice_after_2.potion_storage,
+        Some(vec![101, 4]),
+        "resending an identical value should not alter the stored data"
     );
 
     drop(tx);

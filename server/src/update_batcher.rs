@@ -351,6 +351,7 @@ fn build_values_statement(size: usize) -> String {
     format!(
         r#"
 UPDATE groupscape.members AS a SET
+  last_seen_at = NOW(),
   stats = COALESCE(b.stats, a.stats),
   coordinates = COALESCE(b.coordinates, a.coordinates),
   skills = COALESCE(b.skills, a.skills),
@@ -576,7 +577,7 @@ FOR UPDATE"#,
         let update_stmt = transaction
             .prepare_cached(
                 r#"UPDATE groupscape.members AS a
-SET bank = t.new_bank::int4[], bank_last_update = NOW()
+SET bank = t.new_bank::int4[], bank_last_update = NOW(), last_seen_at = NOW()
 FROM UNNEST($1::int8[], $2::text[], $3::text[]) AS t(group_id, member_name, new_bank)
 WHERE a.group_id = t.group_id AND a.member_name = t.member_name::citext"#,
             )
