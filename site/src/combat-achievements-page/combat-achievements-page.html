@@ -1,20 +1,42 @@
 <div class="rsborder rsbackground combat-achievements-page__container">
-  <h3>Combat Achievements</h3>
-  <p class="combat-achievements-page__hint">
-    Which combat achievement tiers each member has fully completed. Click a member to see their task breakdown.
-  </p>
+  <div class="combat-achievements-page__toolbar">
+    <div>
+      <h3>Combat Achievements</h3>
+      <p class="combat-achievements-page__hint">
+        Which combat achievement tiers each member has fully completed. Click a member, or a tier bar, to see the
+        task breakdown.
+      </p>
+    </div>
+    <div class="combat-achievements-page__group-points">
+      Group total <b class="combat-achievements-page__group-points-value"></b> pts
+    </div>
+  </div>
   <table class="combat-achievements-page__table">
+    <colgroup>
+      <col class="combat-achievements-page__col-member" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-tier" />
+      <col class="combat-achievements-page__col-count" />
+      <col class="combat-achievements-page__col-points" />
+    </colgroup>
     <thead>
       <tr>
         <th sort-key="name" label="Member">Member</th>
-        <th>Easy</th>
-        <th>Medium</th>
-        <th>Hard</th>
-        <th>Elite</th>
-        <th>Master</th>
-        <th>Grandmaster</th>
+        <th><span class="combat-achievements-page__swatch combat-achievements-page__swatch--easy"></span>Easy</th>
+        <th><span class="combat-achievements-page__swatch combat-achievements-page__swatch--medium"></span>Medium</th>
+        <th><span class="combat-achievements-page__swatch combat-achievements-page__swatch--hard"></span>Hard</th>
+        <th><span class="combat-achievements-page__swatch combat-achievements-page__swatch--elite"></span>Elite</th>
+        <th><span class="combat-achievements-page__swatch combat-achievements-page__swatch--master"></span>Master</th>
+        <th>
+          <span class="combat-achievements-page__swatch combat-achievements-page__swatch--grandmaster"></span
+          >Grandmaster
+        </th>
         <th sort-key="tierCount" label="Tiers">Tiers &#9662;</th>
-        <th>Points</th>
+        <th sort-key="points" label="Points">Points</th>
       </tr>
     </thead>
     <tbody class="combat-achievements-page__body"></tbody>

@@ -19,6 +19,7 @@ export class CombatAchievementsPage extends BaseElement {
     this.render();
 
     this.tableBody = this.querySelector(".combat-achievements-page__body");
+    this.groupPointsValue = this.querySelector(".combat-achievements-page__group-points-value");
     this.eventListener(this.querySelector("thead"), "click", this.handleHeaderClick.bind(this));
     this.eventListener(this.tableBody, "click", this.handleRowClick.bind(this));
 
@@ -70,6 +71,9 @@ export class CombatAchievementsPage extends BaseElement {
       if (this.sortKey === "name") {
         return a.name.localeCompare(b.name) * direction;
       }
+      if (this.sortKey === "points") {
+        return (combatAchievement.totalPoints(a) - combatAchievement.totalPoints(b)) * direction;
+      }
       return (combatAchievement.completedTierCount(a) - combatAchievement.completedTierCount(b)) * direction;
     });
   }
@@ -79,6 +83,65 @@ export class CombatAchievementsPage extends BaseElement {
     return this.sortDir === "asc" ? " &#9652;" : " &#9662;";
   }
 
+  tierBarCell({ key, done, total, percent, complete, group = false }) {
+    const trackClasses = [
+      "combat-achievements-page__bar-track",
+      group ? "combat-achievements-page__bar-track--group" : "",
+      complete ? "combat-achievements-page__bar-track--complete" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    const fracClass = group
+      ? "combat-achievements-page__bar-frac combat-achievements-page__bar-frac--group"
+      : "combat-achievements-page__bar-frac";
+
+    const inner = `
+      <div class="${trackClasses}">
+        <span class="combat-achievements-page__bar-fill combat-achievements-page__bar-fill--${key}" style="width: ${percent}%"></span>
+      </div>
+      <div class="${fracClass}">
+        <span>${done}/${total}</span>
+        <span class="combat-achievements-page__bar-pct">${percent}%</span>
+      </div>`;
+
+    if (group) return `<td>${inner}</td>`;
+
+    return `
+      <td>
+        <div class="combat-achievements-page__barcell" tier-key="${key}">
+          ${inner}
+        </div>
+      </td>`;
+  }
+
+  renderGroupRow(members) {
+    if (members.length < 2) return "";
+
+    const tierCells = COMBAT_ACHIEVEMENT_TIERS.map(([key]) => {
+      const total = combatAchievement.totalTasksForTier(key) * members.length;
+      const done = members.reduce((sum, member) => sum + combatAchievement.completedTaskCountForTier(member, key), 0);
+      const percent = total ? Math.round((done / total) * 100) : 0;
+      return this.tierBarCell({ key, done, total, percent, complete: false, group: true });
+    }).join("");
+
+    return `
+      <tr class="combat-achievements-page__row--group">
+        <td>
+          <div class="combat-achievements-page__member-cell">
+            <div class="combat-achievements-page__group-icon">&#9878;</div>
+            <div>
+              <span class="combat-achievements-page__group-label">Group average</span>
+              <span class="combat-achievements-page__group-sub">${members.length} members</span>
+            </div>
+          </div>
+        </td>
+        ${tierCells}
+        <td>&mdash;</td>
+        <td>&mdash;</td>
+      </tr>`;
+  }
+
   renderRows() {
     if (!this.tableBody) return;
 
@@ -86,39 +149,64 @@ export class CombatAchievementsPage extends BaseElement {
       th.innerHTML = `${th.getAttribute("label")}${this.sortArrow(th.getAttribute("sort-key"))}`;
     });
 
-    this.tableBody.innerHTML = this.sortedMembers()
+    const sorted = this.sortedMembers();
+    const pointsByMember = sorted.map((member) => combatAchievement.totalPoints(member));
+    const topPoints = Math.max(0, ...pointsByMember);
+    const secondPoints = Math.max(0, ...pointsByMember.filter((points) => points !== topPoints));
+
+    const groupRowHtml = this.renderGroupRow(sorted);
+    if (this.groupPointsValue) {
+      this.groupPointsValue.textContent = pointsByMember.reduce((sum, points) => sum + points, 0);
+    }
+
+    const memberRowsHtml = sorted
       .map((member) => {
         const tierCells = COMBAT_ACHIEVEMENT_TIERS.map(([key]) => {
           const done = combatAchievement.completedTaskCountForTier(member, key);
           const total = combatAchievement.totalTasksForTier(key);
           const percent = combatAchievement.tierCompletionPercent(member, key);
           const complete = combatAchievement.isTierComplete(member, key);
-          return `
-          <td>
-            <div class="combat-achievements-page__barcell" tier-key="${key}">
-              <span class="combat-achievements-page__bar-track ${
-                complete ? "combat-achievements-page__bar-track--complete" : ""
-              }">
-                <span class="combat-achievements-page__bar-fill combat-achievements-page__bar-fill--${key}" style="width: ${percent}%"></span>
-              </span>
-              <span class="combat-achievements-page__bar-frac">${done}/${total}</span>
-            </div>
-          </td>`;
+          return this.tierBarCell({ key, done, total, percent, complete });
         }).join("");
 
+        const points = combatAchievement.totalPoints(member);
+        const tierCount = combatAchievement.completedTierCount(member);
+        const initial = member.name.trim().charAt(0).toUpperCase();
+        const rankClass =
+          points === topPoints && points > 0
+            ? "combat-achievements-page__avatar--rank1"
+            : points === secondPoints && points > 0
+            ? "combat-achievements-page__avatar--rank2"
+            : "";
+
         return `
-          <tr player-name="${member.name}">
-            <td class="combat-achievements-page__name">${member.name}</td>
+          <tr class="combat-achievements-page__row--member" player-name="${member.name}">
+            <td>
+              <div class="combat-achievements-page__member-cell">
+                <div class="combat-achievements-page__avatar ${rankClass}">${initial}</div>
+                <span class="combat-achievements-page__name">${member.name}</span>
+              </div>
+            </td>
             ${tierCells}
-            <td class="combat-achievements-page__count ${
-              combatAchievement.completedTierCount(member) === COMBAT_ACHIEVEMENT_TIERS.length
-                ? "combat-achievements-page__count--full"
-                : ""
-            }">${combatAchievement.completedTierCount(member)}/${COMBAT_ACHIEVEMENT_TIERS.length}</td>
-            <td class="combat-achievements-page__points">${combatAchievement.totalPoints(member)}</td>
+            <td>
+              <span class="combat-achievements-page__count-pill ${
+                tierCount === COMBAT_ACHIEVEMENT_TIERS.length ? "combat-achievements-page__count-pill--full" : ""
+              }">${tierCount}/${COMBAT_ACHIEVEMENT_TIERS.length}</span>
+            </td>
+            <td>
+              <span class="combat-achievements-page__points ${
+                points === topPoints && points > 0 ? "combat-achievements-page__points--top" : ""
+              }">${points}${
+          points === topPoints && points > 0
+            ? '<span class="combat-achievements-page__points-rank">&#9733; top scorer</span>'
+            : ""
+        }</span>
+            </td>
           </tr>`;
       })
       .join("");
+
+    this.tableBody.innerHTML = groupRowHtml + memberRowsHtml;
   }
 }
 
