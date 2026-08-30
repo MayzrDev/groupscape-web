@@ -5675,17 +5675,17 @@ const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.username, a.status, a.must_
 
 /// Mirrors the 60s "online" threshold used for the live online badge in the group view
 /// (`get_homepage_stats`), scoped to a single account via its characters' `account_hash`.
+/// Uses `last_seen_at` (stamped on every accepted telemetry update, changed or not) rather than
+/// the per-field `*_last_update` columns, which only advance when that field's value actually
+/// changes - an idle-but-connected player would otherwise read as offline here after 60s despite
+/// uploads continuing to arrive fine, same bug `get_homepage_stats` was fixed for.
 fn admin_account_is_online_column() -> String {
     format!(
         r#"EXISTS (
     SELECT 1 FROM groupscape.characters c
     JOIN groupscape.members m ON m.account_hash = c.account_hash
-    WHERE c.account_id = a.id AND m.member_name != '{SHARED_MEMBER}' AND GREATEST(
-        m.stats_last_update, m.coordinates_last_update, m.skills_last_update,
-        m.quests_last_update, m.inventory_last_update, m.equipment_last_update, m.bank_last_update,
-        m.rune_pouch_last_update, m.interacting_last_update, m.seed_vault_last_update, m.diary_vars_last_update,
-        m.collection_log_last_update, m.potion_storage_last_update
-    ) >= NOW() - INTERVAL '60 seconds'
+    WHERE c.account_id = a.id AND m.member_name != '{SHARED_MEMBER}'
+        AND m.last_seen_at >= NOW() - INTERVAL '60 seconds'
 ) AS is_online"#
     )
 }

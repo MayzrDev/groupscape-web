@@ -688,6 +688,12 @@ pub async fn update_group_member(
         let previous = db::get_group_member(&client, auth.group_id, &group_member_inner.name).await?;
         let mut merged_for_broadcast = previous.unwrap_or_else(|| group_member_inner.clone());
         update_batcher::merge_group_member(&mut merged_for_broadcast, &group_member_inner);
+        // This update just arrived, so it proves the member is alive right now - `previous`
+        // was read before the batcher persists this heartbeat, so its last_updated is still the
+        // prior heartbeat's timestamp. Stamping "now" here (rather than trusting the merge) is
+        // what makes the live overlay/side-panel offline check track actual heartbeat cadence
+        // instead of always reading ~one heartbeat interval stale.
+        merged_for_broadcast.last_updated = Some(Utc::now());
 
         let envelope = WsEnvelope::VitalsUpdate {
             payload: VitalsUpdatePayload {

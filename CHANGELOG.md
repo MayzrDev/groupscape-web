@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.67] - 2026-08-30
+
+### Fixed
+- Fixed the account page's online badge showing a group member as offline after a minute of standing idle even though their client was still checking in fine.
+
 ## [1.0.66] - 2026-08-29
 
 ### Added
