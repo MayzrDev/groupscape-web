@@ -175,6 +175,13 @@ export class MemberData {
 
       if (!wasInactive && this.inactive) {
         this.publishUpdate("inactive");
+
+        // Prayers auto-deactivate on logout, so a member who's gone offline has none active
+        // regardless of what was last reported - clear them so the UI doesn't show stale icons.
+        if (this.activePrayers?.length) {
+          this.activePrayers = [];
+          this.publishUpdate("activePrayers");
+        }
       } else if (wasInactive && !this.inactive) {
         this.publishUpdate("active");
       }
