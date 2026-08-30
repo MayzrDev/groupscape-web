@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.68] - 2026-08-31
+
+### Fixed
+- Fixed a group member's active prayer icons sometimes staying visible after they logged out.
+
 ## [1.0.67] - 2026-08-30
 
 ### Fixed
