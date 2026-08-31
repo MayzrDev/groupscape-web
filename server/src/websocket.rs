@@ -156,9 +156,17 @@ impl Default for PingRegistry {
 #[serde(rename_all = "snake_case")]
 pub enum MarkerType {
     Danger,
-    SafeSpot,
+    Defend,
     Loot,
     Focus,
+    One,
+    Two,
+    Three,
+    Four,
+    A,
+    B,
+    C,
+    D,
 }
 
 /// One group member's active raid marker, as tracked in-memory for the web map's poll endpoint
@@ -453,7 +461,7 @@ mod tests {
             payload: RaidMarkerStartPayload {
                 marker_id: "abc".to_string(),
                 member_name: "Zezima".to_string(),
-                marker_type: MarkerType::SafeSpot,
+                marker_type: MarkerType::Defend,
                 kind: PingKind::Tile,
                 x: 3200,
                 y: 3200,
@@ -465,7 +473,7 @@ mod tests {
 
         let json = serde_json::to_value(&envelope).unwrap();
         assert_eq!(json["type"], "marker_start");
-        assert_eq!(json["payload"]["markerType"], "safe_spot");
+        assert_eq!(json["payload"]["markerType"], "defend");
         assert_eq!(json["payload"]["kind"], "tile");
     }
 

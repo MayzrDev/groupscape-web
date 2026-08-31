@@ -2,6 +2,14 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.246] - 2026-08-31
+
+### Added
+- Raid markers on the map now include four numbered (1-4) and four lettered (A-D) generic callouts, alongside Danger/Defend/Loot/Focus.
+
+### Changed
+- Renamed the "Safe Spot" raid marker to "Defend".
+
 ## [1.0.245] - 2026-08-31
 
 ### Fixed

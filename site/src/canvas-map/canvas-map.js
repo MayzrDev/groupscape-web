@@ -8,6 +8,20 @@ import { groupData } from "../data/group-data";
 
 export const ICON_SPRITE_SIZE = 15;
 
+// The 1-4/A-D raid callout marker types have no wiki icon (see raidMarkerIconImages) - drawn
+// instead as their glyph in a colored circle, matching the plugin's RaidMarkerIcons fallback.
+// Colors kept in sync with groupscape-plugin's RaidMarkerType.
+const RAID_MARKER_GLYPHS = {
+  one: { glyph: "1", color: "#3b82f6" },
+  two: { glyph: "2", color: "#0ea5e9" },
+  three: { glyph: "3", color: "#14b8a6" },
+  four: { glyph: "4", color: "#6366f1" },
+  a: { glyph: "A", color: "#f97316" },
+  b: { glyph: "B", color: "#ec4899" },
+  c: { glyph: "C", color: "#84cc16" },
+  d: { glyph: "D", color: "#64748b" },
+};
+
 export class CanvasMap extends BaseElement {
   html() {
     return `{{canvas-map.html}}`;
@@ -86,11 +100,13 @@ export class CanvasMap extends BaseElement {
 
     // Real OSRS wiki icons per raid marker type - drawn as-is (no hue-rotate, unlike
     // drawHelmetIcon/drawPingIcon), since a marker's whole point is being recognizable by type
-    // at a glance, not by who dropped it.
+    // at a glance, not by who dropped it. The 1-4/A-D callout types have no wiki icon, so they're
+    // absent here - drawRaidMarkerIcon falls back to a colored-circle + text glyph for them (see
+    // RAID_MARKER_GLYPH_COLORS below).
     this.raidMarkerIconImages = {};
     for (const [type, src] of Object.entries({
       danger: "/ui/raid-marker-danger.png",
-      safe_spot: "/ui/raid-marker-safe-spot.png",
+      defend: "/ui/raid-marker-defend.png",
       loot: "/ui/raid-marker-loot.png",
       focus: "/ui/raid-marker-focus.png",
     })) {
@@ -909,6 +925,12 @@ export class CanvasMap extends BaseElement {
   }
 
   drawRaidMarkerIcon(centerX, centerY, markerType) {
+    const glyph = RAID_MARKER_GLYPHS[markerType];
+    if (glyph) {
+      this.drawRaidMarkerGlyph(centerX, centerY, glyph);
+      return;
+    }
+
     const image = this.raidMarkerIconImages[markerType];
     if (!image?.complete || image.naturalWidth === 0) return;
 
@@ -922,6 +944,36 @@ export class CanvasMap extends BaseElement {
     this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
     this.ctx.shadowBlur = 6 * scale;
     this.ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    this.ctx.restore();
+  }
+
+  // Colored-circle + text-glyph badge for a raid marker type with no wiki icon - see
+  // RAID_MARKER_GLYPHS. Sized to roughly match the wiki-icon markers' on-screen footprint.
+  drawRaidMarkerGlyph(centerX, centerY, { glyph, color }) {
+    const scale = 1 / Math.min(this.camera.zoom.current, 3);
+    const radius = 11 * scale;
+    const tipY = centerY - radius - 2 * scale;
+
+    this.ctx.save();
+    this.ctx.translate(centerX, tipY);
+    this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    this.ctx.shadowBlur = 6 * scale;
+
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    this.ctx.fillStyle = color;
+    this.ctx.fill();
+    this.ctx.lineWidth = 1.5 * scale;
+    this.ctx.strokeStyle = "black";
+    this.ctx.stroke();
+
+    this.ctx.shadowBlur = 0;
+    this.ctx.fillStyle = "white";
+    this.ctx.font = `bold ${Math.round(radius * 1.1)}px sans-serif`;
+    this.ctx.textAlign = "center";
+    this.ctx.textBaseline = "middle";
+    this.ctx.fillText(glyph, 0, 1 * scale);
+
     this.ctx.restore();
   }
 
