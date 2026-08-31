@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.254] - 2026-08-31
+
+### Fixed
+- Loot Log was always empty - every kill report from the plugin was silently rejected by the server, so no kill or loot ever got recorded. Kills (and their loot) now save properly.
+
 ## [1.0.253] - 2026-08-31
 
 ### Added

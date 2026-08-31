@@ -4260,7 +4260,7 @@ pub async fn nearby_members_for_kill(
 ) -> Result<Vec<String>, ApiError> {
     let rows = client
         .query(
-            "SELECT DISTINCT ON (member_name) member_name FROM groupscape.location_samples WHERE group_id=$1 AND sampled_at BETWEEN $2 - interval '120 seconds' AND $2 AND world=$3 AND plane=$4 AND ((world_x-$5)*(world_x-$5) + (world_y-$6)*(world_y-$6)) <= 4096 ORDER BY member_name, sampled_at DESC",
+            "SELECT DISTINCT ON (member_name) member_name FROM groupscape.location_samples WHERE group_id=$1 AND sampled_at BETWEEN $2::timestamptz - interval '120 seconds' AND $2::timestamptz AND world=$3 AND plane=$4 AND ((world_x-$5)*(world_x-$5) + (world_y-$6)*(world_y-$6)) <= 4096 ORDER BY member_name, sampled_at DESC",
             &[&group_id, &occurred_at, &world, &plane, &world_x, &world_y],
         )
         .await
