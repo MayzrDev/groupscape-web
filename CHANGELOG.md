@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.71] - 2026-08-31
+
+### Changed
+- Internal: fixed the deploy pipeline so the Discord patch-notes bot can find the server's deploy folder, so it stops reporting "no changes" on every real release.
+
 ## [1.0.70] - 2026-08-31
 
 ### Fixed

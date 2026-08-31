@@ -70,6 +70,10 @@ TEE_PID=$!
 
 echo "========================================"
 log_info "Starting GroupScape Web deploy watcher"
+# Vantage (server/lib/deployer.js::runDeploy) scrapes this marker out of deploy
+# output to auto-set deploy_configs.git_work_dir — without it, its git pre-check
+# defaults to the wrong path and always reports "no changes".
+echo "[VANTAGE_WORK_DIR=$REPO_DIR]"
 log_info "Repo: $REPO_DIR"
 log_info "Branch: $BRANCH"
 log_info "Force mode: $FORCE_DEPLOY"
