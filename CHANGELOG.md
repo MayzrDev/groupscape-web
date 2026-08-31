@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.226] - 2026-08-31
+
+### Fixed
+- Fixed clearing a ping (and pings ending automatically) silently failing every time.
+
 ## [1.0.225] - 2026-08-31
 
 ### Changed

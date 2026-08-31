@@ -739,17 +739,20 @@ pub enum PingAction {
     End,
 }
 
-/// Body for `submit_ping`. `x`/`y`/`plane`/`kind` are `None` for `PingAction::End` (a ping-clear
-/// only needs the id) and `kind`/`npc_name` are `None` for `PingAction::Update` (only `Start`
-/// establishes what kind of ping this is - updates just move it). Never persisted, matching the
-/// other ephemeral event types below (`alerts`, `notable_drops`) - a ping is relayed straight to
-/// connected overlays and dropped.
+/// Body for `submit_ping`. `memberName` is only ever sent by the client for `PingAction::Start`
+/// (an update/end request only needs `pingId` to identify which of the sender's pings it applies
+/// to - the sender's identity was already established when the ping started). `x`/`y`/`plane`/
+/// `kind` are `None` for `PingAction::End` (a ping-clear only needs the id) and `kind`/`npc_name`
+/// are `None` for `PingAction::Update` (only `Start` establishes what kind of ping this is -
+/// updates just move it). Never persisted, matching the other ephemeral event types below
+/// (`alerts`, `notable_drops`) - a ping is relayed straight to connected overlays and dropped.
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PingRequest {
     pub action: PingAction,
     pub ping_id: String,
-    pub member_name: String,
+    #[serde(default)]
+    pub member_name: Option<String>,
     #[serde(default)]
     pub kind: Option<PingKind>,
     #[serde(default)]
@@ -778,15 +781,17 @@ pub async fn submit_ping(
 ) -> Result<HttpResponse, Error> {
     let envelope = match body.action {
         PingAction::Start => {
-            let (Some(x), Some(y), Some(plane), Some(kind)) = (body.x, body.y, body.plane, body.kind)
+            let (Some(x), Some(y), Some(plane), Some(kind), Some(member_name)) =
+                (body.x, body.y, body.plane, body.kind, body.member_name.clone())
             else {
-                return Ok(HttpResponse::BadRequest().body("start requires x, y, plane and kind"));
+                return Ok(HttpResponse::BadRequest()
+                    .body("start requires x, y, plane, kind and memberName"));
             };
             ping_registry.start(
                 auth.group_id,
                 ActivePing {
                     ping_id: body.ping_id.clone(),
-                    member_name: body.member_name.clone(),
+                    member_name: member_name.clone(),
                     kind,
                     x,
                     y,
@@ -798,7 +803,7 @@ pub async fn submit_ping(
             WsEnvelope::PingStart {
                 payload: PingStartPayload {
                     ping_id: body.ping_id.clone(),
-                    member_name: body.member_name.clone(),
+                    member_name,
                     kind,
                     x,
                     y,
