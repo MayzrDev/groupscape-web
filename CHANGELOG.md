@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.237] - 2026-08-31
+## [1.0.238] - 2026-08-31
 
 ### Changed
 - The loot log page is simpler now - the clue tier, sort, and accounting-mode filters are gone, and drops are always listed most-recent-first.
