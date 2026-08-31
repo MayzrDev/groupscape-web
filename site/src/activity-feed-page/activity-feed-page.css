@@ -4,7 +4,6 @@ activity-feed-page {
 
 .activity-feed-page__container {
   display: flex;
-  max-width: 760px;
   width: 100%;
   min-height: 300px;
 }

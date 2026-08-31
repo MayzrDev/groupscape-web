@@ -1,10 +1,8 @@
 loot-log-page {
   display: flex;
-  justify-content: center;
 }
 
 .loot-log-page__container {
-  max-width: 760px;
   width: 100%;
   min-height: 300px;
   padding: 14px 16px 18px;
