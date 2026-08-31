@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.228] - 2026-08-31
+## [1.0.229] - 2026-08-31
 
 ### Changed
 - The Combat Achievements member list and the group settings colour picker now show each member's actual helmet icon, tinted to their chosen colour, instead of a plain initial or a hand-drawn helmet shape.
