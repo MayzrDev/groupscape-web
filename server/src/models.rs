@@ -493,6 +493,8 @@ pub struct LootSummaryRow {
     pub rarity: Option<String>,
     pub is_unique: bool,
     pub drop_rate: Option<String>,
+    /// Most recent contributing event's `occurred_at` - the loot log sorts on this, newest first.
+    pub occurred_at: DateTime<Utc>,
 }
 
 /// Wire shape for `GET .../get-item-bonuses` - the equip-screen bonus panel's Attack/Defence/

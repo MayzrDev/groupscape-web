@@ -25,10 +25,7 @@ export class LootLogPage extends BaseElement {
     this.bosses = [];
     this.selectedMember = "";
     this.selectedBoss = "";
-    this.selectedClueTier = "";
     this.timeWindow = "1h";
-    this.splitMode = "reported";
-    this.sort = "value";
   }
 
   html() {
@@ -44,10 +41,7 @@ export class LootLogPage extends BaseElement {
     this.customSince = this.querySelector(".loot-log-page__custom-since");
     this.customUntil = this.querySelector(".loot-log-page__custom-until");
     this.bossSelect = this.querySelector(".loot-log-page__boss-select");
-    this.clueTierSelect = this.querySelector(".loot-log-page__clue-tier-select");
     this.memberSelect = this.querySelector(".loot-log-page__member-select");
-    this.sortSelect = this.querySelector(".loot-log-page__sort-select");
-    this.splitModeSelect = this.querySelector(".loot-log-page__split-mode-select");
     this.list = this.querySelector(".loot-log-page__list");
     this.empty = this.querySelector(".loot-log-page__empty");
 
@@ -59,7 +53,7 @@ export class LootLogPage extends BaseElement {
 
     this.eventListener(this.memberSelect, "change", () => {
       this.selectedMember = this.memberSelect.value;
-      this.fetchLootSummary();
+      this.fetchLoot();
     });
     this.eventListener(this.timeSelect, "change", () => {
       this.timeWindow = this.timeSelect.value;
@@ -73,18 +67,6 @@ export class LootLogPage extends BaseElement {
     this.eventListener(this.bossSelect, "change", () => {
       this.selectedBoss = this.bossSelect.value;
       this.fetchLoot();
-    });
-    this.eventListener(this.clueTierSelect, "change", () => {
-      this.selectedClueTier = this.clueTierSelect.value;
-      this.fetchLoot();
-    });
-    this.eventListener(this.splitModeSelect, "change", () => {
-      this.splitMode = this.splitModeSelect.value;
-      this.fetchLoot();
-    });
-    this.eventListener(this.sortSelect, "change", () => {
-      this.sort = this.sortSelect.value;
-      this.fetchLootSummary();
     });
 
     Promise.all([api.getLootBosses()]).then(([bosses]) => {
@@ -105,8 +87,6 @@ export class LootLogPage extends BaseElement {
     const scope = {
       memberName: this.selectedMember || undefined,
       boss: this.selectedBoss || undefined,
-      clueTier: this.selectedClueTier || undefined,
-      splitMode: this.splitMode,
     };
     if (this.timeWindow !== "all") {
       if (this.timeWindow === "custom") {
@@ -122,7 +102,7 @@ export class LootLogPage extends BaseElement {
 
   async fetchLoot() {
     const scope = this.getScope();
-    this.rows = await api.getLootSummary({ ...scope, sort: this.sort });
+    this.rows = await api.getLootSummary(scope);
     this.split = await api.getLootSplit(scope);
     this.renderBossOptions();
     this.renderList();
@@ -169,14 +149,6 @@ export class LootLogPage extends BaseElement {
       ${this.members.map((member) => `<option value="${member.name}">${member.name}</option>`).join("")}
     `;
     this.memberSelect.value = previousValue;
-  }
-
-  async fetchLootSummary() {
-    await this.fetchLoot();
-  }
-
-  async fetchLootSplit() {
-    await this.fetchLoot();
   }
 
   renderSplit() {

@@ -1067,9 +1067,6 @@ pub async fn get_loot_bosses() -> web::Json<Vec<LootBoss>> {
     web::Json(bosses.chain(chests).collect())
 }
 
-fn default_loot_sort() -> String {
-    "value".to_string()
-}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GetLootSummaryQuery {
@@ -1087,8 +1084,6 @@ pub struct GetLootSummaryQuery {
     pub until: Option<DateTime<Utc>>,
     #[serde(default)]
     pub split_mode: Option<String>,
-    #[serde(default = "default_loot_sort")]
-    pub sort: String,
 }
 /// One normalized (source_name, source_type, clue_tier, loot, participants) view over either a
 /// `GameEvent::Kill` or `GameEvent::Loot` payload, so the summary/split endpoints below don't
@@ -1178,6 +1173,9 @@ pub async fn get_loot_summary(
                 let drop = (source.clue_tier.is_none())
                     .then(|| drop_rates::lookup(&source.source_name, item.item_id))
                     .flatten();
+                // `events` is already ordered newest-first (see list_loot_and_kill_events), so
+                // the first time a (member, source, item) key is seen is its most recent
+                // occurrence - that's what the row's occurred_at should reflect for sorting.
                 let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
                     member_name,
                     source_name: source.source_name.clone(),
@@ -1191,6 +1189,7 @@ pub async fn get_loot_summary(
                     rarity: drop.map(|d| d.rarity.clone()),
                     is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
                     drop_rate: drop.and_then(|d| d.rate.clone()),
+                    occurred_at: event.occurred_at,
                 });
                 row.quantity += item.quantity;
                 let item_value = unit_value.unwrap_or(0) * item.quantity as i64;
@@ -1204,14 +1203,7 @@ pub async fn get_loot_summary(
     }
 
     let mut result: Vec<LootSummaryRow> = rows.into_values().collect();
-    match query.sort.as_str() {
-        "rarity" => result.sort_by(|a, b| {
-            let rank_a = drop_rates::rarity_rank(a.rarity.as_deref().unwrap_or(""));
-            let rank_b = drop_rates::rarity_rank(b.rarity.as_deref().unwrap_or(""));
-            rank_b.cmp(&rank_a).then(b.total_value.cmp(&a.total_value))
-        }),
-        _ => result.sort_by(|a, b| b.total_value.cmp(&a.total_value)),
-    }
+    result.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at));
     Ok(web::Json(result))
 }
 

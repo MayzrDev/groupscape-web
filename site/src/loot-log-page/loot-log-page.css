@@ -97,42 +97,6 @@ loot-log-page {
   padding: 0;
 }
 
-.loot-log-page__toolbar-secondary {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--light-border);
-}
-
-.loot-log-page__mini-field {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72em;
-  font-family: ui-sans-serif, Arial, sans-serif;
-  text-shadow: none;
-  opacity: 0.75;
-}
-
-.loot-log-page__mini-field select {
-  background: transparent;
-  color: inherit;
-  border: none;
-  border-bottom: 1px solid var(--light-border);
-  font-family: ui-sans-serif, Arial, sans-serif;
-  text-shadow: none;
-  font-size: 1em;
-  padding: 0 0 1px;
-}
-
-.loot-log-page__mini-field select:hover {
-  color: var(--primary-text);
-  opacity: 1;
-}
-
 .loot-log-page__list {
   margin-top: 4px;
 }

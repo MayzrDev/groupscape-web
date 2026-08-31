@@ -135,13 +135,13 @@ describe("api", () => {
     const rows = [{ item_id: 995, rarity: "rare" }];
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(rows) });
 
-    const result = await api.getLootSummary({ memberName: "Zezima", sort: "rarity" });
+    const result = await api.getLootSummary({ memberName: "Zezima", clueTier: "master" });
 
     expect(result).toEqual(rows);
     const [url, options] = globalThis.fetch.mock.calls[0];
     expect(url).toContain("/group/iron-team/get-loot-summary?");
     expect(url).toContain("member_name=Zezima");
-    expect(url).toContain("sort=rarity");
+    expect(url).toContain("clue_tier=master");
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
   });
 

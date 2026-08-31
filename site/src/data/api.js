@@ -526,7 +526,7 @@ class Api {
     return response.json();
   }
 
-  async getLootSummary({ memberName, sessionId, boss, clueTier, since, until, splitMode, sort } = {}) {
+  async getLootSummary({ memberName, sessionId, boss, clueTier, since, until, splitMode } = {}) {
     const query = new URLSearchParams();
     if (memberName) query.set("member_name", memberName);
     if (sessionId) query.set("session_id", sessionId);
@@ -535,7 +535,6 @@ class Api {
     if (since) query.set("since", since);
     if (until) query.set("until", until);
     if (splitMode) query.set("split_mode", splitMode);
-    if (sort) query.set("sort", sort);
 
     const response = await fetch(`${this.lootSummaryUrl}?${query.toString()}`, {
       headers: {
