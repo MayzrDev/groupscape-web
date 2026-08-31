@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.240] - 2026-08-31
+## [1.0.241] - 2026-08-31
 
 ### Changed
 - The Activity Feed and Loot Log pages now use the full width of the screen instead of staying narrow and centered, matching the Items page.
