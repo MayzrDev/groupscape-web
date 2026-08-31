@@ -96,7 +96,7 @@ button.side-panel__mobile-toggle {
   .side-panel__panels,
   .side-panel__empty {
     position: relative;
-    z-index: 1;
+    z-index: 30;
   }
 }
 
