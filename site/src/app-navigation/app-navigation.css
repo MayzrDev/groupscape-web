@@ -79,6 +79,15 @@ app-navigation .men-button img {
   margin: 0;
 }
 
+/* "Combat Achievements" is by far the longest tab label, and its width alone can
+   force the tabs panel into horizontal overflow before the account column even
+   gets tight. Shrink just this label so the full tab row keeps fitting next to
+   the account panel longer. */
+.app-navigation__panel--tabs button[route-component="combat-achievements-page"] {
+  font-size: 15px;
+  padding: 4px 6px;
+}
+
 .app-navigation__plane-slot:empty {
   display: none;
 }

@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.233] - 2026-08-31
+
+### Fixed
+- The "Combat Achievements" tab in the top nav no longer gets crowded out by the account menu on narrower screens.
+
 ## [1.0.231] - 2026-08-31
 
 ### Fixed
