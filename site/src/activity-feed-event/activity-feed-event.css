@@ -70,6 +70,13 @@ activity-feed-event.activity-feed-event--enter {
   color: var(--activity-collection-log);
 }
 
+.activity-feed-event__badge--cox,
+.activity-feed-event__badge--tob,
+.activity-feed-event__badge--toa {
+  background: color-mix(in srgb, var(--activity-raid) 16%, transparent);
+  color: var(--activity-raid);
+}
+
 .activity-feed-event__badge--clue {
   background: color-mix(in srgb, var(--clue-tier-color, var(--activity-quest)) 18%, transparent);
   color: var(--clue-tier-color, var(--activity-quest));

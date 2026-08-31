@@ -19,6 +19,7 @@ use crate::models::{
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
 use crate::push;
+use crate::raid_merge;
 use crate::update_batcher;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
@@ -360,6 +361,7 @@ pub async fn update_group_member(
     group_member: web::Json<GroupMember>,
     sender: web::Data<mpsc::Sender<GroupMember>>,
     broadcast_registry: web::Data<GroupBroadcastRegistry>,
+    raid_merge_registry: web::Data<raid_merge::RaidMergeRegistry>,
     db_pool: web::Data<Pool>,
     config: web::Data<Config>,
 ) -> Result<HttpResponse, Error> {
@@ -543,6 +545,25 @@ pub async fn update_group_member(
             let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
             let session_id = db::ensure_open_session(&client, auth.group_id).await?;
             for event in &events {
+                // Raid completions don't go through the generic insert/relay path below at all -
+                // they need to merge with other party members' reports of the same raid before
+                // anything is relayed, which `raid_merge::handle_raid_completion` owns end to end
+                // (including its own `insert_activity_event`-equivalent write).
+                if let GameEvent::Raid(raid) = event {
+                    raid_merge::handle_raid_completion(
+                        &client,
+                        db_pool.clone(),
+                        raid_merge_registry.clone(),
+                        broadcast_registry.clone(),
+                        auth.group_id,
+                        session_id,
+                        group_member_inner.name.clone(),
+                        raid.clone(),
+                    )
+                    .await?;
+                    continue;
+                }
+
                 let mut stored_event = event.clone();
                 if let GameEvent::Kill(kill) = &mut stored_event {
                     let occurred_at = kill.occurred_at.unwrap_or_else(Utc::now);
@@ -1115,6 +1136,11 @@ fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
             participants: None,
         }),
         GameEvent::Death(_) => None,
+        // Raid completions are stored under `event_type = "raid"`, excluded from
+        // `list_loot_and_kill_events`'s `event_type IN ('kill', 'loot')` filter entirely, and use
+        // a payload shape (`RaidCompletionPayload`) this enum doesn't even model - this arm only
+        // exists to keep the match exhaustive.
+        GameEvent::Raid(_) => None,
     }
 }
 /// Query-time pivot over `kill`/`loot` activity events into per-(member, source, item) rows,

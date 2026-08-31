@@ -169,6 +169,10 @@ toast-stack {
   --toast-color: var(--activity-collection-log);
 }
 
+.toast-stack__toast--raid {
+  --toast-color: var(--activity-raid);
+}
+
 .toast-stack__icon {
   flex: none;
   width: 22px;

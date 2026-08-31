@@ -286,14 +286,88 @@ pub struct DeathEvent {
     pub killer_name: Option<String>,
 }
 
-/// Discriminated on the plugin's own `"type"` field ("kill"/"death"), matching
-/// `KillLootDeathEvents`' transport shape field-for-field.
+/// The three raid instances tracked for completion events. `Display` renders the wiki-style
+/// full name used in both the activity feed sentence and the Discord relay.
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[serde(rename_all = "lowercase")]
+pub enum RaidType {
+    Cox,
+    Tob,
+    Toa,
+}
+impl RaidType {
+    pub fn display_name(self) -> &'static str {
+        match self {
+            RaidType::Cox => "Chambers of Xeric",
+            RaidType::Tob => "Theatre of Blood",
+            RaidType::Toa => "Tombs of Amascut",
+        }
+    }
+
+    /// The `payload.raidType` string the frontend keys its per-raid icon/description lookup on
+    /// (`"cox"`/`"tob"`/`"toa"`) - same as the serde tag, spelled out so callers building JSON by
+    /// hand (the merge path in `authed.rs`) don't have to round-trip through serde to get it.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            RaidType::Cox => "cox",
+            RaidType::Tob => "tob",
+            RaidType::Toa => "toa",
+        }
+    }
+}
+
+/// CoX/ToB only ever report a *mode* ("Challenge Mode"/"Hard Mode"/`None` for regular); ToA
+/// reports a numeric *invocation level* instead. The two are mutually exclusive per [`RaidType`],
+/// so this is modeled as an enum rather than two `Option` fields that could both be set or both
+/// `None` at once.
+#[derive(Deserialize, Serialize, Clone, PartialEq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum RaidDifficulty {
+    Mode {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mode: Option<String>,
+    },
+    Level {
+        level: i32,
+    },
+}
+impl RaidDifficulty {
+    /// The merge key component (see `raid_merge`) - two completions only merge when this string
+    /// matches exactly, so a level-300 and a level-350 ToA run (or CM vs non-CM CoX) never merge.
+    pub fn merge_key(&self) -> String {
+        match self {
+            RaidDifficulty::Mode { mode } => format!("mode:{}", mode.as_deref().unwrap_or("")),
+            RaidDifficulty::Level { level } => format!("level:{}", level),
+        }
+    }
+}
+
+/// One raid-completion report from a single reporting member's client. `loot` is that reporter's
+/// own share of the reward-chest loot only - the server sums per-member value when merging
+/// multiple reporters' reports into one feed entry (see `raid_merge`).
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RaidCompletionEvent {
+    pub raid_type: RaidType,
+    pub difficulty: RaidDifficulty,
+    pub world_x: i32,
+    pub world_y: i32,
+    pub plane: i32,
+    pub world: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub occurred_at: Option<DateTime<Utc>>,
+    pub loot: Vec<LootItem>,
+}
+
+/// Discriminated on the plugin's own `"type"` field ("kill"/"death"/"loot"/"raid"), matching
+/// `KillLootDeathEvents`'/`RaidCompletionEvents`' transport shape field-for-field.
 #[derive(Deserialize, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum GameEvent {
     Kill(KillEvent),
     Death(DeathEvent),
     Loot(LootEvent),
+    Raid(RaidCompletionEvent),
 }
 impl GameEvent {
     pub fn event_type(&self) -> &'static str {
@@ -301,6 +375,7 @@ impl GameEvent {
             GameEvent::Kill(_) => "kill",
             GameEvent::Death(_) => "death",
             GameEvent::Loot(_) => "loot",
+            GameEvent::Raid(_) => "raid",
         }
     }
 }
@@ -462,6 +537,129 @@ impl NotableDropEvent {
                 member_name, self.item_name, self.item_value, self.total_value
             ),
         }
+    }
+}
+
+/// One reporting member's contribution to a merged raid-completion [`ActivityEvent`] payload -
+/// see `raid_merge` for how multiple members' [`RaidCompletionEvent`]s fold into one row.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidParticipant {
+    pub member_name: String,
+    pub value: i64,
+    pub loot: Vec<LootItem>,
+}
+
+/// The `groupscape.activity_events.payload` shape for `event_type = "raid"`, built by
+/// `raid_merge` rather than a straight `serde_json::to_value(&RaidCompletionEvent)` - a merged
+/// row carries every reporting member's contribution, not just the first reporter's.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidCompletionPayload {
+    pub raid_type: RaidType,
+    pub difficulty: RaidDifficulty,
+    pub participants: Vec<RaidParticipant>,
+    pub total_value: i64,
+    /// `true` while still inside the 5-minute merge window and eligible to receive more
+    /// participants; flipped to `false` by `raid_merge`'s finalize step, at which point the one
+    /// websocket/Discord relay for this completion fires.
+    pub merge_open: bool,
+}
+/// Sums a raid participant's loot at current GE prices - unpriced items (untradeable uniques,
+/// GE-cache misses) contribute 0 rather than failing the whole completion.
+pub fn raid_loot_value(loot: &[LootItem], ge_prices: &GEPrices) -> i64 {
+    loot.iter()
+        .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+        .sum()
+}
+
+impl RaidCompletionPayload {
+    pub fn first(reporter: &str, event: &RaidCompletionEvent, ge_prices: &GEPrices) -> Self {
+        let value = raid_loot_value(&event.loot, ge_prices);
+        RaidCompletionPayload {
+            raid_type: event.raid_type,
+            difficulty: event.difficulty.clone(),
+            participants: vec![RaidParticipant {
+                member_name: reporter.to_string(),
+                value,
+                loot: event.loot.clone(),
+            }],
+            total_value: value,
+            merge_open: true,
+        }
+    }
+
+    /// Folds another reporting member's contribution into this payload in place - used by
+    /// `raid_merge` when a second (or third, ...) party member's `RaidCompletionEvent` arrives
+    /// for the same raid+difficulty within the merge window. No-ops if `member_name` already
+    /// reported (a member's own client should never report the same completion twice, but this
+    /// keeps a retry/duplicate-heartbeat from double-counting their loot).
+    pub fn append(&mut self, reporter: &str, event: &RaidCompletionEvent, ge_prices: &GEPrices) {
+        if self.participants.iter().any(|p| p.member_name == reporter) {
+            return;
+        }
+        let value = raid_loot_value(&event.loot, ge_prices);
+        self.participants.push(RaidParticipant {
+            member_name: reporter.to_string(),
+            value,
+            loot: event.loot.clone(),
+        });
+        self.total_value += value;
+    }
+
+    /// The one message this completion ever relays (websocket + Discord), built once at finalize
+    /// time so a 4-member raid never produces four near-duplicate "X completed..." posts.
+    pub fn to_message(&self) -> String {
+        let names: Vec<&str> = self
+            .participants
+            .iter()
+            .map(|p| p.member_name.as_str())
+            .collect();
+        let name_list = join_names(&names);
+        let suffix = match &self.difficulty {
+            RaidDifficulty::Level { level } if *level > 0 => format!(" (level {})", level),
+            RaidDifficulty::Level { .. } => String::new(),
+            RaidDifficulty::Mode { mode: Some(mode) } => format!(" ({})", mode),
+            RaidDifficulty::Mode { mode: None } => String::new(),
+        };
+        let gp_suffix = if names.len() > 1 { "gp total" } else { "gp" };
+        format!(
+            "{} completed {}{} — worth {} {}",
+            name_list,
+            self.raid_type.display_name(),
+            suffix,
+            format_gp(self.total_value),
+            gp_suffix
+        )
+    }
+}
+
+fn join_names(names: &[&str]) -> String {
+    match names.len() {
+        0 => String::new(),
+        1 => names[0].to_string(),
+        2 => format!("{} and {}", names[0], names[1]),
+        _ => {
+            let (last, rest) = names.split_last().unwrap();
+            format!("{}, and {}", rest.join(", "), last)
+        }
+    }
+}
+
+fn format_gp(value: i64) -> String {
+    let s = value.abs().to_string();
+    let mut out = String::new();
+    for (i, c) in s.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    let grouped: String = out.chars().rev().collect();
+    if value < 0 {
+        format!("-{}", grouped)
+    } else {
+        grouped
     }
 }
 
@@ -918,6 +1116,7 @@ pub struct DiscordWebhookSettings {
     pub notify_deaths: bool,
     pub notify_loot: bool,
     pub notify_notable_drops: bool,
+    pub notify_raids: bool,
 }
 
 #[derive(Deserialize)]
@@ -1127,6 +1326,124 @@ pub struct AdminDashboard {
     pub live_sessions: i64,
     pub locked_out: i64,
     pub recent_audit: Vec<AdminAuditLogEntry>,
+}
+
+#[cfg(test)]
+mod raid_tests {
+    use super::*;
+
+    #[test]
+    fn game_event_raid_round_trips_level_difficulty() {
+        let json = serde_json::json!({
+            "type": "raid",
+            "raidType": "toa",
+            "difficulty": {"kind": "level", "level": 350},
+            "worldX": 1,
+            "worldY": 2,
+            "plane": 0,
+            "world": 301,
+            "loot": [{"itemId": 5, "quantity": 2}]
+        });
+        let event: GameEvent = serde_json::from_value(json).unwrap();
+        match &event {
+            GameEvent::Raid(raid) => {
+                assert_eq!(raid.raid_type, RaidType::Toa);
+                assert!(matches!(raid.difficulty, RaidDifficulty::Level { level: 350 }));
+                assert_eq!(raid.loot.len(), 1);
+            }
+            _ => panic!("expected GameEvent::Raid"),
+        }
+        assert_eq!(event.event_type(), "raid");
+    }
+
+    #[test]
+    fn game_event_raid_round_trips_mode_difficulty_with_no_mode() {
+        let json = serde_json::json!({
+            "type": "raid",
+            "raidType": "tob",
+            "difficulty": {"kind": "mode"},
+            "worldX": 0,
+            "worldY": 0,
+            "plane": 0,
+            "world": 301,
+            "loot": []
+        });
+        let event: GameEvent = serde_json::from_value(json).unwrap();
+        match &event {
+            GameEvent::Raid(raid) => {
+                assert_eq!(raid.raid_type, RaidType::Tob);
+                assert!(matches!(raid.difficulty, RaidDifficulty::Mode { mode: None }));
+            }
+            _ => panic!("expected GameEvent::Raid"),
+        }
+    }
+
+    #[test]
+    fn merge_key_distinguishes_level_and_mode() {
+        assert_ne!(
+            RaidDifficulty::Level { level: 300 }.merge_key(),
+            RaidDifficulty::Level { level: 350 }.merge_key()
+        );
+        assert_ne!(
+            RaidDifficulty::Mode { mode: None }.merge_key(),
+            RaidDifficulty::Mode {
+                mode: Some("Challenge Mode".to_string())
+            }
+            .merge_key()
+        );
+    }
+
+    fn sample_event(loot_value_items: Vec<LootItem>) -> RaidCompletionEvent {
+        RaidCompletionEvent {
+            raid_type: RaidType::Toa,
+            difficulty: RaidDifficulty::Level { level: 300 },
+            world_x: 0,
+            world_y: 0,
+            plane: 0,
+            world: 301,
+            occurred_at: None,
+            loot: loot_value_items,
+        }
+    }
+
+    #[test]
+    fn append_sums_participants_and_ignores_duplicate_reporter() {
+        let mut ge_prices = GEPrices::new();
+        ge_prices.insert(1, 100);
+        ge_prices.insert(2, 50);
+
+        let event_a = sample_event(vec![LootItem {
+            item_id: 1,
+            quantity: 2,
+        }]);
+        let mut payload = RaidCompletionPayload::first("Alice", &event_a, &ge_prices);
+        assert_eq!(payload.total_value, 200);
+
+        let event_b = sample_event(vec![LootItem {
+            item_id: 2,
+            quantity: 1,
+        }]);
+        payload.append("Bob", &event_b, &ge_prices);
+        assert_eq!(payload.participants.len(), 2);
+        assert_eq!(payload.total_value, 250);
+
+        // A duplicate report from an existing participant must not double-count.
+        payload.append("Bob", &event_b, &ge_prices);
+        assert_eq!(payload.participants.len(), 2);
+        assert_eq!(payload.total_value, 250);
+    }
+
+    #[test]
+    fn to_message_pluralizes_gp_suffix_for_groups() {
+        let ge_prices = GEPrices::new();
+        let event = sample_event(vec![]);
+        let mut payload = RaidCompletionPayload::first("Alice", &event, &ge_prices);
+        assert!(payload.to_message().ends_with("worth 0 gp"));
+
+        payload.append("Bob", &event, &ge_prices);
+        assert!(payload.to_message().ends_with("worth 0 gp total"));
+        assert!(payload.to_message().starts_with("Alice and Bob completed"));
+    }
 }
 
 #[cfg(test)]

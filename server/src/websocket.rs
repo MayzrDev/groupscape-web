@@ -303,6 +303,15 @@ pub struct DropEventPayload {
     pub message: String,
 }
 
+/// Fires once per raid completion, after `raid_merge`'s 5-minute window closes - not per
+/// reporting member, unlike `KillEventPayload`. `message` is pre-built by
+/// `RaidCompletionPayload::to_message` and already names every reporting member.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidEventPayload {
+    pub message: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ColorUpdatePayload {
@@ -403,6 +412,10 @@ pub enum WsEnvelope {
     },
     DropEvent {
         payload: DropEventPayload,
+        ts: DateTime<Utc>,
+    },
+    RaidEvent {
+        payload: RaidEventPayload,
         ts: DateTime<Utc>,
     },
     ColorUpdate {

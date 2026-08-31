@@ -50,6 +50,11 @@ export class ActivityFeedEvent extends BaseElement {
   }
 
   get loot() {
+    // A merged raid completion has no top-level `payload.loot` - each reporting member's share
+    // lives under its own `participants[].loot` entry instead (see `RaidCompletionPayload`).
+    if (["cox", "tob", "toa"].includes(this.displayType)) {
+      return (this.event.payload?.participants || []).flatMap((p) => p.loot || []);
+    }
     return this.event.payload?.loot || [];
   }
 

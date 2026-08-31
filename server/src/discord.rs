@@ -90,6 +90,7 @@ const KILL_COLOR: u32 = 0x2ECC71;
 const DEATH_COLOR: u32 = 0xE74C3C;
 const LOOT_COLOR: u32 = 0xF1C40F;
 const DROP_COLOR: u32 = 0x9B59B6;
+const RAID_COLOR: u32 = 0xE67E22;
 const TEST_COLOR: u32 = 0x5865F2;
 
 fn send_webhook_embed_sync(url: &str, title: &str, description: &str, color: u32) -> Result<(), ureq::Error> {
@@ -217,7 +218,45 @@ pub fn dispatch_event_webhook(
                     send_webhook_embed(webhook_url, "Loot", description, LOOT_COLOR).await;
                 }
             }
+            // Raid completions aren't relayed per-event like the other variants above - they go
+            // through `dispatch_raid_webhook` instead, called once from `raid_merge`'s finalize
+            // step after the merge window closes, so a group's whole party doesn't each trigger
+            // a separate near-duplicate Discord post for the same raid.
+            GameEvent::Raid(_) => {}
         }
+    });
+}
+
+/// Fire-and-forget, mirroring `dispatch_event_webhook` above - posts the merged raid-completion
+/// message (`RaidCompletionPayload::to_message`) as a Discord embed, once per completion, when
+/// the group has a webhook configured and `notify_raids` is on. Like `dispatch_drop_webhook`,
+/// takes the pre-built message directly since the merge/finalize step that produces it already
+/// lives outside this per-event match.
+pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String) {
+    tokio::spawn(async move {
+        let client = match db_pool.get().await {
+            Ok(client) => client,
+            Err(err) => {
+                log::warn!("discord: failed to get db client: {}", err);
+                return;
+            }
+        };
+        let settings = match db::get_discord_webhook_settings(&client, group_id).await {
+            Ok(settings) => settings,
+            Err(err) => {
+                log::warn!("discord: failed to load webhook settings: {}", err);
+                return;
+            }
+        };
+        drop(client);
+        let Some(webhook_url) = settings.webhook_url else {
+            return;
+        };
+        if !settings.notify_raids {
+            return;
+        }
+
+        send_webhook_embed(webhook_url, "Raid", message, RAID_COLOR).await;
     });
 }
 

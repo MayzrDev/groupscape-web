@@ -485,7 +485,7 @@ pub async fn get_discord_webhook_settings(
     let stmt = client
         .prepare_cached(
             "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_loot, \
-             discord_notify_notable_drops \
+             discord_notify_notable_drops, discord_notify_raids \
              FROM groupscape.groups WHERE group_id=$1",
         )
         .await?;
@@ -499,6 +499,7 @@ pub async fn get_discord_webhook_settings(
         notify_deaths: row.try_get("discord_notify_deaths")?,
         notify_loot: row.try_get("discord_notify_loot")?,
         notify_notable_drops: row.try_get("discord_notify_notable_drops")?,
+        notify_raids: row.try_get("discord_notify_raids")?,
     })
 }
 
@@ -511,7 +512,7 @@ pub async fn update_discord_webhook_settings(
         .prepare_cached(
             "UPDATE groupscape.groups SET \
              discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_loot=$5, \
-             discord_notify_notable_drops=$6 \
+             discord_notify_notable_drops=$6, discord_notify_raids=$7 \
              WHERE group_id=$1",
         )
         .await?;
@@ -525,6 +526,7 @@ pub async fn update_discord_webhook_settings(
                 &settings.notify_deaths,
                 &settings.notify_loot,
                 &settings.notify_notable_drops,
+                &settings.notify_raids,
             ],
         )
         .await
@@ -2615,6 +2617,22 @@ ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_groups_discord_notify_raids_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_notify_raids BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_notify_raids_column").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -4221,6 +4239,93 @@ pub async fn insert_activity_event_payload(
     Ok(())
 }
 
+/// Inserts the first reporting member's raid completion, returning the new row's `event_id` so
+/// `raid_merge` can append later reporters to it. Concurrent callers for the same raid+difficulty
+/// are already serialized by `raid_merge`'s in-process `Mutex` (see `authed.rs`), so this doesn't
+/// need its own row-level locking.
+pub async fn insert_raid_completion(
+    client: &Client,
+    group_id: i64,
+    session_id: i64,
+    member_name: &str,
+    event: &crate::models::RaidCompletionEvent,
+    ge_prices: &crate::models::GEPrices,
+) -> Result<i64, ApiError> {
+    let payload = crate::models::RaidCompletionPayload::first(member_name, event, ge_prices);
+    let payload = serde_json::to_value(&payload).map_err(ApiError::SerdeJsonError)?;
+    let stmt = client
+        .prepare_cached(
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload) \
+             VALUES ($1, $2, $3, 'raid', $4) RETURNING event_id",
+        )
+        .await?;
+    let row = client
+        .query_one(&stmt, &[&session_id, &group_id, &member_name, &payload])
+        .await
+        .map_err(ApiError::InsertActivityEventError)?;
+    Ok(row.try_get("event_id")?)
+}
+
+/// Folds another reporting member's completion into an already-inserted raid row (see
+/// [`insert_raid_completion`]). Silently no-ops if the row is gone (finalized+swept between the
+/// merge-registry lookup and this call - vanishingly rare given both happen under the same lock).
+pub async fn append_raid_participant(
+    client: &Client,
+    event_id: i64,
+    member_name: &str,
+    event: &crate::models::RaidCompletionEvent,
+    ge_prices: &crate::models::GEPrices,
+) -> Result<(), ApiError> {
+    let select_stmt = client
+        .prepare_cached("SELECT payload FROM groupscape.activity_events WHERE event_id=$1")
+        .await?;
+    let Some(row) = client
+        .query_opt(&select_stmt, &[&event_id])
+        .await
+        .map_err(ApiError::PGError)?
+    else {
+        return Ok(());
+    };
+    let payload_value: serde_json::Value = row.try_get("payload")?;
+    let mut payload: crate::models::RaidCompletionPayload =
+        serde_json::from_value(payload_value).map_err(ApiError::SerdeJsonError)?;
+    payload.append(member_name, event, ge_prices);
+    let payload = serde_json::to_value(&payload).map_err(ApiError::SerdeJsonError)?;
+    let update_stmt = client
+        .prepare_cached("UPDATE groupscape.activity_events SET payload=$2 WHERE event_id=$1")
+        .await?;
+    client
+        .execute(&update_stmt, &[&event_id, &payload])
+        .await
+        .map_err(ApiError::PGError)?;
+    Ok(())
+}
+
+/// Closes a raid completion's 5-minute merge window, returning the final merged payload for the
+/// one-time websocket/Discord relay - `None` if the row is somehow already gone.
+pub async fn finalize_raid_completion(
+    client: &Client,
+    event_id: i64,
+) -> Result<Option<crate::models::RaidCompletionPayload>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.activity_events SET payload = jsonb_set(payload, '{mergeOpen}', 'false') \
+             WHERE event_id=$1 RETURNING payload",
+        )
+        .await?;
+    let Some(row) = client
+        .query_opt(&stmt, &[&event_id])
+        .await
+        .map_err(ApiError::PGError)?
+    else {
+        return Ok(None);
+    };
+    let payload_value: serde_json::Value = row.try_get("payload")?;
+    Ok(Some(
+        serde_json::from_value(payload_value).map_err(ApiError::SerdeJsonError)?,
+    ))
+}
+
 pub async fn record_location_sample(
     client: &Client,
     group_id: i64,
@@ -4390,7 +4495,7 @@ SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
   AND (
-    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log')
+    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log', 'raid')
     OR (event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
   )
   AND (event_type != 'kill' OR npc_slug = ANY($6))

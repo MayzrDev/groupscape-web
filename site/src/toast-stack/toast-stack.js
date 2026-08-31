@@ -16,6 +16,7 @@ const TOAST_ICONS = {
   diary: "⛰",
   "combat-achievement": "✦",
   collection_log: "❖",
+  raid: "🏆",
   ping: "📍",
 };
 

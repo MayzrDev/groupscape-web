@@ -11,6 +11,7 @@ use server::config::Config;
 use server::db;
 use server::models;
 use server::push;
+use server::raid_merge;
 use server::unauthed;
 use server::update_batcher;
 use server::vantage;
@@ -149,6 +150,7 @@ async fn main() -> std::io::Result<()> {
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let ping_registry = web::Data::new(websocket::PingRegistry::new());
     let raid_marker_registry = web::Data::new(websocket::RaidMarkerRegistry::new());
+    let raid_merge_registry = web::Data::new(raid_merge::RaidMergeRegistry::new());
     let config_data = web::Data::new(config.clone());
 
     HttpServer::new(move || {
@@ -442,6 +444,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(broadcast_registry.clone())
             .app_data(ping_registry.clone())
             .app_data(raid_marker_registry.clone())
+            .app_data(raid_merge_registry.clone())
             .service(group_dashboard_scope)
             .service(character_scope)
             // Must be registered before `admin_scope`: both scopes share the "/api/admin"

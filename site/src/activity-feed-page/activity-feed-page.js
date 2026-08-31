@@ -12,6 +12,7 @@ const EVENT_TYPES = [
   ["combat_task", "Combat tasks"],
   ["collection_log", "Collection log"],
   ["clue", "Clues"],
+  ["raid", "Raids"],
 ];
 
 const PAGE_LIMIT = 25;

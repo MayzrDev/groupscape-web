@@ -6,7 +6,16 @@ const COLLECTION_LOG_WIKI_URL = "https://oldschool.runescape.wiki/w/Collection_l
 
 // The activity feed and the toast stack render the same six milestone event types, so the copy
 // lives here once and each surface just supplies its own member/subject wrappers.
-export const ACTIVITY_EVENT_TYPES = ["kill", "death", "quest", "diary", "combat_task", "collection_log", "clue"];
+export const ACTIVITY_EVENT_TYPES = [
+  "kill",
+  "death",
+  "quest",
+  "diary",
+  "combat_task",
+  "collection_log",
+  "clue",
+  "raid",
+];
 
 const BADGE_LABELS = {
   kill: "Kill",
@@ -16,6 +25,11 @@ const BADGE_LABELS = {
   combat_task: "Combat task",
   collection_log: "Collection log",
   clue: "Clue",
+  // Raid completions display under their own per-raid icon (cox/tob/toa - see
+  // `activityDisplayType`), but all three share the one "Raid" badge/filter chip.
+  cox: "Raid",
+  tob: "Raid",
+  toa: "Raid",
 };
 
 // Secondary line under a toast title. Kills/deaths speak for themselves, so they have none.
@@ -29,6 +43,9 @@ const META_LABELS = {
 // their own "clue" bucket has to derive that display type rather than reading `event_type` raw.
 export function activityDisplayType(event) {
   if (event.event_type === "loot" && event.payload?.clueTier) return "clue";
+  // Raid completions are stored under one shared `event_type: "raid"`, discriminated by
+  // `payload.raidType` ("cox"/"tob"/"toa") so each raid can render its own icon/badge.
+  if (event.event_type === "raid") return event.payload?.raidType || "raid";
   return event.event_type;
 }
 
@@ -80,6 +97,7 @@ export function activityMetaLabel(event) {
 const LINK_BY_EVENT_TYPE = {
   combat_task: "/group/combat-achievements",
   kill: "/group/loot-log",
+  raid: "/group/loot-log",
 };
 
 export function activityLinkFor(event) {
@@ -98,7 +116,54 @@ const ACTIVITY_ICONS = {
   combat_task: "/icons/activity/combat-task.png",
   collection_log: "/icons/activity/collection-log.png",
   clue: "/icons/activity/clue.png",
+  cox: "/icons/activity/cox.png",
+  tob: "/icons/activity/tob.png",
+  // ToA has no single icon here - see `raidIconFor`, which picks one of the three below by
+  // invocation level, matching the wiki's own per-mode iconography for this raid.
 };
+
+const RAID_NAMES = {
+  cox: "Chambers of Xeric",
+  tob: "Theatre of Blood",
+  toa: "Tombs of Amascut",
+};
+
+// ToA's invocation-level bands, matching the wiki's own mode split: Entry 0-149, Normal 150-299,
+// Expert 300-600. Unlike CoX/ToB (one fixed icon each), ToA's icon depends on which band the
+// completed run's level falls into.
+function raidIconFor(raidType, payload) {
+  if (raidType !== "toa") return ACTIVITY_ICONS[raidType];
+  const level = payload?.difficulty?.level || 0;
+  if (level >= 300) return "/icons/activity/toa-expert.png";
+  if (level >= 150) return "/icons/activity/toa-normal.png";
+  return "/icons/activity/toa-entry.png";
+}
+
+function joinNames(names) {
+  if (names.length <= 1) return names[0] || "";
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
+}
+
+// Sums every reporting member's own share of a merged raid completion's loot (see
+// `RaidCompletionPayload` in models.rs) - mirrors `clueValueFor`'s "recompute from loot at
+// render time" approach rather than trusting the server-cached `totalValue` blindly.
+export function raidValueFor(payload) {
+  return (payload?.participants || []).reduce(
+    (total, participant) =>
+      total + (participant.loot || []).reduce((sum, entry) => sum + new Item(entry.itemId).gePrice * entry.quantity, 0),
+    0
+  );
+}
+
+export function raidDifficultyLabel(payload) {
+  const difficulty = payload?.difficulty;
+  if (!difficulty) return null;
+  if (difficulty.kind === "level") {
+    return difficulty.level > 0 ? `level ${difficulty.level}` : "unknown level";
+  }
+  return difficulty.mode || null;
+}
 
 export function questWikiUrl(questName) {
   return `https://oldschool.runescape.wiki/w/${questName.replaceAll(" ", "_")}`;
@@ -182,6 +247,28 @@ export function activityEventDescription(event, format = {}) {
         clueWikiUrl(payload.clueTier),
         ACTIVITY_ICONS.clue
       )} — worth ${value.toLocaleString()} gp`;
+    }
+    case "cox":
+    case "tob":
+    case "toa": {
+      const raidType = activityDisplayType(event);
+      const raidName = RAID_NAMES[raidType];
+      const participants = payload.participants || [];
+      const names = participants.length ? participants.map((p) => p.memberName) : [event.member_name];
+      // Every other branch above wraps a single RSN through `wrapMember` - here the joined list
+      // stands in for "the member" since a merged raid completion has more than one, which is
+      // why this doesn't just reuse the `member` binding computed at the top of this function.
+      const nameList = wrapMember(joinNames(names));
+      const total = raidValueFor(payload);
+      const diffLabel = raidDifficultyLabel(payload);
+      const suffix = diffLabel ? ` (${diffLabel})` : "";
+      const gpSuffix = names.length > 1 ? "gp total" : "gp";
+      return `${nameList} completed ${wrapSubject(
+        raidName,
+        raidType,
+        npcWikiUrl(raidName),
+        raidIconFor(raidType, payload)
+      )}${suffix} — worth ${total.toLocaleString()} ${gpSuffix}`;
     }
     default:
       return `${member} — ${event.event_type}`;
