@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.243] - 2026-08-31
+
+### Fixed
+- The target HP bar in the roster no longer looks short of full when you're talking to or banking with an NPC.
+
 ## [1.0.241] - 2026-08-31
 
 ### Changed

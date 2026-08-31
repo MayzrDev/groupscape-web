@@ -51,13 +51,15 @@ export class PlayerInteracting extends BaseElement {
 
       // Only an attackable actor (one with a combat health bar) gets a real ratio to show;
       // anything else (NPC/object interactions like banking) shows a full bar, same as the
-      // other stat bars above it. The hp box keeps its width reserved either way (see CSS)
-      // so the track never grows past where the numbers would sit.
+      // other stat bars above it. The hp box is hidden in that case - left in place, its
+      // reserved flex width stops the track from ever reaching the row's actual right edge,
+      // making a "full" bar look short by that width.
       const isEnemy = interacting.scale > 0;
       this.classList.toggle("player-interacting--neutral", !isEnemy);
       const healthPercent = Math.max(0, Math.min(1, interacting.ratio / interacting.scale)) * 100;
       this.fill.style.width = isEnemy ? `${healthPercent}%` : "100%";
 
+      this.hp.hidden = !isEnemy;
       this.hp.textContent = isEnemy ? `${Math.round(healthPercent)}%` : "";
 
       this.name.innerHTML = interacting.name;
