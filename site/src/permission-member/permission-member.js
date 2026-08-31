@@ -101,8 +101,8 @@ export class PermissionMember extends BaseElement {
 
       const icon = document.createElement("div");
       icon.className = "permission-member__color-icon";
-      icon.style.color = `hsl(${MEMBER_COLOR_HUES[colorKey]}, 70%, 45%)`;
-      icon.innerHTML = `<svg><use href="#permission-member-helmet-icon"></use></svg>`;
+      icon.style.setProperty("--hue", `${MEMBER_COLOR_HUES[colorKey]}deg`);
+      icon.innerHTML = `<img src="/ui/player-icon.webp" alt="" />`;
 
       chip.appendChild(icon);
       chip.title = colorKey;

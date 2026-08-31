@@ -171,20 +171,19 @@ export class CombatAchievementsPage extends BaseElement {
 
         const points = combatAchievement.totalPoints(member);
         const tierCount = combatAchievement.completedTierCount(member);
-        const initial = member.name.trim().charAt(0).toUpperCase();
         const rankClass =
           points === topPoints && points > 0
-            ? "combat-achievements-page__avatar--rank1"
+            ? "combat-achievements-page__name--rank1"
             : points === secondPoints && points > 0
-            ? "combat-achievements-page__avatar--rank2"
+            ? "combat-achievements-page__name--rank2"
             : "";
 
         return `
           <tr class="combat-achievements-page__row--member" player-name="${member.name}">
             <td>
               <div class="combat-achievements-page__member-cell">
-                <div class="combat-achievements-page__avatar ${rankClass}">${initial}</div>
-                <span class="combat-achievements-page__name">${member.name}</span>
+                <player-icon player-name="${member.name}"></player-icon>
+                <span class="combat-achievements-page__name ${rankClass}">${member.name}</span>
               </div>
             </td>
             ${tierCells}

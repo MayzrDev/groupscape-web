@@ -174,33 +174,8 @@ combat-achievements-page {
   text-align: left;
 }
 
-.combat-achievements-page__avatar {
-  width: 26px;
-  height: 26px;
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
+.combat-achievements-page__member-cell player-icon {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--light-border);
-  opacity: 0.85;
-}
-
-.combat-achievements-page__avatar--rank1 {
-  border-color: #ffd700;
-  color: #ffd700;
-  background: rgba(255, 215, 0, 0.1);
-  opacity: 1;
-}
-
-.combat-achievements-page__avatar--rank2 {
-  border-color: #c7c7c7;
-  color: #c7c7c7;
-  background: rgba(199, 199, 199, 0.08);
-  opacity: 1;
 }
 
 .combat-achievements-page__name {
@@ -209,6 +184,14 @@ combat-achievements-page {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.combat-achievements-page__name--rank1 {
+  color: #ffd700;
+}
+
+.combat-achievements-page__name--rank2 {
+  color: #c7c7c7;
 }
 
 .combat-achievements-page__table tbody tr:hover .combat-achievements-page__name {

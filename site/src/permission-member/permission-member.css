@@ -121,11 +121,15 @@ permission-member:last-child {
 }
 
 .permission-member__color-icon {
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.permission-member__color-icon svg {
+.permission-member__color-icon img {
   width: 100%;
   height: 100%;
+  filter: hue-rotate(var(--hue, 0deg)) saturate(75%);
 }
