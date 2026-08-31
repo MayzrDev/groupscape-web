@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.223] - 2026-08-31
+## [1.0.225] - 2026-08-31
 
 ### Changed
 - The ping toast now stays on screen for 20 seconds instead of 6, so there's actually time to click it before it disappears.
