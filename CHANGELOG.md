@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.227] - 2026-08-31
+
+### Added
+- The group map now shows raid markers (Danger, Safe Spot, Loot, Focus/Kill Target) dropped by teammates in-game, with the same icon they see in RuneLite.
+
 ## [1.0.226] - 2026-08-31
 
 ### Fixed

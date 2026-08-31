@@ -148,6 +148,7 @@ async fn main() -> std::io::Result<()> {
     let admin_rate_limiter = std::sync::Arc::new(AdminLoginRateLimiter::new());
     let broadcast_registry = web::Data::new(websocket::GroupBroadcastRegistry::new());
     let ping_registry = web::Data::new(websocket::PingRegistry::new());
+    let raid_marker_registry = web::Data::new(websocket::RaidMarkerRegistry::new());
     let config_data = web::Data::new(config.clone());
 
     HttpServer::new(move || {
@@ -216,6 +217,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/collection-log").route(web::get().to(authed::get_collection_log)))
             .service(web::resource("/get-item-bonuses").route(web::get().to(authed::get_item_bonuses)))
             .service(web::resource("/get-active-pings").route(web::get().to(authed::get_active_pings)))
+            .service(web::resource("/get-active-raid-markers").route(web::get().to(authed::get_active_raid_markers)))
             .service(authed::get_group_data)
             .service(authed::delete_group_member)
             .service(authed::block_group_member)
@@ -327,6 +329,11 @@ async fn main() -> std::io::Result<()> {
                     .route(web::post().to(authed::submit_ping)),
             )
             .service(
+                web::resource("/raid-marker")
+                    .wrap(grouped_character_middleware())
+                    .route(web::post().to(authed::submit_raid_marker)),
+            )
+            .service(
                 web::resource("/identify")
                     .wrap(ungrouped_character_middleware())
                     .route(web::post().to(authed::identify_character)),
@@ -405,6 +412,7 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/collection-log").route(web::get().to(authed::get_collection_log)))
             .service(web::resource("/get-item-bonuses").route(web::get().to(authed::get_item_bonuses)))
             .service(web::resource("/get-active-pings").route(web::get().to(authed::get_active_pings)))
+            .service(web::resource("/get-active-raid-markers").route(web::get().to(authed::get_active_raid_markers)))
             .service(authed::get_group_data)
             .service(authed::get_portrait);
         let json_config = web::JsonConfig::default().limit(100000);
@@ -433,6 +441,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::Data::new(tx.clone()))
             .app_data(broadcast_registry.clone())
             .app_data(ping_registry.clone())
+            .app_data(raid_marker_registry.clone())
             .service(group_dashboard_scope)
             .service(character_scope)
             // Must be registered before `admin_scope`: both scopes share the "/api/admin"

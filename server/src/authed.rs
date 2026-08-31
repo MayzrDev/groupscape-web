@@ -23,8 +23,10 @@ use crate::update_batcher;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{
-    self, ActivePing, DropEventPayload, GroupBroadcastRegistry, KillEventPayload, PingEndPayload,
-    PingKind, PingRegistry, PingStartPayload, PingUpdatePayload, VitalsUpdatePayload, WsEnvelope,
+    self, ActivePing, ActiveRaidMarker, DropEventPayload, GroupBroadcastRegistry, KillEventPayload,
+    MarkerType, PingEndPayload, PingKind, PingRegistry, PingStartPayload, PingUpdatePayload,
+    RaidMarkerEndPayload, RaidMarkerRegistry, RaidMarkerStartPayload, RaidMarkerUpdatePayload,
+    VitalsUpdatePayload, WsEnvelope,
 };
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
@@ -855,6 +857,136 @@ pub async fn get_active_pings(
     ping_registry: web::Data<PingRegistry>,
 ) -> Result<web::Json<Vec<ActivePing>>, Error> {
     Ok(web::Json(ping_registry.list_active(auth.group_id)))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RaidMarkerAction {
+    Start,
+    Update,
+    End,
+}
+
+/// Body for `submit_raid_marker` - see `PingRequest` for the equivalent plain-ping version this
+/// mirrors. `markerId` alone identifies which of the sender's (up to 8) active markers a request
+/// applies to, since unlike a ping a player can have more than one active marker at a time.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct RaidMarkerRequest {
+    pub action: RaidMarkerAction,
+    pub marker_id: String,
+    #[serde(default)]
+    pub member_name: Option<String>,
+    #[serde(default)]
+    pub marker_type: Option<MarkerType>,
+    #[serde(default)]
+    pub kind: Option<PingKind>,
+    #[serde(default)]
+    pub x: Option<i32>,
+    #[serde(default)]
+    pub y: Option<i32>,
+    #[serde(default)]
+    pub plane: Option<i32>,
+    #[serde(default)]
+    pub npc_name: Option<String>,
+}
+
+/// `POST /raid-marker` - relays a group member's raid marker (right-click "Raid Markers" submenu
+/// on an NPC or tile) to every connected RuneLite party overlay as a `MarkerStart`/`MarkerUpdate`/
+/// `MarkerEnd` frame, and mirrors the same lifecycle into `RaidMarkerRegistry` so the web map can
+/// poll it via `get_active_raid_markers` - see `submit_ping`'s doc comment for why polling exists
+/// alongside the websocket. Same ephemeral, trust-the-client design as `submit_ping`: no DB write,
+/// and the sender's own client is the sole source of truth for a marker's lifecycle (clearing a
+/// prior marker of the same type before starting a new one, clearing all of its markers on
+/// logout/hop). Unlike a ping, a marker is never pruned by a server-side TTL.
+pub async fn submit_raid_marker(
+    auth: Authenticated,
+    body: web::Json<RaidMarkerRequest>,
+    broadcast_registry: web::Data<GroupBroadcastRegistry>,
+    raid_marker_registry: web::Data<RaidMarkerRegistry>,
+) -> Result<HttpResponse, Error> {
+    let envelope = match body.action {
+        RaidMarkerAction::Start => {
+            let (Some(x), Some(y), Some(plane), Some(kind), Some(marker_type), Some(member_name)) = (
+                body.x,
+                body.y,
+                body.plane,
+                body.kind,
+                body.marker_type,
+                body.member_name.clone(),
+            ) else {
+                return Ok(HttpResponse::BadRequest()
+                    .body("start requires x, y, plane, kind, markerType and memberName"));
+            };
+            raid_marker_registry.start(
+                auth.group_id,
+                ActiveRaidMarker {
+                    marker_id: body.marker_id.clone(),
+                    member_name: member_name.clone(),
+                    marker_type,
+                    kind,
+                    x,
+                    y,
+                    plane,
+                    npc_name: body.npc_name.clone(),
+                    last_seen: std::time::Instant::now(),
+                },
+            );
+            WsEnvelope::MarkerStart {
+                payload: RaidMarkerStartPayload {
+                    marker_id: body.marker_id.clone(),
+                    member_name,
+                    marker_type,
+                    kind,
+                    x,
+                    y,
+                    plane,
+                    npc_name: body.npc_name.clone(),
+                },
+                ts: Utc::now(),
+            }
+        }
+        RaidMarkerAction::Update => {
+            let (Some(x), Some(y), Some(plane)) = (body.x, body.y, body.plane) else {
+                return Ok(HttpResponse::BadRequest().body("update requires x, y and plane"));
+            };
+            raid_marker_registry.update(auth.group_id, &body.marker_id, x, y, plane);
+            WsEnvelope::MarkerUpdate {
+                payload: RaidMarkerUpdatePayload {
+                    marker_id: body.marker_id.clone(),
+                    x,
+                    y,
+                    plane,
+                },
+                ts: Utc::now(),
+            }
+        }
+        RaidMarkerAction::End => {
+            raid_marker_registry.end(auth.group_id, &body.marker_id);
+            WsEnvelope::MarkerEnd {
+                payload: RaidMarkerEndPayload {
+                    marker_id: body.marker_id.clone(),
+                },
+                ts: Utc::now(),
+            }
+        }
+    };
+
+    if broadcast_registry.has_subscribers(auth.group_id) {
+        if let Ok(message) = serde_json::to_string(&envelope) {
+            broadcast_registry.publish(auth.group_id, message);
+        }
+    }
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// `GET /get-active-raid-markers` - the web map's poll-based counterpart to the RuneLite-facing
+/// broadcast in `submit_raid_marker`.
+pub async fn get_active_raid_markers(
+    auth: Authenticated,
+    raid_marker_registry: web::Data<RaidMarkerRegistry>,
+) -> Result<web::Json<Vec<ActiveRaidMarker>>, Error> {
+    Ok(web::Json(raid_marker_registry.list_active(auth.group_id)))
 }
 
 fn default_activity_limit() -> i64 {

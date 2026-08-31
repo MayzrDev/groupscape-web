@@ -151,6 +151,92 @@ impl Default for PingRegistry {
     }
 }
 
+/// The fixed set of raid-callout marker types - see `RaidMarkerStartPayload::marker_type`.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MarkerType {
+    Danger,
+    SafeSpot,
+    Loot,
+    Focus,
+}
+
+/// One group member's active raid marker, as tracked in-memory for the web map's poll endpoint
+/// (`get_active_raid_markers`) - see `ActivePing` for the equivalent plain-ping version this
+/// mirrors. Unlike a ping, a marker never auto-expires, so `RaidMarkerRegistry::list_active` never
+/// prunes on `last_seen` - it's kept only for debugging/staleness visibility.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveRaidMarker {
+    pub marker_id: String,
+    pub member_name: String,
+    pub marker_type: MarkerType,
+    pub kind: PingKind,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+    pub npc_name: Option<String>,
+    #[serde(skip)]
+    pub last_seen: std::time::Instant,
+}
+
+/// Per-group active-raid-marker table backing the web map's poll endpoint - see `PingRegistry` for
+/// the equivalent plain-ping version this mirrors. `list_active` deliberately has no TTL-based
+/// pruning: a marker persists until an explicit `RaidMarkerAction::End` (manual clear/redrop, NPC
+/// despawn, or the owner's logout/hop/plugin-shutdown clear-all), never on a timer.
+pub struct RaidMarkerRegistry {
+    inner: RwLock<HashMap<i64, HashMap<String, ActiveRaidMarker>>>,
+}
+
+impl RaidMarkerRegistry {
+    pub fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn start(&self, group_id: i64, marker: ActiveRaidMarker) {
+        let mut inner = self.inner.write().unwrap();
+        inner
+            .entry(group_id)
+            .or_insert_with(HashMap::new)
+            .insert(marker.marker_id.clone(), marker);
+    }
+
+    pub fn update(&self, group_id: i64, marker_id: &str, x: i32, y: i32, plane: i32) {
+        let mut inner = self.inner.write().unwrap();
+        if let Some(group) = inner.get_mut(&group_id) {
+            if let Some(marker) = group.get_mut(marker_id) {
+                marker.x = x;
+                marker.y = y;
+                marker.plane = plane;
+                marker.last_seen = std::time::Instant::now();
+            }
+        }
+    }
+
+    pub fn end(&self, group_id: i64, marker_id: &str) {
+        let mut inner = self.inner.write().unwrap();
+        if let Some(group) = inner.get_mut(&group_id) {
+            group.remove(marker_id);
+        }
+    }
+
+    pub fn list_active(&self, group_id: i64) -> Vec<ActiveRaidMarker> {
+        let inner = self.inner.read().unwrap();
+        inner
+            .get(&group_id)
+            .map(|group| group.values().cloned().collect())
+            .unwrap_or_default()
+    }
+}
+
+impl Default for RaidMarkerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WireVitals {
@@ -260,6 +346,38 @@ pub struct PingEndPayload {
     pub ping_id: String,
 }
 
+/// A raid marker's lifecycle rides its own dedicated envelope variants, same as a plain ping - see
+/// `PingStartPayload`. Unlike a ping, a player can have up to 4 active markers per kind at once (one
+/// per `MarkerType`) rather than just one, so `markerId` alone (not "the sender's one active ping")
+/// distinguishes which of a player's markers a later `MarkerUpdate`/`MarkerEnd` applies to.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidMarkerStartPayload {
+    pub marker_id: String,
+    pub member_name: String,
+    pub marker_type: MarkerType,
+    pub kind: PingKind,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+    pub npc_name: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidMarkerUpdatePayload {
+    pub marker_id: String,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RaidMarkerEndPayload {
+    pub marker_id: String,
+}
+
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEnvelope {
@@ -295,6 +413,18 @@ pub enum WsEnvelope {
         payload: PingEndPayload,
         ts: DateTime<Utc>,
     },
+    MarkerStart {
+        payload: RaidMarkerStartPayload,
+        ts: DateTime<Utc>,
+    },
+    MarkerUpdate {
+        payload: RaidMarkerUpdatePayload,
+        ts: DateTime<Utc>,
+    },
+    MarkerEnd {
+        payload: RaidMarkerEndPayload,
+        ts: DateTime<Utc>,
+    },
 }
 
 #[cfg(test)]
@@ -315,6 +445,51 @@ mod tests {
         assert_eq!(json["type"], "kill_event");
         assert_eq!(json["payload"]["memberName"], "Zezima");
         assert_eq!(json["payload"]["npcName"], "Zulrah");
+    }
+
+    #[test]
+    fn marker_start_serializes_with_snake_case_type_and_marker_type() {
+        let envelope = WsEnvelope::MarkerStart {
+            payload: RaidMarkerStartPayload {
+                marker_id: "abc".to_string(),
+                member_name: "Zezima".to_string(),
+                marker_type: MarkerType::SafeSpot,
+                kind: PingKind::Tile,
+                x: 3200,
+                y: 3200,
+                plane: 0,
+                npc_name: None,
+            },
+            ts: DateTime::<Utc>::MIN_UTC,
+        };
+
+        let json = serde_json::to_value(&envelope).unwrap();
+        assert_eq!(json["type"], "marker_start");
+        assert_eq!(json["payload"]["markerType"], "safe_spot");
+        assert_eq!(json["payload"]["kind"], "tile");
+    }
+
+    #[test]
+    fn raid_marker_registry_never_prunes_on_ttl() {
+        let registry = RaidMarkerRegistry::new();
+        registry.start(
+            1,
+            ActiveRaidMarker {
+                marker_id: "abc".to_string(),
+                member_name: "Zezima".to_string(),
+                marker_type: MarkerType::Danger,
+                kind: PingKind::Npc,
+                x: 3200,
+                y: 3200,
+                plane: 0,
+                npc_name: Some("Vorkath".to_string()),
+                last_seen: std::time::Instant::now()
+                    .checked_sub(std::time::Duration::from_secs(60 * 60))
+                    .unwrap(),
+            },
+        );
+
+        assert_eq!(registry.list_active(1).len(), 1);
     }
 }
 

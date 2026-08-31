@@ -34,9 +34,11 @@ export class CanvasMap extends BaseElement {
     this.playerMarkers = new Map();
     this.interactingMarkers = new Set();
     this.pingMarkers = new Map();
+    this.raidMarkerMarkers = new Map();
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
     this.subscribe("coordinates", this.handleUpdatedCoordinates.bind(this));
     this.subscribe("active-pings", this.handleUpdatedPings.bind(this));
+    this.subscribe("active-raid-markers", this.handleUpdatedRaidMarkers.bind(this));
     this.subscribe("jump-to-ping", this.handleJumpToPing.bind(this));
 
     this.plane = 1;
@@ -81,6 +83,22 @@ export class CanvasMap extends BaseElement {
     this.playerIconImage.onload = () => {
       this.requestUpdate();
     };
+
+    // Real OSRS wiki icons per raid marker type - drawn as-is (no hue-rotate, unlike
+    // drawHelmetIcon/drawPingIcon), since a marker's whole point is being recognizable by type
+    // at a glance, not by who dropped it.
+    this.raidMarkerIconImages = {};
+    for (const [type, src] of Object.entries({
+      danger: "/ui/raid-marker-danger.png",
+      safe_spot: "/ui/raid-marker-safe-spot.png",
+      loot: "/ui/raid-marker-loot.png",
+      focus: "/ui/raid-marker-focus.png",
+    })) {
+      const image = new Image();
+      image.src = src;
+      image.onload = () => this.requestUpdate();
+      this.raidMarkerIconImages[type] = image;
+    }
 
     const [startX, startY] = this.gamePositionToCameraCenter(3103, 3095);
     this.camera.x.goTo(startX, 1);
@@ -259,6 +277,24 @@ export class CanvasMap extends BaseElement {
         hue: groupData.members.get(ping.memberName)?.hue ?? 0,
         memberName: ping.memberName,
         npcName: ping.npcName,
+      });
+    }
+    this.requestUpdate();
+  }
+
+  // Replaces the whole raid marker set each poll tick, same "full snapshot" approach as
+  // handleUpdatedPings - unlike pings there's no server-side TTL to have pruned anything, so a
+  // marker missing this tick means it was actually cleared/redropped/despawned/logged out.
+  handleUpdatedRaidMarkers(markers) {
+    this.raidMarkerMarkers = new Map();
+    for (const marker of markers || []) {
+      const coordinates = { x: marker.x, y: marker.y, plane: marker.plane };
+      if (!this.isValidCoordinates(coordinates)) continue;
+      this.raidMarkerMarkers.set(marker.markerId, {
+        coordinates,
+        markerType: marker.markerType,
+        memberName: marker.memberName,
+        npcName: marker.npcName,
       });
     }
     this.requestUpdate();
@@ -587,6 +623,7 @@ export class CanvasMap extends BaseElement {
 
       this.drawPlayerMarkersAndTrails();
       this.drawPingMarkers();
+      this.drawRaidMarkerMarkers();
       this.drawTileMarkers(this.interactingMarkers.values(), {
         fillColor: "#a832a8",
         strokeColor: "#cc2ed1",
@@ -845,6 +882,46 @@ export class CanvasMap extends BaseElement {
     this.ctx.lineWidth = 1 * scale;
     this.ctx.stroke();
 
+    this.ctx.restore();
+  }
+
+  // A real OSRS wiki icon per marker type - see raidMarkerIconImages in connectedCallback. Same
+  // plane-fade/culling structure as drawPingMarkers.
+  drawRaidMarkerMarkers() {
+    const groupedByPlane = [[], [], [], []];
+    for (const marker of this.raidMarkerMarkers?.values() ?? []) {
+      groupedByPlane[marker.coordinates.plane]?.push(marker);
+    }
+
+    const padPx = this.pixelsPerGameTile * this.camera.zoom.current;
+    for (let plane = 0; plane < groupedByPlane.length; ++plane) {
+      this.ctx.globalAlpha = 1 - Math.abs(this.plane - 1 - plane) * 0.25;
+
+      for (const marker of groupedByPlane[plane]) {
+        if (!this.isGameTileInView(marker.coordinates.x, marker.coordinates.y, padPx)) continue;
+        const half = this.pixelsPerGameTile / 2;
+        const [x, y] = this.gamePositionToCanvas(marker.coordinates.x, marker.coordinates.y);
+        this.drawRaidMarkerIcon(x + half, y + half, marker.markerType);
+      }
+    }
+
+    this.ctx.globalAlpha = 1;
+  }
+
+  drawRaidMarkerIcon(centerX, centerY, markerType) {
+    const image = this.raidMarkerIconImages[markerType];
+    if (!image?.complete || image.naturalWidth === 0) return;
+
+    const scale = 1 / Math.min(this.camera.zoom.current, 3);
+    const width = image.naturalWidth * scale * 1.4;
+    const height = image.naturalHeight * scale * 1.4;
+    const tipY = centerY - height / 2 - 2 * scale;
+
+    this.ctx.save();
+    this.ctx.translate(centerX, tipY);
+    this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    this.ctx.shadowBlur = 6 * scale;
+    this.ctx.drawImage(image, -width / 2, -height / 2, width, height);
     this.ctx.restore();
   }
 

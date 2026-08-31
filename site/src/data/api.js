@@ -143,6 +143,10 @@ class Api {
     return `${this.groupScopeUrl}/get-active-pings`;
   }
 
+  get activeRaidMarkersUrl() {
+    return `${this.groupScopeUrl}/get-active-raid-markers`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -212,6 +216,7 @@ class Api {
   async pollTick() {
     await this.getGroupData();
     await this.getActivePings();
+    await this.getActiveRaidMarkers();
   }
 
   async getActivePings() {
@@ -237,6 +242,21 @@ class Api {
     this.seenPingIds = new Set(pings.map((ping) => ping.pingId));
 
     pubsub.publish("active-pings", pings);
+  }
+
+  // No toast/seen-id diffing here, unlike getActivePings - a raid marker is a persistent state
+  // change (up to 8 per player) rather than a one-off event worth calling out, and the plugin
+  // itself doesn't chat-message on marker start either.
+  async getActiveRaidMarkers() {
+    const response = await fetch(this.activeRaidMarkersUrl, {
+      headers: {
+        Authorization: this.authHeader,
+      },
+    });
+    if (!response.ok) return;
+
+    const markers = await response.json();
+    pubsub.publish("active-raid-markers", markers);
   }
 
   async getGroupData() {
