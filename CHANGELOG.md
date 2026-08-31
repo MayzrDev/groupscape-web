@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.69] - 2026-08-31
+
+### Changed
+- Internal: the live group vitals feed now also carries each member's map position, laying the groundwork for the upcoming RuneLite plugin feature that shows group members on the in-game world map and minimap.
+
 ## [1.0.68] - 2026-08-31
 
 ### Fixed

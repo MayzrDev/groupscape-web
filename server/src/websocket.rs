@@ -84,6 +84,10 @@ pub struct WireVitals {
     pub target_health_scale: Option<i32>,
     pub active_prayers: Vec<String>,
     pub rich_presence: Option<String>,
+    /// `[x, y, plane]` (sometimes `[x, y, plane, is_on_boat, world]` - see `authed.rs`'s
+    /// `record_location_sample`), truncated to 3 once persisted to the `members` row but carried
+    /// through in full on the broadcast merge. Powers the in-game world map/minimap markers.
+    pub coordinates: Option<Vec<i32>>,
 }
 
 #[derive(Serialize)]
@@ -212,6 +216,7 @@ pub fn to_wire_vitals(member: &GroupMember) -> WireVitals {
         target_health_scale,
         active_prayers: member.active_prayers.clone().unwrap_or_default(),
         rich_presence: member.rich_presence.clone(),
+        coordinates: member.coordinates.clone(),
     }
 }
 
