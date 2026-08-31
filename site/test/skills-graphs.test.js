@@ -11,9 +11,8 @@ describe("skills-graphs windowForPeriod", () => {
 });
 
 describe("skills-graphs formatLeaderboardValue", () => {
-  it("formats gp_earned and loot_value as currency-style", () => {
+  it("formats gp_earned as currency-style", () => {
     expect(formatLeaderboardValue("gp_earned", 1234567)).toBe("1,234,567 gp");
-    expect(formatLeaderboardValue("loot_value", 500)).toBe("500 gp");
   });
 
   it("formats xp and boss_kc as plain locale numbers with no gp suffix", () => {

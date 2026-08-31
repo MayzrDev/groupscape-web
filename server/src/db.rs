@@ -4962,33 +4962,6 @@ ORDER BY occurred_at DESC
     rows.iter().map(activity_event_from_row).collect()
 }
 
-/// All `loot` (chest/clue) activity events for a group since `since` - the loot-value
-/// leaderboard's additive complement to [`list_kill_events_since`] (kills and chest/clue loot
-/// are summed together there; boss-KC stays kill-only via `list_kill_events_since` alone).
-async fn list_loot_events_since(
-    client: &Client,
-    group_id: i64,
-    since: Option<DateTime<Utc>>,
-) -> Result<Vec<ActivityEvent>, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            r#"
-SELECT event_id, session_id, member_name, event_type, occurred_at, payload
-FROM groupscape.activity_events
-WHERE group_id=$1
-  AND event_type='loot'
-  AND ($2::timestamptz IS NULL OR occurred_at >= $2)
-ORDER BY occurred_at DESC
-"#,
-        )
-        .await?;
-    let rows = client
-        .query(&stmt, &[&group_id, &since])
-        .await
-        .map_err(ApiError::ListKillEventsError)?;
-    rows.iter().map(activity_event_from_row).collect()
-}
-
 /// Every member's name in a group - used to zero-fill leaderboard metrics computed from
 /// `activity_events` so a member with no matching events still ranks (at 0) rather than being
 /// omitted outright.
@@ -5042,55 +5015,9 @@ pub async fn get_boss_kc_leaderboard(
     Ok((counts.into_iter().collect(), available))
 }
 
-/// Cumulative per-member loot value (GE price at read time) over the window, mirroring
-/// `get_loot_summary`'s value lookup. Includes both NPC-kill loot and chest/clue loot (see
-/// [`list_loot_events_since`]) - unlike boss-KC, "loot value" isn't a kill-only concept.
-pub async fn get_loot_value_leaderboard(
-    client: &Client,
-    group_id: i64,
-    window: crate::leaderboard::LeaderboardWindow,
-    now: DateTime<Utc>,
-    ge_prices: &crate::models::GEPrices,
-) -> Result<Vec<(String, i64)>, ApiError> {
-    let since = leaderboard_window_cutoff(window, now);
-    let kill_events = list_kill_events_since(client, group_id, since).await?;
-    let loot_events = list_loot_events_since(client, group_id, since).await?;
-
-    let mut totals: HashMap<String, i64> = list_member_names(client, group_id)
-        .await?
-        .into_iter()
-        .map(|name| (name, 0))
-        .collect();
-    for event in &kill_events {
-        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
-        else {
-            continue;
-        };
-        let Some(loot) = kill.loot else { continue };
-        let value: i64 = loot
-            .iter()
-            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-            .sum();
-        *totals.entry(event.member_name.clone()).or_insert(0) += value;
-    }
-    for event in &loot_events {
-        let Ok(GameEvent::Loot(loot_event)) =
-            serde_json::from_value::<GameEvent>(event.payload.clone())
-        else {
-            continue;
-        };
-        let value: i64 = loot_event
-            .loot
-            .iter()
-            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-            .sum();
-        *totals.entry(event.member_name.clone()).or_insert(0) += value;
-    }
-    Ok(totals.into_iter().collect())
-}
-
-/// Sums a flat `[item_id, quantity, item_id, quantity, ...]` array (this server's on-wire bank
-/// format, see `validate_member_prop_length`'s `ArrayFormat::ItemPairs`) into a GE-priced total.
+/// Sums a flat `[item_id, quantity, item_id, quantity, ...]` array (this server's on-wire
+/// item-pairs format, see `validate_member_prop_length`'s `ArrayFormat::ItemPairs` - bank,
+/// inventory, and equipment all use it) into a GE-priced total.
 fn bank_value(bank: &[i32], ge_prices: &crate::models::GEPrices) -> i64 {
     bank.chunks_exact(2)
         .map(|pair| {
@@ -5098,6 +5025,17 @@ fn bank_value(bank: &[i32], ge_prices: &crate::models::GEPrices) -> i64 {
             ge_prices.get(&item_id).copied().unwrap_or(0) * quantity as i64
         })
         .sum()
+}
+
+/// "GP earned" net worth: bank + inventory + equipped items combined, so the metric reflects a
+/// member's total holdings day-to-day rather than just what's banked.
+fn net_worth_value(
+    bank: &[i32],
+    inventory: &[i32],
+    equipment: &[i32],
+    ge_prices: &crate::models::GEPrices,
+) -> i64 {
+    bank_value(bank, ge_prices) + bank_value(inventory, ge_prices) + bank_value(equipment, ge_prices)
 }
 
 /// Captures each member's current bank value once per UTC day - the only leaderboard metric
@@ -5110,7 +5048,13 @@ pub async fn capture_bank_value_snapshots(
     now: DateTime<Utc>,
 ) -> Result<(), ApiError> {
     let members_stmt = client
-        .prepare_cached("SELECT member_id, bank FROM groupscape.members WHERE bank IS NOT NULL")
+        .prepare_cached(
+            "SELECT member_id, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank,
+                    COALESCE(inventory, ARRAY[]::INTEGER[]) AS inventory,
+                    COALESCE(equipment, ARRAY[]::INTEGER[]) AS equipment
+             FROM groupscape.members
+             WHERE bank IS NOT NULL OR inventory IS NOT NULL OR equipment IS NOT NULL",
+        )
         .await?;
     let rows = client
         .query(&members_stmt, &[])
@@ -5130,7 +5074,9 @@ ON CONFLICT (member_id, snapshot_date) DO UPDATE SET captured_at=excluded.captur
     for row in &rows {
         let member_id: i64 = row.try_get("member_id")?;
         let bank: Vec<i32> = row.try_get("bank")?;
-        let value = bank_value(&bank, ge_prices);
+        let inventory: Vec<i32> = row.try_get("inventory")?;
+        let equipment: Vec<i32> = row.try_get("equipment")?;
+        let value = net_worth_value(&bank, &inventory, &equipment, ge_prices);
         client
             .execute(&upsert_stmt, &[&member_id, &snapshot_date, &now, &value])
             .await
@@ -5152,7 +5098,10 @@ pub async fn get_gp_earned_leaderboard(
 
     let live_stmt = client
         .prepare_cached(
-            "SELECT member_name, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank FROM groupscape.members WHERE group_id=$1 AND member_name != $2",
+            "SELECT member_name, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank,
+                    COALESCE(inventory, ARRAY[]::INTEGER[]) AS inventory,
+                    COALESCE(equipment, ARRAY[]::INTEGER[]) AS equipment
+             FROM groupscape.members WHERE group_id=$1 AND member_name != $2",
         )
         .await?;
     let live_rows = client
@@ -5163,7 +5112,9 @@ pub async fn get_gp_earned_leaderboard(
     for row in &live_rows {
         let member_name: String = row.try_get("member_name")?;
         let bank: Vec<i32> = row.try_get("bank")?;
-        live.insert(member_name, bank_value(&bank, ge_prices));
+        let inventory: Vec<i32> = row.try_get("inventory")?;
+        let equipment: Vec<i32> = row.try_get("equipment")?;
+        live.insert(member_name, net_worth_value(&bank, &inventory, &equipment, ge_prices));
     }
 
     let baseline_sql = match window {
@@ -5295,63 +5246,10 @@ pub async fn get_boss_kc_metric_data(
     Ok(cumulative_metric_data(per_member))
 }
 
-/// Cumulative per-member loot-value time series (GE price at read time), bucketed at `period`'s
-/// granularity - the chart counterpart to `get_loot_value_leaderboard`. Includes chest/clue loot
-/// alongside NPC-kill loot, same as the leaderboard.
-pub async fn get_loot_value_metric_data(
-    client: &Client,
-    group_id: i64,
-    period: AggregatePeriod,
-    ge_prices: &crate::models::GEPrices,
-) -> Result<GroupMetricData, ApiError> {
-    let kill_events = list_kill_events_since(client, group_id, None).await?;
-    let loot_events = list_loot_events_since(client, group_id, None).await?;
-    let granularity = bucket_granularity(period);
-
-    let mut per_member: HashMap<String, BTreeMap<DateTime<Utc>, i64>> = HashMap::new();
-    for event in &kill_events {
-        let Ok(GameEvent::Kill(kill)) = serde_json::from_value::<GameEvent>(event.payload.clone())
-        else {
-            continue;
-        };
-        let Some(loot) = kill.loot else { continue };
-        let value: i64 = loot
-            .iter()
-            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-            .sum();
-        let bucket = truncate_datetime(event.occurred_at, granularity);
-        *per_member
-            .entry(event.member_name.clone())
-            .or_default()
-            .entry(bucket)
-            .or_insert(0) += value;
-    }
-    for event in &loot_events {
-        let Ok(GameEvent::Loot(loot_event)) =
-            serde_json::from_value::<GameEvent>(event.payload.clone())
-        else {
-            continue;
-        };
-        let value: i64 = loot_event
-            .loot
-            .iter()
-            .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-            .sum();
-        let bucket = truncate_datetime(event.occurred_at, granularity);
-        *per_member
-            .entry(event.member_name.clone())
-            .or_default()
-            .entry(bucket)
-            .or_insert(0) += value;
-    }
-
-    Ok(cumulative_metric_data(per_member))
-}
-
 /// Hourly/daily/monthly GP-earned history for the chart, reading `bank_value_day/month/year`
 /// (populated by `aggregate_bank_value`) - mirrors `get_skills_for_period` exactly, since bank
 /// value is already a cumulative absolute total at each row (no delta/running-sum needed here,
-/// unlike the boss-KC/loot-value metrics above).
+/// unlike the boss-KC metric above).
 pub async fn get_bank_value_for_period(
     client: &Client,
     group_id: i64,
@@ -5396,21 +5294,27 @@ WHERE m.group_id=$1 AND m.member_name != $2
     Ok(member_data.into_values().collect())
 }
 
-/// Computes and upserts every member's current bank value into `bank_value_day/month/year`,
-/// truncated to each table's granularity - the chart-history counterpart to
-/// `capture_bank_value_snapshots` (which stays daily-only and keeps serving the GP-earned
-/// leaderboard metric unchanged). Bank contents aren't a per-update-timestamped column the way
-/// skills are, so unlike `aggregate_skills_for_period` this can't `INSERT ... SELECT` straight
-/// from `members` - each member's value is computed app-side via `bank_value()` first, then
-/// upserted with a prepared statement per member per table (matching
-/// `capture_bank_value_snapshots`'s existing per-member loop style).
+/// Computes and upserts every member's current net worth (bank + inventory + equipment) into
+/// `bank_value_day/month/year`, truncated to each table's granularity - the chart-history
+/// counterpart to `capture_bank_value_snapshots` (which stays daily-only and keeps serving the
+/// GP-earned leaderboard metric unchanged). Bank/inventory/equipment aren't a per-update-
+/// timestamped column the way skills are, so unlike `aggregate_skills_for_period` this can't
+/// `INSERT ... SELECT` straight from `members` - each member's value is computed app-side via
+/// `net_worth_value()` first, then upserted with a prepared statement per member per table
+/// (matching `capture_bank_value_snapshots`'s existing per-member loop style).
 pub async fn aggregate_bank_value(
     client: &mut Client,
     ge_prices: &crate::models::GEPrices,
     now: DateTime<Utc>,
 ) -> Result<(), ApiError> {
     let members_stmt = client
-        .prepare_cached("SELECT member_id, bank FROM groupscape.members WHERE bank IS NOT NULL")
+        .prepare_cached(
+            "SELECT member_id, COALESCE(bank, ARRAY[]::INTEGER[]) AS bank,
+                    COALESCE(inventory, ARRAY[]::INTEGER[]) AS inventory,
+                    COALESCE(equipment, ARRAY[]::INTEGER[]) AS equipment
+             FROM groupscape.members
+             WHERE bank IS NOT NULL OR inventory IS NOT NULL OR equipment IS NOT NULL",
+        )
         .await?;
     let rows = client
         .query(&members_stmt, &[])
@@ -5420,7 +5324,9 @@ pub async fn aggregate_bank_value(
     for row in &rows {
         let member_id: i64 = row.try_get("member_id")?;
         let bank: Vec<i32> = row.try_get("bank")?;
-        values.push((member_id, bank_value(&bank, ge_prices)));
+        let inventory: Vec<i32> = row.try_get("inventory")?;
+        let equipment: Vec<i32> = row.try_get("equipment")?;
+        values.push((member_id, net_worth_value(&bank, &inventory, &equipment, ge_prices)));
     }
 
     let transaction = client.transaction().await?;

@@ -27,19 +27,17 @@ const metricLabels = {
   xp: "XP",
   boss_kc: "Boss KC",
   gp_earned: "GP Earned",
-  loot_value: "Loot Value",
 };
 
 const metricAxisLabels = {
   xp: "XP Gain",
   boss_kc: "KC Gained",
   gp_earned: "GP Earned",
-  loot_value: "Loot Value Gained",
 };
 
 function formatMetricValue(metric, value) {
   if (value === null || value === undefined || isNaN(value)) return "—";
-  if (metric === "gp_earned" || metric === "loot_value") {
+  if (metric === "gp_earned") {
     return `${Math.round(value).toLocaleString()} gp`;
   }
   if (metric === "boss_kc") {

@@ -2,6 +2,17 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.248] - 2026-08-31
+
+### Changed
+- GP Earned now tracks your total wealth - bank, inventory, and worn gear combined - instead of just your bank, so it shows a true day-to-day gp gain or loss.
+
+### Fixed
+- Boss KC now actually records kills. Previously most boss kills, especially ones with longer death animations, were never counted.
+
+### Removed
+- The Loot Value graph and leaderboard option, which never had any data, have been removed.
+
 ## [1.0.246] - 2026-08-31
 
 ### Added

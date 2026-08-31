@@ -1407,18 +1407,6 @@ pub async fn get_leaderboard(
             .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
-        LeaderboardMetric::LootValue => {
-            let ge_prices = get_ge_prices_map();
-            let raw = db::get_loot_value_leaderboard(
-                &client,
-                auth.group_id,
-                query.window,
-                now,
-                &ge_prices,
-            )
-            .await?;
-            (crate::leaderboard::rank_entries(raw), vec![])
-        }
     };
 
     Ok(web::Json(LeaderboardResult {
@@ -1440,7 +1428,7 @@ pub struct GetMetricDataQuery {
     #[serde(default)]
     pub boss: Option<String>,
 }
-/// Graphs tab chart data for boss-KC/GP-earned/loot-value, at the period's bucket granularity,
+/// Graphs tab chart data for boss-KC/GP-earned, at the period's bucket granularity,
 /// as running cumulative totals (not pre-diffed - the client turns a cumulative series into
 /// "gained since period start" itself, mirroring how it already does that for skill XP). XP has
 /// its own richer endpoint (`get_skill_data`) and is rejected here.
@@ -1474,11 +1462,6 @@ pub async fn get_metric_data(
         }
         LeaderboardMetric::GpEarned => {
             db::get_bank_value_for_period(&client, auth.group_id, aggregate_period).await?
-        }
-        LeaderboardMetric::LootValue => {
-            let ge_prices = get_ge_prices_map();
-            db::get_loot_value_metric_data(&client, auth.group_id, aggregate_period, &ge_prices)
-                .await?
         }
     };
 

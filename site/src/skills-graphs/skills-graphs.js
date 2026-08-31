@@ -15,7 +15,7 @@ export const windowForPeriod = {
 };
 
 export function formatLeaderboardValue(metric, value) {
-  if (metric === "gp_earned" || metric === "loot_value") {
+  if (metric === "gp_earned") {
     return `${Math.round(value).toLocaleString()} gp`;
   }
   return Math.round(value).toLocaleString();
