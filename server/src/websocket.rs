@@ -6,7 +6,7 @@ use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use futures_util::StreamExt;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use tokio::sync::broadcast;
@@ -63,6 +63,89 @@ impl GroupBroadcastRegistry {
 }
 
 impl Default for GroupBroadcastRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Longest a ping can go without a fresh Start/Update before `PingRegistry::list_active` prunes
+/// it - a safety net for the web poll path in case a client crashes/disconnects without ever
+/// sending `PingAction::End` (the plugin's own 60s client-side timeout is the primary expiry;
+/// this is deliberately looser so it never prunes a still-live ping out from under a slightly
+/// slow heartbeat).
+const PING_TTL: std::time::Duration = std::time::Duration::from_secs(70);
+
+/// One group member's active ping, as tracked in-memory for the web map's poll endpoint
+/// (`get_active_pings`). The RuneLite-facing path doesn't need this snapshot at all - it just
+/// forwards `PingStart`/`PingUpdate`/`PingEnd` frames straight through `GroupBroadcastRegistry` as
+/// they arrive - but the web site has no websocket (see `authed::submit_ping`'s doc comment) and
+/// polls instead, which needs something to poll *from*.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivePing {
+    pub ping_id: String,
+    pub member_name: String,
+    pub kind: PingKind,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+    pub npc_name: Option<String>,
+    #[serde(skip)]
+    pub last_seen: std::time::Instant,
+}
+
+/// Per-group active-ping table backing the web map's poll endpoint. Never persisted to the DB -
+/// same ephemeral treatment as `GroupBroadcastRegistry`'s in-memory channels.
+pub struct PingRegistry {
+    inner: RwLock<HashMap<i64, HashMap<String, ActivePing>>>,
+}
+
+impl PingRegistry {
+    pub fn new() -> Self {
+        Self {
+            inner: RwLock::new(HashMap::new()),
+        }
+    }
+
+    pub fn start(&self, group_id: i64, ping: ActivePing) {
+        let mut inner = self.inner.write().unwrap();
+        inner
+            .entry(group_id)
+            .or_insert_with(HashMap::new)
+            .insert(ping.ping_id.clone(), ping);
+    }
+
+    pub fn update(&self, group_id: i64, ping_id: &str, x: i32, y: i32, plane: i32) {
+        let mut inner = self.inner.write().unwrap();
+        if let Some(group) = inner.get_mut(&group_id) {
+            if let Some(ping) = group.get_mut(ping_id) {
+                ping.x = x;
+                ping.y = y;
+                ping.plane = plane;
+                ping.last_seen = std::time::Instant::now();
+            }
+        }
+    }
+
+    pub fn end(&self, group_id: i64, ping_id: &str) {
+        let mut inner = self.inner.write().unwrap();
+        if let Some(group) = inner.get_mut(&group_id) {
+            group.remove(ping_id);
+        }
+    }
+
+    /// Prunes anything past `PING_TTL` for this group, then returns what's left.
+    pub fn list_active(&self, group_id: i64) -> Vec<ActivePing> {
+        let mut inner = self.inner.write().unwrap();
+        let Some(group) = inner.get_mut(&group_id) else {
+            return Vec::new();
+        };
+        group.retain(|_, ping| ping.last_seen.elapsed() < PING_TTL);
+        group.values().cloned().collect()
+    }
+}
+
+impl Default for PingRegistry {
     fn default() -> Self {
         Self::new()
     }
@@ -133,6 +216,50 @@ pub struct ColorUpdatePayload {
     pub color: String,
 }
 
+/// What a ping was dropped on - see `PingStartPayload::npc_name`.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PingKind {
+    Tile,
+    Npc,
+}
+
+/// A ping's lifecycle rides its own dedicated envelope variants (Start/Update/End) rather than
+/// piggybacking on `WireVitals` - unlike vitals, a ping is a discrete event stream, not continuous
+/// per-tick state. `pingId` lets receivers match `PingUpdate`/`PingEnd` frames back to the
+/// `PingStart` they belong to (one player can only have one active ping - see
+/// `authed::submit_ping` - but a fresh ping's id still needs to be distinguishable from a stale one
+/// still in flight over the wire).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PingStartPayload {
+    pub ping_id: String,
+    pub member_name: String,
+    pub kind: PingKind,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+    /// Set only for `PingKind::Npc` - the tracked NPC's name, for the marker tooltip/chat line.
+    pub npc_name: Option<String>,
+}
+
+/// Live-tracking re-broadcast of an NPC ping's current tile - only the pinging player's own
+/// client observes the NPC and resends its position; other clients never resolve the NPC locally.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PingUpdatePayload {
+    pub ping_id: String,
+    pub x: i32,
+    pub y: i32,
+    pub plane: i32,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PingEndPayload {
+    pub ping_id: String,
+}
+
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEnvelope {
@@ -154,6 +281,18 @@ pub enum WsEnvelope {
     },
     ColorUpdate {
         payload: ColorUpdatePayload,
+        ts: DateTime<Utc>,
+    },
+    PingStart {
+        payload: PingStartPayload,
+        ts: DateTime<Utc>,
+    },
+    PingUpdate {
+        payload: PingUpdatePayload,
+        ts: DateTime<Utc>,
+    },
+    PingEnd {
+        payload: PingEndPayload,
         ts: DateTime<Utc>,
     },
 }

@@ -4,6 +4,7 @@ import { utility } from "../utility";
 import { Animation } from "./animation";
 import { mapTrails } from "../data/map-trails";
 import { pubsub } from "../data/pubsub";
+import { groupData } from "../data/group-data";
 
 export const ICON_SPRITE_SIZE = 15;
 
@@ -32,8 +33,10 @@ export class CanvasMap extends BaseElement {
     this.eventListener(window, "resize", this.onResize.bind(this));
     this.playerMarkers = new Map();
     this.interactingMarkers = new Set();
+    this.pingMarkers = new Map();
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
     this.subscribe("coordinates", this.handleUpdatedCoordinates.bind(this));
+    this.subscribe("active-pings", this.handleUpdatedPings.bind(this));
 
     this.plane = 1;
     this.tileSize = 256;
@@ -240,6 +243,24 @@ export class CanvasMap extends BaseElement {
         this.requestUpdate();
       }
     }
+  }
+
+  // Replaces the whole ping set each poll tick (same "full snapshot, not deltas" approach as
+  // handleUpdatedMembers) - the server's `get-active-pings` already dropped anything past its
+  // TTL, so whatever's missing this tick is just gone.
+  handleUpdatedPings(pings) {
+    this.pingMarkers = new Map();
+    for (const ping of pings || []) {
+      const coordinates = { x: ping.x, y: ping.y, plane: ping.plane };
+      if (!this.isValidCoordinates(coordinates)) continue;
+      this.pingMarkers.set(ping.pingId, {
+        coordinates,
+        hue: groupData.members.get(ping.memberName)?.hue ?? 0,
+        memberName: ping.memberName,
+        npcName: ping.npcName,
+      });
+    }
+    this.requestUpdate();
   }
 
   followPlayer(playerName) {
@@ -555,6 +576,7 @@ export class CanvasMap extends BaseElement {
       this.drawMapLinks();
 
       this.drawPlayerMarkersAndTrails();
+      this.drawPingMarkers();
       this.drawTileMarkers(this.interactingMarkers.values(), {
         fillColor: "#a832a8",
         strokeColor: "#cc2ed1",
@@ -756,6 +778,62 @@ export class CanvasMap extends BaseElement {
 
     this.ctx.filter = `hue-rotate(${hue}deg) saturate(75%)`;
     this.ctx.drawImage(this.playerIconImage, -width / 2, -height / 2, width, height);
+
+    this.ctx.restore();
+  }
+
+  // A downward arrow/pin, per-pinger hue-tinted like drawHelmetIcon - deliberately a different
+  // silhouette from the helmet member-position marker so the two never read as the same thing.
+  drawPingMarkers() {
+    const groupedByPlane = [[], [], [], []];
+    for (const ping of this.pingMarkers?.values() ?? []) {
+      groupedByPlane[ping.coordinates.plane]?.push(ping);
+    }
+
+    const padPx = this.pixelsPerGameTile * this.camera.zoom.current;
+    for (let plane = 0; plane < groupedByPlane.length; ++plane) {
+      this.ctx.globalAlpha = 1 - Math.abs(this.plane - 1 - plane) * 0.25;
+
+      for (const ping of groupedByPlane[plane]) {
+        if (!this.isGameTileInView(ping.coordinates.x, ping.coordinates.y, padPx)) continue;
+        const half = this.pixelsPerGameTile / 2;
+        const [x, y] = this.gamePositionToCanvas(ping.coordinates.x, ping.coordinates.y);
+        this.drawPingIcon(x + half, y + half, ping.hue);
+      }
+    }
+
+    this.ctx.globalAlpha = 1;
+  }
+
+  drawPingIcon(centerX, centerY, hue) {
+    const scale = 1 / Math.min(this.camera.zoom.current, 3);
+    const shaftWidth = 5 * scale;
+    const shaftHeight = 12 * scale;
+    const headWidth = 13 * scale;
+    const headHeight = 8 * scale;
+    // Marker floats above the tile, point down, same as the viewport's beam/arrow treatment.
+    const tipY = centerY - 2 * scale;
+
+    this.ctx.save();
+    this.ctx.translate(centerX, tipY);
+    this.ctx.shadowColor = "rgba(0, 0, 0, 0.75)";
+    this.ctx.shadowBlur = 6 * scale;
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, 0);
+    this.ctx.lineTo(-headWidth / 2, -headHeight);
+    this.ctx.lineTo(-shaftWidth / 2, -headHeight);
+    this.ctx.lineTo(-shaftWidth / 2, -headHeight - shaftHeight);
+    this.ctx.lineTo(shaftWidth / 2, -headHeight - shaftHeight);
+    this.ctx.lineTo(shaftWidth / 2, -headHeight);
+    this.ctx.lineTo(headWidth / 2, -headHeight);
+    this.ctx.closePath();
+
+    this.ctx.fillStyle = `hsl(${hue}, 85%, 55%)`;
+    this.ctx.fill();
+    this.ctx.strokeStyle = "black";
+    this.ctx.lineWidth = 1 * scale;
+    this.ctx.stroke();
 
     this.ctx.restore();
   }

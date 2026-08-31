@@ -139,6 +139,10 @@ class Api {
     return `${this.groupScopeUrl}/get-item-bonuses`;
   }
 
+  get activePingsUrl() {
+    return `${this.groupScopeUrl}/get-active-pings`;
+  }
+
   setCredentials(groupName, groupToken) {
     this.groupName = groupName;
     this.groupToken = groupToken;
@@ -180,7 +184,7 @@ class Api {
       // any intervals with multiple calls to .enable(). This could be possible because of
       // the wait for the item and quest data loads before we create the interval.
       this.getGroupInterval = pubsub.waitForAllEvents("item-data-loaded", "quest-data-loaded").then(() => {
-        return utility.callOnInterval(this.getGroupData.bind(this), 1000);
+        return utility.callOnInterval(this.pollTick.bind(this), 1000);
       });
     }
 
@@ -200,6 +204,25 @@ class Api {
     if (this.getGroupInterval) {
       window.clearInterval(await this.getGroupInterval);
     }
+  }
+
+  // The single interval tick driving `startPolling` - keeps active pings on the same ~1s
+  // cadence as member positions rather than opening a second interval for them.
+  async pollTick() {
+    await this.getGroupData();
+    await this.getActivePings();
+  }
+
+  async getActivePings() {
+    const response = await fetch(this.activePingsUrl, {
+      headers: {
+        Authorization: this.authHeader,
+      },
+    });
+    if (!response.ok) return;
+
+    const pings = await response.json();
+    pubsub.publish("active-pings", pings);
   }
 
   async getGroupData() {

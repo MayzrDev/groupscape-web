@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.221] - 2026-08-31
+
+### Added
+- Group members can now drop pings on the map that everyone in the group sees live, both in-game and on the website map, laying the groundwork for the upcoming right-click/hotkey ping feature in the RuneLite plugin.
+
 ## [1.0.71] - 2026-08-31
 
 ### Changed

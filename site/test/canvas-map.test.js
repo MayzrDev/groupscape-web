@@ -78,6 +78,7 @@ function createMapInstance() {
   map.touch = {};
   map.playerMarkers = new Map();
   map.interactingMarkers = new Set();
+  map.pingMarkers = new Map();
   map.followingPlayer = {};
   map.tiles = [new Map(), new Map(), new Map(), new Map()];
   map.tilesInView = [];

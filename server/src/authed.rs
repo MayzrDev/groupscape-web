@@ -23,7 +23,8 @@ use crate::update_batcher;
 use crate::unauthed::get_ge_prices_map;
 use crate::validators::{valid_name, validate_member_prop_length, ArrayFormat};
 use crate::websocket::{
-    self, DropEventPayload, GroupBroadcastRegistry, KillEventPayload, VitalsUpdatePayload, WsEnvelope,
+    self, ActivePing, DropEventPayload, GroupBroadcastRegistry, KillEventPayload, PingEndPayload,
+    PingKind, PingRegistry, PingStartPayload, PingUpdatePayload, VitalsUpdatePayload, WsEnvelope,
 };
 use actix_web::{delete, get, post, put, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
@@ -728,6 +729,127 @@ pub async fn get_group_data(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let group_members = db::get_group_data(&client, auth.group_id, &from_time).await?;
     Ok(web::Json(group_members))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PingAction {
+    Start,
+    Update,
+    End,
+}
+
+/// Body for `submit_ping`. `x`/`y`/`plane`/`kind` are `None` for `PingAction::End` (a ping-clear
+/// only needs the id) and `kind`/`npc_name` are `None` for `PingAction::Update` (only `Start`
+/// establishes what kind of ping this is - updates just move it). Never persisted, matching the
+/// other ephemeral event types below (`alerts`, `notable_drops`) - a ping is relayed straight to
+/// connected overlays and dropped.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PingRequest {
+    pub action: PingAction,
+    pub ping_id: String,
+    pub member_name: String,
+    #[serde(default)]
+    pub kind: Option<PingKind>,
+    #[serde(default)]
+    pub x: Option<i32>,
+    #[serde(default)]
+    pub y: Option<i32>,
+    #[serde(default)]
+    pub plane: Option<i32>,
+    #[serde(default)]
+    pub npc_name: Option<String>,
+}
+
+/// `POST /ping` - relays a group member's ping (right-click/hotkey on an NPC or tile) to every
+/// connected RuneLite party overlay as a `PingStart`/`PingUpdate`/`PingEnd` frame, and mirrors the
+/// same lifecycle into `PingRegistry` so the web map (which has no websocket - it polls
+/// `get-active-pings` on the same cadence it already polls member positions) can pick it up too.
+/// No DB write and no membership/ownership checks beyond the existing group-scope auth - the
+/// sender's own client is the sole source of truth for its ping's lifecycle (e.g. clearing the
+/// previous ping before starting a new one), matching this endpoint's ephemeral, trust-the-client
+/// design.
+pub async fn submit_ping(
+    auth: Authenticated,
+    body: web::Json<PingRequest>,
+    broadcast_registry: web::Data<GroupBroadcastRegistry>,
+    ping_registry: web::Data<PingRegistry>,
+) -> Result<HttpResponse, Error> {
+    let envelope = match body.action {
+        PingAction::Start => {
+            let (Some(x), Some(y), Some(plane), Some(kind)) = (body.x, body.y, body.plane, body.kind)
+            else {
+                return Ok(HttpResponse::BadRequest().body("start requires x, y, plane and kind"));
+            };
+            ping_registry.start(
+                auth.group_id,
+                ActivePing {
+                    ping_id: body.ping_id.clone(),
+                    member_name: body.member_name.clone(),
+                    kind,
+                    x,
+                    y,
+                    plane,
+                    npc_name: body.npc_name.clone(),
+                    last_seen: std::time::Instant::now(),
+                },
+            );
+            WsEnvelope::PingStart {
+                payload: PingStartPayload {
+                    ping_id: body.ping_id.clone(),
+                    member_name: body.member_name.clone(),
+                    kind,
+                    x,
+                    y,
+                    plane,
+                    npc_name: body.npc_name.clone(),
+                },
+                ts: Utc::now(),
+            }
+        }
+        PingAction::Update => {
+            let (Some(x), Some(y), Some(plane)) = (body.x, body.y, body.plane) else {
+                return Ok(HttpResponse::BadRequest().body("update requires x, y and plane"));
+            };
+            ping_registry.update(auth.group_id, &body.ping_id, x, y, plane);
+            WsEnvelope::PingUpdate {
+                payload: PingUpdatePayload {
+                    ping_id: body.ping_id.clone(),
+                    x,
+                    y,
+                    plane,
+                },
+                ts: Utc::now(),
+            }
+        }
+        PingAction::End => {
+            ping_registry.end(auth.group_id, &body.ping_id);
+            WsEnvelope::PingEnd {
+                payload: PingEndPayload {
+                    ping_id: body.ping_id.clone(),
+                },
+                ts: Utc::now(),
+            }
+        }
+    };
+
+    if broadcast_registry.has_subscribers(auth.group_id) {
+        if let Ok(message) = serde_json::to_string(&envelope) {
+            broadcast_registry.publish(auth.group_id, message);
+        }
+    }
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// `GET /get-active-pings` - the web map's poll-based counterpart to the RuneLite-facing
+/// broadcast in `submit_ping`. Polled on the same cadence the site already polls member
+/// positions.
+pub async fn get_active_pings(
+    auth: Authenticated,
+    ping_registry: web::Data<PingRegistry>,
+) -> Result<web::Json<Vec<ActivePing>>, Error> {
+    Ok(web::Json(ping_registry.list_active(auth.group_id)))
 }
 
 fn default_activity_limit() -> i64 {
