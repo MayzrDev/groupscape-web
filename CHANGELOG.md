@@ -2,6 +2,12 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.245] - 2026-08-31
+
+### Fixed
+- Combat Achievements, Activity Feed, and Loot Log no longer get partially hidden behind the account menu (Group Settings/My Account/Logout) in the top-right corner.
+- The Graphs leaderboard now sits next to the chart instead of dropping out of view at the bottom of a tall page.
+
 ## [1.0.243] - 2026-08-31
 
 ### Fixed

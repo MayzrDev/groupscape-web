@@ -29,7 +29,6 @@ skills-graphs {
 .skills-graphs__leaderboard {
   flex-shrink: 0;
   width: 260px;
-  align-self: end;
   box-sizing: border-box;
   padding: 10px;
 }
