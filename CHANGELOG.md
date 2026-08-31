@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.222] - 2026-08-31
+
+### Added
+- Dropping a ping now pops a quick toast for everyone in the group - click it to jump straight to that spot on the map.
+
 ## [1.0.221] - 2026-08-31
 
 ### Added

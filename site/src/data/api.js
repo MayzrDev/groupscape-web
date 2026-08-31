@@ -201,6 +201,7 @@ class Api {
     groupData.members = new Map();
     groupData.groupItems = {};
     groupData.filters = [""];
+    this.seenPingIds = undefined;
     if (this.getGroupInterval) {
       window.clearInterval(await this.getGroupInterval);
     }
@@ -222,6 +223,19 @@ class Api {
     if (!response.ok) return;
 
     const pings = await response.json();
+
+    // A ping newly appearing since the last poll gets a toast - same "diff against what we saw
+    // last time" idea as toast-source.js's activity events, just sourced from this poll instead
+    // since pings never land in the activity event feed (they're ephemeral, not stored).
+    if (this.seenPingIds) {
+      for (const ping of pings) {
+        if (!this.seenPingIds.has(ping.pingId)) {
+          pubsub.publish("toast", { type: "ping", ping });
+        }
+      }
+    }
+    this.seenPingIds = new Set(pings.map((ping) => ping.pingId));
+
     pubsub.publish("active-pings", pings);
   }
 

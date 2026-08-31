@@ -1,8 +1,13 @@
 import { BaseElement } from "../base-element/base-element";
 import { activityEventDescription, activityMetaLabel, activityLinkFor } from "../data/activity-event-copy";
+import { pubsub } from "../data/pubsub";
 
 const LEAVE_ANIMATION_MS = 300;
 const RELATIVE_TIME_TICK_MS = 1000;
+// Unlike activity-event toasts (meant to sit around while the app runs unattended - see the class
+// doc below), a ping is a live "look here now" callout - it auto-dismisses so the stack doesn't
+// fill up with stale pings from a session left open a while.
+const PING_TOAST_LIFETIME_MS = 6000;
 
 const TOAST_ICONS = {
   kill: "⚔",
@@ -11,6 +16,7 @@ const TOAST_ICONS = {
   diary: "⛰",
   "combat-achievement": "✦",
   collection_log: "❖",
+  ping: "📍",
 };
 
 function relativeTime(fromDate) {
@@ -52,7 +58,7 @@ export class ToastStack extends BaseElement {
   handleToast(toast) {
     const el = document.createElement("a");
     el.className = `toast-stack__toast toast-stack__toast--${toast.type}`;
-    el.href = toast.event ? activityLinkFor(toast.event) : "/group/activity";
+    el.href = toast.type === "ping" ? "/group/map" : toast.event ? activityLinkFor(toast.event) : "/group/activity";
     el.dataset.occurredAt = toast.event?.occurred_at || new Date().toISOString();
     el.innerHTML = `
       <div class="toast-stack__icon">${TOAST_ICONS[toast.type] || "•"}</div>
@@ -84,6 +90,11 @@ export class ToastStack extends BaseElement {
       "click",
       (event) => {
         event.preventDefault();
+        if (toast.type === "ping" && toast.ping) {
+          // canvas-map.js replays this on connect (pubsub's "most recent" behavior), so it still
+          // works even when the map page isn't mounted yet at click time.
+          pubsub.publish("jump-to-ping", { x: toast.ping.x, y: toast.ping.y, plane: toast.ping.plane });
+        }
         window.history.pushState("", "", el.href);
         this.dismiss(el);
       },
@@ -92,6 +103,10 @@ export class ToastStack extends BaseElement {
     this.updateTimestamp(el);
     this.list.appendChild(el);
     this.updateClearButton();
+
+    if (toast.type === "ping") {
+      setTimeout(() => this.dismiss(el), PING_TOAST_LIFETIME_MS);
+    }
   }
 
   dismiss(el) {
@@ -131,11 +146,16 @@ export class ToastStack extends BaseElement {
   // Copy is shared with the activity feed (see `data/activity-event-copy.js`) - the toast just
   // highlights the member name instead of the subject.
   titleHtml(toast) {
+    if (toast.type === "ping" && toast.ping) {
+      const where = toast.ping.npcName ? this.subject(toast.ping.npcName) : "a location";
+      return `${this.subject(toast.ping.memberName)} pinged ${where}`;
+    }
     if (!toast.event) return this.subject(toast.memberName || "");
     return activityEventDescription(toast.event, { member: (name) => this.subject(name) });
   }
 
   metaHtml(toast) {
+    if (toast.type === "ping") return "Click to view on map";
     if (!toast.event) return "";
     return activityMetaLabel(toast.event);
   }

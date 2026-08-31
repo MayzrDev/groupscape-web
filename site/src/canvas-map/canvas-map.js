@@ -37,6 +37,7 @@ export class CanvasMap extends BaseElement {
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
     this.subscribe("coordinates", this.handleUpdatedCoordinates.bind(this));
     this.subscribe("active-pings", this.handleUpdatedPings.bind(this));
+    this.subscribe("jump-to-ping", this.handleJumpToPing.bind(this));
 
     this.plane = 1;
     this.tileSize = 256;
@@ -261,6 +262,15 @@ export class CanvasMap extends BaseElement {
       });
     }
     this.requestUpdate();
+  }
+
+  // Fired by clicking a ping toast (toast-stack.js) - pubsub replays the most recent publish to a
+  // late subscriber, so this still works even if the map page wasn't mounted yet at click time.
+  // Unpublish after consuming so a later, unrelated visit to this page doesn't replay a stale jump.
+  handleJumpToPing(target) {
+    if (!this.isValidCoordinates(target)) return;
+    this.goToMapLink(target);
+    pubsub.unpublish("jump-to-ping");
   }
 
   followPlayer(playerName) {
