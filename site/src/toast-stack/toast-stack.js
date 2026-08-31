@@ -7,7 +7,7 @@ const RELATIVE_TIME_TICK_MS = 1000;
 // Unlike activity-event toasts (meant to sit around while the app runs unattended - see the class
 // doc below), a ping is a live "look here now" callout - it auto-dismisses so the stack doesn't
 // fill up with stale pings from a session left open a while.
-const PING_TOAST_LIFETIME_MS = 6000;
+const PING_TOAST_LIFETIME_MS = 20000;
 
 const TOAST_ICONS = {
   kill: "⚔",
