@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.230] - 2026-08-31
+## [1.0.231] - 2026-08-31
 
 ### Fixed
 - On mobile, the player stats panel could no longer be closed by tapping outside it without also blocking taps on the buttons and tabs inside the panel itself.
