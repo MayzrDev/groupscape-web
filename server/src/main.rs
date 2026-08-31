@@ -314,16 +314,6 @@ async fn main() -> std::io::Result<()> {
                     .wrap(grouped_character_middleware())
                     .route(web::get().to(authed::get_item_bonuses)),
             )
-            // get_group_data is declared with #[get(...)] (see authed.rs), so unlike the plain
-            // `async fn` handlers above it can only be mounted via `.service(...)`, not
-            // `.route(...).to(...)` - wrap it in its own unnamed scope, same fix as account_scope
-            // uses above, rather than nesting it alongside the grouped/ungrouped middleware split
-            // that broke when two wrapped scope("") children shared this same parent.
-            .service(
-                web::scope("")
-                    .wrap(grouped_character_middleware())
-                    .service(authed::get_group_data),
-            )
             .service(
                 web::resource("/ws")
                     .wrap(grouped_character_middleware())
@@ -339,6 +329,20 @@ async fn main() -> std::io::Result<()> {
                     .app_data(web::PayloadConfig::new(5_000_000))
                     .wrap(ungrouped_character_middleware())
                     .route(web::post().to(authed::update_character_portrait)),
+            )
+            // get_group_data is declared with #[get(...)] (see authed.rs), so unlike the plain
+            // `async fn` handlers above it can only be mounted via `.service(...)`, not
+            // `.route(...).to(...)` - wrap it in its own unnamed scope, same fix as account_scope
+            // uses above, rather than nesting it alongside the grouped/ungrouped middleware split
+            // that broke when two wrapped scope("") children shared this same parent. A
+            // `web::scope("")` sibling also shadows any resource registered *after* it in the
+            // same parent (actix's empty-prefix scope swallows routing instead of falling
+            // through) - see the "/ws" and "/identify" 404s this caused when it sat above them.
+            // Keep this block last in the chain.
+            .service(
+                web::scope("")
+                    .wrap(grouped_character_middleware())
+                    .service(authed::get_group_data),
             );
         let admin_scope = web::scope("/api/admin")
             .wrap(AdminAuthenticateMiddlewareFactory::new(

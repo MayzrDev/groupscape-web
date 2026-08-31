@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.70] - 2026-08-31
+
+### Fixed
+- Fixed the RuneLite plugin's live party overlay and side panel not showing other group members, even though they showed up fine as online on the website. A routing mix-up on the server meant the plugin's real-time connection request and character-linking request were quietly being rejected.
+
 ## [1.0.69] - 2026-08-31
 
 ### Changed
