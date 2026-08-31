@@ -9,15 +9,15 @@ loot-log-page {
   box-sizing: border-box;
 }
 
-.loot-log-page__split-stats {
+.loot-log-page__summary-stats {
   display: flex;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
   font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
 }
 
-.loot-log-page__split-card {
+.loot-log-page__summary-card {
   background: var(--elevated);
   border: 1px solid var(--light-border);
   border-radius: 8px;
@@ -26,7 +26,7 @@ loot-log-page {
   min-width: 110px;
 }
 
-.loot-log-page__split-n {
+.loot-log-page__summary-n {
   font-size: 1.25em;
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   color: var(--orange);
@@ -34,32 +34,11 @@ loot-log-page {
   text-shadow: none;
 }
 
-.loot-log-page__split-l {
+.loot-log-page__summary-l {
   font-size: 0.68em;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   opacity: 0.65;
-}
-
-.loot-log-page__participants {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
-  font-size: 0.78em;
-}
-
-.loot-log-page__participant-chip {
-  background: var(--darken);
-  border: 1px solid var(--light-border);
-  border-radius: 999px;
-  padding: 4px 10px;
-  text-shadow: none;
-}
-
-.loot-log-page__participant-chip b {
-  color: var(--green);
 }
 
 .loot-log-page__toolbar-primary {

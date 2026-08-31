@@ -1,0 +1,49 @@
+loot-log-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  background: var(--elevated);
+  border: 2px solid var(--rarity-common);
+  border-radius: 4px;
+}
+
+loot-log-tile[data-rarity="uncommon"] {
+  border-color: var(--rarity-uncommon);
+}
+
+loot-log-tile[data-rarity="rare"] {
+  border-color: var(--rarity-rare);
+}
+
+loot-log-tile[data-rarity="very_rare"] {
+  border-color: var(--rarity-very-rare);
+}
+
+loot-log-tile[data-unique="true"] {
+  border-color: var(--rarity-unique);
+  box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35), 0 0 8px rgba(255, 215, 0, 0.25);
+}
+
+loot-log-tile item-box {
+  width: 100%;
+  height: 100%;
+}
+
+.loot-log-tile__tt-unique {
+  color: var(--rarity-unique);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.loot-log-tile__tt-rarity {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}

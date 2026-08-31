@@ -3,6 +3,11 @@ use serde::{Deserialize, Serialize};
 
 pub const SHARED_MEMBER: &str = "@SHARED";
 
+/// Synthetic `MemberMetricData::name` for the raid-completions chart's aggregate "Total" line -
+/// no real member is ever named this, so the frontend can special-case it for styling without a
+/// dedicated wire field. Kept in sync with `skill-graph.js`'s matching literal.
+pub const RAID_GROUP_TOTAL_LABEL: &str = "Group Total";
+
 /// Helmet/accent colour keys a member row's `color` column may hold. Shared vocabulary with the
 /// site's `member-data.js` palette - the hue each key maps to is a frontend-only concern, so
 /// only the keys themselves need to agree between the two.
@@ -312,6 +317,18 @@ impl RaidType {
             RaidType::Cox => "cox",
             RaidType::Tob => "tob",
             RaidType::Toa => "toa",
+        }
+    }
+
+    /// Inverse of [`as_str`](Self::as_str) - parses the `raid_type` query param on the
+    /// leaderboard/metric-data endpoints. `None` for anything else, including `"all"` (the
+    /// caller treats that as "don't filter" rather than an unknown raid).
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "cox" => Some(RaidType::Cox),
+            "tob" => Some(RaidType::Tob),
+            "toa" => Some(RaidType::Toa),
+            _ => None,
         }
     }
 }
@@ -724,25 +741,22 @@ pub struct CombatStyleBonuses {
     pub ranged: i32,
 }
 
+/// Count of loot-granting events (kills, chest openings, or clue caskets) for one source, keyed
+/// the same way the frontend groups `LootSummaryRow`s (source_name + source_type + clue_tier).
+/// `get_loot_summary`'s rows are deduped to one per (member, source, item), so they can't carry
+/// this count themselves - it's tallied separately over the same event scan.
 #[derive(Serialize)]
-pub struct LootSplitParticipant {
-    pub member_name: String,
-    /// Count of loot-granting events (kills, chest openings, or clue caskets) this member
-    /// reported in the range - not literally "kills" now that chest/clue sources are included.
+pub struct LootSourceCount {
+    pub source_name: String,
+    pub source_type: String,
+    pub clue_tier: Option<String>,
     pub event_count: i64,
-    pub loot_value: i64,
 }
 
-/// This server has no multi-actor kill co-attribution (each kill/loot event belongs to exactly
-/// one reporting member), so unlike `groupscape-old`'s split, participants here are every member
-/// who reported a kill/chest/clue event in the range, not a per-event actor list.
 #[derive(Serialize)]
-pub struct LootSplitResult {
-    pub total_value: i64,
-    pub event_count: i64,
-    pub participants: Vec<LootSplitParticipant>,
-    pub per_person_gp: i64,
-    pub remainder_gp: i64,
+pub struct LootSummaryResult {
+    pub rows: Vec<LootSummaryRow>,
+    pub sources: Vec<LootSourceCount>,
 }
 
 #[derive(Serialize)]

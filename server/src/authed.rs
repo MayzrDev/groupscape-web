@@ -12,7 +12,7 @@ use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
     GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem,
-    LootSplitParticipant, LootSplitResult, LootSummaryRow, MyPermissions, PermissionFlags,
+    LootSourceCount, LootSummaryResult, LootSummaryRow, MyPermissions, PermissionFlags,
     PermissionKey, RenameGroup,
     UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
@@ -1152,7 +1152,7 @@ pub async fn get_loot_summary(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
     query: web::Query<GetLootSummaryQuery>,
-) -> Result<web::Json<Vec<LootSummaryRow>>, Error> {
+) -> Result<web::Json<LootSummaryResult>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let events = db::list_loot_and_kill_events(
         &client,
@@ -1166,6 +1166,9 @@ pub async fn get_loot_summary(
     let ge_prices = get_ge_prices_map();
 
     let mut rows: HashMap<(String, String, i32), LootSummaryRow> = HashMap::new();
+    // Keyed the same way the frontend groups rows for display (source_name + source_type +
+    // clue_tier) - counted once per underlying event, unlike `rows` which is deduped per item.
+    let mut source_counts: HashMap<(String, String, Option<String>), i64> = HashMap::new();
     for event in &events {
         let Ok(parsed) = serde_json::from_value::<GameEvent>(event.payload.clone()) else {
             continue;
@@ -1183,6 +1186,13 @@ pub async fn get_loot_summary(
                 continue;
             }
         }
+        *source_counts
+            .entry((
+                source.source_name.clone(),
+                source.source_type.to_string(),
+                source.clue_tier.clone(),
+            ))
+            .or_insert(0) += 1;
         for item in &source.loot {
             let participants = source
                 .participants
@@ -1230,119 +1240,22 @@ pub async fn get_loot_summary(
 
     let mut result: Vec<LootSummaryRow> = rows.into_values().collect();
     result.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at));
-    Ok(web::Json(result))
-}
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct GetLootSplitQuery {
-    #[serde(default)]
-    pub member_name: Option<String>,
-    #[serde(default)]
-    pub session_id: Option<i64>,
-    #[serde(default)]
-    pub boss: Option<String>,
-    #[serde(default)]
-    pub clue_tier: Option<String>,
-    #[serde(default)]
-    pub since: Option<DateTime<Utc>>,
-    #[serde(default)]
-    pub until: Option<DateTime<Utc>>,
-    #[serde(default)]
-    pub split_mode: Option<String>,
-}
-/// Total loot GP over `[since, until]` split evenly across every member who reported a kill,
-/// chest, or clue event in that range. Unlike `groupscape-old`'s split (which credits a per-kill
-/// `actor_character_ids` list), this server has no multi-actor kill co-attribution, so
-/// "participants" here is the set of reporting members rather than a raid roster.
-pub async fn get_loot_split(
-    auth: Authenticated,
-    db_pool: web::Data<Pool>,
-    query: web::Query<GetLootSplitQuery>,
-) -> Result<web::Json<LootSplitResult>, Error> {
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let events = db::list_loot_and_kill_events(
-        &client,
-        auth.group_id,
-        query.member_name.as_deref(),
-        query.session_id,
-        query.since,
-        query.until,
-    )
-    .await?;
-    let ge_prices = get_ge_prices_map();
-
-    let mut per_member: HashMap<String, (i64, i64)> = HashMap::new();
-    let mut total_value: i64 = 0;
-    let mut event_count: i64 = 0;
-    for event in &events {
-        let Ok(parsed) = serde_json::from_value::<GameEvent>(event.payload.clone()) else {
-            continue;
-        };
-        let Some(source) = as_loot_source_event(&parsed) else {
-            continue;
-        };
-        if let Some(boss) = query.boss.as_deref() {
-            if drop_rates::slugify_npc_name(&source.source_name) != boss {
-                continue;
-            }
-        }
-        if let Some(tier) = query.clue_tier.as_deref() {
-            if source.clue_tier.as_deref() != Some(tier) {
-                continue;
-            }
-        }
-        event_count += 1;
-        let participants = source
-            .participants
-            .unwrap_or_else(|| vec![event.member_name.clone()]);
-        let names: Vec<String> = match query.split_mode.as_deref() {
-            Some("proximity") | Some("personal") => participants.clone(),
-            _ => vec![event.member_name.clone()],
-        };
-        let participant_count = participants.len().max(1) as i64;
-        for member_name in names {
-            let entry = per_member.entry(member_name).or_insert((0, 0));
-            entry.0 += 1;
-            for item in &source.loot {
-                let value =
-                    ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
-                entry.1 += if query.split_mode.as_deref() == Some("proximity") {
-                    value / participant_count
-                } else {
-                    value
-                };
-                total_value += value;
-            }
-        }
-    }
-
-    let mut participants: Vec<LootSplitParticipant> = per_member
+    let sources = source_counts
         .into_iter()
-        .map(|(member_name, (events, loot_value))| LootSplitParticipant {
-            member_name,
-            event_count: events,
-            loot_value,
-        })
-        .collect();
-    participants.sort_by(|a, b| a.member_name.cmp(&b.member_name));
-
-    let participant_count = participants.len() as i64;
-    let (per_person_gp, remainder_gp) = if participant_count > 0 {
-        (
-            total_value / participant_count,
-            total_value % participant_count,
+        .map(
+            |((source_name, source_type, clue_tier), event_count)| LootSourceCount {
+                source_name,
+                source_type,
+                clue_tier,
+                event_count,
+            },
         )
-    } else {
-        (0, 0)
-    };
+        .collect();
 
-    Ok(web::Json(LootSplitResult {
-        total_value,
-        event_count,
-        participants,
-        per_person_gp,
-        remainder_gp,
+    Ok(web::Json(LootSummaryResult {
+        rows: result,
+        sources,
     }))
 }
 
@@ -1393,6 +1306,15 @@ pub struct GetLeaderboardQuery {
     /// `db::skill_array_index`'s doc comment for how this is resolved.
     #[serde(default)]
     pub skill: Option<String>,
+    /// Only meaningful when `metric == RaidCompletions`. `"cox"`/`"tob"`/`"toa"`, or omitted/`"all"`
+    /// for every raid combined.
+    #[serde(default)]
+    pub raid_type: Option<String>,
+    /// Only meaningful when `metric == RaidCompletions`. `"regular"`/`"cm"` (CoX) or
+    /// `"entry"`/`"normal"`/`"expert"` (ToA); ignored for ToB, which has no difficulty split.
+    /// Omitted/`"all"` for every difficulty combined.
+    #[serde(default)]
+    pub raid_difficulty: Option<String>,
 }
 /// XP/boss-KC/GP-earned/loot-value rankings over a daily/weekly/all-time window - part of the
 /// Graphs tab rather than a standalone leaderboards page/feature (see [`crate::leaderboard`]).
@@ -1439,6 +1361,18 @@ pub async fn get_leaderboard(
             .await?;
             (crate::leaderboard::rank_entries(raw), vec![])
         }
+        LeaderboardMetric::RaidCompletions => {
+            let raw = db::get_raid_completions_leaderboard(
+                &client,
+                auth.group_id,
+                query.window,
+                query.raid_type.as_deref(),
+                query.raid_difficulty.as_deref(),
+                now,
+            )
+            .await?;
+            (crate::leaderboard::rank_entries(raw), vec![])
+        }
     };
 
     Ok(web::Json(LeaderboardResult {
@@ -1459,6 +1393,17 @@ pub struct GetMetricDataQuery {
     /// as `get_boss_kc_leaderboard`'s existing `boss: None` semantics.
     #[serde(default)]
     pub boss: Option<String>,
+    /// Only used when `metric == RaidCompletions` - see `GetLeaderboardQuery::raid_type`.
+    #[serde(default)]
+    pub raid_type: Option<String>,
+    /// Only used when `metric == RaidCompletions` - see `GetLeaderboardQuery::raid_difficulty`.
+    #[serde(default)]
+    pub raid_difficulty: Option<String>,
+    /// Only used when `metric == RaidCompletions`. `"member"` credits every participant
+    /// separately (one line per member); omitted/anything else collapses to one aggregate
+    /// "Group Total" line - see `db::get_raid_completions_metric_data`'s `group_by_member`.
+    #[serde(default)]
+    pub group_by: Option<String>,
 }
 /// Graphs tab chart data for boss-KC/GP-earned, at the period's bucket granularity,
 /// as running cumulative totals (not pre-diffed - the client turns a cumulative series into
@@ -1497,6 +1442,17 @@ pub async fn get_metric_data(
         }
         LeaderboardMetric::GpEarned => {
             db::get_bank_value_for_period(&client, auth.group_id, aggregate_period).await?
+        }
+        LeaderboardMetric::RaidCompletions => {
+            db::get_raid_completions_metric_data(
+                &client,
+                auth.group_id,
+                aggregate_period,
+                query.raid_type.as_deref(),
+                query.raid_difficulty.as_deref(),
+                query.group_by.as_deref() == Some("member"),
+            )
+            .await?
         }
     };
 

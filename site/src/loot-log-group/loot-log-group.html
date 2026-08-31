@@ -1,0 +1,15 @@
+<div class="loot-log-group__header">
+  <div class="loot-log-group__name-wrap">
+    <span class="loot-log-group__source-dot"></span>
+    <div>
+      <div class="loot-log-group__name">${this.sourceLabel}</div>
+      ${
+        this.group.eventCount
+          ? `<div class="loot-log-group__meta">${this.group.eventCount.toLocaleString()} ${this.countLabel}</div>`
+          : ""
+      }
+    </div>
+  </div>
+  <div class="loot-log-group__total">${this.totalValue.toLocaleString()} gp</div>
+</div>
+<div class="loot-log-group__grid"></div>

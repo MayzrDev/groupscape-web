@@ -127,10 +127,6 @@ class Api {
     return `${this.groupScopeUrl}/get-loot-summary`;
   }
 
-  get lootSplitUrl() {
-    return `${this.groupScopeUrl}/get-loot-split`;
-  }
-
   get lootBossesUrl() {
     return `${this.groupScopeUrl}/get-loot-bosses`;
   }
@@ -474,10 +470,12 @@ class Api {
     return response.json();
   }
 
-  async getLeaderboard(metric, window, boss, skill) {
+  async getLeaderboard(metric, window, boss, skill, raidType, raidDifficulty) {
     const query = new URLSearchParams({ metric, window });
     if (boss) query.set("boss", boss);
     if (skill && metric === "xp") query.set("skill", skill);
+    if (raidType && metric === "raid_completions") query.set("raid_type", raidType);
+    if (raidDifficulty && metric === "raid_completions") query.set("raid_difficulty", raidDifficulty);
     const response = await fetch(`${this.leaderboardUrl}?${query.toString()}`, {
       headers: {
         Authorization: this.authHeader,
@@ -489,9 +487,12 @@ class Api {
     return response.json();
   }
 
-  async getMetricData(metric, period, boss) {
+  async getMetricData(metric, period, boss, raidType, raidDifficulty, groupBy) {
     const query = new URLSearchParams({ metric, period });
     if (boss) query.set("boss", boss);
+    if (raidType && metric === "raid_completions") query.set("raid_type", raidType);
+    if (raidDifficulty && metric === "raid_completions") query.set("raid_difficulty", raidDifficulty);
+    if (groupBy && metric === "raid_completions") query.set("group_by", groupBy);
     const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
       headers: {
         Authorization: this.authHeader,
@@ -542,28 +543,7 @@ class Api {
       },
     });
     if (!response.ok) {
-      return [];
-    }
-    return response.json();
-  }
-
-  async getLootSplit({ memberName, sessionId, boss, clueTier, since, until, splitMode } = {}) {
-    const query = new URLSearchParams();
-    if (memberName) query.set("member_name", memberName);
-    if (sessionId) query.set("session_id", sessionId);
-    if (boss) query.set("boss", boss);
-    if (clueTier) query.set("clue_tier", clueTier);
-    if (since) query.set("since", since);
-    if (until) query.set("until", until);
-    if (splitMode) query.set("split_mode", splitMode);
-
-    const response = await fetch(`${this.lootSplitUrl}?${query.toString()}`, {
-      headers: {
-        Authorization: this.authHeader,
-      },
-    });
-    if (!response.ok) {
-      return null;
+      return { rows: [], sources: [] };
     }
     return response.json();
   }

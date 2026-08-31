@@ -37,7 +37,6 @@ describe("api", () => {
     expect(api.myPermissionsUrl).toContain("/group/iron-team/get-my-permissions");
     expect(api.activityEventsUrl).toContain("/group/iron-team/get-activity-events");
     expect(api.lootSummaryUrl).toContain("/group/iron-team/get-loot-summary");
-    expect(api.lootSplitUrl).toContain("/group/iron-team/get-loot-split");
     expect(api.leaderboardUrl).toContain("/group/iron-team/get-leaderboard");
   });
 
@@ -129,15 +128,15 @@ describe("api", () => {
     expect(url).not.toContain("boss=");
   });
 
-  it("getLootSummary builds the query string from provided filters and returns the parsed rows", async () => {
+  it("getLootSummary builds the query string from provided filters and returns the parsed result", async () => {
     api.setCredentials("iron-team", "secret-token");
 
-    const rows = [{ item_id: 995, rarity: "rare" }];
-    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(rows) });
+    const summary = { rows: [{ item_id: 995, rarity: "rare" }], sources: [] };
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(summary) });
 
     const result = await api.getLootSummary({ memberName: "Zezima", clueTier: "master" });
 
-    expect(result).toEqual(rows);
+    expect(result).toEqual(summary);
     const [url, options] = globalThis.fetch.mock.calls[0];
     expect(url).toContain("/group/iron-team/get-loot-summary?");
     expect(url).toContain("member_name=Zezima");
@@ -145,34 +144,11 @@ describe("api", () => {
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
   });
 
-  it("getLootSummary returns an empty array when the request fails", async () => {
+  it("getLootSummary returns an empty result when the request fails", async () => {
     api.setCredentials("iron-team", "secret-token");
     globalThis.fetch.mockResolvedValueOnce({ ok: false });
 
-    expect(await api.getLootSummary()).toEqual([]);
-  });
-
-  it("getLootSplit builds the query string from provided filters and returns the parsed result", async () => {
-    api.setCredentials("iron-team", "secret-token");
-
-    const split = { total_value: 100, event_count: 1, participants: [], per_person_gp: 100, remainder_gp: 0 };
-    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(split) });
-
-    const result = await api.getLootSplit({ since: "2026-01-01T00:00:00Z", until: "2026-02-01T00:00:00Z" });
-
-    expect(result).toEqual(split);
-    const [url, options] = globalThis.fetch.mock.calls[0];
-    expect(url).toContain("/group/iron-team/get-loot-split?");
-    expect(url).toContain("since=2026-01-01T00%3A00%3A00Z");
-    expect(url).toContain("until=2026-02-01T00%3A00%3A00Z");
-    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
-  });
-
-  it("getLootSplit returns null when the request fails", async () => {
-    api.setCredentials("iron-team", "secret-token");
-    globalThis.fetch.mockResolvedValueOnce({ ok: false });
-
-    expect(await api.getLootSplit()).toBeNull();
+    expect(await api.getLootSummary()).toEqual({ rows: [], sources: [] });
   });
 
   it("getActivityEvents builds the query string from provided filters and returns the parsed events", async () => {

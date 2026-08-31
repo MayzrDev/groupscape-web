@@ -210,7 +210,6 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/get-sessions").route(web::get().to(authed::get_sessions)))
             .service(web::resource("/get-loot-bosses").route(web::get().to(authed::get_loot_bosses)))
             .service(web::resource("/get-loot-summary").route(web::get().to(authed::get_loot_summary)))
-            .service(web::resource("/get-loot-split").route(web::get().to(authed::get_loot_split)))
             .service(web::resource("/am-i-logged-in").route(web::get().to(authed::am_i_logged_in)))
             .service(web::resource("/am-i-in-group").route(web::get().to(authed::am_i_in_group)))
             .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
@@ -279,11 +278,6 @@ async fn main() -> std::io::Result<()> {
                 web::resource("/get-loot-summary")
                     .wrap(grouped_character_middleware())
                     .route(web::get().to(authed::get_loot_summary)),
-            )
-            .service(
-                web::resource("/get-loot-split")
-                    .wrap(grouped_character_middleware())
-                    .route(web::get().to(authed::get_loot_split)),
             )
             .service(
                 web::resource("/am-i-logged-in")
@@ -407,7 +401,6 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/get-sessions").route(web::get().to(authed::get_sessions)))
             .service(web::resource("/get-loot-bosses").route(web::get().to(authed::get_loot_bosses)))
             .service(web::resource("/get-loot-summary").route(web::get().to(authed::get_loot_summary)))
-            .service(web::resource("/get-loot-split").route(web::get().to(authed::get_loot_split)))
             .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
             .service(web::resource("/get-metric-data").route(web::get().to(authed::get_metric_data)))
             .service(web::resource("/get-leaderboard").route(web::get().to(authed::get_leaderboard)))
