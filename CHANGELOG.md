@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.234] - 2026-08-31
+
+### Added
+- Clue casket completions now show up in the activity feed, with the clue tier, total casket value in gp, and a clue scroll icon.
+
 ## [1.0.233] - 2026-08-31
 
 ### Fixed

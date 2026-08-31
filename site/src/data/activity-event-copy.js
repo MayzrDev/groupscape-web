@@ -6,7 +6,7 @@ const COLLECTION_LOG_WIKI_URL = "https://oldschool.runescape.wiki/w/Collection_l
 
 // The activity feed and the toast stack render the same six milestone event types, so the copy
 // lives here once and each surface just supplies its own member/subject wrappers.
-export const ACTIVITY_EVENT_TYPES = ["kill", "death", "quest", "diary", "combat_task", "collection_log"];
+export const ACTIVITY_EVENT_TYPES = ["kill", "death", "quest", "diary", "combat_task", "collection_log", "clue"];
 
 const BADGE_LABELS = {
   kill: "Kill",
@@ -15,6 +15,7 @@ const BADGE_LABELS = {
   diary: "Diary",
   combat_task: "Combat task",
   collection_log: "Collection log",
+  clue: "Clue",
 };
 
 // Secondary line under a toast title. Kills/deaths speak for themselves, so they have none.
@@ -23,8 +24,29 @@ const META_LABELS = {
   collection_log: "Collection log",
 };
 
-export function activityBadgeLabel(eventType) {
-  return BADGE_LABELS[eventType] || eventType;
+// Clue casket openings are stored as `loot` events (shared with chest openings - see LootEvent in
+// models.rs) discriminated by `clueTier` being set, so every surface that wants to treat them as
+// their own "clue" bucket has to derive that display type rather than reading `event_type` raw.
+export function activityDisplayType(event) {
+  if (event.event_type === "loot" && event.payload?.clueTier) return "clue";
+  return event.event_type;
+}
+
+export function activityBadgeLabel(event) {
+  const displayType = activityDisplayType(event);
+  return BADGE_LABELS[displayType] || displayType;
+}
+
+export function clueTierLabel(tier) {
+  return tier ? tier[0].toUpperCase() + tier.slice(1) : "";
+}
+
+export function clueValueFor(payload) {
+  return (payload?.loot || []).reduce((total, entry) => total + new Item(entry.item_id).gePrice * entry.quantity, 0);
+}
+
+export function clueWikiUrl(tier) {
+  return `https://oldschool.runescape.wiki/w/Clue_scroll_(${tier})`;
 }
 
 export function questNameFor(payload) {
@@ -75,6 +97,7 @@ const ACTIVITY_ICONS = {
   diary: "/icons/activity/diary.png",
   combat_task: "/icons/activity/combat-task.png",
   collection_log: "/icons/activity/collection-log.png",
+  clue: "/icons/activity/clue.png",
 };
 
 export function questWikiUrl(questName) {
@@ -100,7 +123,7 @@ export function activityEventDescription(event, format = {}) {
   const member = wrapMember(event.member_name);
   const payload = event.payload || {};
 
-  switch (event.event_type) {
+  switch (activityDisplayType(event)) {
     case "kill": {
       // `npcName` is the server's camelCase `KillEvent` serialization; `npc_name` is accepted
       // too so either casing renders.
@@ -149,6 +172,17 @@ export function activityEventDescription(event, format = {}) {
         new Item(payload.item_id).wikiLink,
         Item.itemDetails?.[payload.item_id] ? Item.imageUrl(payload.item_id) : ACTIVITY_ICONS.collection_log
       )} to their collection log`;
+    case "clue": {
+      const tierLabel = clueTierLabel(payload.clueTier);
+      const article = /^[aeiou]/i.test(tierLabel) ? "an" : "a";
+      const value = clueValueFor(payload);
+      return `${member} completed ${article} ${wrapSubject(
+        `${tierLabel} clue`,
+        "clue",
+        clueWikiUrl(payload.clueTier),
+        ACTIVITY_ICONS.clue
+      )} — worth ${value.toLocaleString()} gp`;
+    }
     default:
       return `${member} — ${event.event_type}`;
   }

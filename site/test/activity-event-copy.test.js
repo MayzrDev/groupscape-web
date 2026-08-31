@@ -26,12 +26,13 @@ describe("activity event copy", () => {
   });
 
   it("labels each milestone type", () => {
-    expect(activityBadgeLabel("kill")).toBe("Kill");
-    expect(activityBadgeLabel("death")).toBe("Death");
-    expect(activityBadgeLabel("quest")).toBe("Quest");
-    expect(activityBadgeLabel("diary")).toBe("Diary");
-    expect(activityBadgeLabel("combat_task")).toBe("Combat task");
-    expect(activityBadgeLabel("collection_log")).toBe("Collection log");
+    expect(activityBadgeLabel(event("kill"))).toBe("Kill");
+    expect(activityBadgeLabel(event("death"))).toBe("Death");
+    expect(activityBadgeLabel(event("quest"))).toBe("Quest");
+    expect(activityBadgeLabel(event("diary"))).toBe("Diary");
+    expect(activityBadgeLabel(event("combat_task"))).toBe("Combat task");
+    expect(activityBadgeLabel(event("collection_log"))).toBe("Collection log");
+    expect(activityBadgeLabel(event("loot", { clueTier: "master" }))).toBe("Clue");
   });
 
   it("describes kills and deaths", () => {
@@ -73,6 +74,18 @@ describe("activity event copy", () => {
     expect(activityEventDescription(completed)).toBe("Bandos completed the Zulrah collection log");
     expect(activityMetaLabel(added)).toBe("Collection log");
     expect(activityMetaLabel(completed)).toBe("Collection log");
+  });
+
+  it("describes a clue casket completion with its tier and gp value", () => {
+    Item.itemDetails = { 4151: { id: 4151, name: "Abyssal whip" } };
+    Item.gePrices = { 4151: 2000000 };
+    const clue = event(
+      "loot",
+      { clueTier: "master", loot: [{ item_id: 4151, quantity: 1 }] },
+      "Torvesta"
+    );
+
+    expect(activityEventDescription(clue)).toBe("Torvesta completed a Master clue — worth 2,000,000 gp");
   });
 
   it("wraps the member and subject with the caller's formatters", () => {

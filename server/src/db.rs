@@ -4389,10 +4389,17 @@ pub async fn list_activity_events(
 SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
-  AND event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log')
+  AND (
+    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log')
+    OR (event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
+  )
   AND (event_type != 'kill' OR npc_slug = ANY($6))
   AND ($2::text IS NULL OR member_name = $2)
-  AND ($3::text IS NULL OR event_type = $3)
+  AND (
+    $3::text IS NULL
+    OR ($3 = 'clue' AND event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
+    OR ($3 != 'clue' AND event_type = $3)
+  )
   AND ($4::timestamptz IS NULL OR occurred_at < $4)
 ORDER BY occurred_at DESC
 LIMIT $5

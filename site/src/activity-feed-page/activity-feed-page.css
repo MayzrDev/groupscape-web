@@ -114,6 +114,11 @@ activity-feed-page {
   color: var(--activity-collection-log);
 }
 
+.activity-feed-page__type-chip--clue.activity-feed-page__type-chip--active {
+  border-color: var(--clue-master);
+  color: var(--clue-master);
+}
+
 .activity-feed-page__list {
   margin-top: 6px;
 }

@@ -11,6 +11,7 @@ const EVENT_TYPES = [
   ["diary", "Diaries"],
   ["combat_task", "Combat tasks"],
   ["collection_log", "Collection log"],
+  ["clue", "Clues"],
 ];
 
 const PAGE_LIMIT = 25;

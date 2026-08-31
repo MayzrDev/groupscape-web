@@ -70,6 +70,11 @@ activity-feed-event.activity-feed-event--enter {
   color: var(--activity-collection-log);
 }
 
+.activity-feed-event__badge--clue {
+  background: color-mix(in srgb, var(--clue-tier-color, var(--activity-quest)) 18%, transparent);
+  color: var(--clue-tier-color, var(--activity-quest));
+}
+
 .activity-feed-event__line {
   font-size: 0.92em;
   line-height: 1.5;
@@ -99,6 +104,10 @@ a.activity-feed-event__subject:hover {
 
 .activity-feed-event__subject--death {
   color: var(--red);
+}
+
+.activity-feed-event__subject--clue {
+  color: var(--clue-tier-color, var(--activity-quest));
 }
 
 .activity-feed-event__loot {
