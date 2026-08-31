@@ -1322,6 +1322,9 @@ pub async fn get_loot_split(
 
 #[derive(Deserialize)]
 pub enum SkillDataPeriod {
+    Hour1,
+    Hour6,
+    Hour12,
     Day,
     Week,
     Month,
@@ -1339,6 +1342,9 @@ pub async fn get_skill_data(
 ) -> Result<web::Json<GroupSkillData>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let aggregate_period = match query.period {
+        SkillDataPeriod::Hour1 => db::AggregatePeriod::Day,
+        SkillDataPeriod::Hour6 => db::AggregatePeriod::Day,
+        SkillDataPeriod::Hour12 => db::AggregatePeriod::Day,
         SkillDataPeriod::Day => db::AggregatePeriod::Day,
         SkillDataPeriod::Week => db::AggregatePeriod::Month,
         SkillDataPeriod::Month => db::AggregatePeriod::Month,
@@ -1443,6 +1449,9 @@ pub async fn get_metric_data(
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let aggregate_period = match query.period {
+        SkillDataPeriod::Hour1 => db::AggregatePeriod::Day,
+        SkillDataPeriod::Hour6 => db::AggregatePeriod::Day,
+        SkillDataPeriod::Hour12 => db::AggregatePeriod::Day,
         SkillDataPeriod::Day => db::AggregatePeriod::Day,
         SkillDataPeriod::Week => db::AggregatePeriod::Month,
         SkillDataPeriod::Month => db::AggregatePeriod::Month,

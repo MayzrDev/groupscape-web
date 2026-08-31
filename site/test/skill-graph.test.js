@@ -14,6 +14,36 @@ describe("SkillGraph.datesForPeriod", () => {
 
     const cases = [
       {
+        period: "Hour1",
+        count: 1,
+        now: "2026-11-01T23:30:00",
+        nextDate: (date) => {
+          const t = new Date(date);
+          t.setTime(t.getTime() + 3600000);
+          return t;
+        },
+      },
+      {
+        period: "Hour6",
+        count: 6,
+        now: "2026-11-01T23:30:00",
+        nextDate: (date) => {
+          const t = new Date(date);
+          t.setTime(t.getTime() + 3600000);
+          return t;
+        },
+      },
+      {
+        period: "Hour12",
+        count: 12,
+        now: "2026-11-01T23:30:00",
+        nextDate: (date) => {
+          const t = new Date(date);
+          t.setTime(t.getTime() + 3600000);
+          return t;
+        },
+      },
+      {
         period: "Day",
         count: 24,
         now: "2026-11-01T23:30:00",

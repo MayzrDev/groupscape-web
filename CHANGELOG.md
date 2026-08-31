@@ -2,6 +2,14 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.253] - 2026-08-31
+
+### Added
+- Graphs now has 1H, 6H, and 12H time period options, alongside the existing 24H/7D/30D/1Y.
+
+### Changed
+- Simplified the top nav's account menu into a plain divider next to the tab row, instead of a floating panel — fixes it occasionally overlapping page content on Activity Feed, Combat Achievements, and Loot Log.
+
 ## [1.0.248] - 2026-08-31
 
 ### Changed

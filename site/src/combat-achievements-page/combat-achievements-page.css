@@ -11,11 +11,6 @@ combat-achievements-page {
 .combat-achievements-page__container {
   padding: 8px 16px 16px;
   width: 100%;
-  /* The account menu (Group Settings/My Account/Support/Logout) is absolutely positioned
-     over the top-right corner, so as a positioned element it paints above this card
-     regardless of DOM order. Clear its height so the toolbar's right-aligned content
-     doesn't render underneath it. */
-  margin-top: var(--account-panel-height, 0px);
 }
 
 .combat-achievements-page__toolbar {

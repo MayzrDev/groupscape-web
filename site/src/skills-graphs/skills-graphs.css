@@ -123,7 +123,15 @@ skills-graphs {
 
 .skills-graphs__period-toggle {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+
+.skills-graphs__period-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--graph-grid-border);
+  margin: 0 2px;
 }
 
 .skills-graphs__sub-select-container {

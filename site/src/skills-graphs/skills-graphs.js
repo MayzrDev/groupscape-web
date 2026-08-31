@@ -8,6 +8,9 @@ import { GroupData, groupData } from "../data/group-data";
 // leaderboard. The leaderboard only understands 3 windows on the wire, so this collapses
 // Month and Year down onto the same "all_time" window (no new window value is introduced).
 export const windowForPeriod = {
+  Hour1: "daily",
+  Hour6: "daily",
+  Hour12: "daily",
   Day: "daily",
   Week: "weekly",
   Month: "all_time",

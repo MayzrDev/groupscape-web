@@ -7,10 +7,6 @@ loot-log-page {
   min-height: 300px;
   padding: 14px 16px 18px;
   box-sizing: border-box;
-  /* The account menu is absolutely positioned over the top-right corner, so as a
-     positioned element it paints above this card regardless of DOM order. Clear its
-     height so the toolbar's fields don't render underneath it. */
-  margin-top: var(--account-panel-height, 0px);
 }
 
 .loot-log-page__split-stats {

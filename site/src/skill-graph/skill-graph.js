@@ -10,6 +10,9 @@ function hslToHsla(color, alpha) {
 }
 
 const periodHours = {
+  Hour1: 1,
+  Hour6: 6,
+  Hour12: 12,
   Day: 24,
   Week: 168,
   Month: 720,
@@ -17,11 +20,19 @@ const periodHours = {
 };
 
 const periodLabels = {
+  Hour1: "1H",
+  Hour6: "6H",
+  Hour12: "12H",
   Day: "24H",
   Week: "7D",
   Month: "30D",
   Year: "1Y",
 };
+
+// Hour1/Hour6/Hour12/Day all read the same server-side hourly buckets (see
+// windowForPeriod/SkillDataPeriod on the server - there's no finer-grained snapshot data than
+// hourly, kept for 1 day) and only differ in how many trailing hourly buckets are shown.
+const hourlyPeriods = new Set(["Hour1", "Hour6", "Hour12", "Day"]);
 
 const metricLabels = {
   xp: "XP",
@@ -598,7 +609,7 @@ export class SkillGraph extends BaseElement {
 
   labelsForPeriod(period, dates) {
     const normalizedPeriod = SkillGraph.normalizedPeriod(period);
-    if (normalizedPeriod === "Day") {
+    if (hourlyPeriods.has(normalizedPeriod)) {
       return dates.map((date) => date.toLocaleTimeString([], { hour: "numeric" }));
     }
     if (normalizedPeriod === "Year") {
@@ -612,6 +623,9 @@ export class SkillGraph extends BaseElement {
   static datesForPeriod(period) {
     const normalizedPeriod = SkillGraph.normalizedPeriod(period);
     const stepCountsForPeriods = {
+      Hour1: 1,
+      Hour6: 6,
+      Hour12: 12,
       Day: 24,
       Week: 7,
       Month: 30,
@@ -624,7 +638,7 @@ export class SkillGraph extends BaseElement {
     for (let i = count - 1; i >= 0; --i) {
       const t = new Date(now);
 
-      if (normalizedPeriod === "Day") {
+      if (hourlyPeriods.has(normalizedPeriod)) {
         t.setTime(now.getTime() - i * 3600000);
         result.push(t);
         continue;
@@ -647,7 +661,7 @@ export class SkillGraph extends BaseElement {
     const t = new Date(date);
     t.setMinutes(0, 0, 0);
 
-    if (normalizedPeriod !== "Day") {
+    if (!hourlyPeriods.has(normalizedPeriod)) {
       t.setHours(0);
     }
 
@@ -659,7 +673,7 @@ export class SkillGraph extends BaseElement {
   }
 
   static normalizedPeriod(period) {
-    const periods = new Set(["Day", "Week", "Month", "Year"]);
+    const periods = new Set(["Hour1", "Hour6", "Hour12", "Day", "Week", "Month", "Year"]);
     return periods.has(period) ? period : "Day";
   }
 }

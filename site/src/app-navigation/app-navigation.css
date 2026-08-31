@@ -41,51 +41,28 @@ app-navigation .men-button img {
   box-sizing: border-box;
 }
 
-/* Taken out of normal flow so its taller stack never pushes page content
-   down — only the tab row's height counts toward the nav's flow height.
-   Its rendered width is measured in JS to reserve space on the tabs panel. */
-.app-navigation__panel--account {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: max-content;
-  flex-direction: column;
-  align-items: stretch;
-  row-gap: 6px;
-}
-
 .app-navigation__panel--tabs {
   overflow-x: auto;
   overflow-y: hidden;
   min-width: 0;
 }
 
-.app-navigation__panel--account men-link,
-.app-navigation__panel--account donate-button {
-  display: block;
-  width: 100%;
-}
-
-.app-navigation__panel--account men-link > a,
-.app-navigation__panel--account donate-button > a {
-  width: 100%;
-}
-
-.app-navigation__panel--account button.men-button {
-  width: 100%;
+.app-navigation__divider {
+  align-self: stretch;
+  width: 2px;
+  margin: 2px 2px;
+  flex: none;
+  background: linear-gradient(
+    rgba(0, 0, 0, 0.4),
+    rgba(255, 255, 255, 0.12) 20%,
+    rgba(255, 255, 255, 0.12) 80%,
+    rgba(0, 0, 0, 0.4)
+  );
+  border-radius: 1px;
 }
 
 .app-navigation__nav men-link {
   margin: 0;
-}
-
-/* "Combat Achievements" is by far the longest tab label, and its width alone can
-   force the tabs panel into horizontal overflow before the account column even
-   gets tight. Shrink just this label so the full tab row keeps fitting next to
-   the account panel longer. */
-.app-navigation__panel--tabs button[route-component="combat-achievements-page"] {
-  font-size: 15px;
-  padding: 4px 6px;
 }
 
 .app-navigation__plane-slot:empty {
