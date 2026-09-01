@@ -553,11 +553,7 @@ export class SkillGraph extends BaseElement {
     for (const playerMetricData of this.metricDataForGroup || []) {
       const member = this.currentGroupData.members.get(playerMetricData.name);
       const isGroupTotal = playerMetricData.name === RAID_GROUP_TOTAL_LABEL;
-      const color = member
-        ? `hsl(${member.hue}, 70%, 45%)`
-        : isGroupTotal
-        ? "hsl(32, 100%, 55%)"
-        : "hsl(0, 0%, 60%)";
+      const color = member ? `hsl(${member.hue}, 70%, 45%)` : isGroupTotal ? "hsl(32, 100%, 55%)" : "hsl(0, 0%, 60%)";
       const series = playerMetricData.metric_data || [];
       const currentValue = series.length ? series[series.length - 1].value : 0;
       const completeTimeSeries = this.generateCompleteTimeSeries(series, currentValue, (dataPoint) => dataPoint.value);

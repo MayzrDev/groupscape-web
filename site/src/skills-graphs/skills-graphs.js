@@ -84,9 +84,7 @@ export class SkillsGraphs extends BaseElement {
     this.raidTypeSelect = this.querySelector(".skills-graphs__raid-type-select");
     this.raidTypeSelectContainer = this.querySelector(".skills-graphs__sub-select-container--raid-type");
     this.raidDifficultySelect = this.querySelector(".skills-graphs__raid-difficulty-select");
-    this.raidDifficultySelectContainer = this.querySelector(
-      ".skills-graphs__sub-select-container--raid-difficulty"
-    );
+    this.raidDifficultySelectContainer = this.querySelector(".skills-graphs__sub-select-container--raid-difficulty");
     this.groupByContainer = this.querySelector(".skills-graphs__sub-select-container--group-by");
     this.groupByButtons = this.querySelectorAll(".skills-graphs__group-by-btn");
     this.leaderboardList = this.querySelector(".skills-graphs__leaderboard-list");
@@ -134,9 +132,7 @@ export class SkillsGraphs extends BaseElement {
       return;
     }
     const previousValue = this.state.raidDifficulty;
-    this.raidDifficultySelect.innerHTML = options
-      .map((o) => `<option value="${o.value}">${o.label}</option>`)
-      .join("");
+    this.raidDifficultySelect.innerHTML = options.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
     const stillValid = options.some((o) => o.value === previousValue);
     this.raidDifficultySelect.value = stillValid ? previousValue : "all";
     this.state.raidDifficulty = this.raidDifficultySelect.value;
