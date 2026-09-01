@@ -239,6 +239,13 @@ pub struct KillEvent {
     pub world: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occurred_at: Option<DateTime<Utc>>,
+    /// Stable id the plugin generates once, at the moment this kill is captured (not at send
+    /// time) - lets the server recognize a resend of the same buffered event (e.g. after a
+    /// connection drop during a server restart whose response never reached the client) as a
+    /// duplicate rather than a second kill. Absent from older plugin builds, in which case this
+    /// event isn't deduplicated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participants: Option<Vec<String>>,
     /// Absent when the plugin's best-effort loot correlation (`onLoot`) never matched a
@@ -279,6 +286,9 @@ pub struct LootEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub occurred_at: Option<DateTime<Utc>>,
     pub loot: Vec<LootItem>,
+    /// See [`KillEvent::event_id`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone)]
@@ -294,6 +304,9 @@ pub struct DeathEvent {
     /// "killed by" fact, so this is `None` rather than defaulted to any placeholder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub killer_name: Option<String>,
+    /// See [`KillEvent::event_id`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub event_id: Option<String>,
 }
 
 /// The three raid instances tracked for completion events. `Display` renders the wiki-style
@@ -398,6 +411,18 @@ impl GameEvent {
             GameEvent::Death(_) => "death",
             GameEvent::Loot(_) => "loot",
             GameEvent::Raid(_) => "raid",
+        }
+    }
+
+    /// The plugin-generated dedup id, when present - see [`KillEvent::event_id`]. Raid
+    /// completions aren't included here since they already have their own merge-based dedup
+    /// path (`raid_merge`) rather than going through [`crate::db::insert_activity_event`].
+    pub fn event_id(&self) -> Option<&str> {
+        match self {
+            GameEvent::Kill(kill) => kill.event_id.as_deref(),
+            GameEvent::Death(death) => death.event_id.as_deref(),
+            GameEvent::Loot(loot) => loot.event_id.as_deref(),
+            GameEvent::Raid(_) => None,
         }
     }
 }

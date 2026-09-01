@@ -2722,6 +2722,31 @@ ADD COLUMN IF NOT EXISTS discord_notify_diaries BOOLEAN NOT NULL DEFAULT true
         transaction.commit().await?;
     }
 
+    if !has_migration_run(client, "add_activity_events_client_event_id").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                "ALTER TABLE groupscape.activity_events ADD COLUMN IF NOT EXISTS client_event_id TEXT",
+                &[],
+            )
+            .await?;
+        // Partial (NULLs, e.g. progress/raid events, never conflict with each other or anything
+        // else) so a resent kill/death/loot event - identical `client_event_id`, same group - is
+        // rejected by insert_activity_event_payload's ON CONFLICT DO NOTHING instead of landing
+        // as a second row. See insert_activity_event_payload's doc comment for why this exists.
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS activity_events_group_client_event_id_idx ON groupscape.activity_events (group_id, client_event_id) WHERE client_event_id IS NOT NULL
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_activity_events_client_event_id").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -4287,6 +4312,16 @@ pub async fn prune_old_sessions(client: &Client) -> Result<u64, ApiError> {
 /// `groupscape.activity_events`' `(event_type, payload)` columns are already generic enough to
 /// hold any discrete event kind, so the quest/diary/combat-task/collection-log milestones reuse
 /// this table and its `GET /get-activity-events` endpoint rather than getting a dedicated table.
+///
+/// `client_event_id`, when present, is the plugin-generated id from `GameEvent::event_id` -
+/// stamped once at capture time so a client resend of an already-processed kill/death/loot event
+/// (e.g. the connection dropping mid-request during a server restart, after the server already
+/// committed the first insert but before its response reached the client) carries the exact same
+/// id. The `ON CONFLICT DO NOTHING` against `activity_events_group_client_event_id_idx` makes
+/// that resend a no-op instead of a duplicate row; the returned bool tells the caller whether a
+/// row actually landed, so it can skip firing a second Discord message for a rejected duplicate.
+/// `None` (progress events, older plugin builds, raid completions) always inserts, matching the
+/// pre-dedup behavior.
 pub async fn insert_activity_event_payload(
     client: &Client,
     group_id: i64,
@@ -4294,7 +4329,8 @@ pub async fn insert_activity_event_payload(
     member_name: &str,
     event_type: &str,
     payload: serde_json::Value,
-) -> Result<(), ApiError> {
+    client_event_id: Option<&str>,
+) -> Result<bool, ApiError> {
     // Precomputed so `list_activity_events`' `npc_slug = ANY(...)` notable-kill gate can run in
     // SQL instead of filtering rows after fetching them (see that function's doc comment).
     let npc_slug = (event_type == "kill")
@@ -4308,10 +4344,10 @@ pub async fn insert_activity_event_payload(
         .flatten();
     let stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload, npc_slug) VALUES ($1, $2, $3, $4, $5, $6)",
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload, npc_slug, client_event_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (group_id, client_event_id) WHERE client_event_id IS NOT NULL DO NOTHING",
         )
         .await?;
-    client
+    let inserted = client
         .execute(
             &stmt,
             &[
@@ -4321,11 +4357,12 @@ pub async fn insert_activity_event_payload(
                 &event_type,
                 &payload,
                 &npc_slug,
+                &client_event_id,
             ],
         )
         .await
         .map_err(ApiError::InsertActivityEventError)?;
-    Ok(())
+    Ok(inserted > 0)
 }
 
 /// Inserts the first reporting member's raid completion, returning the new row's `event_id` so
@@ -4475,13 +4512,17 @@ pub async fn nearby_members_for_kill(
 /// array - this server doesn't track other members' live world/position with enough recency to
 /// attribute a kill to more than the reporting member, so multi-actor credit is left for a
 /// follow-up rather than modeled here.
+///
+/// Returns whether the event was actually inserted (`false` when `event.event_id()` matched an
+/// already-stored row and was rejected as a duplicate) - see
+/// [`insert_activity_event_payload`]'s doc comment.
 pub async fn insert_activity_event(
     client: &Client,
     group_id: i64,
     session_id: i64,
     member_name: &str,
     event: &GameEvent,
-) -> Result<(), ApiError> {
+) -> Result<bool, ApiError> {
     let payload = serde_json::to_value(event).map_err(ApiError::SerdeJsonError)?;
     insert_activity_event_payload(
         client,
@@ -4490,6 +4531,7 @@ pub async fn insert_activity_event(
         member_name,
         event.event_type(),
         payload,
+        event.event_id(),
     )
     .await
 }
@@ -4510,8 +4552,10 @@ pub async fn insert_progress_event(
         member_name,
         event.event_type,
         event.payload.clone(),
+        None,
     )
-    .await
+    .await?;
+    Ok(())
 }
 
 /// The member's currently-stored progress columns, read before the batcher overwrites them so the

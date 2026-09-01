@@ -200,6 +200,7 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                         quantity: rand_range(1, 4) as i32,
                     }]),
                     account_kc: None,
+                    event_id: None,
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;
@@ -220,6 +221,7 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                         item_id: 536,
                         quantity: rand_range(1, 4) as i32,
                     }],
+                    event_id: None,
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;
@@ -241,6 +243,7 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                         item_id: 536,
                         quantity: rand_range(1, 4) as i32,
                     }],
+                    event_id: None,
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;
@@ -255,6 +258,7 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                     world: 420,
                     occurred_at: Some(occurred_at),
                     killer_name: Some(choose(&bosses).to_string()),
+                    event_id: None,
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;

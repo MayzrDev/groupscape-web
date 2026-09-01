@@ -42,6 +42,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The "Exit view" button on the admin read-only viewing banner no longer fails to click while looking at the Map tab.
 - Activity Feed's type and member filter counts no longer zero out every other option when you pick a filter - they now show real counts for each choice regardless of what's currently selected.
 - The Discord notify toggles in Group Settings were invisible and couldn't be clicked at all - fixed.
+- Kills, loot, and deaths could occasionally show up twice in the Activity Feed and get posted twice to Discord, most often right around a server restart - fixed.
 
 ## [1.0.254] - 2026-08-31
 

@@ -587,7 +587,7 @@ pub async fn update_group_member(
                         .await?,
                     );
                 }
-                db::insert_activity_event(
+                let inserted = db::insert_activity_event(
                     &client,
                     auth.group_id,
                     session_id,
@@ -595,6 +595,13 @@ pub async fn update_group_member(
                     &stored_event,
                 )
                 .await?;
+                // A rejected duplicate (see insert_activity_event's doc comment - most commonly
+                // a resend after a server restart dropped the connection before its response
+                // reached the client) already has a Discord message and feed row from the first
+                // successful insert; firing either again here would just double them.
+                if !inserted {
+                    continue;
+                }
                 discord::dispatch_event_webhook(
                     db_pool.get_ref().clone(),
                     auth.group_id,

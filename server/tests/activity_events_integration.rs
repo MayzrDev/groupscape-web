@@ -89,6 +89,7 @@ fn sample_kill() -> GameEvent {
             quantity: 1,
         }]),
         account_kc: None,
+        event_id: None,
     })
 }
 
@@ -100,6 +101,7 @@ fn sample_death() -> GameEvent {
         world: 420,
         occurred_at: None,
         killer_name: Some("Zulrah".to_string()),
+        event_id: None,
     })
 }
 
@@ -288,6 +290,7 @@ async fn test_kill_event_without_loot_round_trips() {
         participants: None,
         loot: None,
         account_kc: None,
+        event_id: None,
     });
     db::insert_activity_event(&client, group_id, session_id, "Zezima", &kill_without_loot)
         .await
@@ -298,6 +301,54 @@ async fn test_kill_event_without_loot_round_trips() {
         .unwrap();
     assert_eq!(events.len(), 1);
     assert!(events[0].payload.get("loot").is_none());
+}
+
+/// Regression test for kills/loot/deaths getting duplicated on server restart: the plugin
+/// resends a buffered event verbatim (same `event_id`) when it can't tell a dropped connection
+/// from an outright failure - `insert_activity_event` must reject the replay rather than writing
+/// a second row, and report that back so the caller doesn't fire a second Discord message either.
+#[tokio::test]
+async fn test_insert_activity_event_is_idempotent_on_matching_event_id() {
+    let _guard = TEST_MUTEX.lock().await;
+    let pool = create_test_pool().await;
+    setup(&pool).await;
+    let client = pool.get().await.unwrap();
+    let group_id = create_test_group(&client, "activitytest8").await;
+    let session_id = db::ensure_open_session(&client, group_id).await.unwrap();
+
+    let kill = GameEvent::Kill(KillEvent {
+        npc_id: 3129,
+        npc_name: "Zulrah".to_string(),
+        world_x: 2200,
+        world_y: 3057,
+        plane: 0,
+        world: 420,
+        occurred_at: None,
+        participants: None,
+        loot: None,
+        account_kc: None,
+        event_id: Some("replayed-kill-1".to_string()),
+    });
+
+    let first_insert = db::insert_activity_event(&client, group_id, session_id, "Zezima", &kill)
+        .await
+        .expect("first insert should succeed");
+    assert!(first_insert, "first send of an event should be inserted");
+
+    // Simulates the plugin resending the same buffered event after a connection drop whose
+    // response never reached it (e.g. the server restarting mid-request).
+    let second_insert = db::insert_activity_event(&client, group_id, session_id, "Zezima", &kill)
+        .await
+        .expect("replayed insert should not error");
+    assert!(
+        !second_insert,
+        "a resend with the same event_id must be rejected as a duplicate"
+    );
+
+    let events = db::list_activity_events(&client, group_id, None, None, None, 30)
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 1, "the replay must not create a second row");
 }
 
 #[tokio::test]
@@ -320,6 +371,7 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
         participants: None,
         loot: None,
         account_kc: None,
+        event_id: None,
     });
     let boss_kill = sample_kill();
     let death_by_ordinary_npc = GameEvent::Death(DeathEvent {
@@ -329,6 +381,7 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
         world: 301,
         occurred_at: None,
         killer_name: Some("Cow".to_string()),
+        event_id: None,
     });
 
     db::insert_activity_event(&client, group_id, session_id, "Zezima", &ordinary_kill)
@@ -426,6 +479,7 @@ async fn test_out_of_scope_event_types_are_excluded_from_the_feed() {
             "Zezima",
             event_type,
             serde_json::json!({ "npcName": "Hans" }),
+            None,
         )
         .await
         .expect("insert should succeed");
@@ -649,6 +703,7 @@ fn metric_sample_kill(npc_name: &str, loot_item_id: i32) -> GameEvent {
             quantity: 1,
         }]),
         account_kc: None,
+        event_id: None,
     })
 }
 
