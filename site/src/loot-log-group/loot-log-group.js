@@ -1,6 +1,8 @@
 import { BaseElement } from "../base-element/base-element";
 import { Item } from "../data/item";
-import { wikiHiscoreIconUrl } from "../data/wiki-icon";
+import { slugifyNpcName } from "../data/npc-slug";
+import { BOSS_ICON_SLUGS, CLUE_TIER_ICONS } from "../data/boss-icons";
+import { BOSS_COMBAT_LEVELS } from "../data/boss-levels";
 
 const COUNT_LABELS = {
   kill: "kills",
@@ -30,19 +32,6 @@ export class LootLogGroup extends BaseElement {
       tile.row = row;
       tile.showKillers = this.group.showKillers;
       grid.appendChild(tile);
-    }
-
-    if (this.group.sourceType === "kill") {
-      wikiHiscoreIconUrl(this.group.sourceName).then((url) => {
-        if (!url || !this.isConnected) return;
-        const dot = this.querySelector(".loot-log-group__source-dot");
-        if (!dot) return;
-        const icon = document.createElement("img");
-        icon.className = "loot-log-group__boss-icon";
-        icon.src = url;
-        icon.alt = "";
-        dot.replaceWith(icon);
-      });
     }
   }
 
@@ -75,11 +64,28 @@ export class LootLogGroup extends BaseElement {
       const tier = group.clueTier ? group.clueTier[0].toUpperCase() + group.clueTier.slice(1) : "";
       return `${tier} clue casket`.trim();
     }
+    if (group.sourceType === "kill") {
+      const level = BOSS_COMBAT_LEVELS[slugifyNpcName(group.sourceName)];
+      if (level) return `${group.sourceName} (level-${level})`;
+    }
     return group.sourceName;
   }
 
   get countLabel() {
     return COUNT_LABELS[this.group.sourceType] || "events";
+  }
+
+  // Self-hosted RuneLite-hiscore-style icon for this group's source (see data/boss-icons.js) -
+  // null falls back to the plain colored source dot rendered in loot-log-group.html.
+  get iconUrl() {
+    const group = this.group;
+    if (group.sourceType === "clue") {
+      return group.clueTier && CLUE_TIER_ICONS.has(group.clueTier)
+        ? `/icons/hiscore/clues/${group.clueTier}.png`
+        : null;
+    }
+    const slug = slugifyNpcName(group.sourceName);
+    return BOSS_ICON_SLUGS.has(slug) ? `/icons/hiscore/bosses/${slug}.png` : null;
   }
 
   get totalValue() {

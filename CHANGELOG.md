@@ -10,6 +10,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log tiles now show a small helmet badge (tinted to each member's color) for who got the drop when "All members" is selected. An item dropped by more than one member is combined into a single tile with a stacked badge and a per-member breakdown in the tooltip, instead of one duplicate tile per member. Boss kill sources also get their chathead icon next to the name.
 - Loot Log summary now shows a session card - the time span from your first kill to your last within the selected window, plus the duration.
 - Clicking a Loot Log item now opens its OSRS Wiki page in a new tab.
+- Loot Log boss names now show their combat level (e.g. "Vorkath (level-732)"), matching the in-game overhead format, for bosses with one fixed level.
 
 ### Changed
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
@@ -21,7 +22,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log items GroupScape doesn't recognize (no name, image, or value on file) no longer render as broken empty tiles - they're hidden instead.
 - Loot Log items from the same kill no longer reshuffle their order every time the page refreshes.
 - Coin drops in the Loot Log no longer value at 0gp.
-- Loot Log boss icons now use the same small square icon as RuneLite's Hiscore panel (and the official OSRS hiscores page) instead of the wiki's big infobox art.
+- Loot Log boss, chest, and clue-tier icons now use the same small square icon as RuneLite's Hiscore panel (and the official OSRS hiscores page), self-hosted instead of hotlinked so they always load.
 - Test/diagnostic kill data no longer shows up in the Loot Log.
 - Untradeable items in the Loot Log now show an "Untradeable" tag in their tooltip instead of "0 gp x quantity".
 

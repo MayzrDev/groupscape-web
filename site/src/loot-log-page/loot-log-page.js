@@ -2,19 +2,9 @@ import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { pubsub } from "../data/pubsub";
 import { utility } from "../utility";
+import { slugifyNpcName } from "../data/npc-slug";
 
 const REFRESH_INTERVAL_MS = 15000;
-
-// Mirrors the server's slugify_npc_name (server/src/drop_rates.rs) so the fallback boss list
-// (built from raw kill npc_name values when the curated boss list hasn't loaded yet) sends the
-// same slug the backend filters on.
-function slugifyNpcName(name) {
-  return name
-    .replace(/'/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
 
 export class LootLogPage extends BaseElement {
   constructor() {
