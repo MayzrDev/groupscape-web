@@ -26,6 +26,15 @@ loot-log-page {
   min-width: 110px;
 }
 
+.loot-log-page__summary-card--session {
+  min-width: 170px;
+}
+
+.loot-log-page__summary-card--session .loot-log-page__summary-l {
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .loot-log-page__summary-n {
   font-size: 1.25em;
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;

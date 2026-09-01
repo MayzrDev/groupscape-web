@@ -1239,7 +1239,10 @@ pub async fn get_loot_summary(
     }
 
     let mut result: Vec<LootSummaryRow> = rows.into_values().collect();
-    result.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at));
+    // `rows` is a HashMap, so its iteration order (and thus the input to this sort) is randomized
+    // per request - two rows sharing an `occurred_at` (same kill event) would otherwise flip
+    // order on every refresh. item_id as a tiebreaker keeps that deterministic.
+    result.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at).then(a.item_id.cmp(&b.item_id)));
 
     let sources = source_counts
         .into_iter()

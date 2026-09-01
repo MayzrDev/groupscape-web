@@ -3,10 +3,10 @@ loot-log-tile {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 46px;
+  height: 46px;
   box-sizing: border-box;
-  padding: 5px;
+  padding: 8px;
   background: var(--elevated);
   border: 2px solid var(--rarity-common);
   border-radius: 4px;

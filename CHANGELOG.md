@@ -8,14 +8,16 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Activity Feed now shows raid completions for Chambers of Xeric, Theatre of Blood, and Tombs of Amascut, including who finished it, the difficulty (invocation level for Tombs of Amascut, mode for the other two), and how much the reward chest was worth. If several of you finish the same raid together, it shows up as one entry crediting everyone instead of one per person. Raids also get their own filter chip and toast notification, and Tombs of Amascut shows a different icon depending on the invocation level reached.
 - Graphs now has a "Raid Completions" option alongside XP and Boss KC, showing your group's Chambers of Xeric, Theatre of Blood, and Tombs of Amascut completions over time. Filter by raid and (for CoX/ToA) by difficulty, and switch between one combined group line or a line per member - the leaderboard panel ranks members by how many of those completions they were part of.
 - Loot Log tiles now show a small helmet badge (tinted to each member's color) for who got the drop when "All members" is selected. An item dropped by more than one member is combined into a single tile with a stacked badge and a per-member breakdown in the tooltip, instead of one duplicate tile per member. Boss kill sources also get their chathead icon next to the name.
+- Loot Log summary now shows a session card - the time span from your first kill to your last within the selected window, plus the duration.
 
 ### Changed
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
-- Loot Log item art now has a little breathing room inside its rarity border instead of touching it edge-to-edge.
+- Loot Log item art now has a lot more breathing room inside its rarity border instead of crowding the edge.
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
 - Loot Log items GroupScape doesn't recognize (no name, image, or value on file) no longer render as broken empty tiles - they're hidden instead.
+- Loot Log items from the same kill no longer reshuffle their order every time the page refreshes.
 
 ## [1.0.254] - 2026-08-31
 
