@@ -47,11 +47,16 @@ export class LootLogTile extends BaseElement {
     return `https://oldschool.runescape.wiki/w/Special:Lookup?type=item&id=${this.row.item_id}`;
   }
 
+  get isUntradeable() {
+    return !this.row.unit_value;
+  }
+
   buildTooltip() {
-    const unitValue = this.row.unit_value ?? 0;
     const lines = [
       `${this.itemName}${this.row.is_unique ? ` <span class="loot-log-tile__tt-unique">Unique</span>` : ""}`,
-      `${unitValue.toLocaleString()} gp &times; ${this.row.quantity.toLocaleString()} = <b>${this.row.total_value.toLocaleString()} gp</b>`,
+      this.isUntradeable
+        ? `<span class="loot-log-tile__tt-untradeable">Untradeable</span> &times; ${this.row.quantity.toLocaleString()}`
+        : `${this.row.unit_value.toLocaleString()} gp &times; ${this.row.quantity.toLocaleString()} = <b>${this.row.total_value.toLocaleString()} gp</b>`,
     ];
     if (this.rarityLabel) {
       lines.push(`<span class="loot-log-tile__tt-rarity">${this.rarityLabel}</span>`);

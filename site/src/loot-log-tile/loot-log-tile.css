@@ -49,6 +49,11 @@ loot-log-tile item-box {
   letter-spacing: 0.04em;
 }
 
+.loot-log-tile__tt-untradeable {
+  font-style: italic;
+  opacity: 0.7;
+}
+
 .loot-log-tile__tt-rarity {
   display: inline-block;
   margin-top: 2px;
