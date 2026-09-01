@@ -182,12 +182,18 @@ pub fn dispatch_event_webhook(
                 // `content/drop_rates.json`) aren't posted - only bosses, matching what a group
                 // actually wants pinged in Discord.
                 if settings.notify_kills && drop_rates::is_boss(&kill.npc_name) {
-                    let kc = db::count_kills_for_member_npc(&client, group_id, &member_name, &kill.npc_name)
-                        .await
-                        .unwrap_or_else(|err| {
-                            log::warn!("discord: failed to load kill count: {}", err);
-                            0
-                        });
+                    // Prefer the account's real in-game KC (parsed client-side from the "kill
+                    // count is" chat line); only fall back to counting this server's own kill
+                    // log when that line didn't arrive in time, e.g. right at plugin startup.
+                    let kc = match kill.account_kc {
+                        Some(kc) => kc as i64,
+                        None => db::count_kills_for_member_npc(&client, group_id, &member_name, &kill.npc_name)
+                            .await
+                            .unwrap_or_else(|err| {
+                                log::warn!("discord: failed to load kill count: {}", err);
+                                0
+                            }),
+                    };
                     let description = format!("{} killed {} (KC: {})", member_name, kill.npc_name, kc);
                     send_webhook_embed(webhook_url.clone(), "Kill", description, KILL_COLOR).await;
                 }

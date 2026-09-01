@@ -199,6 +199,7 @@ async fn regenerate_history(client: &Client, group_id: i64) -> Result<(), ApiErr
                         item_id: 536,
                         quantity: rand_range(1, 4) as i32,
                     }]),
+                    account_kc: None,
                 });
                 insert_backdated_event(client, group_id, session_id, member_name, &event, occurred_at)
                     .await?;

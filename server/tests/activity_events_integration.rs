@@ -88,6 +88,7 @@ fn sample_kill() -> GameEvent {
             item_id: 12934,
             quantity: 1,
         }]),
+        account_kc: None,
     })
 }
 
@@ -286,6 +287,7 @@ async fn test_kill_event_without_loot_round_trips() {
         occurred_at: None,
         participants: None,
         loot: None,
+        account_kc: None,
     });
     db::insert_activity_event(&client, group_id, session_id, "Zezima", &kill_without_loot)
         .await
@@ -317,6 +319,7 @@ async fn test_list_activity_events_hides_non_notable_kills_but_keeps_all_deaths(
         occurred_at: None,
         participants: None,
         loot: None,
+        account_kc: None,
     });
     let boss_kill = sample_kill();
     let death_by_ordinary_npc = GameEvent::Death(DeathEvent {
@@ -645,6 +648,7 @@ fn metric_sample_kill(npc_name: &str, loot_item_id: i32) -> GameEvent {
             item_id: loot_item_id,
             quantity: 1,
         }]),
+        account_kc: None,
     })
 }
 

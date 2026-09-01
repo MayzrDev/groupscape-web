@@ -245,6 +245,11 @@ pub struct KillEvent {
     /// pending kill before the next drain - the kill still ships without loot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub loot: Option<Vec<LootItem>>,
+    /// The account's real in-game kill count, parsed client-side from the "Your X kill count
+    /// is: N." chat line. Absent when that line never arrived before the next upload drain -
+    /// callers fall back to a server-tracked count in that case.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_kc: Option<i32>,
 }
 
 /// Distinguishes a chest/instance reward (e.g. Chambers of Xeric, Barrows) from a clue scroll
