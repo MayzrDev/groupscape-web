@@ -3,7 +3,7 @@ use crate::db;
 use crate::drop_rates;
 use crate::error::ApiError;
 use crate::item_names;
-use crate::models::{GameEvent, GEPrices};
+use crate::models::{format_gp, GameEvent, GEPrices};
 use crate::unauthed;
 use deadpool_postgres::Pool;
 use serde::Deserialize;
@@ -113,6 +113,16 @@ fn drop_lines(items: &[crate::models::LootItem], ge_prices: &GEPrices, min_value
         .collect()
 }
 
+/// Combined GE value of a whole kill's loot, regardless of the per-item `drops_min_value`
+/// threshold `drop_lines` applies - the kill message reports what the boss actually dropped, not
+/// just the slice a group cares to see itemized in the separate Drops notification.
+fn total_loot_value(items: &[crate::models::LootItem], ge_prices: &GEPrices) -> i64 {
+    items
+        .iter()
+        .map(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+        .sum()
+}
+
 fn send_webhook_embed_sync(url: &str, title: &str, description: &str, color: u32) -> Result<(), ureq::Error> {
     ureq::post(url)
         .send_json(serde_json::json!({
@@ -194,7 +204,13 @@ pub fn dispatch_event_webhook(
                                 0
                             }),
                     };
-                    let description = format!("{} killed {} (KC: {})", member_name, kill.npc_name, kc);
+                    let mut description = format!("{} killed {} (KC: {})", member_name, kill.npc_name, kc);
+                    if let Some(loot) = &kill.loot {
+                        let value = total_loot_value(loot, &unauthed::get_ge_prices_map());
+                        if value > 0 {
+                            description = format!("{} — loot worth {} gp", description, format_gp(value));
+                        }
+                    }
                     send_webhook_embed(webhook_url.clone(), "Kill", description, KILL_COLOR).await;
                 }
                 if settings.notify_drops {

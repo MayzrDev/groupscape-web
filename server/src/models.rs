@@ -668,7 +668,7 @@ fn join_names(names: &[&str]) -> String {
     }
 }
 
-fn format_gp(value: i64) -> String {
+pub(crate) fn format_gp(value: i64) -> String {
     let s = value.abs().to_string();
     let mut out = String::new();
     for (i, c) in s.chars().rev().enumerate() {
