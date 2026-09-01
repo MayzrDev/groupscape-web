@@ -1068,32 +1068,6 @@ pub async fn get_sessions(
     Ok(web::Json(sessions))
 }
 
-#[derive(serde::Serialize)]
-pub struct LootBoss {
-    pub slug: String,
-    pub name: String,
-    /// "kill" | "chest" - lets the site group/icon bosses separately from chest sources.
-    pub source_type: &'static str,
-}
-
-pub async fn get_loot_bosses() -> web::Json<Vec<LootBoss>> {
-    let bosses = crate::notable_npcs::names()
-        .into_iter()
-        .map(|(slug, name)| LootBoss {
-            slug,
-            name,
-            source_type: "kill",
-        });
-    let chests = crate::loot_sources::names()
-        .into_iter()
-        .map(|(slug, name)| LootBoss {
-            slug,
-            name,
-            source_type: "chest",
-        });
-    web::Json(bosses.chain(chests).collect())
-}
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GetLootSummaryQuery {
@@ -1196,6 +1170,17 @@ pub async fn get_loot_summary(
         if is_diagnostic_source(&source.source_name) {
             continue;
         }
+        // Counted before the boss/clue_tier filters below, so `sources` reflects every source
+        // present in the date/member/session scope regardless of which source is selected -
+        // that's what populates the Source dropdown, which shouldn't collapse to one option
+        // once a source is picked.
+        *source_counts
+            .entry((
+                source.source_name.clone(),
+                source.source_type.to_string(),
+                source.clue_tier.clone(),
+            ))
+            .or_insert(0) += 1;
         if let Some(boss) = query.boss.as_deref() {
             if drop_rates::slugify_npc_name(&source.source_name) != boss {
                 continue;
@@ -1206,13 +1191,6 @@ pub async fn get_loot_summary(
                 continue;
             }
         }
-        *source_counts
-            .entry((
-                source.source_name.clone(),
-                source.source_type.to_string(),
-                source.clue_tier.clone(),
-            ))
-            .or_insert(0) += 1;
         for item in &source.loot {
             let participants = source
                 .participants

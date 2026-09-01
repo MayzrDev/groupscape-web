@@ -135,10 +135,6 @@ class Api {
     return `${this.groupScopeUrl}/get-loot-summary`;
   }
 
-  get lootBossesUrl() {
-    return `${this.groupScopeUrl}/get-loot-bosses`;
-  }
-
   get itemBonusesUrl() {
     return `${this.groupScopeUrl}/get-item-bonuses`;
   }
@@ -578,12 +574,6 @@ class Api {
     if (!response.ok) {
       return { rows: [], sources: [] };
     }
-    return response.json();
-  }
-
-  async getLootBosses() {
-    const response = await fetch(this.lootBossesUrl, { headers: { Authorization: this.authHeader } });
-    if (!response.ok) return [];
     return response.json();
   }
 
