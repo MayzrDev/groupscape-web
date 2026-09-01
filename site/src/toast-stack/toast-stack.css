@@ -144,6 +144,28 @@ toast-stack {
   animation: toast-stack-leave 350ms ease-in forwards;
 }
 
+.toast-stack__toast--pulse {
+  animation: toast-stack-pulse 500ms ease;
+}
+
+@keyframes toast-stack-pulse {
+  0% {
+    background: #171310;
+  }
+  30% {
+    background: color-mix(in srgb, var(--toast-color) 22%, #171310);
+  }
+  100% {
+    background: #171310;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-stack__toast--pulse {
+    animation: none;
+  }
+}
+
 .toast-stack__toast--kill {
   --toast-color: var(--green);
 }

@@ -1,5 +1,12 @@
 import { BaseElement } from "../base-element/base-element";
-import { activityEventDescription, activityMetaLabel, activityLinkFor } from "../data/activity-event-copy";
+import {
+  activityEventDescription,
+  activityMetaLabel,
+  activityLinkFor,
+  activityDisplayType,
+  killGroupKey,
+  KILL_MERGE_WINDOW_MS,
+} from "../data/activity-event-copy";
 import { pubsub } from "../data/pubsub";
 
 const LEAVE_ANIMATION_MS = 300;
@@ -49,6 +56,9 @@ export class ToastStack extends BaseElement {
     this.eventListener(this.clearButton, "click", () => this.clearAll());
     this.subscribe("toast", this.handleToast.bind(this));
     this.tickInterval = window.setInterval(this.tickTimestamps.bind(this), RELATIVE_TIME_TICK_MS);
+    // key (member+boss, see `killGroupKey`) -> { toast, el } for the kill toast currently on
+    // screen for that key, so a repeat kill updates it in place instead of stacking a duplicate.
+    this.killToastGroups = new Map();
   }
 
   disconnectedCallback() {
@@ -56,7 +66,35 @@ export class ToastStack extends BaseElement {
     window.clearInterval(this.tickInterval);
   }
 
+  // Repeat kills of the same boss by the same member fold into the toast still on screen for
+  // that kill (see `KILL_MERGE_WINDOW_MS`) rather than stacking a duplicate. Returns true when
+  // the toast was merged in place, so the caller skips creating a new element.
+  mergeIntoExistingKillToast(toast) {
+    const key = killGroupKey(toast.event);
+    const group = this.killToastGroups.get(key);
+    if (!group) return false;
+    const eventTime = new Date(toast.event.occurred_at).getTime();
+    const groupTime = new Date(group.toast.event.occurred_at).getTime();
+    if (Math.abs(eventTime - groupTime) > KILL_MERGE_WINDOW_MS) return false;
+
+    group.toast.event = {
+      ...group.toast.event,
+      aggregateCount: (group.toast.event.aggregateCount || 1) + 1,
+      occurred_at: eventTime > groupTime ? toast.event.occurred_at : group.toast.event.occurred_at,
+    };
+    group.el.querySelector(".toast-stack__title").innerHTML = this.titleHtml(group.toast);
+    group.el.dataset.occurredAt = group.toast.event.occurred_at;
+    this.updateTimestamp(group.el);
+    group.el.classList.remove("toast-stack__toast--pulse");
+    void group.el.offsetWidth;
+    group.el.classList.add("toast-stack__toast--pulse");
+    return true;
+  }
+
   handleToast(toast) {
+    const isKillToast = toast.event && activityDisplayType(toast.event) === "kill";
+    if (isKillToast && this.mergeIntoExistingKillToast(toast)) return;
+
     const el = document.createElement("a");
     el.className = `toast-stack__toast toast-stack__toast--${toast.type}`;
     el.href = toast.type === "ping" ? "/group/map" : toast.event ? activityLinkFor(toast.event) : "/group/activity";
@@ -105,6 +143,12 @@ export class ToastStack extends BaseElement {
     this.list.appendChild(el);
     this.updateClearButton();
 
+    if (isKillToast) {
+      const key = killGroupKey(toast.event);
+      el.dataset.killGroupKey = key;
+      this.killToastGroups.set(key, { toast, el });
+    }
+
     if (toast.type === "ping") {
       setTimeout(() => this.dismiss(el), PING_TOAST_LIFETIME_MS);
     }
@@ -118,6 +162,10 @@ export class ToastStack extends BaseElement {
       el.remove();
       this.updateClearButton();
     }, LEAVE_ANIMATION_MS);
+    // Dismissed toasts no longer accept a merge - the next kill for this key spawns a fresh one.
+    if (el.dataset.killGroupKey && this.killToastGroups.get(el.dataset.killGroupKey)?.el === el) {
+      this.killToastGroups.delete(el.dataset.killGroupKey);
+    }
   }
 
   clearAll() {

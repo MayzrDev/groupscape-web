@@ -2,6 +2,7 @@ import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { pubsub } from "../data/pubsub";
 import { utility } from "../utility";
+import { activityDisplayType, killGroupKey, KILL_MERGE_WINDOW_MS } from "../data/activity-event-copy";
 
 const EVENT_TYPES = [
   [null, "All"],
@@ -30,6 +31,9 @@ export class ActivityFeedPage extends BaseElement {
     this.memberCountEvents = [];
     this.loadingMore = false;
     this.exhausted = false;
+    // key (member+boss, see `killGroupKey`) -> { event, row } for the kill currently shown as the
+    // aggregated row for that key, so a repeat kill can be folded in rather than adding a row.
+    this.feedGroups = new Map();
   }
 
   html() {
@@ -156,9 +160,41 @@ export class ActivityFeedPage extends BaseElement {
     return row;
   }
 
+  // Folds a repeat kill of the same boss by the same member into its existing aggregated row
+  // (see `KILL_MERGE_WINDOW_MS`) instead of creating a new one. Returns the row to insert, or
+  // null when the event was merged into an already-rendered row instead.
+  mergeOrCreateRow(event, { prepend }) {
+    if (activityDisplayType(event) === "kill") {
+      const key = killGroupKey(event);
+      const group = this.feedGroups.get(key);
+      const eventTime = new Date(event.occurred_at).getTime();
+      if (group && Math.abs(eventTime - new Date(group.event.occurred_at).getTime()) <= KILL_MERGE_WINDOW_MS) {
+        group.event.aggregateCount = (group.event.aggregateCount || 1) + 1;
+        group.event.payload = {
+          ...group.event.payload,
+          loot: [...(group.event.payload?.loot || []), ...(event.payload?.loot || [])],
+        };
+        if (eventTime > new Date(group.event.occurred_at).getTime()) group.event.occurred_at = event.occurred_at;
+        group.row.event = group.event;
+        group.row.render();
+        // Only a fresh, more recent kill (poll) should bump the row back to the top - an older
+        // kill filled in from loadMore already sits above the batch being appended below it.
+        if (prepend) this.list.insertBefore(group.row, this.list.firstChild);
+        return null;
+      }
+    }
+
+    const row = this.createRow(event);
+    if (activityDisplayType(event) === "kill") {
+      this.feedGroups.set(killGroupKey(event), { event, row });
+    }
+    return row;
+  }
+
   async resetAndLoad() {
     this.loaded = [];
     this.exhausted = false;
+    this.feedGroups = new Map();
     this.list.innerHTML = "";
     this.empty.classList.remove("activity-feed-page__empty--visible");
     await Promise.all([this.loadMore(), this.loadCounts()]);
@@ -190,7 +226,8 @@ export class ActivityFeedPage extends BaseElement {
 
     for (const event of page) {
       this.loaded.push(event);
-      this.list.appendChild(this.createRow(event));
+      const row = this.mergeOrCreateRow(event, { prepend: false });
+      if (row) this.list.appendChild(row);
     }
     this.exhausted = page.length < PAGE_LIMIT;
     this.sentinel.classList.toggle("activity-feed-page__sentinel--visible", !this.exhausted);
@@ -219,14 +256,16 @@ export class ActivityFeedPage extends BaseElement {
     const scrollTopBefore = this.scrollContainer.scrollTop;
     const heightBefore = this.list.scrollHeight;
 
-    const fragment = document.createDocumentFragment();
-    for (const event of incoming) {
+    // Oldest-of-batch first so each insertion lands above the previous one, keeping merge
+    // repositioning (see `mergeOrCreateRow`) in the right chronological order at the top.
+    for (const event of [...incoming].reverse()) {
       this.loaded.unshift(event);
-      const row = this.createRow(event);
-      row.classList.add("activity-feed-event--enter");
-      fragment.appendChild(row);
+      const row = this.mergeOrCreateRow(event, { prepend: true });
+      if (row) {
+        row.classList.add("activity-feed-event--enter");
+        this.list.insertBefore(row, this.list.firstChild);
+      }
     }
-    this.list.insertBefore(fragment, this.list.firstChild);
 
     if (scrollTopBefore > 0) {
       const delta = this.list.scrollHeight - heightBefore;

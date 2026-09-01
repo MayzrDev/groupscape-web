@@ -1,6 +1,8 @@
 import { Quest } from "./quest";
 import { Item } from "./item";
 import { combatAchievement } from "./combat-achievement";
+import { slugifyNpcName } from "./npc-slug";
+import { BOSS_ICON_SLUGS } from "./boss-icons";
 
 const COLLECTION_LOG_WIKI_URL = "https://oldschool.runescape.wiki/w/Collection_log";
 
@@ -109,6 +111,25 @@ export function npcWikiUrl(npcName) {
   return `https://oldschool.runescape.wiki/w/Special:Lookup?type=npc&name=${encodeURIComponent(npcName)}`;
 }
 
+// Repeat kills of the same boss by the same member within this window collapse into one
+// activity-feed row / toast instead of stacking duplicates - see `mergeOrCreateRow` in
+// activity-feed-page.js and `handleToast` in toast-stack.js. Each merge resets the window from
+// the latest kill, so a steady drip of kills keeps merging indefinitely.
+export const KILL_MERGE_WINDOW_MS = 60 * 60 * 1000;
+
+export function killGroupKey(event) {
+  const npc = event.payload?.npcName || event.payload?.npc_name;
+  return `${event.member_name}|${npc}`;
+}
+
+// Same self-hosted RuneLite-hiscore-style icon the loot log uses per boss (see
+// `loot-log-group.js`'s `iconUrl` getter) - null falls back to no icon for NPCs outside that set.
+export function bossIconFor(npcName) {
+  if (!npcName) return null;
+  const slug = slugifyNpcName(npcName);
+  return BOSS_ICON_SLUGS.has(slug) ? `/icons/hiscore/bosses/${slug}.png` : null;
+}
+
 // Category icons for the milestone event types - saved locally from the OSRS wiki's own
 // icons for Quests, Achievement Diaries, Combat Achievements and the Collection log.
 const ACTIVITY_ICONS = {
@@ -195,9 +216,13 @@ export function activityEventDescription(event, format = {}) {
       // too so either casing renders.
       const npc = payload.npcName || payload.npc_name;
       const noLoot = !payload.loot || payload.loot.length === 0;
-      return `${member} killed ${wrapSubject(npc || "an NPC", "monster", npc && npcWikiUrl(npc))}${
-        noLoot ? " — no loot" : ""
-      }`;
+      // `aggregateCount` is a client-side field set by the activity feed/toast stack when folding
+      // repeat kills of the same boss by the same member within an hour into one row (see
+      // `mergeKillEvents` in activity-feed-page.js) - it's never sent by the server.
+      const count = event.aggregateCount || 1;
+      return `${member} killed ${wrapSubject(npc || "an NPC", "monster", npc && npcWikiUrl(npc), bossIconFor(npc))}${
+        count > 1 ? ` &times;${count}` : ""
+      }${noLoot ? " — no loot" : ""}`;
     }
     case "death": {
       const killer = payload.killerName || payload.killer_name;

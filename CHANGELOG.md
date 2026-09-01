@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Group Settings' Discord Integration section now has toggles for Combat achievements, Collection log, Quest completions, and Diary completions, so those milestones can post to Discord too.
 
 ### Changed
+- Activity Feed kill entries now show the boss's icon next to its name, and repeated kills of the same boss by the same member within an hour merge into one entry with a running count (e.g. "killed Vorkath ×3") instead of listing each kill separately - the same merging applies to a kill toast that's still on screen.
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
 - Loot Log item art now has a lot more breathing room inside its rarity border instead of crowding the edge.
 - The Loot Log time window's "Last day" option is now labeled "Last 24h".
