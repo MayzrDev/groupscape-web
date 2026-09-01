@@ -87,6 +87,15 @@ export class GroupSettings extends BaseElement {
     const blockedToggle = this.querySelector(".group-settings__blocked-toggle");
     this.eventListener(blockedToggle, "click", this.toggleBlockedList.bind(this));
 
+    const discordHowtoToggle = this.querySelector(".group-settings__discord-howto-toggle");
+    this.eventListener(discordHowtoToggle, "click", this.toggleDiscordHowto.bind(this));
+    this.discordUrlInput = this.querySelector(".group-settings__discord-url-input");
+    const discordSaveButton = this.querySelector(".group-settings__discord-save-button");
+    this.eventListener(discordSaveButton, "click", this.saveDiscordSettings.bind(this));
+    for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
+      this.eventListener(checkbox, "change", this.saveDiscordSettings.bind(this));
+    }
+
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
       this.handleUpdatedMembers(mostRecentMembers);
@@ -95,6 +104,7 @@ export class GroupSettings extends BaseElement {
     this.loadBlockedMembers();
     this.loadPermissions();
     this.loadCanKickMembers();
+    this.loadDiscordSettings();
   }
 
   // Cached rather than checked per-member: it's one account's permission for this group, not
@@ -329,6 +339,103 @@ export class GroupSettings extends BaseElement {
       permissionMember.showColor = showColor;
       permissionMember.permission = permission;
       container.appendChild(permissionMember);
+    }
+  }
+
+  toggleDiscordHowto() {
+    this.querySelector(".group-settings__discord-howto-body").classList.toggle(
+      "group-settings__discord-howto-body--open"
+    );
+    this.querySelector(".group-settings__discord-howto-arrow").classList.toggle(
+      "group-settings__discord-howto-arrow--open"
+    );
+  }
+
+  // Mirrors loadPermissions' gating pattern: the GET is itself the ManageDiscord check, so a
+  // 401/403 just hides the whole section rather than showing controls that would 403 on save.
+  async loadDiscordSettings() {
+    const section = this.querySelector(".group-settings__discord-section");
+    const response = await api.getDiscordSettings();
+    if (!response.ok) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+
+    const settings = await response.json();
+    this.lastSavedDiscordSettings = settings;
+    this.applyDiscordSettingsToForm(settings);
+    this.setDiscordConnected(!!settings.webhook_url);
+  }
+
+  applyDiscordSettingsToForm(settings) {
+    this.discordUrlInput.input.value = settings.webhook_url || "";
+    for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
+      checkbox.checked = !!settings[checkbox.closest(".group-settings__discord-notify-row").dataset.key];
+    }
+  }
+
+  // A webhook only ever gets persisted after `update-discord-settings` tests it live against
+  // Discord (see `discord::test_webhook`), so a saved, non-empty URL can be trusted as connected
+  // without re-testing it just for opening the settings page.
+  setDiscordConnected(connected) {
+    const badge = this.querySelector(".group-settings__discord-conn-badge");
+    badge.classList.toggle("group-settings__discord-conn-badge--connected", connected);
+    badge.querySelector(".group-settings__discord-conn-text").textContent = connected ? "Connected" : "Not connected";
+
+    for (const row of this.querySelectorAll(".group-settings__discord-notify-row")) {
+      row.classList.toggle("group-settings__discord-notify-row--locked", !connected);
+    }
+    for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
+      checkbox.disabled = !connected;
+    }
+    this.querySelector(".group-settings__discord-lock-note").style.display = connected ? "none" : "";
+  }
+
+  showDiscordStatus(text, kind) {
+    const status = this.querySelector(".group-settings__discord-status");
+    status.textContent = text;
+    status.className = `group-settings__discord-status group-settings__discord-status--${kind}`;
+  }
+
+  // Always submits the full settings object (matching DiscordWebhookSettings' deny_unknown_fields
+  // + full-replace update endpoint) - fired both by the Save button and by any notify checkbox
+  // change, since there's no separate patch endpoint for toggles alone.
+  async saveDiscordSettings() {
+    const webhookUrl = this.discordUrlInput.value;
+    const settings = { webhook_url: webhookUrl || null };
+    for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
+      settings[checkbox.closest(".group-settings__discord-notify-row").dataset.key] = checkbox.checked;
+    }
+
+    try {
+      loadingScreenManager.showLoadingScreen();
+      const response = await api.updateDiscordSettings(settings);
+      if (response.ok) {
+        const saved = await response.json();
+        this.lastSavedDiscordSettings = saved;
+        this.setDiscordConnected(!!saved.webhook_url);
+        this.showDiscordStatus(
+          saved.webhook_url
+            ? "Saved — test message sent to Discord."
+            : "Saved — webhook cleared, notifications are off.",
+          "ok"
+        );
+      } else {
+        // The server rejected the whole update (bad URL, or Discord no longer recognizes it) -
+        // nothing was persisted, so the notify checkboxes are reset to the last known-good state
+        // rather than left showing an edit that never actually saved. The URL field is left as
+        // typed so it can be corrected.
+        const message = await response.text();
+        if (this.lastSavedDiscordSettings) {
+          this.applyDiscordSettingsToForm({ ...this.lastSavedDiscordSettings, webhook_url: webhookUrl });
+        }
+        this.showDiscordStatus(message, "err");
+      }
+    } catch (error) {
+      this.showDiscordStatus(`Failed to save: ${error}`, "err");
+    } finally {
+      loadingScreenManager.hideLoadingScreen();
     }
   }
 

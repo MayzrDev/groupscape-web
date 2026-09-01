@@ -83,6 +83,14 @@ class Api {
     return `${this.groupScopeUrl}/update-member-color`;
   }
 
+  get discordSettingsUrl() {
+    return `${this.groupScopeUrl}/get-discord-settings`;
+  }
+
+  get updateDiscordSettingsUrl() {
+    return `${this.groupScopeUrl}/update-discord-settings`;
+  }
+
   get renameGroupUrl() {
     return `${this.groupScopeUrl}/rename-group`;
   }
@@ -355,6 +363,31 @@ class Api {
     });
 
     return response.ok;
+  }
+
+  async getDiscordSettings() {
+    const response = await fetch(this.discordSettingsUrl, {
+      headers: {
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+    });
+
+    return response;
+  }
+
+  async updateDiscordSettings(settings) {
+    const response = await fetch(this.updateDiscordSettingsUrl, {
+      body: JSON.stringify(settings),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
+    });
+
+    return response;
   }
 
   async getGroupPermissions() {

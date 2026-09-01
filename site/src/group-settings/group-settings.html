@@ -50,6 +50,98 @@
     <div class="group-settings__permissions rsborder-tiny rsbackground"></div>
   </div>
 
+  <div class="group-settings__discord-section" style="display: none;">
+    <h3>Discord Integration</h3>
+    <p class="group-settings__hint">Post kills, deaths, loot and raid completions from this group into a Discord channel.</p>
+
+    <div class="group-settings__discord-howto-toggle">
+      <h4>How do I get a webhook URL?</h4>
+      <span class="group-settings__discord-howto-arrow">&#9656;</span>
+    </div>
+    <div class="group-settings__discord-howto-body">
+      <ol>
+        <li>In Discord, open <strong>Server Settings</strong> for the channel's server.</li>
+        <li>Go to <strong>Integrations</strong> &rarr; <strong>Webhooks</strong>.</li>
+        <li>Click <strong>New Webhook</strong>, pick the channel it should post to.</li>
+        <li>Click <strong>Copy Webhook URL</strong>.</li>
+        <li>Paste it below and hit Save &mdash; GroupScape sends a test message to confirm it works.</li>
+      </ol>
+    </div>
+
+    <div class="group-settings__discord-field">
+      <div class="group-settings__discord-field-label-row">
+        <h4>Webhook URL</h4>
+        <span class="group-settings__discord-conn-badge">
+          <span class="group-settings__discord-conn-dot"></span>
+          <span class="group-settings__discord-conn-text">Not connected</span>
+        </span>
+      </div>
+      <men-input
+        class="group-settings__discord-url-input"
+        input-id="groupSettingsDiscordUrl"
+        placeholder-text="https://discord.com/api/webhooks/&hellip;"
+        max-length="200"
+      ></men-input>
+      <div class="group-settings__discord-actions">
+        <button class="group-settings__discord-save-button men-button small">Save</button>
+      </div>
+      <p class="group-settings__hint">
+        Saving sends a real test message to Discord first &mdash; if Discord rejects the URL, nothing is saved and the group keeps whichever webhook was working before.
+      </p>
+      <div class="group-settings__discord-status"></div>
+    </div>
+
+    <h4 class="group-settings__discord-notify-heading">Notify on</h4>
+    <p class="group-settings__hint group-settings__discord-lock-note" style="display: none;">
+      Add and save a webhook URL above to enable notifications.
+    </p>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_kills">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--kill"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Kills</div>
+        <div class="group-settings__discord-notify-desc">A member kills an NPC or boss.</div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" />
+    </div>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_deaths">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--death"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Deaths</div>
+        <div class="group-settings__discord-notify-desc">A member dies, and to what.</div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" />
+    </div>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_loot">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--loot"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Loot</div>
+        <div class="group-settings__discord-notify-desc">Items received from a kill.</div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" />
+    </div>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_notable_drops">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--drop"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Notable drops</div>
+        <div class="group-settings__discord-notify-desc">Rare or high-value drops worth flagging on their own.</div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" />
+    </div>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_raids">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--raid"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Raid completions</div>
+        <div class="group-settings__discord-notify-desc">One combined post per completed raid for the whole party.</div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" />
+    </div>
+  </div>
+
   <h3>Appearance settings</h3>
   <fieldset class="group-settings__panels">
     <legend>Player panels</legend>
