@@ -449,11 +449,14 @@ export class GroupSettings extends BaseElement {
       const response = await api.updateDiscordSettings(settings);
       if (response.ok) {
         const saved = await response.json();
+        const urlChanged = saved.webhook_url !== (this.lastSavedDiscordSettings?.webhook_url ?? null);
         this.lastSavedDiscordSettings = saved;
         this.setDiscordConnected(!!saved.webhook_url);
         this.showDiscordStatus(
           saved.webhook_url
-            ? "Saved — test message sent to Discord."
+            ? urlChanged
+              ? "Saved — test message sent to Discord."
+              : "Saved."
             : "Saved — webhook cleared, notifications are off.",
           "ok"
         );

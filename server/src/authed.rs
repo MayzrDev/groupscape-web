@@ -330,8 +330,10 @@ pub async fn get_discord_settings(
 }
 
 /// Always submits full settings state (not a patch) - see [`DiscordWebhookSettings`]. A
-/// non-empty `webhook_url` is validated with a live test message before saving, so a typo'd URL
-/// never gets silently stored; an empty/`None` URL clears it without a test call.
+/// `webhook_url` that's new or changed from what's currently stored is validated with a live
+/// test message before saving, so a typo'd URL never gets silently stored; an empty/`None` URL
+/// clears it without a test call. Re-saving an unchanged URL (e.g. toggling a notify checkbox)
+/// skips the test call so it doesn't spam the channel on every settings save.
 #[put("/update-discord-settings")]
 pub async fn update_discord_settings(
     req: HttpRequest,
@@ -348,8 +350,12 @@ pub async fn update_discord_settings(
         .webhook_url
         .map(|url| url.trim().to_string())
         .filter(|url| !url.is_empty());
+
+    let existing = db::get_discord_webhook_settings(&client, auth.group_id).await?;
     if let Some(url) = &settings.webhook_url {
-        discord::test_webhook(url).await?;
+        if existing.webhook_url.as_deref() != Some(url.as_str()) {
+            discord::test_webhook(url).await?;
+        }
     }
 
     db::update_discord_webhook_settings(&client, auth.group_id, &settings).await?;
