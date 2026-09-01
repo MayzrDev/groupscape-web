@@ -1,5 +1,6 @@
 import { BaseElement } from "../base-element/base-element";
 import { activityBadgeLabel, activityDisplayType, activityEventDescription } from "../data/activity-event-copy";
+import { Item } from "../data/item";
 
 const RELATIVE_UNITS = [
   ["y", 31536000],
@@ -52,10 +53,13 @@ export class ActivityFeedEvent extends BaseElement {
   get loot() {
     // A merged raid completion has no top-level `payload.loot` - each reporting member's share
     // lives under its own `participants[].loot` entry instead (see `RaidCompletionPayload`).
-    if (["cox", "tob", "toa"].includes(this.displayType)) {
-      return (this.event.payload?.participants || []).flatMap((p) => p.loot || []);
-    }
-    return this.event.payload?.loot || [];
+    const loot = ["cox", "tob", "toa"].includes(this.displayType)
+      ? (this.event.payload?.participants || []).flatMap((p) => p.loot || [])
+      : this.event.payload?.loot || [];
+    // Same "unrecognized item" filter loot-log-group.js applies before rendering an item-box -
+    // an item id with no local catalog entry (not yet added, or a bad drop report) would otherwise
+    // throw inside item-box's Item.imageUrl() and take the whole row's render() down with it.
+    return loot.filter((entry) => Item.exists(entry.item_id));
   }
 
   get displayType() {

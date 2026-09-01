@@ -45,6 +45,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Discord notify toggles in Group Settings were invisible and couldn't be clicked at all - fixed.
 - Kills, loot, and deaths could occasionally show up twice in the Activity Feed and get posted twice to Discord, most often right around a server restart - fixed.
 - Activity Feed no longer gets stuck endlessly spinning for a group with a long same-boss farming streak - when merging repeat kills keeps pulling in more history without adding anything new to see, it now pauses and shows a "Load more" button instead of spinning forever.
+- Activity Feed no longer breaks entirely (spinner stuck forever) when a kill's loot includes an item GroupScape doesn't recognize yet - that item is now just skipped instead of crashing the whole feed.
 
 ## [1.0.254] - 2026-08-31
 
