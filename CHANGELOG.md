@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.288] - 2026-09-01
+
+### Fixed
+- Activity Feed no longer gets stuck endlessly spinning for a group with a long same-boss farming streak - when merging repeat kills keeps pulling in more history without adding anything new to see, it now pauses and shows a "Load more" button instead of spinning forever.
+
 ## [1.0.257] - 2026-09-01
 
 ### Added
@@ -76,11 +81,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Changed
 - Renamed the "Safe Spot" raid marker to "Defend".
 
-## [1.0.245] - 2026-08-31
-
-### Fixed
-- Combat Achievements, Activity Feed, and Loot Log no longer get partially hidden behind the account menu (Group Settings/My Account/Logout) in the top-right corner.
-- The Graphs leaderboard now sits next to the chart instead of dropping out of view at the bottom of a tall page.
+[1.0.245] — Fix Menu Overlap On Activity Feed, Loot Log, Graphs Leaderboard
 
 ## [1.0.243] - 2026-08-31
 

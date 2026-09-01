@@ -141,6 +141,26 @@ activity-feed-page {
   display: flex;
 }
 
+.activity-feed-page__load-more {
+  display: none;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.85em;
+  color: var(--orange);
+  background: transparent;
+  border: 1px solid var(--light-border);
+  border-radius: 2px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.activity-feed-page__sentinel--paused .activity-feed-page__spinner {
+  display: none;
+}
+
+.activity-feed-page__sentinel--paused .activity-feed-page__load-more {
+  display: inline-block;
+}
+
 .activity-feed-page__spinner {
   width: 13px;
   height: 13px;

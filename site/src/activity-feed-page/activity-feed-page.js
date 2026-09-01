@@ -19,6 +19,12 @@ const EVENT_TYPES = [
 const PAGE_LIMIT = 25;
 const COUNT_LIMIT = 200;
 const REFRESH_INTERVAL_MS = 15000;
+// A page of raw events can collapse to zero new visible rows when every kill in it merges into
+// an already-rendered aggregate row (see `mergeOrCreateRow`) - a long same-boss farming session
+// can do this for many consecutive pages. Auto-loading via the sentinel would otherwise keep
+// firing fetch after fetch with no visible progress, reading as a stuck spinner. After this many
+// consecutive empty-growth pages, pause auto-loading and require a manual click instead.
+const EMPTY_PAGE_STREAK_LIMIT = 3;
 
 export class ActivityFeedPage extends BaseElement {
   constructor() {
@@ -31,6 +37,8 @@ export class ActivityFeedPage extends BaseElement {
     this.memberCountEvents = [];
     this.loadingMore = false;
     this.exhausted = false;
+    this.emptyPageStreak = 0;
+    this.autoLoadPaused = false;
     // key (member+boss, see `killGroupKey`) -> { event, row } for the kill currently shown as the
     // aggregated row for that key, so a repeat kill can be folded in rather than adding a row.
     this.feedGroups = new Map();
@@ -49,6 +57,8 @@ export class ActivityFeedPage extends BaseElement {
     this.list = this.querySelector(".activity-feed-page__list");
     this.sentinel = this.querySelector(".activity-feed-page__sentinel");
     this.empty = this.querySelector(".activity-feed-page__empty");
+    this.loadMoreButton = this.querySelector(".activity-feed-page__load-more");
+    this.eventListener(this.loadMoreButton, "click", () => this.loadMore({ manual: true }));
     this.scrollContainer = this.closest(".authed-section__main-content") || document.documentElement;
 
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
@@ -81,6 +91,7 @@ export class ActivityFeedPage extends BaseElement {
   }
 
   handleSentinelIntersect(entries) {
+    if (this.autoLoadPaused) return;
     if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
   }
 
@@ -194,9 +205,12 @@ export class ActivityFeedPage extends BaseElement {
   async resetAndLoad() {
     this.loaded = [];
     this.exhausted = false;
+    this.emptyPageStreak = 0;
+    this.autoLoadPaused = false;
     this.feedGroups = new Map();
     this.list.innerHTML = "";
     this.empty.classList.remove("activity-feed-page__empty--visible");
+    this.sentinel.classList.remove("activity-feed-page__sentinel--paused");
     await Promise.all([this.loadMore(), this.loadCounts()]);
   }
 
@@ -211,8 +225,14 @@ export class ActivityFeedPage extends BaseElement {
     this.renderMemberFilters();
   }
 
-  async loadMore() {
+  async loadMore({ manual = false } = {}) {
     if (this.loadingMore || this.exhausted) return;
+    if (this.autoLoadPaused && !manual) return;
+    if (manual) {
+      this.autoLoadPaused = false;
+      this.emptyPageStreak = 0;
+      this.sentinel.classList.remove("activity-feed-page__sentinel--paused");
+    }
     this.loadingMore = true;
     this.sentinel.classList.add("activity-feed-page__sentinel--visible");
 
@@ -224,13 +244,20 @@ export class ActivityFeedPage extends BaseElement {
       limit: PAGE_LIMIT,
     });
 
+    let newRows = 0;
     for (const event of page) {
       this.loaded.push(event);
       const row = this.mergeOrCreateRow(event, { prepend: false });
-      if (row) this.list.appendChild(row);
+      if (row) {
+        this.list.appendChild(row);
+        newRows++;
+      }
     }
     this.exhausted = page.length < PAGE_LIMIT;
+    this.emptyPageStreak = page.length > 0 && newRows === 0 ? this.emptyPageStreak + 1 : 0;
+    this.autoLoadPaused = !this.exhausted && this.emptyPageStreak >= EMPTY_PAGE_STREAK_LIMIT;
     this.sentinel.classList.toggle("activity-feed-page__sentinel--visible", !this.exhausted);
+    this.sentinel.classList.toggle("activity-feed-page__sentinel--paused", this.autoLoadPaused);
     this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
     this.renderRail();
     this.renderMemberFilters();
