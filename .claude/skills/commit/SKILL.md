@@ -15,19 +15,22 @@ This repo's deploy pipeline posts the newest CHANGELOG.md entry straight to Disc
    - 1-3 short bullets, written for someone using the site — "Group map now shows other members' world" not "fixed CanvasMap.js world sync bug".
    - Categorize each bullet under `### Added`, `### Changed`, `### Fixed`, or `### Removed`.
    - If the change is genuinely internal-only (refactor, test, CI, deploy tooling) with zero user-facing effect, still add one bullet under `### Changed` — keep it honest and brief (e.g. "Internal: tidied up deploy scripts") rather than skipping the entry. Every commit gets one.
-4. Update `CHANGELOG.md` at the repo root:
-   - If the top block's header is already today's date (`## YYYY-MM-DD`), append the new bullets to the matching `###` subsection (creating the subsection if it doesn't exist yet), instead of adding a second block for the same day.
-   - Otherwise, insert a new `## YYYY-MM-DD` block right after the `# Changelog` title line (before any existing dated blocks) — newest always on top.
-5. Stage `CHANGELOG.md` along with the rest of the changed files.
-6. Create the commit exactly like the default commit flow (see global git-commit instructions: heredoc for the message, no `--no-verify`, author is the user only — never add a co-author).
-7. Confirm with `git status`.
+4. Update `CHANGELOG.md` at the repo root. Headers are `## [x.y.z] - YYYY-MM-DD`, keyed by *date*, not by a 1:1 version-per-commit:
+   - If the top block's date is already today, append the new bullets to the matching `###` subsection of that same block (creating the subsection if it doesn't exist yet). **Do not create a new versioned header for a same-day commit** — the version number in an existing header is not expected to track every commit that lands under it.
+   - Otherwise (first commit of a new day), insert a new `## [x.y.z] - YYYY-MM-DD` block right after the `# Changelog` title line. Read the *current* version from `site/package.json` and add 1 to the patch number for this header — do not write that number to `package.json` yourself (see step 5).
+5. **Never hand-edit the version field in `site/package.json`.** This repo's husky pre-commit hook (`npm run precommit` → `version:bump`) bumps the patch version and stages it automatically on every commit, unconditionally. Editing it yourself before committing causes a double bump (e.g. 1.0.287 → your manual 1.0.288 → the hook's 1.0.289, silently skipping the number you put in the changelog). Just predict the post-hook version (current + 1 patch) for the changelog header/commit message and let the hook do the actual write.
+6. Stage `CHANGELOG.md` along with the rest of the changed files.
+7. Create the commit exactly like the default commit flow (see global git-commit instructions: heredoc for the message, no `--no-verify`, author is the user only — never add a co-author).
+8. Confirm with `git status` and check `site/package.json`'s version matches what you predicted in step 4 — if it doesn't, something bumped it more than once; fix forward with a correcting commit rather than amending.
 
 ## Example CHANGELOG.md block
 
 ```markdown
-## 2026-08-28
+## [1.0.257] - 2026-09-01
+
 ### Added
 - Live world map now shows a trail of each group member's recent movement.
+
 ### Fixed
 - Prayer bar no longer flickers when a group member logs out mid-tick.
 ```

@@ -2,11 +2,6 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.288] - 2026-09-01
-
-### Fixed
-- Activity Feed no longer gets stuck endlessly spinning for a group with a long same-boss farming streak - when merging repeat kills keeps pulling in more history without adding anything new to see, it now pauses and shows a "Load more" button instead of spinning forever.
-
 ## [1.0.257] - 2026-09-01
 
 ### Added
@@ -35,6 +30,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log now defaults to the last 24h instead of the last hour when you open it.
 - Discord "Drops" messages now show each item's value (or "untradeable" if it has none) and its drop rate when known, and value now reflects the whole stack - 33x a 100gp item shows as 3,300 gp, not 100 gp.
 - Loot Log's Source filter now only lists sources you've actually looted in the selected date range, instead of every boss and chest in the game - picking a different date range updates the list, and it's empty if nothing was looted in that range.
+- Internal: fixed the commit workflow doc so it can't cause the version number to double-bump on a single commit.
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
@@ -48,6 +44,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Activity Feed's type and member filter counts no longer zero out every other option when you pick a filter - they now show real counts for each choice regardless of what's currently selected.
 - The Discord notify toggles in Group Settings were invisible and couldn't be clicked at all - fixed.
 - Kills, loot, and deaths could occasionally show up twice in the Activity Feed and get posted twice to Discord, most often right around a server restart - fixed.
+- Activity Feed no longer gets stuck endlessly spinning for a group with a long same-boss farming streak - when merging repeat kills keeps pulling in more history without adding anything new to see, it now pauses and shows a "Load more" button instead of spinning forever.
 
 ## [1.0.254] - 2026-08-31
 
