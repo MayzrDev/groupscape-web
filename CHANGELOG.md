@@ -5,6 +5,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ## [1.0.257] - 2026-09-01
 
 ### Added
+- Activity Feed now posts a standalone announcement when a member finishes every combat achievement task for a specific boss, the same way finishing a collection log page already does.
 - Group Settings now has a Discord Integration section — paste in a channel webhook URL and GroupScape can post your group's kills, deaths, loot, notable drops, and raid completions straight to Discord, with a toggle for each one. Saving sends a live test message first, so a bad or deleted webhook is caught immediately instead of silently failing later.
 - The Activity Feed now shows raid completions for Chambers of Xeric, Theatre of Blood, and Tombs of Amascut, including who finished it, the difficulty (invocation level for Tombs of Amascut, mode for the other two), and how much the reward chest was worth. If several of you finish the same raid together, it shows up as one entry crediting everyone instead of one per person. Raids also get their own filter chip and toast notification, and Tombs of Amascut shows a different icon depending on the invocation level reached.
 - Graphs now has a "Raid Completions" option alongside XP and Boss KC, showing your group's Chambers of Xeric, Theatre of Blood, and Tombs of Amascut completions over time. Filter by raid and (for CoX/ToA) by difficulty, and switch between one combined group line or a line per member - the leaderboard panel ranks members by how many of those completions they were part of.

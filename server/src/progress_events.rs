@@ -11,6 +11,7 @@
 //! old row, so there is nothing to diff against there.
 
 use crate::collection_log_content;
+use crate::combat_achievement_content;
 use crate::diary_tiers;
 use crate::models::{CombatAchievements, GroupMember};
 use crate::quest_ids::{self, QUEST_STATE_FINISHED};
@@ -83,9 +84,20 @@ fn diff_diaries(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> {
         .collect()
 }
 
-/// Task ids newly present in the plugin's sparse `tasks` map. The plugin only ever includes
-/// completed (`true`) entries and re-sends the whole snapshot each upload, so a key appearing for
-/// the first time is a completion.
+fn task_is_complete(tasks: &HashMap<String, bool>, task_id: i64) -> bool {
+    tasks.get(&task_id.to_string()).copied().unwrap_or(false)
+}
+
+fn boss_is_complete(tasks: &HashMap<String, bool>, task_ids: &[i64]) -> bool {
+    task_ids.iter().all(|task_id| task_is_complete(tasks, *task_id))
+}
+
+/// Task ids newly present in the plugin's sparse `tasks` map, plus any boss whose every task just
+/// became complete. Both ride the single `combat_task` event type, discriminated by the payload's
+/// `kind` - mirrors `diff_collection_log`'s item/page split.
+///
+/// The plugin only ever includes completed (`true`) entries and re-sends the whole snapshot each
+/// upload, so a key appearing for the first time is a completion.
 fn diff_combat_tasks(
     previous: &CombatAchievements,
     current: &CombatAchievements,
@@ -99,13 +111,26 @@ fn diff_combat_tasks(
     // HashMap iteration order isn't stable; sort so a multi-task upload persists deterministically.
     task_ids.sort_unstable();
 
-    task_ids
+    let mut events: Vec<ProgressEvent> = task_ids
         .into_iter()
         .map(|task_id| ProgressEvent {
             event_type: EVENT_TYPE_COMBAT_TASK,
             payload: json!({ "task_id": task_id }),
         })
-        .collect()
+        .collect();
+
+    for (boss, boss_task_ids) in combat_achievement_content::boss_groups() {
+        if boss_is_complete(&current.tasks, boss_task_ids)
+            && !boss_is_complete(&previous.tasks, boss_task_ids)
+        {
+            events.push(ProgressEvent {
+                event_type: EVENT_TYPE_COMBAT_TASK,
+                payload: json!({ "kind": "boss", "boss": boss }),
+            });
+        }
+    }
+
+    events
 }
 
 /// Flat `[item_id, quantity, ...]` pairs -> canonical item id -> total quantity.
@@ -265,6 +290,32 @@ mod tests {
     fn resent_combat_task_snapshot_emits_nothing() {
         let snapshot = combat_achievements(&["1", "2"]);
         assert!(diff_combat_tasks(&snapshot, &snapshot).is_empty());
+    }
+
+    #[test]
+    fn completing_every_task_for_a_boss_emits_a_boss_event() {
+        let (boss, task_ids) = combat_achievement_content::boss_groups()
+            .iter()
+            .find(|(boss, _)| boss == "Barrows")
+            .expect("Barrows boss group must exist");
+
+        let all_ids: Vec<String> = task_ids.iter().map(|id| id.to_string()).collect();
+        let current = combat_achievements(&all_ids.iter().map(String::as_str).collect::<Vec<_>>());
+        // One task short beforehand, so the boss group only completes on this upload.
+        let previous = combat_achievements(
+            &all_ids[..all_ids.len() - 1]
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        );
+
+        let events = diff_combat_tasks(&previous, &current);
+        let boss_events: Vec<_> = events
+            .iter()
+            .filter(|event| event.payload["kind"] == json!("boss"))
+            .collect();
+        assert_eq!(boss_events.len(), 1);
+        assert_eq!(boss_events[0].payload["boss"], json!(boss));
     }
 
     #[test]

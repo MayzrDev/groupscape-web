@@ -65,6 +65,13 @@ describe("activity event copy", () => {
     expect(activityMetaLabel(task)).toBe("Grandmaster combat task");
   });
 
+  it("describes completing every combat task for a boss", () => {
+    const boss = event("combat_task", { kind: "boss", boss: "Zulrah" }, "Framed");
+
+    expect(activityEventDescription(boss)).toBe("Framed completed all combat achievements for Zulrah");
+    expect(activityMetaLabel(boss)).toBe("Combat achievements");
+  });
+
   it("describes both collection log variants under one type", () => {
     Item.itemDetails = { 4151: { id: 4151, name: "Abyssal whip" } };
     const added = event("collection_log", { kind: "item", item_id: 4151, quantity: 1 });

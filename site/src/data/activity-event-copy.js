@@ -86,6 +86,7 @@ export function collectionLogItemNameFor(payload) {
 
 export function activityMetaLabel(event) {
   if (event.event_type === "combat_task") {
+    if (event.payload?.kind === "boss") return "Combat achievements";
     const { tierLabel } = combatTaskFor(event.payload);
     return tierLabel ? `${tierLabel} combat task` : "Combat task";
   }
@@ -214,6 +215,14 @@ export function activityEventDescription(event, format = {}) {
         ACTIVITY_ICONS.diary
       )} diary`;
     case "combat_task": {
+      if (payload.kind === "boss") {
+        return `${member} completed all combat achievements for ${wrapSubject(
+          payload.boss,
+          "combat_task",
+          combatAchievement.bossWikiUrl(payload.boss),
+          ACTIVITY_ICONS.combat_task
+        )}`;
+      }
       const { name, tierLabel } = combatTaskFor(payload);
       return `${member} completed ${wrapSubject(
         name,

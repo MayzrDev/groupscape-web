@@ -6,6 +6,7 @@ pub mod auth_middleware;
 pub mod authed;
 pub mod character_auth_middleware;
 pub mod collection_log_content;
+pub mod combat_achievement_content;
 pub mod config;
 pub mod crypto;
 pub mod db;
