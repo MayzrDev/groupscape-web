@@ -3,6 +3,7 @@ import { Item } from "../data/item";
 import { slugifyNpcName } from "../data/npc-slug";
 import { BOSS_ICON_SLUGS, CLUE_TIER_ICONS } from "../data/boss-icons";
 import { BOSS_COMBAT_LEVELS } from "../data/boss-levels";
+import { timeBounds, formatTimeRange } from "../data/time-range";
 
 const COUNT_LABELS = {
   kill: "kills",
@@ -73,6 +74,14 @@ export class LootLogGroup extends BaseElement {
 
   get countLabel() {
     return COUNT_LABELS[this.group.sourceType] || "events";
+  }
+
+  // First kill -> last kill for this source alone, so a boss farmed across several days shows
+  // that span instead of just a kill count - the page-level session card only covers the whole
+  // scoped window, not per-source granularity.
+  get timeRangeLabel() {
+    const { first, last } = timeBounds(this.group.rows);
+    return formatTimeRange(first, last);
   }
 
   // Self-hosted RuneLite-hiscore-style icon for this group's source (see data/boss-icons.js) -

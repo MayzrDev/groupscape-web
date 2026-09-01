@@ -9,7 +9,7 @@
       <div class="loot-log-group__name">${this.sourceLabel}</div>
       ${
         this.group.eventCount
-          ? `<div class="loot-log-group__meta">${this.group.eventCount.toLocaleString()} ${this.countLabel}</div>`
+          ? `<div class="loot-log-group__meta">${this.group.eventCount.toLocaleString()} ${this.countLabel} &middot; ${this.timeRangeLabel}</div>`
           : ""
       }
     </div>

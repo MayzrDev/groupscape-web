@@ -9,6 +9,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Graphs now has a "Raid Completions" option alongside XP and Boss KC, showing your group's Chambers of Xeric, Theatre of Blood, and Tombs of Amascut completions over time. Filter by raid and (for CoX/ToA) by difficulty, and switch between one combined group line or a line per member - the leaderboard panel ranks members by how many of those completions they were part of.
 - Loot Log tiles now show a small helmet badge (tinted to each member's color) for who got the drop when "All members" is selected. An item dropped by more than one member is combined into a single tile with a stacked badge and a per-member breakdown in the tooltip, instead of one duplicate tile per member. Boss kill sources also get their chathead icon next to the name.
 - Loot Log summary now shows a session card - the time span from your first kill to your last within the selected window, plus the duration.
+- Each Loot Log source now shows its own first-kill-to-last-kill time range next to the kill count, so a boss farmed across several days shows that span instead of just a total.
 - Clicking a Loot Log item now opens its OSRS Wiki page in a new tab.
 - Loot Log boss names now show their combat level (e.g. "Vorkath (level-732)"), matching the in-game overhead format, for bosses with one fixed level.
 
