@@ -26,6 +26,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log boss, chest, and clue-tier icons now use the same small square icon as RuneLite's Hiscore panel (and the official OSRS hiscores page), self-hosted instead of hotlinked so they always load.
 - Test/diagnostic kill data no longer shows up in the Loot Log.
 - Untradeable items in the Loot Log now show an "Untradeable" tag in their tooltip instead of "0 gp x quantity".
+- The "Exit view" button on the admin read-only viewing banner no longer fails to click while looking at the Map tab.
 
 ## [1.0.254] - 2026-08-31
 

@@ -9,6 +9,7 @@ admin-view-banner {
   justify-content: center;
   gap: 12px;
   padding: 8px 12px;
+  pointer-events: auto;
   font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   font-size: 14px;
   color: white;
