@@ -38,7 +38,7 @@ export class ActivityFeedPage extends BaseElement {
     this.render();
 
     this.rail = this.querySelector(".activity-feed-page__rail");
-    this.typeFilters = this.querySelector(".activity-feed-page__type-filters");
+    this.memberFilters = this.querySelector(".activity-feed-page__member-filters");
     this.list = this.querySelector(".activity-feed-page__list");
     this.sentinel = this.querySelector(".activity-feed-page__sentinel");
     this.empty = this.querySelector(".activity-feed-page__empty");
@@ -50,7 +50,7 @@ export class ActivityFeedPage extends BaseElement {
       this.handleUpdatedMembers(mostRecentMembers);
     }
 
-    this.renderTypeFilters();
+    this.renderRail();
     this.resetAndLoad();
 
     this.intersectionObserver = new IntersectionObserver(this.handleSentinelIntersect.bind(this), {
@@ -70,65 +70,79 @@ export class ActivityFeedPage extends BaseElement {
 
   handleUpdatedMembers(members) {
     this.members = members.filter((member) => member.name !== "@SHARED");
-    this.renderRail();
+    this.renderMemberFilters();
   }
 
   handleSentinelIntersect(entries) {
     if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
   }
 
-  // Best-effort count over events fetched so far, not a true per-member total — there's no
-  // cheap way to get an exact total from a cursor-paginated feed without a dedicated count query.
-  loadedCountFor(memberName) {
+  // Best-effort counts over events fetched so far, not true totals — there's no cheap way to get
+  // an exact total from a cursor-paginated feed without a dedicated count query.
+  loadedCountForMember(memberName) {
     return this.loaded.filter((event) => !memberName || event.member_name === memberName).length;
+  }
+
+  loadedCountForType(type) {
+    return this.loaded.filter((event) => !type || event.event_type === type).length;
   }
 
   renderRail() {
     if (!this.rail) return;
     this.rail.innerHTML = "";
-
-    const allButton = this.createRailButton(null, "All members", this.loadedCountFor(null));
-    this.rail.appendChild(allButton);
-
-    for (const member of this.members) {
-      this.rail.appendChild(this.createRailButton(member.name, member.name, this.loadedCountFor(member.name)));
+    for (const [type, label] of EVENT_TYPES) {
+      this.rail.appendChild(this.createTypeRailButton(type, label, this.loadedCountForType(type)));
     }
   }
 
-  createRailButton(memberName, label, count) {
+  createTypeRailButton(type, label, count) {
     const button = document.createElement("button");
     button.className = "activity-feed-page__rail-btn";
-    button.classList.toggle("activity-feed-page__rail-btn--active", this.selectedMember === memberName);
+    if (type) button.classList.add(`activity-feed-page__rail-btn--${type}`);
+    button.classList.toggle("activity-feed-page__rail-btn--active", this.selectedType === type);
     button.innerHTML = `
-      ${memberName ? `<player-icon player-name="${memberName}"></player-icon>` : ""}
       <span class="activity-feed-page__rail-label">${label}</span>
       <span class="activity-feed-page__rail-count">${count}</span>
     `;
     this.eventListener(button, "click", () => {
-      if (this.selectedMember === memberName) return;
-      this.selectedMember = memberName;
+      if (this.selectedType === type) return;
+      this.selectedType = type;
       this.renderRail();
       this.resetAndLoad();
     });
     return button;
   }
 
-  renderTypeFilters() {
-    this.typeFilters.innerHTML = "";
-    for (const [type, label] of EVENT_TYPES) {
-      const chip = document.createElement("button");
-      chip.className = "activity-feed-page__type-chip";
-      if (type) chip.classList.add(`activity-feed-page__type-chip--${type}`);
-      chip.classList.toggle("activity-feed-page__type-chip--active", this.selectedType === type);
-      chip.textContent = label;
-      this.eventListener(chip, "click", () => {
-        if (this.selectedType === type) return;
-        this.selectedType = type;
-        this.renderTypeFilters();
-        this.resetAndLoad();
-      });
-      this.typeFilters.appendChild(chip);
+  renderMemberFilters() {
+    if (!this.memberFilters) return;
+    this.memberFilters.innerHTML = "";
+
+    const allChip = this.createMemberChip(null, "All members", this.loadedCountForMember(null));
+    this.memberFilters.appendChild(allChip);
+
+    for (const member of this.members) {
+      this.memberFilters.appendChild(
+        this.createMemberChip(member.name, member.name, this.loadedCountForMember(member.name))
+      );
     }
+  }
+
+  createMemberChip(memberName, label, count) {
+    const chip = document.createElement("button");
+    chip.className = "activity-feed-page__member-chip";
+    chip.classList.toggle("activity-feed-page__member-chip--active", this.selectedMember === memberName);
+    chip.innerHTML = `
+      ${memberName ? `<player-icon player-name="${memberName}"></player-icon>` : ""}
+      <span class="activity-feed-page__member-chip-label">${label}</span>
+      <span class="activity-feed-page__member-chip-count">${count}</span>
+    `;
+    this.eventListener(chip, "click", () => {
+      if (this.selectedMember === memberName) return;
+      this.selectedMember = memberName;
+      this.renderMemberFilters();
+      this.resetAndLoad();
+    });
+    return chip;
   }
 
   createRow(event) {
@@ -166,6 +180,7 @@ export class ActivityFeedPage extends BaseElement {
     this.sentinel.classList.toggle("activity-feed-page__sentinel--visible", !this.exhausted);
     this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
     this.renderRail();
+    this.renderMemberFilters();
     this.loadingMore = false;
   }
 
@@ -203,6 +218,7 @@ export class ActivityFeedPage extends BaseElement {
     }
 
     this.renderRail();
+    this.renderMemberFilters();
   }
 }
 

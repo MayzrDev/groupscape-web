@@ -44,6 +44,31 @@ activity-feed-page {
   color: var(--orange);
 }
 
+.activity-feed-page__rail-btn--quest.activity-feed-page__rail-btn--active {
+  border-color: var(--activity-quest);
+  color: var(--activity-quest);
+}
+
+.activity-feed-page__rail-btn--diary.activity-feed-page__rail-btn--active {
+  border-color: var(--activity-diary);
+  color: var(--activity-diary);
+}
+
+.activity-feed-page__rail-btn--combat_task.activity-feed-page__rail-btn--active {
+  border-color: var(--activity-combat-task);
+  color: var(--activity-combat-task);
+}
+
+.activity-feed-page__rail-btn--collection_log.activity-feed-page__rail-btn--active {
+  border-color: var(--activity-collection-log);
+  color: var(--activity-collection-log);
+}
+
+.activity-feed-page__rail-btn--clue.activity-feed-page__rail-btn--active {
+  border-color: var(--clue-master);
+  color: var(--clue-master);
+}
+
 .activity-feed-page__rail-label {
   flex: 1;
   overflow: hidden;
@@ -70,15 +95,19 @@ activity-feed-page {
   gap: 8px;
 }
 
-.activity-feed-page__type-filters {
+.activity-feed-page__member-filters {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.activity-feed-page__type-chip {
+.activity-feed-page__member-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
   font-size: 0.78em;
-  padding: 4px 10px;
+  padding: 3px 10px 3px 6px;
   border-radius: 999px;
   border: 1px solid var(--light-border);
   background: transparent;
@@ -87,35 +116,15 @@ activity-feed-page {
   cursor: pointer;
 }
 
-.activity-feed-page__type-chip--active {
+.activity-feed-page__member-chip-count {
+  font-size: 0.85em;
+  opacity: 0.65;
+}
+
+.activity-feed-page__member-chip--active {
   border-color: var(--orange);
   color: var(--orange);
   opacity: 1;
-}
-
-.activity-feed-page__type-chip--quest.activity-feed-page__type-chip--active {
-  border-color: var(--activity-quest);
-  color: var(--activity-quest);
-}
-
-.activity-feed-page__type-chip--diary.activity-feed-page__type-chip--active {
-  border-color: var(--activity-diary);
-  color: var(--activity-diary);
-}
-
-.activity-feed-page__type-chip--combat_task.activity-feed-page__type-chip--active {
-  border-color: var(--activity-combat-task);
-  color: var(--activity-combat-task);
-}
-
-.activity-feed-page__type-chip--collection_log.activity-feed-page__type-chip--active {
-  border-color: var(--activity-collection-log);
-  color: var(--activity-collection-log);
-}
-
-.activity-feed-page__type-chip--clue.activity-feed-page__type-chip--active {
-  border-color: var(--clue-master);
-  color: var(--clue-master);
 }
 
 .activity-feed-page__list {

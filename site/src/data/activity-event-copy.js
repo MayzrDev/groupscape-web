@@ -235,7 +235,8 @@ export function activityEventDescription(event, format = {}) {
         collectionLogItemNameFor(payload),
         "collection_log",
         new Item(payload.item_id).wikiLink,
-        Item.itemDetails?.[payload.item_id] ? Item.imageUrl(payload.item_id) : ACTIVITY_ICONS.collection_log
+        Item.itemDetails?.[payload.item_id] ? Item.imageUrl(payload.item_id) : null,
+        ACTIVITY_ICONS.collection_log
       )} to their collection log`;
     case "clue": {
       const tierLabel = clueTierLabel(payload.clueTier);

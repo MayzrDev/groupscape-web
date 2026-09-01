@@ -106,7 +106,7 @@ a.activity-feed-event__subject:hover {
   height: 18px;
   object-fit: contain;
   vertical-align: -4px;
-  margin-right: 2px;
+  margin-left: 2px;
 }
 
 .activity-feed-event__subject--death {

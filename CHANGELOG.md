@@ -17,6 +17,8 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
 - Loot Log item art now has a lot more breathing room inside its rarity border instead of crowding the edge.
 - The Loot Log time window's "Last day" option is now labeled "Last 24h".
+- Activity Feed entries for new collection log items now show the item's own icon next to the collection log icon, and link out to that item's OSRS Wiki page.
+- Activity Feed's left-hand rail now filters by activity type (kills, raids, collection log, clues, etc.) and the pills at the top now filter by member - swapped from before, where it was the other way around.
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
