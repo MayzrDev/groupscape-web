@@ -30,6 +30,10 @@ export class Item {
     return Item.itemDetails[itemId].name;
   }
 
+  static exists(itemId) {
+    return !!Item.itemDetails[itemId];
+  }
+
   static shortQuantity(quantity) {
     return utility.formatShortQuantity(quantity);
   }

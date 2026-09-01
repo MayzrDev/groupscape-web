@@ -8,6 +8,8 @@ const RARITY_LABELS = {
   very_rare: "Very Rare",
 };
 
+const MAX_KILLER_BADGES = 3;
+
 export class LootLogTile extends BaseElement {
   constructor() {
     super();
@@ -50,7 +52,28 @@ export class LootLogTile extends BaseElement {
     if (this.rarityLabel) {
       lines.push(`<span class="loot-log-tile__tt-rarity">${this.rarityLabel}</span>`);
     }
+    if (this.row.killerBreakdown && this.row.killerBreakdown.length > 1) {
+      lines.push(
+        `<span class="loot-log-tile__tt-breakdown">${this.row.killerBreakdown
+          .map(({ memberName, quantity }) => `${memberName}: ${quantity.toLocaleString()}`)
+          .join("<br />")}</span>`
+      );
+    }
     return lines.join("<br />");
+  }
+
+  killerBadgesHtml() {
+    const killers = this.row.killers;
+    const shown = killers.slice(0, MAX_KILLER_BADGES);
+    const overflow = killers.length - shown.length;
+    const badges = shown
+      .map(
+        (memberName) =>
+          `<span class="loot-log-tile__killer"><player-icon player-name="${memberName}"></player-icon></span>`
+      )
+      .join("");
+    const more = overflow > 0 ? `<span class="loot-log-tile__killer-more">+${overflow}</span>` : "";
+    return `${more}${badges}`;
   }
 }
 customElements.define("loot-log-tile", LootLogTile);

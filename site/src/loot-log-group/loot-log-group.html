@@ -1,6 +1,10 @@
 <div class="loot-log-group__header">
   <div class="loot-log-group__name-wrap">
-    <span class="loot-log-group__source-dot"></span>
+    ${
+      this.bossIconUrl
+        ? `<img class="loot-log-group__boss-icon" src="${this.bossIconUrl}" alt="" onerror="this.remove()" />`
+        : `<span class="loot-log-group__source-dot"></span>`
+    }
     <div>
       <div class="loot-log-group__name">${this.sourceLabel}</div>
       ${

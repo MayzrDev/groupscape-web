@@ -27,6 +27,16 @@ loot-log-group {
   background: var(--loot-source-kill);
 }
 
+.loot-log-group__boss-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: var(--elevated);
+  border: 1px solid var(--light-border);
+  border-radius: 5px;
+}
+
 loot-log-group[data-source="chest"] .loot-log-group__source-dot {
   background: var(--loot-source-chest);
 }
