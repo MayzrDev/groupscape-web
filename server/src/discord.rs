@@ -99,17 +99,33 @@ const COLLECTION_LOG_COLOR: u32 = 0x6C8CFF;
 const QUEST_COLOR: u32 = 0xC9962B;
 const DIARY_COLOR: u32 = 0x29C2B0;
 
-/// `{quantity}x [name](wiki link)` lines, worth at least `min_value` gp combined-per-line, for
-/// the unified "Drops" notification - shared by kill loot, chest/clue loot, since both format the
-/// same way once resolved to a display line and a gp value.
-fn drop_lines(items: &[crate::models::LootItem], ge_prices: &GEPrices, min_value: i64) -> Vec<String> {
+/// `{quantity}x {name} ({value}, {drop rate})` lines for the unified "Drops" notification -
+/// shared by kill loot, chest/clue loot, since both format the same way once resolved to a
+/// display line, a gp value, and (when curated) a drop rate.
+///
+/// The stack's *combined* value gates `min_value` and is what's shown (e.g. 33x a 100gp item is
+/// "3,300 gp", not "100 gp") - a single expensive-enough item shouldn't get hidden just because
+/// its unit price is small. Untradeable items (no GE price at all) can't be judged against
+/// `min_value`, so they always pass the filter and show "untradeable" instead of a gp amount.
+fn drop_lines(items: &[crate::models::LootItem], ge_prices: &GEPrices, min_value: i64, source_name: &str) -> Vec<String> {
     items
         .iter()
-        .filter(|item| {
-            let value = ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64;
-            value >= min_value
+        .filter_map(|item| {
+            let unit_value = ge_prices.get(&item.item_id).copied();
+            let value = unit_value.unwrap_or(0) * item.quantity as i64;
+            if unit_value.is_some() && value < min_value {
+                return None;
+            }
+            let value_part = match unit_value {
+                Some(_) => format!("{} gp", format_gp(value)),
+                None => "untradeable".to_string(),
+            };
+            let detail = match drop_rates::lookup(source_name, item.item_id).and_then(|d| d.rate.clone()) {
+                Some(rate) => format!("{}, {}", value_part, rate),
+                None => value_part,
+            };
+            Some(format!("{}x {} ({})", item.quantity, item_names::display(item.item_id), detail))
         })
-        .map(|item| format!("{}x {}", item.quantity, item_names::display(item.item_id)))
         .collect()
 }
 
@@ -216,7 +232,7 @@ pub fn dispatch_event_webhook(
                 if settings.notify_drops {
                     if let Some(loot) = &kill.loot {
                         let ge_prices = unauthed::get_ge_prices_map();
-                        let lines = drop_lines(loot, &ge_prices, settings.drops_min_value);
+                        let lines = drop_lines(loot, &ge_prices, settings.drops_min_value, &kill.npc_name);
                         if !lines.is_empty() {
                             let description = format!(
                                 "{} received {} from {}",
@@ -241,7 +257,7 @@ pub fn dispatch_event_webhook(
             GameEvent::Loot(loot_event) => {
                 if settings.notify_drops && !loot_event.loot.is_empty() {
                     let ge_prices = unauthed::get_ge_prices_map();
-                    let lines = drop_lines(&loot_event.loot, &ge_prices, settings.drops_min_value);
+                    let lines = drop_lines(&loot_event.loot, &ge_prices, settings.drops_min_value, &loot_event.source_name);
                     if !lines.is_empty() {
                         let description = format!(
                             "{} received {} from {}",

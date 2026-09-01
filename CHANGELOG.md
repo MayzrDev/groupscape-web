@@ -28,6 +28,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord's "Kills" notification is now "Boss kills" and only fires for actual bosses, not regular NPCs, and now includes the member's kill count for that boss.
 - Discord kill and drop messages now show the item's real name, linked to its OSRS Wiki page, instead of "item #12345".
 - Loot Log now defaults to the last 24h instead of the last hour when you open it.
+- Discord "Drops" messages now show each item's value (or "untradeable" if it has none) and its drop rate when known, and value now reflects the whole stack - 33x a 100gp item shows as 3,300 gp, not 100 gp.
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
