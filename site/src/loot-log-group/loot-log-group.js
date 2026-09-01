@@ -1,5 +1,6 @@
 import { BaseElement } from "../base-element/base-element";
 import { Item } from "../data/item";
+import { wikiPageIconUrl } from "../data/wiki-icon";
 
 const COUNT_LABELS = {
   kill: "kills",
@@ -29,6 +30,19 @@ export class LootLogGroup extends BaseElement {
       tile.row = row;
       tile.showKillers = this.group.showKillers;
       grid.appendChild(tile);
+    }
+
+    if (this.group.sourceType === "kill") {
+      wikiPageIconUrl(this.group.sourceName).then((url) => {
+        if (!url || !this.isConnected) return;
+        const dot = this.querySelector(".loot-log-group__source-dot");
+        if (!dot) return;
+        const icon = document.createElement("img");
+        icon.className = "loot-log-group__boss-icon";
+        icon.src = url;
+        icon.alt = "";
+        dot.replaceWith(icon);
+      });
     }
   }
 
@@ -66,16 +80,6 @@ export class LootLogGroup extends BaseElement {
 
   get countLabel() {
     return COUNT_LABELS[this.group.sourceType] || "events";
-  }
-
-  // Bosses get a chathead icon hotlinked from the wiki's file-path redirect - no backend
-  // scraping, so a boss whose page doesn't use the usual "<Name> chathead.png" filename just
-  // falls back to the plain source dot via the <img>'s onerror in loot-log-group.html.
-  get bossIconUrl() {
-    if (this.group.sourceType !== "kill") return null;
-    return `https://oldschool.runescape.wiki/w/Special:FilePath/${encodeURIComponent(
-      `${this.group.sourceName} chathead.png`
-    )}`;
   }
 
   get totalValue() {

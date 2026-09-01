@@ -1,4 +1,6 @@
-<item-box item-id="${this.row.item_id}" item-quantity="${this.row.quantity}" no-tooltip></item-box>
+<a class="loot-log-tile__link" href="${this.wikiLink}" target="_blank" rel="noopener noreferrer">
+  <item-box item-id="${this.row.item_id}" item-quantity="${this.row.quantity}" no-tooltip></item-box>
+</a>
 ${
   this.showKillers && this.row.killers && this.row.killers.length
     ? `<div class="loot-log-tile__killers">${this.killerBadgesHtml()}</div>`

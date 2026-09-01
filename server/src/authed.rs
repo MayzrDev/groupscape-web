@@ -1116,6 +1116,17 @@ struct LootSourceEvent {
     loot: Vec<LootItem>,
     participants: Option<Vec<String>>,
 }
+/// Synthetic NPC names that have shown up in real kill/loot data from manual plugin testing -
+/// never a real drop, so they're filtered out of the Loot Log rather than needing a DB cleanup
+/// every time one turns up.
+const DIAGNOSTIC_NPC_NAMES: &[&str] = &["DiagTestNpc"];
+
+fn is_diagnostic_source(source_name: &str) -> bool {
+    DIAGNOSTIC_NPC_NAMES
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(source_name))
+}
+
 fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
     match event {
         GameEvent::Kill(kill) => Some(LootSourceEvent {
@@ -1176,6 +1187,9 @@ pub async fn get_loot_summary(
         let Some(source) = as_loot_source_event(&parsed) else {
             continue;
         };
+        if is_diagnostic_source(&source.source_name) {
+            continue;
+        }
         if let Some(boss) = query.boss.as_deref() {
             if drop_rates::slugify_npc_name(&source.source_name) != boss {
                 continue;

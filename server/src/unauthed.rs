@@ -48,6 +48,12 @@ pub async fn update_ge_prices() -> Result<(), ApiError> {
         ge_prices.insert(item_id, avg_ge_price);
     }
 
+    // Coins (995) aren't a tradeable GE item, so the wiki price feed never lists them - but they're
+    // worth exactly 1gp each by definition. Without this every gp-value calc that joins against
+    // this map (loot summary, gp-earned leaderboard, bank/inventory value) silently prices coin
+    // drops/holdings at 0.
+    ge_prices.insert(995, 1);
+
     GE_PRICES.store(Arc::new(serde_json::to_string(&ge_prices)?));
 
     Ok(())

@@ -9,15 +9,20 @@ All notable changes to GroupScape web are logged here, newest first.
 - Graphs now has a "Raid Completions" option alongside XP and Boss KC, showing your group's Chambers of Xeric, Theatre of Blood, and Tombs of Amascut completions over time. Filter by raid and (for CoX/ToA) by difficulty, and switch between one combined group line or a line per member - the leaderboard panel ranks members by how many of those completions they were part of.
 - Loot Log tiles now show a small helmet badge (tinted to each member's color) for who got the drop when "All members" is selected. An item dropped by more than one member is combined into a single tile with a stacked badge and a per-member breakdown in the tooltip, instead of one duplicate tile per member. Boss kill sources also get their chathead icon next to the name.
 - Loot Log summary now shows a session card - the time span from your first kill to your last within the selected window, plus the duration.
+- Clicking a Loot Log item now opens its OSRS Wiki page in a new tab.
 
 ### Changed
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
 - Loot Log item art now has a lot more breathing room inside its rarity border instead of crowding the edge.
+- The Loot Log time window's "Last day" option is now labeled "Last 24h".
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
 - Loot Log items GroupScape doesn't recognize (no name, image, or value on file) no longer render as broken empty tiles - they're hidden instead.
 - Loot Log items from the same kill no longer reshuffle their order every time the page refreshes.
+- Coin drops in the Loot Log no longer value at 0gp.
+- Loot Log boss icons now actually load, resolved from the boss's wiki page instead of a filename guess that mostly 404'd.
+- Test/diagnostic kill data no longer shows up in the Loot Log.
 
 ## [1.0.254] - 2026-08-31
 

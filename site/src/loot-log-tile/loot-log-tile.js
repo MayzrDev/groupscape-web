@@ -43,6 +43,10 @@ export class LootLogTile extends BaseElement {
     return RARITY_LABELS[this.row.rarity] || null;
   }
 
+  get wikiLink() {
+    return `https://oldschool.runescape.wiki/w/Special:Lookup?type=item&id=${this.row.item_id}`;
+  }
+
   buildTooltip() {
     const unitValue = this.row.unit_value ?? 0;
     const lines = [
