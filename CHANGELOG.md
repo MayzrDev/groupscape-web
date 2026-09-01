@@ -21,7 +21,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log items GroupScape doesn't recognize (no name, image, or value on file) no longer render as broken empty tiles - they're hidden instead.
 - Loot Log items from the same kill no longer reshuffle their order every time the page refreshes.
 - Coin drops in the Loot Log no longer value at 0gp.
-- Loot Log boss icons now actually load, resolved from the boss's wiki page instead of a filename guess that mostly 404'd.
+- Loot Log boss icons now use the same small square icon as RuneLite's Hiscore panel (and the official OSRS hiscores page) instead of the wiki's big infobox art.
 - Test/diagnostic kill data no longer shows up in the Loot Log.
 - Untradeable items in the Loot Log now show an "Untradeable" tag in their tooltip instead of "0 gp x quantity".
 

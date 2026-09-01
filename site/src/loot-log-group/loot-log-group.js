@@ -1,6 +1,6 @@
 import { BaseElement } from "../base-element/base-element";
 import { Item } from "../data/item";
-import { wikiPageIconUrl } from "../data/wiki-icon";
+import { wikiHiscoreIconUrl } from "../data/wiki-icon";
 
 const COUNT_LABELS = {
   kill: "kills",
@@ -33,7 +33,7 @@ export class LootLogGroup extends BaseElement {
     }
 
     if (this.group.sourceType === "kill") {
-      wikiPageIconUrl(this.group.sourceName).then((url) => {
+      wikiHiscoreIconUrl(this.group.sourceName).then((url) => {
         if (!url || !this.isConnected) return;
         const dot = this.querySelector(".loot-log-group__source-dot");
         if (!dot) return;

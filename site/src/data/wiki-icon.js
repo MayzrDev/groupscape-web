@@ -1,29 +1,28 @@
-// Resolves a wiki page's thumbnail image via MediaWiki's pageimages API, rather than guessing a
-// "<Name> chathead.png" file title - most bosses don't have a chathead file (no in-game dialogue),
-// but every page has a pageimage. `origin=*` opts into the wiki's CORS allowlist for anonymous
-// cross-origin reads (no auth, no write access) - see https://www.mediawiki.org/wiki/API:Cross-site_requests.
-const WIKI_API = "https://oldschool.runescape.wiki/api.php";
+// Resolves a boss's small square hiscore-style icon - the same art RuneLite's Hiscore plugin
+// panel and the official OSRS hiscores page use for each boss (see HiscoreSkill.java in the
+// runelite/runelite repo: those icons are sprite ids pulled from the live game cache at
+// render time, not a downloadable file, so there's nothing to hotlink there directly). The wiki
+// mirrors the same art under a predictable "<Boss Name> icon.png" file, hotlinked via its
+// file-path redirect. Only the ~60 bosses tracked on the official hiscores have this file -
+// anything else (regular monsters, chests, clues) 404s and the caller falls back to the plain
+// source dot.
+const WIKI_BASE = "https://oldschool.runescape.wiki/w/Special:FilePath";
 
-// Keyed by page title; caches the in-flight/resolved promise so concurrent lookups for the same
-// boss (e.g. several loot-log-group tiles mounting at once) share one request.
+// Keyed by boss name; caches the resolved (or null, on 404) URL so repeated mounts of the same
+// boss's loot-log-group don't re-request the image.
 const iconUrlCache = new Map();
 
-export function wikiPageIconUrl(pageTitle) {
-  if (iconUrlCache.has(pageTitle)) return iconUrlCache.get(pageTitle);
+export function wikiHiscoreIconUrl(bossName) {
+  if (iconUrlCache.has(bossName)) return iconUrlCache.get(bossName);
 
-  const url = `${WIKI_API}?action=query&titles=${encodeURIComponent(
-    pageTitle
-  )}&prop=pageimages&format=json&pithumbsize=64&origin=*`;
+  const url = `${WIKI_BASE}/${encodeURIComponent(`${bossName} icon.png`)}`;
+  const promise = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(url);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 
-  const promise = fetch(url)
-    .then((response) => (response.ok ? response.json() : null))
-    .then((data) => {
-      const pages = data?.query?.pages;
-      const page = pages && Object.values(pages)[0];
-      return page?.thumbnail?.source || null;
-    })
-    .catch(() => null);
-
-  iconUrlCache.set(pageTitle, promise);
+  iconUrlCache.set(bossName, promise);
   return promise;
 }
