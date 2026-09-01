@@ -6,6 +6,7 @@ pub enum LeaderboardMetric {
     Xp,
     BossKc,
     GpEarned,
+    RaidCompletions,
 }
 
 #[derive(Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,6 +42,7 @@ impl Serialize for LeaderboardMetric {
             LeaderboardMetric::Xp => "xp",
             LeaderboardMetric::BossKc => "boss_kc",
             LeaderboardMetric::GpEarned => "gp_earned",
+            LeaderboardMetric::RaidCompletions => "raid_completions",
         };
         serializer.serialize_str(s)
     }

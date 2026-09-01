@@ -38,13 +38,34 @@ const metricLabels = {
   xp: "XP",
   boss_kc: "Boss KC",
   gp_earned: "GP Earned",
+  raid_completions: "Raid Completions",
 };
 
 const metricAxisLabels = {
   xp: "XP Gain",
   boss_kc: "KC Gained",
   gp_earned: "GP Earned",
+  raid_completions: "Completions",
 };
+
+const raidTypeLabels = {
+  all: "All Raids",
+  cox: "Chambers of Xeric",
+  tob: "Theatre of Blood",
+  toa: "Tombs of Amascut",
+};
+
+const raidDifficultyLabels = {
+  regular: "Regular",
+  cm: "Challenge Mode",
+  entry: "Entry",
+  normal: "Normal",
+  expert: "Expert",
+};
+
+// Kept in sync with the server's `RAID_GROUP_TOTAL_LABEL` - no real member is ever named this,
+// so it's safe to special-case as the raid-completions chart's single aggregate line.
+const RAID_GROUP_TOTAL_LABEL = "Group Total";
 
 function formatMetricValue(metric, value) {
   if (value === null || value === undefined || isNaN(value)) return "—";
@@ -74,6 +95,9 @@ export class SkillGraph extends BaseElement {
     this.skillName = this.getAttribute("skill-name");
     this.metric = this.getAttribute("metric") || "xp";
     this.boss = this.getAttribute("boss") || "";
+    this.raidType = this.getAttribute("raid-type") || "all";
+    this.raidDifficulty = this.getAttribute("raid-difficulty") || "all";
+    this.groupBy = this.getAttribute("group-by") || "member";
     this.render();
     this.tableContainer = this.querySelector(".skill-graph__table-container");
     this.ctx = this.querySelector("canvas").getContext("2d");
@@ -478,6 +502,13 @@ export class SkillGraph extends BaseElement {
       return `Boss KC (All Bosses) - ${periodLabel}`;
     }
 
+    if (this.metric === "raid_completions") {
+      const raidLabel = raidTypeLabels[this.raidType] || "All Raids";
+      const difficultyLabel = raidDifficultyLabels[this.raidDifficulty];
+      const suffix = difficultyLabel ? ` (${difficultyLabel})` : "";
+      return `${raidLabel}${suffix} Completions - ${periodLabel}`;
+    }
+
     const metricLabel = metricLabels[this.metric] || this.metric;
     return `${metricLabel} - ${periodLabel}`;
   }
@@ -521,7 +552,12 @@ export class SkillGraph extends BaseElement {
     const result = [];
     for (const playerMetricData of this.metricDataForGroup || []) {
       const member = this.currentGroupData.members.get(playerMetricData.name);
-      const color = member ? `hsl(${member.hue}, 70%, 45%)` : "hsl(0, 0%, 60%)";
+      const isGroupTotal = playerMetricData.name === RAID_GROUP_TOTAL_LABEL;
+      const color = member
+        ? `hsl(${member.hue}, 70%, 45%)`
+        : isGroupTotal
+        ? "hsl(32, 100%, 55%)"
+        : "hsl(0, 0%, 60%)";
       const series = playerMetricData.metric_data || [];
       const currentValue = series.length ? series[series.length - 1].value : 0;
       const completeTimeSeries = this.generateCompleteTimeSeries(series, currentValue, (dataPoint) => dataPoint.value);

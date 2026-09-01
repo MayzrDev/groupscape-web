@@ -17,6 +17,7 @@
       <option value="xp">XP</option>
       <option value="boss_kc">Boss KC</option>
       <option value="gp_earned">GP Earned</option>
+      <option value="raid_completions">Raid Completions</option>
     </select>
   </div>
 
@@ -32,6 +33,24 @@
     <select class="skills-graphs__boss-select">
       <option value="">All Bosses</option>
     </select>
+  </div>
+
+  <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover skills-graphs__sub-select-container skills-graphs__sub-select-container--raid-type">
+    <select class="skills-graphs__raid-type-select">
+      <option value="all">All Raids</option>
+      <option value="cox">Chambers of Xeric</option>
+      <option value="tob">Theatre of Blood</option>
+      <option value="toa">Tombs of Amascut</option>
+    </select>
+  </div>
+
+  <div class="men-control-container rsborder-tiny rsbackground rsbackground-hover skills-graphs__sub-select-container skills-graphs__sub-select-container--raid-difficulty">
+    <select class="skills-graphs__raid-difficulty-select"></select>
+  </div>
+
+  <div class="skills-graphs__group-by-toggle skills-graphs__sub-select-container skills-graphs__sub-select-container--group-by">
+    <button class="men-button small skills-graphs__group-by-btn" data-group-by="total">Total</button>
+    <button class="men-button small skills-graphs__group-by-btn active" data-group-by="member">By Member</button>
   </div>
 </div>
 <div class="skills-graphs__body">

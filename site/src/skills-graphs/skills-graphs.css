@@ -143,20 +143,37 @@ skills-graphs {
 }
 
 .skills-graphs__skill-select,
-.skills-graphs__boss-select {
+.skills-graphs__boss-select,
+.skills-graphs__raid-type-select,
+.skills-graphs__raid-difficulty-select {
   width: 100%;
 }
 
 .skills-graphs__metric-select,
 .skills-graphs__skill-select,
 .skills-graphs__boss-select,
+.skills-graphs__raid-type-select,
+.skills-graphs__raid-difficulty-select,
 .skills-graphs__metric-select option,
 .skills-graphs__skill-select option,
-.skills-graphs__boss-select option {
+.skills-graphs__boss-select option,
+.skills-graphs__raid-type-select option,
+.skills-graphs__raid-difficulty-select option {
   font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
 }
 
-.skills-graphs__period-btn.active {
+.skills-graphs__group-by-toggle {
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.skills-graphs__group-by-toggle.visible {
+  display: flex;
+}
+
+.skills-graphs__period-btn.active,
+.skills-graphs__group-by-btn.active {
   background: rgb(66, 55, 38);
   outline: 1px solid rgb(200, 200, 200);
 }

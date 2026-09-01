@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - The Activity Feed now shows raid completions for Chambers of Xeric, Theatre of Blood, and Tombs of Amascut, including who finished it, the difficulty (invocation level for Tombs of Amascut, mode for the other two), and how much the reward chest was worth. If several of you finish the same raid together, it shows up as one entry crediting everyone instead of one per person. Raids also get their own filter chip and toast notification, and Tombs of Amascut shows a different icon depending on the invocation level reached.
+- Graphs now has a "Raid Completions" option alongside XP and Boss KC, showing your group's Chambers of Xeric, Theatre of Blood, and Tombs of Amascut completions over time. Filter by raid and (for CoX/ToA) by difficulty, and switch between one combined group line or a line per member - the leaderboard panel ranks members by how many of those completions they were part of.
 
 ### Changed
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.

@@ -8,7 +8,8 @@ use crate::models::{
     CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
     GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession, GroupSkillData,
     ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
-    PermissionFlagsPatch, PermissionKey, MEMBER_COLOR_PALETTE, SHARED_MEMBER,
+    PermissionFlagsPatch, PermissionKey, RaidCompletionPayload, RaidDifficulty, RaidType,
+    MEMBER_COLOR_PALETTE, RAID_GROUP_TOTAL_LABEL, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -5349,6 +5350,165 @@ pub async fn get_boss_kc_metric_data(
     }
 
     Ok(cumulative_metric_data(per_member))
+}
+
+/// All finalized `raid` events for a group since `since` (`None` = unbounded) - a completion
+/// still inside `raid_merge`'s 5-minute open window is excluded by [`parse_finalized_raid`]
+/// rather than here, since "finalized" lives in the payload, not a queryable column.
+async fn list_raid_events_since(
+    client: &Client,
+    group_id: i64,
+    since: Option<DateTime<Utc>>,
+) -> Result<Vec<ActivityEvent>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT event_id, session_id, member_name, event_type, occurred_at, payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type='raid'
+  AND ($2::timestamptz IS NULL OR occurred_at >= $2)
+ORDER BY occurred_at DESC
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &since])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
+    rows.iter().map(activity_event_from_row).collect()
+}
+
+/// Parses an `activity_events` row's payload as a [`RaidCompletionPayload`], returning `None` for
+/// a malformed payload or one still inside `raid_merge`'s open merge window - an in-progress
+/// completion's participant list is still growing, so counting it now would undercount it and
+/// then have it vanish from a later query once merged into a different bucket boundary.
+fn parse_finalized_raid(event: &ActivityEvent) -> Option<RaidCompletionPayload> {
+    let payload: RaidCompletionPayload = serde_json::from_value(event.payload.clone()).ok()?;
+    if payload.merge_open {
+        return None;
+    }
+    Some(payload)
+}
+
+/// Buckets a Tombs of Amascut invocation level into the game's own difficulty tiers (Entry
+/// 0-149, Normal 150-299, Expert 300+) - the plugin only reports the raw level (see
+/// `RaidCompletionEvents` on the plugin side), so this is derived at query time rather than
+/// stored.
+fn toa_tier(level: i32) -> &'static str {
+    if level >= 300 {
+        "expert"
+    } else if level >= 150 {
+        "normal"
+    } else {
+        "entry"
+    }
+}
+
+/// Whether a finalized raid completion matches the leaderboard/chart's `raid_type`/`difficulty`
+/// filter. `None` or `"all"` for either matches everything. CoX's only split is Regular vs
+/// Challenge Mode (`mode` unset vs set); ToA buckets via [`toa_tier`]; ToB has no difficulty
+/// filter at all yet (its `mode` is always unset - Hard Mode detection isn't implemented, see
+/// `RaidCompletionEvents`'s doc comment on the plugin side), so any `difficulty` filter for ToB
+/// matches every ToB completion rather than filtering them all out.
+fn raid_completion_matches(
+    payload: &RaidCompletionPayload,
+    raid_type: Option<&str>,
+    difficulty: Option<&str>,
+) -> bool {
+    if let Some(raid_type) = raid_type.filter(|t| *t != "all") {
+        if payload.raid_type.as_str() != raid_type {
+            return false;
+        }
+    }
+    let Some(difficulty) = difficulty.filter(|d| *d != "all") else {
+        return true;
+    };
+    match (payload.raid_type, &payload.difficulty) {
+        (RaidType::Cox, RaidDifficulty::Mode { mode }) => (difficulty == "regular") == mode.is_none(),
+        (RaidType::Toa, RaidDifficulty::Level { level }) => toa_tier(*level) == difficulty,
+        _ => true,
+    }
+}
+
+/// Per-member participation counts for raid completions matching `raid_type`/`difficulty` over
+/// the window - "participation" means present in [`RaidCompletionPayload::participants`], not
+/// just the reporting member, since a raid completion is a group event every party member should
+/// get credit for.
+pub async fn get_raid_completions_leaderboard(
+    client: &Client,
+    group_id: i64,
+    window: crate::leaderboard::LeaderboardWindow,
+    raid_type: Option<&str>,
+    difficulty: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<Vec<(String, i64)>, ApiError> {
+    let events =
+        list_raid_events_since(client, group_id, leaderboard_window_cutoff(window, now)).await?;
+
+    let mut counts: HashMap<String, i64> = list_member_names(client, group_id)
+        .await?
+        .into_iter()
+        .map(|name| (name, 0))
+        .collect();
+    for event in &events {
+        let Some(payload) = parse_finalized_raid(event) else {
+            continue;
+        };
+        if !raid_completion_matches(&payload, raid_type, difficulty) {
+            continue;
+        }
+        for participant in &payload.participants {
+            *counts.entry(participant.member_name.clone()).or_insert(0) += 1;
+        }
+    }
+
+    Ok(counts.into_iter().collect())
+}
+
+/// Cumulative raid-completion time series matching `raid_type`/`difficulty`, bucketed at
+/// `period`'s granularity - the chart counterpart to [`get_raid_completions_leaderboard`].
+/// `group_by_member = false` collapses everything into one [`RAID_GROUP_TOTAL_LABEL`] line (one
+/// completion, one increment, regardless of party size); `true` credits every participant
+/// separately, matching the leaderboard's per-member counting.
+pub async fn get_raid_completions_metric_data(
+    client: &Client,
+    group_id: i64,
+    period: AggregatePeriod,
+    raid_type: Option<&str>,
+    difficulty: Option<&str>,
+    group_by_member: bool,
+) -> Result<GroupMetricData, ApiError> {
+    let events = list_raid_events_since(client, group_id, None).await?;
+    let granularity = bucket_granularity(period);
+
+    let mut per_key: HashMap<String, BTreeMap<DateTime<Utc>, i64>> = HashMap::new();
+    for event in &events {
+        let Some(payload) = parse_finalized_raid(event) else {
+            continue;
+        };
+        if !raid_completion_matches(&payload, raid_type, difficulty) {
+            continue;
+        }
+        let bucket = truncate_datetime(event.occurred_at, granularity);
+        if group_by_member {
+            for participant in &payload.participants {
+                *per_key
+                    .entry(participant.member_name.clone())
+                    .or_default()
+                    .entry(bucket)
+                    .or_insert(0) += 1;
+            }
+        } else {
+            *per_key
+                .entry(RAID_GROUP_TOTAL_LABEL.to_string())
+                .or_default()
+                .entry(bucket)
+                .or_insert(0) += 1;
+        }
+    }
+
+    Ok(cumulative_metric_data(per_key))
 }
 
 /// Hourly/daily/monthly GP-earned history for the chart, reading `bank_value_day/month/year`
