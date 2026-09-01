@@ -652,6 +652,12 @@ pub async fn update_group_member(
                         event,
                     )
                     .await?;
+                    discord::dispatch_progress_webhook(
+                        db_pool.get_ref().clone(),
+                        auth.group_id,
+                        group_member_inner.name.clone(),
+                        event.clone(),
+                    );
                 }
             }
         }

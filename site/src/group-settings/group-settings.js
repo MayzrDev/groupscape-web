@@ -17,6 +17,27 @@ function hasRealToken(group) {
   return !!group.groupToken && group.groupToken.startsWith(`${group.groupName}|`);
 }
 
+// Accepts plain gp amounts or `k`/`m` shorthand (e.g. "250k", "1.2m") for the Drops
+// minimum-value field. Returns null for anything that doesn't parse as a non-negative number.
+function parseGpShorthand(value) {
+  const match = /^([\d.]+)\s*(k|m)?$/i.exec(value.trim());
+  if (!match) return null;
+  let amount = parseFloat(match[1]);
+  if (Number.isNaN(amount)) return null;
+  const suffix = match[2] ? match[2].toLowerCase() : null;
+  if (suffix === "k") amount *= 1_000;
+  if (suffix === "m") amount *= 1_000_000;
+  return Math.round(amount);
+}
+
+// Renders a gp amount as the shortest shorthand that round-trips through parseGpShorthand,
+// so re-opening the settings shows back whatever form is easiest to read (e.g. 250000 -> "250k").
+function formatGpShorthand(amount) {
+  if (amount !== 0 && amount % 1_000_000 === 0) return `${amount / 1_000_000}m`;
+  if (amount !== 0 && amount % 1_000 === 0) return `${amount / 1_000}k`;
+  return String(amount);
+}
+
 export class GroupSettings extends BaseElement {
   constructor() {
     super();
@@ -95,6 +116,10 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       this.eventListener(checkbox, "change", this.saveDiscordSettings.bind(this));
     }
+    this.discordDropsMinValueInput = this.querySelector(".group-settings__discord-drops-min-value");
+    this.discordDropsParsed = this.querySelector(".group-settings__discord-drops-parsed");
+    this.eventListener(this.discordDropsMinValueInput, "input", this.updateDiscordDropsParsedPreview.bind(this));
+    this.eventListener(this.discordDropsMinValueInput, "change", this.saveDiscordSettings.bind(this));
 
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
@@ -373,6 +398,14 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       checkbox.checked = !!settings[checkbox.closest(".group-settings__discord-notify-row").dataset.key];
     }
+    this.discordDropsMinValueInput.value = formatGpShorthand(settings.drops_min_value ?? 250_000);
+    this.updateDiscordDropsParsedPreview();
+  }
+
+  updateDiscordDropsParsedPreview() {
+    const parsed = parseGpShorthand(this.discordDropsMinValueInput.value);
+    this.discordDropsParsed.textContent =
+      parsed === null ? "Unrecognized amount — try 250k or 1.2m" : `= ${parsed.toLocaleString()} gp`;
   }
 
   // A webhook only ever gets persisted after `update-discord-settings` tests it live against
@@ -389,6 +422,7 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       checkbox.disabled = !connected;
     }
+    this.discordDropsMinValueInput.disabled = !connected;
     this.querySelector(".group-settings__discord-lock-note").style.display = connected ? "none" : "";
   }
 
@@ -407,6 +441,8 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       settings[checkbox.closest(".group-settings__discord-notify-row").dataset.key] = checkbox.checked;
     }
+    const parsedMinValue = parseGpShorthand(this.discordDropsMinValueInput.value);
+    settings.drops_min_value = parsedMinValue ?? this.lastSavedDiscordSettings?.drops_min_value ?? 250_000;
 
     try {
       loadingScreenManager.showLoadingScreen();

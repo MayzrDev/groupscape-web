@@ -14,6 +14,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Each Loot Log source now shows its own first-kill-to-last-kill time range next to the kill count, so a boss farmed across several days shows that span instead of just a total.
 - Clicking a Loot Log item now opens its OSRS Wiki page in a new tab.
 - Loot Log boss names now show their combat level (e.g. "Vorkath (level-732)"), matching the in-game overhead format, for bosses with one fixed level.
+- Group Settings' Discord Integration section now has toggles for Combat achievements, Collection log, Quest completions, and Diary completions, so those milestones can post to Discord too.
 
 ### Changed
 - Loot Log now groups drops by boss, chest, or clue tier under a square icon grid instead of a flat list, with a rarity-colored border on each item and a hover tooltip showing its name and value. Each source shows its own total value alongside a kill/open/casket count. Loot splitting and the per-person breakdown have been removed - Loot Log is just a log now.
@@ -21,6 +22,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Loot Log time window's "Last day" option is now labeled "Last 24h".
 - Activity Feed entries for new collection log items now show the item's own icon next to the collection log icon, and link out to that item's OSRS Wiki page.
 - Activity Feed's left-hand rail now filters by activity type (kills, raids, collection log, clues, etc.) and the pills at the top now filter by member - swapped from before, where it was the other way around.
+- Discord's "Loot" and "Notable drops" toggles are now a single "Drops" toggle with an adjustable minimum value (250k gp by default) - only drops worth at least that amount get posted.
+- Discord's "Kills" notification is now "Boss kills" and only fires for actual bosses, not regular NPCs, and now includes the member's kill count for that boss.
+- Discord kill and drop messages now show the item's real name, linked to its OSRS Wiki page, instead of "item #12345".
 
 ### Fixed
 - Loot Log items dropped by a boss with no curated rarity data no longer show up as "Item #12345" - the real item name is shown.
@@ -32,6 +36,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Untradeable items in the Loot Log now show an "Untradeable" tag in their tooltip instead of "0 gp x quantity".
 - The "Exit view" button on the admin read-only viewing banner no longer fails to click while looking at the Map tab.
 - Activity Feed's type and member filter counts no longer zero out every other option when you pick a filter - they now show real counts for each choice regardless of what's currently selected.
+- The Discord notify toggles in Group Settings were invisible and couldn't be clicked at all - fixed.
 
 ## [1.0.254] - 2026-08-31
 

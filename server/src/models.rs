@@ -1128,9 +1128,16 @@ pub struct DiscordWebhookSettings {
     pub webhook_url: Option<String>,
     pub notify_kills: bool,
     pub notify_deaths: bool,
-    pub notify_loot: bool,
-    pub notify_notable_drops: bool,
+    /// Replaces the old separate `notify_loot`/`notify_notable_drops` toggles - one "Drops"
+    /// switch, gated by `drops_min_value` regardless of whether the drop came off a kill or a
+    /// plugin-side notable-drop alert.
+    pub notify_drops: bool,
+    pub drops_min_value: i64,
     pub notify_raids: bool,
+    pub notify_combat_achievements: bool,
+    pub notify_collection_log: bool,
+    pub notify_quests: bool,
+    pub notify_diaries: bool,
 }
 
 #[derive(Deserialize)]

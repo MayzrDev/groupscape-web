@@ -50,6 +50,12 @@ pub fn lookup(npc_name: &str, item_id: i32) -> Option<&'static DropRateEntry> {
     DROP_RATES.get(&slugify_npc_name(npc_name))?.get(&item_id)
 }
 
+/// Whether `npc_name` is one of the curated bosses in `content/drop_rates.json` - used to gate
+/// the "Boss kills" Discord notification, which should skip regular NPCs.
+pub fn is_boss(npc_name: &str) -> bool {
+    DROP_RATES.contains_key(&slugify_npc_name(npc_name))
+}
+
 /// Ordinal rank for sorting loot summary rows by rarity, rarest first. Unknown/missing
 /// rarities rank below every known tier rather than erroring.
 pub fn rarity_rank(rarity: &str) -> u8 {

@@ -12,6 +12,8 @@ pub const QUEST_STATE_FINISHED: u8 = 2;
 struct QuestEntry {
     #[serde(default)]
     hidden: bool,
+    #[serde(default)]
+    name: String,
 }
 
 /// Quest ids in the same order the plugin's `quests` byte array is indexed.
@@ -34,10 +36,26 @@ static QUEST_IDS: LazyLock<Vec<i32>> = LazyLock::new(|| {
     ids
 });
 
+static QUEST_NAMES: LazyLock<HashMap<i32, String>> = LazyLock::new(|| {
+    let data: HashMap<String, QuestEntry> =
+        serde_json::from_str(include_str!("content/quest_data.json"))
+            .expect("content/quest_data.json must parse");
+    data.into_iter()
+        .filter_map(|(quest_id, entry)| quest_id.parse::<i32>().ok().map(|id| (id, entry.name)))
+        .collect()
+});
+
 /// The quest id stored at `index` of an uploaded `quests` byte array, or `None` if the array is
 /// longer than the catalog this server knows about (a newer plugin/game release).
 pub fn quest_id_at(index: usize) -> Option<i32> {
     QUEST_IDS.get(index).copied()
+}
+
+/// Display name for a quest id - used by the Discord "Quest completions" notification, which
+/// only has the id (see [`quest_id_at`]'s doc comment on why the frontend resolves this itself
+/// for the activity feed instead).
+pub fn quest_name(quest_id: i32) -> Option<&'static str> {
+    QUEST_NAMES.get(&quest_id).map(String::as_str)
 }
 
 #[cfg(test)]

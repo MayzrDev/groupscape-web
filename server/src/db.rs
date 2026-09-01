@@ -485,8 +485,9 @@ pub async fn get_discord_webhook_settings(
 ) -> Result<DiscordWebhookSettings, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_loot, \
-             discord_notify_notable_drops, discord_notify_raids \
+            "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_drops, \
+             discord_drops_min_value, discord_notify_raids, discord_notify_combat_achievements, \
+             discord_notify_collection_log, discord_notify_quests, discord_notify_diaries \
              FROM groupscape.groups WHERE group_id=$1",
         )
         .await?;
@@ -498,9 +499,13 @@ pub async fn get_discord_webhook_settings(
         webhook_url: row.try_get("discord_webhook_url")?,
         notify_kills: row.try_get("discord_notify_kills")?,
         notify_deaths: row.try_get("discord_notify_deaths")?,
-        notify_loot: row.try_get("discord_notify_loot")?,
-        notify_notable_drops: row.try_get("discord_notify_notable_drops")?,
+        notify_drops: row.try_get("discord_notify_drops")?,
+        drops_min_value: row.try_get("discord_drops_min_value")?,
         notify_raids: row.try_get("discord_notify_raids")?,
+        notify_combat_achievements: row.try_get("discord_notify_combat_achievements")?,
+        notify_collection_log: row.try_get("discord_notify_collection_log")?,
+        notify_quests: row.try_get("discord_notify_quests")?,
+        notify_diaries: row.try_get("discord_notify_diaries")?,
     })
 }
 
@@ -512,8 +517,9 @@ pub async fn update_discord_webhook_settings(
     let stmt = client
         .prepare_cached(
             "UPDATE groupscape.groups SET \
-             discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_loot=$5, \
-             discord_notify_notable_drops=$6, discord_notify_raids=$7 \
+             discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_drops=$5, \
+             discord_drops_min_value=$6, discord_notify_raids=$7, discord_notify_combat_achievements=$8, \
+             discord_notify_collection_log=$9, discord_notify_quests=$10, discord_notify_diaries=$11 \
              WHERE group_id=$1",
         )
         .await?;
@@ -525,14 +531,38 @@ pub async fn update_discord_webhook_settings(
                 &settings.webhook_url,
                 &settings.notify_kills,
                 &settings.notify_deaths,
-                &settings.notify_loot,
-                &settings.notify_notable_drops,
+                &settings.notify_drops,
+                &settings.drops_min_value,
                 &settings.notify_raids,
+                &settings.notify_combat_achievements,
+                &settings.notify_collection_log,
+                &settings.notify_quests,
+                &settings.notify_diaries,
             ],
         )
         .await
         .map_err(ApiError::UpdateDiscordWebhookSettingsError)?;
     Ok(())
+}
+
+/// Total kills recorded for `member_name` against `npc_name` in this group, all-time - the
+/// "(KC: n)" suffix on the Discord boss-kill message. Reuses `list_kill_events`' JSON-payload
+/// filtering rather than a new SQL predicate, matching `get_boss_kc_leaderboard`'s approach.
+pub async fn count_kills_for_member_npc(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    npc_name: &str,
+) -> Result<i64, ApiError> {
+    let events = list_kill_events(client, group_id, Some(member_name), None, None, None).await?;
+    let count = events
+        .iter()
+        .filter(|event| {
+            serde_json::from_value::<GameEvent>(event.payload.clone())
+                .is_ok_and(|event| matches!(event, GameEvent::Kill(kill) if kill.npc_name == npc_name))
+        })
+        .count();
+    Ok(count as i64)
 }
 
 pub struct HomepageStats {
@@ -2631,6 +2661,64 @@ ADD COLUMN IF NOT EXISTS discord_notify_raids BOOLEAN NOT NULL DEFAULT true
             .await?;
 
         commit_migration(&transaction, "add_groups_discord_notify_raids_column").await?;
+        transaction.commit().await?;
+    }
+
+    // Merges the old `discord_notify_loot`/`discord_notify_notable_drops` toggles into one
+    // `discord_notify_drops` switch plus a gp-value floor (see `DiscordWebhookSettings`) - a
+    // group that had either of the old toggles on keeps posting drops after this runs.
+    if !has_migration_run(client, "merge_groups_discord_drops_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_notify_drops BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_drops_min_value BIGINT NOT NULL DEFAULT 250000
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+UPDATE groupscape.groups
+SET discord_notify_drops = (discord_notify_loot OR discord_notify_notable_drops)
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+DROP COLUMN IF EXISTS discord_notify_loot,
+DROP COLUMN IF EXISTS discord_notify_notable_drops
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "merge_groups_discord_drops_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_groups_discord_achievement_notify_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_notify_combat_achievements BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_collection_log BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_quests BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_diaries BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_achievement_notify_columns").await?;
         transaction.commit().await?;
     }
 

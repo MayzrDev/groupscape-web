@@ -35,6 +35,7 @@ pub struct ProgressSnapshot {
     pub combat_achievements: Option<CombatAchievements>,
 }
 
+#[derive(Clone)]
 pub struct ProgressEvent {
     pub event_type: &'static str,
     pub payload: serde_json::Value,
