@@ -16,6 +16,7 @@ const EVENT_TYPES = [
 ];
 
 const PAGE_LIMIT = 25;
+const COUNT_LIMIT = 200;
 const REFRESH_INTERVAL_MS = 15000;
 
 export class ActivityFeedPage extends BaseElement {
@@ -25,6 +26,8 @@ export class ActivityFeedPage extends BaseElement {
     this.selectedMember = null;
     this.selectedType = null;
     this.loaded = [];
+    this.typeCountEvents = [];
+    this.memberCountEvents = [];
     this.loadingMore = false;
     this.exhausted = false;
   }
@@ -77,14 +80,16 @@ export class ActivityFeedPage extends BaseElement {
     if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
   }
 
-  // Best-effort counts over events fetched so far, not true totals — there's no cheap way to get
-  // an exact total from a cursor-paginated feed without a dedicated count query.
+  // Best-effort counts, not true totals — there's no cheap way to get an exact total from a
+  // cursor-paginated feed without a dedicated count query. Counted from a pool fetched ignoring
+  // the axis being counted (but still respecting the *other* axis' filter), so picking a type
+  // doesn't zero out every other type's count and vice versa.
   loadedCountForMember(memberName) {
-    return this.loaded.filter((event) => !memberName || event.member_name === memberName).length;
+    return this.memberCountEvents.filter((event) => !memberName || event.member_name === memberName).length;
   }
 
   loadedCountForType(type) {
-    return this.loaded.filter((event) => !type || event.event_type === type).length;
+    return this.typeCountEvents.filter((event) => !type || event.event_type === type).length;
   }
 
   renderRail() {
@@ -156,7 +161,18 @@ export class ActivityFeedPage extends BaseElement {
     this.exhausted = false;
     this.list.innerHTML = "";
     this.empty.classList.remove("activity-feed-page__empty--visible");
-    await this.loadMore();
+    await Promise.all([this.loadMore(), this.loadCounts()]);
+  }
+
+  async loadCounts() {
+    const [typeCountEvents, memberCountEvents] = await Promise.all([
+      api.getActivityEvents({ memberName: this.selectedMember, limit: COUNT_LIMIT }),
+      api.getActivityEvents({ eventType: this.selectedType, limit: COUNT_LIMIT }),
+    ]);
+    this.typeCountEvents = typeCountEvents;
+    this.memberCountEvents = memberCountEvents;
+    this.renderRail();
+    this.renderMemberFilters();
   }
 
   async loadMore() {
@@ -217,8 +233,7 @@ export class ActivityFeedPage extends BaseElement {
       this.scrollContainer.scrollTop = scrollTopBefore + delta;
     }
 
-    this.renderRail();
-    this.renderMemberFilters();
+    await this.loadCounts();
   }
 }
 

@@ -31,6 +31,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Test/diagnostic kill data no longer shows up in the Loot Log.
 - Untradeable items in the Loot Log now show an "Untradeable" tag in their tooltip instead of "0 gp x quantity".
 - The "Exit view" button on the admin read-only viewing banner no longer fails to click while looking at the Map tab.
+- Activity Feed's type and member filter counts no longer zero out every other option when you pick a filter - they now show real counts for each choice regardless of what's currently selected.
 
 ## [1.0.254] - 2026-08-31
 
