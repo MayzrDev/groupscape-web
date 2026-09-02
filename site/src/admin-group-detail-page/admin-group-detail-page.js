@@ -6,6 +6,13 @@ import { requireAdmin } from "../data/admin-guard";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { loadingScreenManager } from "../loading-screen/loading-screen-manager";
 
+const MEMBER_DATA_COLUMNS = [
+  { key: "collection_log", label: "collection log" },
+  { key: "combat_achievements", label: "combat achievements" },
+  { key: "skill_xp_history", label: "skill & XP history" },
+  { key: "bank_value_history", label: "bank value history" },
+];
+
 export class AdminGroupDetailPage extends BaseElement {
   constructor() {
     super();
@@ -33,6 +40,16 @@ export class AdminGroupDetailPage extends BaseElement {
       "click",
       this.viewAsMember.bind(this)
     );
+    this.eventListener(this.querySelector(".admin-data-mgmt__clear-feed"), "click", this.clearActivityFeed.bind(this));
+    this.eventListener(this.querySelector(".admin-data-mgmt__clear-loot"), "click", this.clearLootLog.bind(this));
+    this.eventListener(
+      this.querySelector(".admin-data-mgmt__clear-selected"),
+      "click",
+      this.clearSelectedMemberData.bind(this)
+    );
+    this.querySelectorAll(".admin-data-mgmt__selectall").forEach((button) => {
+      this.eventListener(button, "click", () => this.toggleSelectAll(button.dataset.col));
+    });
     await this.fetchGroup();
   }
 
@@ -110,9 +127,111 @@ export class AdminGroupDetailPage extends BaseElement {
     const roster = this.querySelector(".admin-group-detail__roster");
     roster.innerHTML =
       group.members.length > 0
-        ? group.members.map((name) => `<div class="admin-roster__member">${name}</div>`).join("")
+        ? group.members.map((member) => `<div class="admin-roster__member">${member.member_name}</div>`).join("")
         : `<div class="admin-roster__empty">No members.</div>`;
     this.querySelector(".admin-group-detail__roster-count").textContent = group.members.length;
+
+    this.renderMemberDataTable();
+  }
+
+  renderMemberDataTable() {
+    const tbody = this.querySelector(".admin-data-mgmt__tbody");
+    const members = this.group.members;
+    tbody.innerHTML =
+      members.length > 0
+        ? members
+            .map(
+              (member) => `
+      <tr>
+        <td>${member.member_name}</td>
+        ${MEMBER_DATA_COLUMNS.map(
+          (col) => `<td><input type="checkbox" data-member-id="${member.member_id}" data-col="${col.key}"></td>`
+        ).join("")}
+      </tr>
+    `
+            )
+            .join("")
+        : `<tr><td colspan="${MEMBER_DATA_COLUMNS.length + 1}">No members.</td></tr>`;
+    this.eventListener(tbody, "change", this.refreshSelectionState.bind(this));
+    this.refreshSelectionState();
+  }
+
+  getSelectedMemberData() {
+    return Array.from(this.querySelectorAll(".admin-data-mgmt__tbody input[type='checkbox']:checked")).map(
+      (checkbox) => ({
+        member_id: Number(checkbox.dataset.memberId),
+        data_type: checkbox.dataset.col,
+      })
+    );
+  }
+
+  refreshSelectionState() {
+    const selected = this.getSelectedMemberData();
+    const clearButton = this.querySelector(".admin-data-mgmt__clear-selected");
+    const countLabel = this.querySelector(".admin-data-mgmt__selection-count");
+    clearButton.disabled = selected.length === 0;
+    countLabel.textContent = selected.length === 0 ? "Nothing selected" : `${selected.length} selected`;
+  }
+
+  toggleSelectAll(col) {
+    const boxes = Array.from(this.querySelectorAll(`.admin-data-mgmt__tbody input[data-col="${col}"]`));
+    const allChecked = boxes.length > 0 && boxes.every((box) => box.checked);
+    boxes.forEach((box) => (box.checked = !allChecked));
+    this.refreshSelectionState();
+  }
+
+  clearActivityFeed() {
+    confirmDialogManager.confirm({
+      headline: "Clear activity feed?",
+      body: `Every activity feed entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
+      yesCallback: () =>
+        this.runAction(async () => {
+          const response = await adminApi.clearActivityFeed(this.groupId);
+          if (!response.ok) throw new Error("Failed to clear activity feed");
+        }),
+      noCallback: () => {},
+    });
+  }
+
+  clearLootLog() {
+    confirmDialogManager.confirm({
+      headline: "Clear loot log?",
+      body: `Every loot log entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
+      yesCallback: () =>
+        this.runAction(async () => {
+          const response = await adminApi.clearLootLog(this.groupId);
+          if (!response.ok) throw new Error("Failed to clear loot log");
+        }),
+      noCallback: () => {},
+    });
+  }
+
+  clearSelectedMemberData() {
+    const items = this.getSelectedMemberData();
+    if (items.length === 0) return;
+
+    const byMember = new Map();
+    for (const { member_id, data_type } of items) {
+      const member = this.group.members.find((m) => m.member_id === member_id);
+      const label = MEMBER_DATA_COLUMNS.find((c) => c.key === data_type).label;
+      const name = member ? member.member_name : `#${member_id}`;
+      if (!byMember.has(name)) byMember.set(name, []);
+      byMember.get(name).push(label);
+    }
+    const summary = Array.from(byMember.entries())
+      .map(([name, types]) => `${name}: ${types.join(", ")}`)
+      .join("\n");
+
+    confirmDialogManager.confirm({
+      headline: `Clear data for ${items.length} selection${items.length === 1 ? "" : "s"}?`,
+      body: `This cannot be undone.\n${summary}`,
+      yesCallback: () =>
+        this.runAction(async () => {
+          const response = await adminApi.clearMemberData(this.groupId, items);
+          if (!response.ok) throw new Error("Failed to clear member data");
+        }),
+      noCallback: () => {},
+    });
   }
 
   async suspend() {

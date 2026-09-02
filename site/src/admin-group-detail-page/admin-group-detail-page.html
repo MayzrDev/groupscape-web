@@ -17,3 +17,67 @@
   </h3>
   <div class="admin-group-detail__roster admin-roster"></div>
 </div>
+
+<div class="admin-panel">
+  <h3>Data management</h3>
+
+  <div class="admin-data-mgmt__section">
+    <div class="admin-data-mgmt__section-title">Bulk logs</div>
+    <div class="admin-data-mgmt__bulk-row">
+      <div class="admin-data-mgmt__bulk-copy">
+        <span class="admin-data-mgmt__bulk-label">Clear activity feed</span>
+        <span class="admin-data-mgmt__bulk-desc">Deletes every activity feed entry for this group. Cannot be undone.</span>
+      </div>
+      <button class="admin-btn admin-btn--danger admin-data-mgmt__clear-feed">Clear&hellip;</button>
+    </div>
+    <div class="admin-data-mgmt__bulk-row">
+      <div class="admin-data-mgmt__bulk-copy">
+        <span class="admin-data-mgmt__bulk-label">Clear loot log</span>
+        <span class="admin-data-mgmt__bulk-desc">Deletes every loot log entry for this group. Cannot be undone.</span>
+      </div>
+      <button class="admin-btn admin-btn--danger admin-data-mgmt__clear-loot">Clear&hellip;</button>
+    </div>
+  </div>
+
+  <div class="admin-data-mgmt__section">
+    <div class="admin-data-mgmt__section-title">Member data</div>
+    <div class="admin-data-mgmt__table-wrap">
+      <table class="admin-data-mgmt__table">
+        <thead>
+          <tr>
+            <th></th>
+            <th data-col="collection_log">
+              <div class="admin-data-mgmt__col-head">
+                <span>Collection log</span>
+                <button class="admin-data-mgmt__selectall" data-col="collection_log">select all</button>
+              </div>
+            </th>
+            <th data-col="combat_achievements">
+              <div class="admin-data-mgmt__col-head">
+                <span>Combat achievements</span>
+                <button class="admin-data-mgmt__selectall" data-col="combat_achievements">select all</button>
+              </div>
+            </th>
+            <th data-col="skill_xp_history">
+              <div class="admin-data-mgmt__col-head">
+                <span>Skill &amp; XP history</span>
+                <button class="admin-data-mgmt__selectall" data-col="skill_xp_history">select all</button>
+              </div>
+            </th>
+            <th data-col="bank_value_history">
+              <div class="admin-data-mgmt__col-head">
+                <span>Bank value history</span>
+                <button class="admin-data-mgmt__selectall" data-col="bank_value_history">select all</button>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody class="admin-data-mgmt__tbody"></tbody>
+      </table>
+    </div>
+    <div class="admin-data-mgmt__footer">
+      <span class="admin-data-mgmt__selection-count">Nothing selected</span>
+      <button class="admin-btn admin-btn--danger admin-data-mgmt__clear-selected" disabled>Clear selected&hellip;</button>
+    </div>
+  </div>
+</div>

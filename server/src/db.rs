@@ -4,7 +4,7 @@ use crate::error::ApiError;
 use crate::models::{
     ActivityEvent, AdminAccountCharacter, AdminAccountDetail, AdminAccountGroup,
     AdminAccountSession, AdminAccountSummary, AdminAuditLogEntry, AdminDashboard,
-    AdminGroupDetail, AdminGroupSummary, AggregateSkillData, BlockedMember,
+    AdminGroupDetail, AdminGroupMember, AdminGroupSummary, AggregateSkillData, BlockedMember,
     CombatStyleBonuses, CreateGroup, DiscordWebhookSettings, GameEvent, GroupMember,
     GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession, GroupSkillData,
     ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint, PermissionFlags,
@@ -4877,14 +4877,20 @@ WHERE g.group_id = $1
 
     let members_stmt = client
         .prepare_cached(
-            "SELECT member_name FROM groupscape.members WHERE group_id = $1 AND member_name != $2 ORDER BY member_name",
+            "SELECT member_id, member_name FROM groupscape.members WHERE group_id = $1 AND member_name != $2 ORDER BY member_name",
         )
         .await?;
     let member_rows = client
         .query(&members_stmt, &[&group_id, &SHARED_MEMBER])
         .await
         .map_err(|e| ApiError::AdminDbError("AdminGetGroupMembersError".to_string(), e))?;
-    let members = member_rows.into_iter().map(|row| row.get(0)).collect();
+    let members = member_rows
+        .into_iter()
+        .map(|row| AdminGroupMember {
+            member_id: row.get("member_id"),
+            member_name: row.get("member_name"),
+        })
+        .collect();
 
     Ok(Some(AdminGroupDetail {
         group_id: group_row.get("group_id"),
@@ -4977,6 +4983,150 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
         .commit()
         .await
         .map_err(|e| ApiError::AdminDbError("AdminDeleteGroupCommitError".to_string(), e))?;
+
+    Ok(())
+}
+
+/// Deletes every row the activity feed view surfaces for a group (mirrors `list_activity_events`'s
+/// event_type/clue-tier filter). Kept separate from `admin_clear_loot_log` because the feed and
+/// loot log read the same table with overlapping event_types (e.g. `kill`) and there's no
+/// per-row "which view(s) showed this" flag to preserve - a row shared by both views is deleted
+/// outright by whichever clear runs first.
+pub async fn admin_clear_activity_feed(client: &Client, group_id: i64) -> Result<u64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+DELETE FROM groupscape.activity_events
+WHERE group_id = $1
+  AND (
+    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log', 'raid', 'level_up')
+    OR (event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
+  )
+"#,
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminClearActivityFeedError".to_string(), e))
+}
+
+/// Deletes every row the Loot Log view surfaces for a group (mirrors
+/// `list_loot_and_kill_events_page`'s event_type filter). See `admin_clear_activity_feed` for why
+/// a row shared by both views is deleted outright rather than hidden from just this one.
+pub async fn admin_clear_loot_log(client: &Client, group_id: i64) -> Result<u64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "DELETE FROM groupscape.activity_events WHERE group_id = $1 AND event_type IN ('kill', 'loot')",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminClearLootLogError".to_string(), e))
+}
+
+const CLEARABLE_MEMBER_DATA_TYPES: &[&str] = &[
+    "collection_log",
+    "combat_achievements",
+    "skill_xp_history",
+    "bank_value_history",
+];
+
+/// Applies the group-detail "Data management" matrix selection: a set of (member_id, data_type)
+/// pairs. Collection log / combat achievements live as columns on `members` and reset in place;
+/// skill/XP and bank-value history are per-member tables and get their rows deleted. Silently
+/// skips any member_id that isn't actually in `group_id`, so a stale selection can't reach into
+/// another group.
+pub async fn admin_clear_member_data(
+    client: &mut Client,
+    group_id: i64,
+    items: &[(i64, String)],
+) -> Result<(), ApiError> {
+    for (_, data_type) in items {
+        if !CLEARABLE_MEMBER_DATA_TYPES.contains(&data_type.as_str()) {
+            return Err(ApiError::AdminInvalidRequestError(format!(
+                "Unknown data_type: {data_type}"
+            )));
+        }
+    }
+
+    let member_id_stmt = client
+        .prepare_cached("SELECT member_id FROM groupscape.members WHERE group_id = $1")
+        .await?;
+    let valid_member_ids: HashSet<i64> = client
+        .query(&member_id_stmt, &[&group_id])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminClearMemberDataLookupError".to_string(), e))?
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect();
+
+    let transaction = client.transaction().await?;
+
+    for (member_id, data_type) in items {
+        if !valid_member_ids.contains(member_id) {
+            continue;
+        }
+        match data_type.as_str() {
+            "collection_log" => {
+                let stmt = transaction
+                    .prepare_cached(
+                        "UPDATE groupscape.members SET collection_log = NULL, collection_log_last_update = NULL WHERE member_id = $1",
+                    )
+                    .await?;
+                transaction
+                    .execute(&stmt, &[member_id])
+                    .await
+                    .map_err(|e| {
+                        ApiError::AdminDbError("AdminClearCollectionLogError".to_string(), e)
+                    })?;
+            }
+            "combat_achievements" => {
+                let stmt = transaction
+                    .prepare_cached(
+                        "UPDATE groupscape.members SET combat_achievements = NULL, combat_achievements_last_update = NULL WHERE member_id = $1",
+                    )
+                    .await?;
+                transaction
+                    .execute(&stmt, &[member_id])
+                    .await
+                    .map_err(|e| {
+                        ApiError::AdminDbError("AdminClearCombatAchievementsError".to_string(), e)
+                    })?;
+            }
+            "skill_xp_history" => {
+                delete_skills_data_for_member(&transaction, AggregatePeriod::Day, *member_id)
+                    .await?;
+                delete_skills_data_for_member(&transaction, AggregatePeriod::Month, *member_id)
+                    .await?;
+                delete_skills_data_for_member(&transaction, AggregatePeriod::Year, *member_id)
+                    .await?;
+            }
+            "bank_value_history" => {
+                delete_bank_value_data_for_member(&transaction, AggregatePeriod::Day, *member_id)
+                    .await?;
+                delete_bank_value_data_for_member(&transaction, AggregatePeriod::Month, *member_id)
+                    .await?;
+                delete_bank_value_data_for_member(&transaction, AggregatePeriod::Year, *member_id)
+                    .await?;
+                let stmt = transaction
+                    .prepare_cached(
+                        "DELETE FROM groupscape.bank_value_snapshots WHERE member_id = $1",
+                    )
+                    .await?;
+                transaction.execute(&stmt, &[member_id]).await.map_err(|e| {
+                    ApiError::AdminDbError("AdminClearBankValueSnapshotsError".to_string(), e)
+                })?;
+            }
+            _ => unreachable!("data_type validated above"),
+        }
+    }
+
+    transaction
+        .commit()
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminClearMemberDataCommitError".to_string(), e))?;
 
     Ok(())
 }

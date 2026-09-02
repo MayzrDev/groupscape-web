@@ -1252,13 +1252,19 @@ pub struct AdminGroupsResponse {
 }
 
 #[derive(Serialize)]
+pub struct AdminGroupMember {
+    pub member_id: i64,
+    pub member_name: String,
+}
+
+#[derive(Serialize)]
 pub struct AdminGroupDetail {
     pub group_id: i64,
     pub group_name: String,
     pub version: i32,
     pub status: String,
     pub reason: Option<String>,
-    pub members: Vec<String>,
+    pub members: Vec<AdminGroupMember>,
 }
 
 #[derive(Deserialize)]
@@ -1266,6 +1272,22 @@ pub struct AdminGroupDetail {
 pub struct AdminModerationRequest {
     #[serde(default)]
     pub reason: Option<String>,
+}
+
+/// One member/data-type pair from the group-detail "Data management" matrix - see
+/// `db::admin_clear_member_data`. `data_type` is one of `collection_log`, `combat_achievements`,
+/// `skill_xp_history`, `bank_value_history`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminClearMemberDataItem {
+    pub member_id: i64,
+    pub data_type: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminClearMemberDataRequest {
+    pub items: Vec<AdminClearMemberDataItem>,
 }
 
 

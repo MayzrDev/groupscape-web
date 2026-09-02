@@ -68,6 +68,31 @@ class AdminApi {
     return response;
   }
 
+  async clearActivityFeed(groupId) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-activity-feed`, {
+      method: "POST",
+      headers: this.authHeaders,
+    });
+    return response;
+  }
+
+  async clearLootLog(groupId) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-loot-log`, {
+      method: "POST",
+      headers: this.authHeaders,
+    });
+    return response;
+  }
+
+  async clearMemberData(groupId, items) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-member-data`, {
+      method: "POST",
+      headers: { ...this.authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    });
+    return response;
+  }
+
   async deleteCharacter(characterId) {
     const response = await fetch(`${this.baseUrl}/characters/${characterId}`, {
       method: "DELETE",

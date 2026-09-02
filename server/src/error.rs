@@ -66,6 +66,9 @@ pub enum ApiError {
     AdminNotFoundError,
     AdminRateLimitedError,
     #[from(ignore)]
+    #[display("{_0}")]
+    AdminInvalidRequestError(String),
+    #[from(ignore)]
     DiscordOAuthError(String),
     DiscordIdAlreadyLinkedError,
     #[from(ignore)]
@@ -227,6 +230,9 @@ impl ResponseError for ApiError {
             ApiError::AdminDbError(ref context, ref err) => handle_pg_error(err, context),
             ApiError::AdminNotFoundError => HttpResponse::NotFound().finish(),
             ApiError::AdminRateLimitedError => HttpResponse::TooManyRequests().finish(),
+            ApiError::AdminInvalidRequestError(ref reason) => {
+                HttpResponse::BadRequest().body(reason.clone())
+            }
             ApiError::CreateAccountError(ref err) => handle_pg_error(err, "CreateAccountError"),
             ApiError::UsernameAlreadyRegisteredError => {
                 HttpResponse::Conflict().body("Username already registered")

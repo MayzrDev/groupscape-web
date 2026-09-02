@@ -4,9 +4,9 @@ use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAddAccountToGroup,
-    AdminAuditLogResponse, AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest,
-    AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery, AdminSearchResponse,
-    AdminSetAccountUsername, AdminSetAccountStatus,
+    AdminAuditLogResponse, AdminClearMemberDataRequest, AdminGroupsQuery, AdminGroupsResponse,
+    AdminModerationRequest, AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery,
+    AdminSearchResponse, AdminSetAccountUsername, AdminSetAccountStatus,
 };
 use actix_web::{delete, get, post, web, Error, HttpResponse};
 use deadpool_postgres::{Client, Pool};
@@ -166,6 +166,88 @@ pub async fn delete_group(
         Some("group"),
         Some(&group_id.to_string()),
         None,
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/groups/{group_id}/clear-activity-feed")]
+pub async fn clear_activity_feed(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let group_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_group(&client, group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    let deleted = db::admin_clear_activity_feed(&client, group_id).await?;
+    db::admin_record_audit_log(
+        &client,
+        "group.clear_activity_feed",
+        Some("group"),
+        Some(&group_id.to_string()),
+        Some(json!({ "rows_deleted": deleted })),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/groups/{group_id}/clear-loot-log")]
+pub async fn clear_loot_log(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let group_id = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_group(&client, group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    let deleted = db::admin_clear_loot_log(&client, group_id).await?;
+    db::admin_record_audit_log(
+        &client,
+        "group.clear_loot_log",
+        Some("group"),
+        Some(&group_id.to_string()),
+        Some(json!({ "rows_deleted": deleted })),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Applies the group-detail "Data management" matrix selection - see
+/// `db::admin_clear_member_data` for the per-data-type semantics.
+#[post("/groups/{group_id}/clear-member-data")]
+pub async fn clear_member_data(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    body: web::Json<AdminClearMemberDataRequest>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let group_id = path.into_inner();
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_group(&client, group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    let items: Vec<(i64, String)> = body
+        .items
+        .iter()
+        .map(|item| (item.member_id, item.data_type.clone()))
+        .collect();
+    let item_count = items.len();
+
+    db::admin_clear_member_data(&mut client, group_id, &items).await?;
+    db::admin_record_audit_log(
+        &client,
+        "group.clear_member_data",
+        Some("group"),
+        Some(&group_id.to_string()),
+        Some(json!({ "items": items, "item_count": item_count })),
     )
     .await?;
     Ok(HttpResponse::Ok().finish())
