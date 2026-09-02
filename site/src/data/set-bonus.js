@@ -13,11 +13,15 @@ function loadSets() {
 
 /**
  * OSRS Wiki page titles are sentence case (first letter capitalized, everything else lowercase),
- * which every curated set name here already conforms to - so the page title, and therefore the
- * URL, is derivable rather than needing a hand-maintained field per set.
+ * which most curated set names here conform to, so the page title (and therefore the URL) is
+ * usually derivable. That derived title is a Grand Exchange trading-bundle page for a handful of
+ * sets though (e.g. "Ahrim's armour set" is just the tradeable bundle item, not the equipment
+ * page with the actual set effect) - those sets carry an explicit `wiki` override in
+ * set_bonuses.json pointing at the real page instead.
  */
-function wikiUrl(name) {
-  const title = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+function wikiUrl(set) {
+  if (set.wiki) return set.wiki;
+  const title = set.name.charAt(0).toUpperCase() + set.name.slice(1).toLowerCase();
   return `https://oldschool.runescape.wiki/w/${encodeURIComponent(title.replace(/ /g, "_"))}`;
 }
 
@@ -40,7 +44,7 @@ export async function detectActiveSets(equippedItemIds) {
     return {
       name: set.name,
       effect: set.effect,
-      wikiUrl: wikiUrl(set.name),
+      wikiUrl: wikiUrl(set),
       image: set.image,
       pieceCount: set.pieces.length,
       missingItemIds,

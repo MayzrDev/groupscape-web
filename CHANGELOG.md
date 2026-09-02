@@ -27,6 +27,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The "Boss kill" in-game chat notification no longer fires for every NPC kill (including slayer task mobs) - it's now limited to actual tracked bosses, matching what the setting says it does.
 - Set Bonuses now defaults "Other Sets" open when you have no active or partial sets, instead of hiding everything behind a collapsed accordion.
 - Set Bonuses is now scrollable again when its contents overflow the dialog, including when the "Other Sets" list is long.
+- Set Bonuses' wiki links for the 6 Barrows sets and 3 Moon sets now go to the actual equipment page instead of the Grand Exchange trading-bundle page, which doesn't describe the set effect at all.
 
 ## [1.0.257] - 2026-09-01
 

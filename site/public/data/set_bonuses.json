@@ -36,7 +36,8 @@
       [4714, 4874, 4875, 4876, 4877]
     ],
     "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Ahrim's_robes_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Ahrim's_robes_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Ahrim_the_Blighted%27s_equipment"
   },
   {
     "name": "Dharok's Armour Set",
@@ -47,7 +48,8 @@
       [4722, 4898, 4899, 4900, 4901]
     ],
     "effect": "The lower your remaining Hitpoints, the higher your melee damage - up to roughly double (about 98% extra) at 1 HP - while the full set (including the greataxe) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Dharok's_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Dharok's_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Dharok_the_Wretched%27s_equipment"
   },
   {
     "name": "Guthan's Armour Set",
@@ -58,7 +60,8 @@
       [4730, 4922, 4923, 4924, 4925]
     ],
     "effect": "Successful melee attacks have a 25% chance to heal you for the amount of damage dealt, while the full set (including the warspear) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Guthan's_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Guthan's_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Guthan_the_Infested%27s_equipment"
   },
   {
     "name": "Karil's Armour Set",
@@ -69,7 +72,8 @@
       [4738, 4946, 4947, 4948, 4949]
     ],
     "effect": "Successful ranged attacks have a 25% chance to lower the target's Agility level by 20%, while the full set (including the crossbow) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Karil's_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Karil's_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Karil_the_Tainted%27s_equipment"
   },
   {
     "name": "Torag's Armour Set",
@@ -80,7 +84,8 @@
       [4751, 4970, 4971, 4972, 4973]
     ],
     "effect": "Successful melee attacks have a 25% chance to lower the target's Run energy by 20%, while the full set (including the hammers) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Torag's_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Torag's_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Torag_the_Corrupted%27s_equipment"
   },
   {
     "name": "Verac's Armour Set",
@@ -91,25 +96,29 @@
       [4759, 4994, 4995, 4996, 4997]
     ],
     "effect": "Melee attacks have a 25% chance to ignore the target's Defence level and any active protection prayer, while the full set (including the flail) is worn.",
-    "image": "https://oldschool.runescape.wiki/images/Verac's_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Verac's_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Verac_the_Defiled%27s_equipment"
   },
   {
     "name": "Blood Moon Armour Set",
     "pieces": [[29028, 29047], [29022, 29043], [29025, 29045], [28997]],
     "effect": "While the full set (including the Dual macuahuitl) is worn, each successful macuahuitl hit has a 33% chance to speed up your next attack to 3 ticks instead of 4 - since the weapon hits twice per swing, this works out to roughly a 55.5% chance of the speed-up triggering per attack.",
-    "image": "https://oldschool.runescape.wiki/images/Blood_moon_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Blood_moon_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Blood_moon_armour"
   },
   {
     "name": "Blue Moon Armour Set",
     "pieces": [[29019, 29041], [29013, 29037], [29016, 29039], [28988]],
     "effect": "While the full set (including the Blue moon spear) is worn, casting a bind, freeze, or root spell has a chance to immediately follow up with a delay-free melee spear hit - 20% after Bind/Ice spells, 50% after Arceuus Grasp spells.",
-    "image": "https://oldschool.runescape.wiki/images/Blue_moon_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Blue_moon_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Blue_moon_armour"
   },
   {
     "name": "Eclipse Moon Armour Set",
     "pieces": [[29010, 29035], [29004, 29031], [29007, 29033], [29000]],
     "effect": "While the full set (including the Eclipse atlatl) is worn, successful atlatl hits have a 20% chance to inflict a stacking burn (up to 5 stacks, averaging roughly 2 extra damage per hit); in PvP the set also speeds up the atlatl from 5 ticks to 3.",
-    "image": "https://oldschool.runescape.wiki/images/Eclipse_moon_armour_equipped_male.png"
+    "image": "https://oldschool.runescape.wiki/images/Eclipse_moon_armour_equipped_male.png",
+    "wiki": "https://oldschool.runescape.wiki/w/Eclipse_moon_armour"
   },
   {
     "name": "Justiciar Armour",
