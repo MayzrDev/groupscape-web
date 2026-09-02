@@ -12,6 +12,16 @@ function loadSets() {
 }
 
 /**
+ * OSRS Wiki page titles are sentence case (first letter capitalized, everything else lowercase),
+ * which every curated set name here already conforms to - so the page title, and therefore the
+ * URL, is derivable rather than needing a hand-maintained field per set.
+ */
+function wikiUrl(name) {
+  const title = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return `https://oldschool.runescape.wiki/w/${encodeURIComponent(title.replace(/ /g, "_"))}`;
+}
+
+/**
  * Given the item ids currently equipped, returns every curated set with its completion status:
  * `active` (every piece equipped), `partial` (some but not all pieces equipped, with
  * `missingItemIds` listing what's left), or neither (no pieces equipped at all).
@@ -30,6 +40,7 @@ export async function detectActiveSets(equippedItemIds) {
     return {
       name: set.name,
       effect: set.effect,
+      wikiUrl: wikiUrl(set.name),
       pieceCount: set.pieces.length,
       missingItemIds,
       active: missingPieces.length === 0,

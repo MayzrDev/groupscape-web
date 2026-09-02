@@ -13,6 +13,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log now groups drops into farming sessions per player (kills within 45 minutes of each other), showing when each session started and ended, instead of lumping a boss's entire history into one block.
 - Searching the Loot Log highlights the matching item in a session and fades the rest, making it easy to spot what you searched for.
 - Health and prayer bars now stretch to fill the wider panel when you have the equipment tab open, instead of stopping short of the gear/stat columns.
+- The Set Bonuses dialog now groups sets into Active, Partial, and a collapsed "Other Sets" list instead of one flat list, and set names link out to their OSRS Wiki page.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.

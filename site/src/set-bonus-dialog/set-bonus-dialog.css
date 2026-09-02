@@ -28,6 +28,21 @@ set-bonus-dialog .dialog__container {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 18px;
+}
+
+.set-bonus-dialog__tier-label {
+  font-size: 0.75em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  margin: 0 0 8px 2px;
+}
+
+.set-bonus-dialog__tier-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
@@ -38,19 +53,29 @@ set-bonus-dialog .dialog__container {
 .set-bonus-dialog__set-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .set-bonus-dialog__set-name {
   font-family: "rssmall";
   color: var(--orange);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.set-bonus-dialog__set-name:hover,
+.set-bonus-dialog__set-name:focus-visible {
+  border-bottom-color: currentColor;
 }
 
 .set-bonus-dialog__set-status {
   font-size: 0.85em;
   opacity: 0.75;
+  white-space: nowrap;
 }
 
+.set-bonus-dialog__set--active .set-bonus-dialog__set-name,
 .set-bonus-dialog__set--active .set-bonus-dialog__set-status {
   color: rgb(0, 200, 0);
   opacity: 1;
@@ -75,4 +100,110 @@ set-bonus-dialog .dialog__container {
   margin: 4px 0 0;
   font-size: 0.8em;
   color: var(--invalid);
+}
+
+/* "Other Sets" accordion - unworn sets, collapsed and de-emphasized by default */
+
+.set-bonus-dialog__others {
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.set-bonus-dialog__others-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  font: inherit;
+  font-size: 0.85em;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.set-bonus-dialog__others-toggle:hover {
+  opacity: 0.85;
+}
+
+.set-bonus-dialog__others-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+
+.set-bonus-dialog__others[data-open="true"] .set-bonus-dialog__others-chevron {
+  transform: rotate(45deg);
+}
+
+.set-bonus-dialog__others-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
+}
+
+.set-bonus-dialog__others[data-open="true"] .set-bonus-dialog__others-panel {
+  grid-template-rows: 1fr;
+}
+
+.set-bonus-dialog__others-panel-inner {
+  overflow: hidden;
+}
+
+.set-bonus-dialog__others-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.set-bonus-dialog__other {
+  padding: 8px 10px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.set-bonus-dialog__other:hover {
+  opacity: 0.9;
+}
+
+.set-bonus-dialog__other-name {
+  font-family: "rssmall";
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.set-bonus-dialog__other-name:hover,
+.set-bonus-dialog__other-name:focus-visible {
+  color: var(--orange);
+  border-bottom-color: currentColor;
+}
+
+.set-bonus-dialog__other-pieces {
+  font-size: 0.75em;
+  opacity: 0.7;
+  margin-left: 8px;
+}
+
+.set-bonus-dialog__other-effect {
+  margin: 4px 0 0;
+  font-size: 0.8em;
+  opacity: 0.85;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .set-bonus-dialog__others-chevron,
+  .set-bonus-dialog__others-panel {
+    transition: none;
+  }
 }
