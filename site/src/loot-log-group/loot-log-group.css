@@ -76,6 +76,6 @@ loot-log-group[data-source="clue"] .loot-log-group__source-dot {
 
 .loot-log-group__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 46px);
+  grid-template-columns: repeat(10, 46px);
   gap: 8px;
 }
