@@ -214,6 +214,33 @@ pub fn start_session_idle_closer(db_pool: Pool) {
     });
 }
 
+/// Purges loot log entries (`groupscape.activity_events` rows with `event_type = 'loot'`)
+/// older than 28 days. Runs hourly, matching the coarser-interval jobs above.
+pub fn start_loot_log_cleanup(db_pool: Pool) {
+    task::spawn(async move {
+        let mut interval = time::interval(Duration::from_secs(3600));
+
+        loop {
+            interval.tick().await;
+
+            match db_pool.get().await {
+                Ok(client) => match db::prune_old_loot_events(&client).await {
+                    Ok(pruned) if pruned > 0 => {
+                        log::info!("Pruned {} old loot log entries", pruned);
+                    }
+                    Ok(_) => (),
+                    Err(err) => {
+                        log::error!("Failed to prune old loot log entries: {}", err);
+                    }
+                },
+                Err(err) => {
+                    log::error!("Failed to get db client: {}", err);
+                }
+            }
+        }
+    });
+}
+
 /// Parses the same cached GE-price snapshot `GET /ge-prices` serves as raw JSON into a map,
 /// for server-side joins (e.g. loot summary/split value calculations) instead of re-fetching.
 pub fn get_ge_prices_map() -> GEPrices {

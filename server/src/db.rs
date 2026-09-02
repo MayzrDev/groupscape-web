@@ -4308,6 +4308,20 @@ pub async fn prune_old_sessions(client: &Client) -> Result<u64, ApiError> {
         .map_err(ApiError::PGError)
 }
 
+/// Purges loot log entries older than 28 days. Note: boss-KC and loot-value leaderboards
+/// (see the "--- Leaderboards ---" comment above) read their AllTime window live from these
+/// same `activity_events` rows, so once this job has run, AllTime there is effectively capped
+/// at the last 28 days too.
+pub async fn prune_old_loot_events(client: &Client) -> Result<u64, ApiError> {
+    client
+        .execute(
+            "DELETE FROM groupscape.activity_events WHERE event_type = 'loot' AND occurred_at < now() - interval '28 days'",
+            &[],
+        )
+        .await
+        .map_err(ApiError::PGError)
+}
+
 /// Shared insert behind [`insert_activity_event`]/[`insert_progress_event`] -
 /// `groupscape.activity_events`' `(event_type, payload)` columns are already generic enough to
 /// hold any discrete event kind, so the quest/diary/combat-task/collection-log milestones reuse

@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.299] - 2026-09-02
 
+### Changed
+- Loot Log entries older than 28 days are now automatically cleared out to keep things tidy.
+
 ### Fixed
 - Activity Feed collection log entries now show the item's own icon in front of its name, matching the "icon, item name, log book icon" order instead of stacking both icons after the name.
 - Fixed the collection log item icon rendering oversized instead of at the same 18px size as the log book icon next to it.
