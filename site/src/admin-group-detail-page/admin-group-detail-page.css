@@ -171,11 +171,9 @@
   opacity: 1;
 }
 
-.admin-data-mgmt__table input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--admin-accent);
-  cursor: pointer;
+.admin-data-mgmt__table td label {
+  margin: 0 auto;
+  width: fit-content;
 }
 
 .admin-data-mgmt__footer {

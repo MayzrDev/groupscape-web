@@ -144,9 +144,10 @@ export class AdminGroupDetailPage extends BaseElement {
               (member) => `
       <tr>
         <td>${member.member_name}</td>
-        ${MEMBER_DATA_COLUMNS.map(
-          (col) => `<td><input type="checkbox" data-member-id="${member.member_id}" data-col="${col.key}"></td>`
-        ).join("")}
+        ${MEMBER_DATA_COLUMNS.map((col) => {
+          const id = `admin-data-mgmt__cb-${member.member_id}-${col.key}`;
+          return `<td><input type="checkbox" id="${id}" data-member-id="${member.member_id}" data-col="${col.key}"><label for="${id}"></label></td>`;
+        }).join("")}
       </tr>
     `
             )
