@@ -27,12 +27,19 @@ services:
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
       - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
+      - REDIS_URL=redis://groupscape-redis:6379
     restart: always
     depends_on:
       - "postgres"
+      - "groupscape-redis"
     container_name: groupscape-backend
     ports:
       - 5000:8080 # replace this if using a docker-compatible reverse proxy like traefik
+  groupscape-redis:
+    image: redis:7-alpine
+    restart: always
+    container_name: groupscape-redis
+    # Pure response cache, no persistence needed - fine to lose on restart.
   groupscape-postgres:
     image: postgres
     restart: always

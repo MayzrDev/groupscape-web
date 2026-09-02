@@ -771,7 +771,7 @@ pub struct LootLogPage {
 
 /// All-time (or all-matching-search) totals for the loot log's summary bar - a full unbounded
 /// scan since it only needs to accumulate two numbers, unlike `get_loot_log`'s paginated rows.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LootLogSummary {
     pub total_value: i64,
     pub event_count: i64,
@@ -806,7 +806,7 @@ pub struct CombatStyleBonuses {
     pub ranged: i32,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct GroupSession {
     pub id: i64,
     pub started_at: DateTime<Utc>,
@@ -823,12 +823,12 @@ pub struct MemberSkillData {
     pub skill_data: Vec<AggregateSkillData>,
 }
 pub type GroupSkillData = Vec<MemberSkillData>;
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MetricDataPoint {
     pub time: DateTime<Utc>,
     pub value: i64,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MemberMetricData {
     pub name: String,
     pub metric_data: Vec<MetricDataPoint>,

@@ -19,11 +19,14 @@ services:
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
+      REDIS_URL: redis://groupscape-web-redis:6379
     ports:
       - "${API_PORT:-3021}:8080"
     restart: unless-stopped
     depends_on:
       groupscape-web-db:
+        condition: service_healthy
+      groupscape-web-redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/8080' || exit 1"]
@@ -31,6 +34,21 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    networks:
+      - groupscape-web
+
+  groupscape-web-redis:
+    image: redis:7-alpine
+    container_name: groupscape-web-redis
+    # Pure response cache (short-TTL leaderboard/metric-data/sessions/loot-log-summary reads,
+    # see server/src/cache.rs) - no persistence needed, fine to lose on restart.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
     networks:
       - groupscape-web
 

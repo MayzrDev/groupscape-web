@@ -69,6 +69,13 @@ async fn main() -> std::io::Result<()> {
     }
     config.web_origin = std::env::var("WEB_ORIGIN").unwrap_or_default();
     let config = config;
+    // Optional short-TTL response cache for read-heavy aggregate endpoints (leaderboard,
+    // metric-data, sessions, loot log summary) - see server::cache::RedisCache. Absent or
+    // unreachable REDIS_URL just disables caching; every request still works, straight to
+    // Postgres, exactly as it did before this existed.
+    let redis_cache = web::Data::new(
+        server::cache::RedisCache::connect(std::env::var("REDIS_URL").ok()).await,
+    );
     let pool = config.pg.create_pool(None, NoTls).unwrap();
     env_logger::init_from_env(
         env_logger::Env::new().default_filter_or(config.logger.level.to_string()),
@@ -438,6 +445,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(web::PayloadConfig::new(100000))
             .app_data(json_config)
             .app_data(web::Data::new(pool.clone()))
+            .app_data(redis_cache.clone())
             .app_data(web::Data::new(config.clone()))
             .app_data(web::Data::new(tx.clone()))
             .app_data(broadcast_registry.clone())

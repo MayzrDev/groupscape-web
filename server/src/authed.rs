@@ -1,4 +1,5 @@
 use crate::auth_middleware::Authenticated;
+use crate::cache::RedisCache;
 use crate::character_auth_middleware::CharacterIdentified;
 use crate::config::Config;
 use crate::crypto::session_token_hash;
@@ -35,6 +36,12 @@ use deadpool_postgres::{Client, Pool};
 use serde::Deserialize;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
+
+/// TTL for the short-lived Redis response cache on the leaderboard/metric-data/sessions/loot-log-
+/// summary endpoints (see `crate::cache::RedisCache`). All four read data that's written on a hot
+/// per-tick path (or a 30-min aggregator job), so a short TTL keeps staleness unnoticeable while
+/// avoiding the need to thread explicit cache-invalidation calls through that hot write path.
+const CACHE_TTL_SECS: u64 = 15;
 
 #[delete("/delete-group-member")]
 pub async fn delete_group_member(
@@ -1076,10 +1083,16 @@ pub struct GetSessionsQuery {
 pub async fn get_sessions(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetSessionsQuery>,
 ) -> Result<web::Json<Vec<GroupSession>>, Error> {
+    let cache_key = format!("v1:sessions:{}:{}", auth.group_id, query.limit);
+    if let Some(cached) = redis.get_json::<Vec<GroupSession>>(&cache_key).await {
+        return Ok(web::Json(cached));
+    }
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let sessions = db::list_sessions(&client, auth.group_id, query.limit).await?;
+    redis.set_json(&cache_key, &sessions, CACHE_TTL_SECS).await;
     Ok(web::Json(sessions))
 }
 
@@ -1355,8 +1368,18 @@ const LOOT_LOG_SUMMARY_BATCH_SIZE: i64 = 500;
 pub async fn get_loot_log_summary(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetLootLogSummaryQuery>,
 ) -> Result<web::Json<LootLogSummary>, Error> {
+    let cache_key = format!(
+        "v1:loot-log-summary:{}:{}:{}",
+        auth.group_id,
+        query.search.as_deref().unwrap_or(""),
+        query.item_ids.as_deref().unwrap_or("")
+    );
+    if let Some(cached) = redis.get_json::<LootLogSummary>(&cache_key).await {
+        return Ok(web::Json(cached));
+    }
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
@@ -1402,13 +1425,15 @@ pub async fn get_loot_log_summary(
         cursor = Some(batch.last().unwrap().occurred_at);
     }
 
-    Ok(web::Json(LootLogSummary {
+    let summary = LootLogSummary {
         total_value,
         event_count,
-    }))
+    };
+    redis.set_json(&cache_key, &summary, CACHE_TTL_SECS).await;
+    Ok(web::Json(summary))
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub enum SkillDataPeriod {
     Hour1,
     Hour6,
@@ -1470,8 +1495,22 @@ pub struct GetLeaderboardQuery {
 pub async fn get_leaderboard(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetLeaderboardQuery>,
 ) -> Result<web::Json<LeaderboardResult>, Error> {
+    let cache_key = format!(
+        "v1:leaderboard:{}:{:?}:{:?}:{}:{}:{}:{}",
+        auth.group_id,
+        query.metric,
+        query.window,
+        query.boss.as_deref().unwrap_or(""),
+        query.skill.as_deref().unwrap_or(""),
+        query.raid_type.as_deref().unwrap_or(""),
+        query.raid_difficulty.as_deref().unwrap_or(""),
+    );
+    if let Some(cached) = redis.get_json::<LeaderboardResult>(&cache_key).await {
+        return Ok(web::Json(cached));
+    }
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let now = Utc::now();
 
@@ -1524,13 +1563,15 @@ pub async fn get_leaderboard(
         }
     };
 
-    Ok(web::Json(LeaderboardResult {
+    let result = LeaderboardResult {
         metric: query.metric,
         window: query.window,
         boss: query.boss.clone(),
         available_bosses,
         entries,
-    }))
+    };
+    redis.set_json(&cache_key, &result, CACHE_TTL_SECS).await;
+    Ok(web::Json(result))
 }
 
 #[derive(Deserialize)]
@@ -1561,10 +1602,25 @@ pub struct GetMetricDataQuery {
 pub async fn get_metric_data(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetMetricDataQuery>,
 ) -> Result<web::Json<GroupMetricData>, Error> {
     if query.metric == LeaderboardMetric::Xp {
         return Err(ApiError::MetricDataXpNotSupportedError.into());
+    }
+
+    let cache_key = format!(
+        "v1:metric-data:{}:{:?}:{:?}:{}:{}:{}:{}",
+        auth.group_id,
+        query.metric,
+        query.period,
+        query.boss.as_deref().unwrap_or(""),
+        query.raid_type.as_deref().unwrap_or(""),
+        query.raid_difficulty.as_deref().unwrap_or(""),
+        query.group_by.as_deref().unwrap_or(""),
+    );
+    if let Some(cached) = redis.get_json::<GroupMetricData>(&cache_key).await {
+        return Ok(web::Json(cached));
     }
 
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -1605,6 +1661,7 @@ pub async fn get_metric_data(
         }
     };
 
+    redis.set_json(&cache_key, &data, CACHE_TTL_SECS).await;
     Ok(web::Json(data))
 }
 

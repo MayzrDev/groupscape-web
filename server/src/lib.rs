@@ -4,6 +4,7 @@ pub mod admin;
 pub mod admin_auth_middleware;
 pub mod auth_middleware;
 pub mod authed;
+pub mod cache;
 pub mod character_auth_middleware;
 pub mod collection_log_content;
 pub mod combat_achievement_content;

@@ -17,14 +17,14 @@ pub enum LeaderboardWindow {
     AllTime,
 }
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct LeaderboardEntry {
     pub member_name: String,
     pub value: i64,
     pub rank: i64,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LeaderboardResult {
     pub metric: LeaderboardMetric,
     pub window: LeaderboardWindow,

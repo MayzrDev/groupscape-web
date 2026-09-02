@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Set Bonuses now covers every skilling outfit (Graceful, Carpenter's, Farmer's, Pyromancer, Angler's, Prospector, Zealot's, Raiments of the Eye, Smiths', Rogue, Lumberjack) as well as Bloodbark and Swampbark armour, on top of the combat sets it already tracked.
 - Set Bonuses now shows each set's OSRS Wiki equipped-character image next to its entry, including all 6 Barrows sets - click a thumbnail to open that set's wiki page.
 - Loot Log now shows two session cards side by side on wide screens instead of one long column, collapsing back to one per row on narrower screens.
+- Leaderboards, the Graphs tab, session history, and the Loot Log's totals bar now load noticeably faster on a group with a lot of activity.
 
 ### Fixed
 - Loot Log (and Activity Feed) could get stuck showing only the first page of results with the loading spinner spinning forever, or silently load an inconsistent amount depending on the page - scrolling now reliably keeps loading further results.
