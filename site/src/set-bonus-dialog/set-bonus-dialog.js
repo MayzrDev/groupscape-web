@@ -48,6 +48,12 @@ export class SetBonusDialog extends BaseElement {
     this.remove();
   }
 
+  renderThumb(set, className) {
+    return set.image
+      ? `<div class="${className}"><img src="${set.image}" alt="" loading="lazy" /></div>`
+      : `<div class="${className} ${className}--empty"></div>`;
+  }
+
   renderSetRow(set) {
     const wornPieces = set.pieceCount - set.missingItemIds.length;
     const status = set.active ? "Active" : `${wornPieces} / ${set.pieceCount} worn`;
@@ -59,12 +65,15 @@ export class SetBonusDialog extends BaseElement {
       <div class="set-bonus-dialog__set rsborder-tiny ${
         set.active ? "set-bonus-dialog__set--active" : "set-bonus-dialog__set--partial"
       }">
-        <div class="set-bonus-dialog__set-head">
-          <a class="set-bonus-dialog__set-name" href="${set.wikiUrl}" target="_blank" rel="noopener">${set.name}</a>
-          <span class="set-bonus-dialog__set-status">${status}</span>
+        ${this.renderThumb(set, "set-bonus-dialog__set-thumb")}
+        <div class="set-bonus-dialog__set-body">
+          <div class="set-bonus-dialog__set-head">
+            <a class="set-bonus-dialog__set-name" href="${set.wikiUrl}" target="_blank" rel="noopener">${set.name}</a>
+            <span class="set-bonus-dialog__set-status">${status}</span>
+          </div>
+          <p class="set-bonus-dialog__effect">${set.effect}</p>
+          ${missing}
         </div>
-        <p class="set-bonus-dialog__effect">${set.effect}</p>
-        ${missing}
       </div>
     `;
   }
@@ -72,11 +81,14 @@ export class SetBonusDialog extends BaseElement {
   renderOtherRow(set) {
     return `
       <div class="set-bonus-dialog__other">
-        <a class="set-bonus-dialog__other-name" href="${set.wikiUrl}" target="_blank" rel="noopener"
-          >${set.name}<span class="set-bonus-dialog__other-pieces">${set.pieceCount} piece${
+        ${this.renderThumb(set, "set-bonus-dialog__other-thumb")}
+        <div class="set-bonus-dialog__other-body">
+          <a class="set-bonus-dialog__other-name" href="${set.wikiUrl}" target="_blank" rel="noopener"
+            >${set.name}<span class="set-bonus-dialog__other-pieces">${set.pieceCount} piece${
       set.pieceCount === 1 ? "" : "s"
     }</span></a>
-        <p class="set-bonus-dialog__other-effect">${set.effect}</p>
+          <p class="set-bonus-dialog__other-effect">${set.effect}</p>
+        </div>
       </div>
     `;
   }

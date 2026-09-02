@@ -7,7 +7,8 @@
       [8840, 24179],
       [11665, 24185]
     ],
-    "effect": "+10% melee accuracy and damage while the full set (including a Void melee helm) is worn - swap in the Void ranger helm for the same 10% ranged bonus, or the Void mage helm for +45% magic accuracy only (no magic damage boost at base tier)."
+    "effect": "+10% melee accuracy and damage while the full set (including a Void melee helm) is worn - swap in the Void ranger helm for the same 10% ranged bonus, or the Void mage helm for +45% magic accuracy only (no magic damage boost at base tier).",
+    "image": "https://oldschool.runescape.wiki/images/Void_knight_robes_(male)_equipped.png"
   },
   {
     "name": "Elite Void Knight Equipment",
@@ -17,12 +18,14 @@
       [8842, 24182],
       [11664, 24184]
     ],
-    "effect": "Upgrades the base Void bonus: with the Void ranger helm, ranged damage rises from 10% to 12.5%; with the Void mage helm, magic gains +5% damage on top of the existing 45% accuracy. No additional bonus over regular Void for the melee helm."
+    "effect": "Upgrades the base Void bonus: with the Void ranger helm, ranged damage rises from 10% to 12.5%; with the Void mage helm, magic gains +5% damage on top of the existing 45% accuracy. No additional bonus over regular Void for the melee helm.",
+    "image": "https://oldschool.runescape.wiki/images/Elite_void_set_equipped_male.png"
   },
   {
     "name": "Obsidian Armour",
     "pieces": [[21298], [21301], [21304]],
-    "effect": "10% boost to melee accuracy and Strength bonus when using an Obsidian melee weapon (Toktz-xil-ak, Toktz-xil-ek, Tzhaar-ket-em, or Tzhaar-ket-om) with the full set worn; stacks with the Berserker necklace's 20% damage boost for obsidian weapons."
+    "effect": "10% boost to melee accuracy and Strength bonus when using an Obsidian melee weapon (Toktz-xil-ak, Toktz-xil-ek, Tzhaar-ket-em, or Tzhaar-ket-om) with the full set worn; stacks with the Berserker necklace's 20% damage boost for obsidian weapons.",
+    "image": "https://oldschool.runescape.wiki/images/Obsidian_armour_equipped_male.png"
   },
   {
     "name": "Ahrim's Armour Set",
@@ -32,7 +35,8 @@
       [4712, 4868, 4869, 4870, 4871],
       [4714, 4874, 4875, 4876, 4877]
     ],
-    "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn."
+    "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn.",
+    "image": null
   },
   {
     "name": "Dharok's Armour Set",
@@ -42,7 +46,8 @@
       [4720, 4892, 4893, 4894, 4895],
       [4722, 4898, 4899, 4900, 4901]
     ],
-    "effect": "The lower your remaining Hitpoints, the higher your melee damage - up to roughly double (about 98% extra) at 1 HP - while the full set (including the greataxe) is worn."
+    "effect": "The lower your remaining Hitpoints, the higher your melee damage - up to roughly double (about 98% extra) at 1 HP - while the full set (including the greataxe) is worn.",
+    "image": null
   },
   {
     "name": "Guthan's Armour Set",
@@ -52,7 +57,8 @@
       [4728, 4916, 4917, 4918, 4919],
       [4730, 4922, 4923, 4924, 4925]
     ],
-    "effect": "Successful melee attacks have a 25% chance to heal you for the amount of damage dealt, while the full set (including the warspear) is worn."
+    "effect": "Successful melee attacks have a 25% chance to heal you for the amount of damage dealt, while the full set (including the warspear) is worn.",
+    "image": null
   },
   {
     "name": "Karil's Armour Set",
@@ -62,7 +68,8 @@
       [4736, 4940, 4941, 4942, 4943],
       [4738, 4946, 4947, 4948, 4949]
     ],
-    "effect": "Successful ranged attacks have a 25% chance to lower the target's Agility level by 20%, while the full set (including the crossbow) is worn."
+    "effect": "Successful ranged attacks have a 25% chance to lower the target's Agility level by 20%, while the full set (including the crossbow) is worn.",
+    "image": null
   },
   {
     "name": "Torag's Armour Set",
@@ -72,7 +79,8 @@
       [4749, 4964, 4965, 4966, 4967],
       [4751, 4970, 4971, 4972, 4973]
     ],
-    "effect": "Successful melee attacks have a 25% chance to lower the target's Run energy by 20%, while the full set (including the hammers) is worn."
+    "effect": "Successful melee attacks have a 25% chance to lower the target's Run energy by 20%, while the full set (including the hammers) is worn.",
+    "image": null
   },
   {
     "name": "Verac's Armour Set",
@@ -82,37 +90,44 @@
       [4757, 4988, 4989, 4990, 4991],
       [4759, 4994, 4995, 4996, 4997]
     ],
-    "effect": "Melee attacks have a 25% chance to ignore the target's Defence level and any active protection prayer, while the full set (including the flail) is worn."
+    "effect": "Melee attacks have a 25% chance to ignore the target's Defence level and any active protection prayer, while the full set (including the flail) is worn.",
+    "image": null
   },
   {
     "name": "Blood Moon Armour Set",
     "pieces": [[29028, 29047], [29022, 29043], [29025, 29045], [28997]],
-    "effect": "While the full set (including the Dual macuahuitl) is worn, each successful macuahuitl hit has a 33% chance to speed up your next attack to 3 ticks instead of 4 - since the weapon hits twice per swing, this works out to roughly a 55.5% chance of the speed-up triggering per attack."
+    "effect": "While the full set (including the Dual macuahuitl) is worn, each successful macuahuitl hit has a 33% chance to speed up your next attack to 3 ticks instead of 4 - since the weapon hits twice per swing, this works out to roughly a 55.5% chance of the speed-up triggering per attack.",
+    "image": "https://oldschool.runescape.wiki/images/Blood_moon_armour_equipped_male.png"
   },
   {
     "name": "Blue Moon Armour Set",
     "pieces": [[29019, 29041], [29013, 29037], [29016, 29039], [28988]],
-    "effect": "While the full set (including the Blue moon spear) is worn, casting a bind, freeze, or root spell has a chance to immediately follow up with a delay-free melee spear hit - 20% after Bind/Ice spells, 50% after Arceuus Grasp spells."
+    "effect": "While the full set (including the Blue moon spear) is worn, casting a bind, freeze, or root spell has a chance to immediately follow up with a delay-free melee spear hit - 20% after Bind/Ice spells, 50% after Arceuus Grasp spells.",
+    "image": "https://oldschool.runescape.wiki/images/Blue_moon_armour_equipped_male.png"
   },
   {
     "name": "Eclipse Moon Armour Set",
     "pieces": [[29010, 29035], [29004, 29031], [29007, 29033], [29000]],
-    "effect": "While the full set (including the Eclipse atlatl) is worn, successful atlatl hits have a 20% chance to inflict a stacking burn (up to 5 stacks, averaging roughly 2 extra damage per hit); in PvP the set also speeds up the atlatl from 5 ticks to 3."
+    "effect": "While the full set (including the Eclipse atlatl) is worn, successful atlatl hits have a 20% chance to inflict a stacking burn (up to 5 stacks, averaging roughly 2 extra damage per hit); in PvP the set also speeds up the atlatl from 5 ticks to 3.",
+    "image": "https://oldschool.runescape.wiki/images/Eclipse_moon_armour_equipped_male.png"
   },
   {
     "name": "Justiciar Armour",
     "pieces": [[22326], [22327], [22328]],
-    "effect": "While the full set is worn, incoming non-typeless PvM damage is reduced by (your defence bonus for that attack style) / 3000 - e.g. +450 crush defence cuts crush damage taken by 15% - always leaving at least 1 damage and never increasing damage taken."
+    "effect": "While the full set is worn, incoming non-typeless PvM damage is reduced by (your defence bonus for that attack style) / 3000 - e.g. +450 crush defence cuts crush damage taken by 15% - always leaving at least 1 damage and never increasing damage taken.",
+    "image": "https://oldschool.runescape.wiki/images/Justiciar_armour_equipped_male.png"
   },
   {
     "name": "Inquisitor's Armour",
     "pieces": [[24419], [24420], [24421]],
-    "effect": "While attacking with crush style, the full set gives +0.5% (great helm), +1% (hauberk), and +1% (plateskirt) crush accuracy and damage, for 2.5% total - tripled to 7.5% if the Inquisitor's mace is also wielded."
+    "effect": "While attacking with crush style, the full set gives +0.5% (great helm), +1% (hauberk), and +1% (plateskirt) crush accuracy and damage, for 2.5% total - tripled to 7.5% if the Inquisitor's mace is also wielded.",
+    "image": "https://oldschool.runescape.wiki/images/Inquisitor's_armour_equipped_male.png"
   },
   {
     "name": "Virtus Robes",
     "pieces": [[26241], [26243], [26245]],
-    "effect": "Each piece gives +2% magic damage for standard spells (6% total); when casting Ancient Magicks combat spells, each piece instead gives +5% magic damage, for 15% total with the full set."
+    "effect": "Each piece gives +2% magic damage for standard spells (6% total); when casting Ancient Magicks combat spells, each piece instead gives +5% magic damage, for 15% total with the full set.",
+    "image": "https://oldschool.runescape.wiki/images/Virtus_robes_equipped_male.png"
   },
   {
     "name": "Graceful Outfit",
@@ -142,12 +157,14 @@
         24746, 24748, 25072, 25074, 27447, 27449, 30048, 30050
       ]
     ],
-    "effect": "Each piece boosts natural run energy restoration (+3-4%, 20% total for all six); wearing the full outfit (hood, top, legs, gloves, boots, cape) adds a further 10%, for 30% total. Any colourway works identically - only the graphics differ."
+    "effect": "Each piece boosts natural run energy restoration (+3-4%, 20% total for all six); wearing the full outfit (hood, top, legs, gloves, boots, cape) adds a further 10%, for 30% total. Any colourway works identically - only the graphics differ.",
+    "image": "https://oldschool.runescape.wiki/images/Graceful_outfit_equipped.png"
   },
   {
     "name": "Carpenter's Outfit",
     "pieces": [[24872], [24874], [24876], [24878]],
-    "effect": "+2.5% Construction experience while the full set is worn (0.4%/0.8%/0.6%/0.2% per piece, plus a 0.5% bonus for the complete set)."
+    "effect": "+2.5% Construction experience while the full set is worn (0.4%/0.8%/0.6%/0.2% per piece, plus a 0.5% bonus for the complete set).",
+    "image": "https://oldschool.runescape.wiki/images/Carpenter's_outfit_equipped.png"
   },
   {
     "name": "Farmer's Outfit",
@@ -157,17 +174,20 @@
       [13640, 13641],
       [13644, 13645]
     ],
-    "effect": "+2.5% Farming experience while the full set is worn."
+    "effect": "+2.5% Farming experience while the full set is worn.",
+    "image": "https://oldschool.runescape.wiki/images/Farmer's_outfit_(male)_equipped.png"
   },
   {
     "name": "Pyromancer Outfit",
     "pieces": [[20708], [20704], [20706], [20710]],
-    "effect": "+2.5% Firemaking experience while the full set is worn; also counts as warm clothing for the Wintertodt."
+    "effect": "+2.5% Firemaking experience while the full set is worn; also counts as warm clothing for the Wintertodt.",
+    "image": "https://oldschool.runescape.wiki/images/Pyromancer_outfit_equipped_male.png"
   },
   {
     "name": "Angler's Outfit",
     "pieces": [[13258], [13259], [13260], [13261]],
-    "effect": "+2.5% Fishing experience while the full set is worn."
+    "effect": "+2.5% Fishing experience while the full set is worn.",
+    "image": "https://oldschool.runescape.wiki/images/Angler's_outfit_equipped.png"
   },
   {
     "name": "Prospector Kit",
@@ -177,42 +197,50 @@
       [12015, 29476],
       [12016, 29478]
     ],
-    "effect": "+2.5% Mining experience while the full set is worn."
+    "effect": "+2.5% Mining experience while the full set is worn.",
+    "image": "https://oldschool.runescape.wiki/images/Prospector_kit_(male)_equipped.png"
   },
   {
     "name": "Zealot's Robes",
     "pieces": [[25438], [25434], [25436], [25440]],
-    "effect": "1.25% chance per piece for a bone or ensouled head to not be consumed when sacrificed at an altar - 5% total with the full set worn."
+    "effect": "1.25% chance per piece for a bone or ensouled head to not be consumed when sacrificed at an altar - 5% total with the full set worn.",
+    "image": "https://oldschool.runescape.wiki/images/Zealot's_robes_equipped_male.png"
   },
   {
     "name": "Raiments of the Eye",
     "pieces": [[26850, 26858, 26864, 26870], [26852, 26860, 26866, 26872], [26854, 26862, 26868, 26874], [26856]],
-    "effect": "Each piece grants +10% runes when Runecrafting; the full set adds a further +20%, for +60% total. Any colourway works identically."
+    "effect": "Each piece grants +10% runes when Runecrafting; the full set adds a further +20%, for +60% total. Any colourway works identically.",
+    "image": "https://oldschool.runescape.wiki/images/Raiments_of_the_eye_equipped_male.png"
   },
   {
     "name": "Smiths' Uniform",
     "pieces": [[27023], [27025], [27029, 27031], [27027]],
-    "effect": "Each piece gives a 20% chance to speed up an anvil Smithing action by 1 tick, up to 100% with the full set worn; also boosts Giants' Foundry experience per hour by roughly 20%."
+    "effect": "Each piece gives a 20% chance to speed up an anvil Smithing action by 1 tick, up to 100% with the full set worn; also boosts Giants' Foundry experience per hour by roughly 20%.",
+    "image": "https://oldschool.runescape.wiki/images/Smiths'_Uniform_equipped.png"
   },
   {
     "name": "Rogue Equipment",
     "pieces": [[5554], [5553], [5556], [5555], [5557]],
-    "effect": "Guarantees double loot when pickpocketing while the full set is worn, except scroll boxes and coin pouches, which instead have a chance to grant a bonus coin pouch."
+    "effect": "Guarantees double loot when pickpocketing while the full set is worn, except scroll boxes and coin pouches, which instead have a chance to grant a bonus coin pouch.",
+    "image": "https://oldschool.runescape.wiki/images/Rogue_equipment_equipped_male.png"
   },
   {
     "name": "Lumberjack Outfit",
     "pieces": [[10941], [10939], [10940], [10933]],
-    "effect": "+2.5% Woodcutting experience while the full set is worn."
+    "effect": "+2.5% Woodcutting experience while the full set is worn.",
+    "image": "https://oldschool.runescape.wiki/images/Lumberjack_outfit_equipped_male.png"
   },
   {
     "name": "Bloodbark Armour",
     "pieces": [[25413], [25404], [25416], [25407], [25410]],
-    "effect": "Each piece increases how much blood spells heal by 2% of the damage dealt; the full set heals 35% of the damage dealt (higher still with the Ancient sceptre or Zuriel's staff wielded)."
+    "effect": "Each piece increases how much blood spells heal by 2% of the damage dealt; the full set heals 35% of the damage dealt (higher still with the Ancient sceptre or Zuriel's staff wielded).",
+    "image": "https://oldschool.runescape.wiki/images/Bloodbark_armour_equipped_male.png"
   },
   {
     "name": "Swampbark Armour",
     "pieces": [[25398], [25389], [25401]],
-    "effect": "The helm, body, and legs each extend bind-type spell durations by 2 ticks; wearing all three adds 6 ticks (e.g. Bind goes from 8 to 14 ticks). Gauntlets and boots don't contribute to this bonus, so they aren't required for the full effect."
+    "effect": "The helm, body, and legs each extend bind-type spell durations by 2 ticks; wearing all three adds 6 ticks (e.g. Bind goes from 8 to 14 ticks). Gauntlets and boots don't contribute to this bonus, so they aren't required for the full effect.",
+    "image": "https://oldschool.runescape.wiki/images/Swampbark_armour_equipped_male.png"
   },
   {
     "name": "Shayzien Armour",
@@ -223,11 +251,13 @@
       [13377, 18575],
       [13378, 18576]
     ],
-    "effect": "Reduces damage taken from lizardman shamans' poison attack by 100% while the full tier 5 set is worn (lower tiers grant 20% per tier)."
+    "effect": "Reduces damage taken from lizardman shamans' poison attack by 100% while the full tier 5 set is worn (lower tiers grant 20% per tier).",
+    "image": "https://oldschool.runescape.wiki/images/Shayzien_armour_(5)_(male)_equipped.png"
   },
   {
     "name": "Crystal Armour",
     "pieces": [[23971], [23975], [23979]],
-    "effect": "Each piece boosts accuracy and damage specifically for the Crystal bow and Bow of Faerdhinen - the full set gives +30% accuracy and +15% damage; pairing crystal body/legs with a Slayer helmet (i) further multiplies the damage bonus to roughly 29.375%. No effect on other weapons."
+    "effect": "Each piece boosts accuracy and damage specifically for the Crystal bow and Bow of Faerdhinen - the full set gives +30% accuracy and +15% damage; pairing crystal body/legs with a Slayer helmet (i) further multiplies the damage bonus to roughly 29.375%. No effect on other weapons.",
+    "image": "https://oldschool.runescape.wiki/images/Crystal_armour_equipped_male.png"
   }
 ]

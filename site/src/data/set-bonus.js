@@ -41,6 +41,7 @@ export async function detectActiveSets(equippedItemIds) {
       name: set.name,
       effect: set.effect,
       wikiUrl: wikiUrl(set.name),
+      image: set.image,
       pieceCount: set.pieces.length,
       missingItemIds,
       active: missingPieces.length === 0,
