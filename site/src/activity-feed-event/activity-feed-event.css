@@ -120,6 +120,8 @@ a.activity-feed-event__subject:hover {
 }
 
 .activity-feed-event__subject-icon--leading {
+  width: 32px;
+  height: 32px;
   margin-left: 4px;
   margin-right: 4px;
 }

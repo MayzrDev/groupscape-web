@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Changed
 - Loot Log now loads much bigger chunks of history per scroll and auto-loads further before asking you to click "Load more" again, so scrolling through a group's full loot history takes far fewer steps.
+- The item icon shown next to a Collection Log completion in the Activity Feed is now bigger and easier to see.
 
 ### Fixed
 - Fixed the Graphs tab sometimes showing the wrong group's leaderboard numbers by making sure it waits for your group's data to be ready before loading them.
