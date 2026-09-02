@@ -12,6 +12,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The item icon shown next to a Collection Log completion in the Activity Feed is now bigger and easier to see.
 
 ### Fixed
+- Fixed Level Up milestones sometimes getting skipped in the Activity Feed when a skill jumped past more than one milestone in a single update (e.g. a big XP gain crossing both level 80 and 85 at once now posts both, not just the higher one).
 - Fixed the Graphs tab sometimes showing the wrong group's leaderboard numbers by making sure it waits for your group's data to be ready before loading them.
 - Fixed the Activity Feed and Loot Log tabs sometimes going permanently stuck (no more loading, scrolling, or updates) after you'd navigated away from them once and come back.
 - Fixed Loot Log session cards sometimes growing more loot after they'd already loaded, when scrolling further back added drops to a session you'd already seen.

@@ -260,15 +260,13 @@ fn level_for_xp(xp: i32) -> u32 {
     (1..=99u32).rev().find(|&level| xp >= table[level as usize]).unwrap_or(1)
 }
 
-/// Highest milestone newly crossed going from `previous_level` to `current_level`, or `None` if
-/// none was crossed. When a heartbeat jumps a skill across more than one threshold at once (e.g.
-/// a large XP-lump reward), only the highest is reported - the lower ones aren't backfilled.
-fn milestone_crossed(previous_level: u32, current_level: u32) -> Option<u32> {
+/// Every milestone newly crossed going from `previous_level` to `current_level`, in ascending
+/// order. When a heartbeat jumps a skill across more than one threshold at once (e.g. a large
+/// XP-lump reward), all of them are backfilled rather than only the highest.
+fn milestones_crossed(previous_level: u32, current_level: u32) -> impl Iterator<Item = u32> {
     LEVEL_MILESTONES
-        .iter()
-        .rev()
-        .find(|&&milestone| milestone > previous_level && milestone <= current_level)
-        .copied()
+        .into_iter()
+        .filter(move |&milestone| milestone > previous_level && milestone <= current_level)
 }
 
 /// Skills whose level crossed a new milestone threshold this upload (see `LEVEL_MILESTONES`).
@@ -285,7 +283,7 @@ fn diff_skills(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> {
         };
         let previous_level = level_for_xp(previous_xp);
         let current_level = level_for_xp(current_xp);
-        if let Some(milestone) = milestone_crossed(previous_level, current_level) {
+        for milestone in milestones_crossed(previous_level, current_level) {
             events.push(ProgressEvent {
                 event_type: EVENT_TYPE_LEVEL_UP,
                 payload: json!({ "skill": skill, "level": milestone }),
@@ -509,13 +507,13 @@ mod tests {
     }
 
     #[test]
-    fn jumping_multiple_thresholds_at_once_emits_only_the_highest() {
+    fn jumping_multiple_thresholds_at_once_backfills_every_one() {
         let previous = skills_xp(xp_for_level(68) as i32);
         let current = skills_xp(xp_for_level(81) as i32);
 
         let events = diff_skills(&previous, &current);
-        assert_eq!(events.len(), 1);
-        assert_eq!(events[0].payload["level"], json!(80));
+        let levels: Vec<_> = events.iter().map(|event| event.payload["level"].clone()).collect();
+        assert_eq!(levels, vec![json!(70), json!(80)]);
     }
 
     #[test]
