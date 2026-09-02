@@ -21,6 +21,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Leaderboards, the Graphs tab, session history, and the Loot Log's totals bar now load noticeably faster on a group with a lot of activity.
 
 ### Fixed
+- Fixed uneven spacing around the item icon in Activity Feed collection log entries.
 - Loot Log (and Activity Feed) could get stuck showing only the first page of results with the loading spinner spinning forever, or silently load an inconsistent amount depending on the page - scrolling now reliably keeps loading further results.
 - Loot Log item icons within a session now line up in a fixed 10-per-row grid instead of reflowing unevenly based on available width.
 - Loot Log's total gp value now sits directly above the item icons instead of floating off to the right of a wide panel.
