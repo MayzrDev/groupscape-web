@@ -2,9 +2,10 @@
 //! heartbeat and turns the transitions into persisted activity-feed events.
 //!
 //! Only the milestones the activity feed is scoped to are produced here: quest completions,
-//! achievement-diary tier completions, individual combat-achievement task completions, and
-//! collection-log item additions / page completions. Kills and deaths come off the plugin's own
-//! discrete `events` key instead (see [`crate::models::GameEvent`]).
+//! achievement-diary tier completions, individual combat-achievement task completions,
+//! collection-log item additions / page completions, and skill level-up milestones. Kills and
+//! deaths come off the plugin's own discrete `events` key instead (see
+//! [`crate::models::GameEvent`]).
 //!
 //! This has to run synchronously in the update handler rather than in
 //! [`crate::update_batcher`] - the batcher only does latest-value-wins upserts and never reads the
@@ -17,11 +18,13 @@ use crate::models::{CombatAchievements, GroupMember};
 use crate::quest_ids::{self, QUEST_STATE_FINISHED};
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 pub const EVENT_TYPE_QUEST: &str = "quest";
 pub const EVENT_TYPE_DIARY: &str = "diary";
 pub const EVENT_TYPE_COMBAT_TASK: &str = "combat_task";
 pub const EVENT_TYPE_COLLECTION_LOG: &str = "collection_log";
+pub const EVENT_TYPE_LEVEL_UP: &str = "level_up";
 
 /// The member's previously-stored progress columns, read straight from `groupscape.members`.
 /// A `None` field means "never populated" - those are never diffed, so a member's first-ever
@@ -33,6 +36,7 @@ pub struct ProgressSnapshot {
     pub diary_vars: Option<Vec<i32>>,
     pub collection_log: Option<Vec<i32>>,
     pub combat_achievements: Option<CombatAchievements>,
+    pub skills: Option<Vec<i32>>,
 }
 
 #[derive(Clone)]
@@ -191,6 +195,106 @@ fn diff_collection_log(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> 
     events
 }
 
+/// Order matches the stored `skills INTEGER[24]` column (see `db::skill_array_index`'s doc
+/// comment) - index 0 is Postgres `skills[1]` (Agility) through index 23, `skills[24]` (Sailing).
+/// "Overall" has no slot of its own, so it never posts a level-up milestone.
+const SKILL_NAMES: [&str; 24] = [
+    "Agility",
+    "Attack",
+    "Construction",
+    "Cooking",
+    "Crafting",
+    "Defence",
+    "Farming",
+    "Firemaking",
+    "Fishing",
+    "Fletching",
+    "Herblore",
+    "Hitpoints",
+    "Hunter",
+    "Magic",
+    "Mining",
+    "Prayer",
+    "Ranged",
+    "Runecraft",
+    "Slayer",
+    "Smithing",
+    "Strength",
+    "Thieving",
+    "Woodcutting",
+    "Sailing",
+];
+
+/// Level milestones the activity feed posts for - every 10 up to 80, every 5 up to 95, then every
+/// level up to 99. Common early levels aren't worth a post; the max-level grind is.
+const LEVEL_MILESTONES: [u32; 15] = [10, 20, 30, 40, 50, 60, 70, 80, 85, 90, 95, 96, 97, 98, 99];
+
+/// XP required to *start* the given level, ported 1:1 from `site/src/data/skill.js`'s
+/// `xpForLevel` so the server's milestone detection agrees with what the client displays.
+fn xp_for_level(level: u32) -> u64 {
+    let mut xp: f64 = 0.0;
+    for i in 1..=level {
+        xp += (i as f64 + 300.0 * 2f64.powf(i as f64 / 7.0)).floor();
+    }
+    (0.25 * xp).floor() as u64
+}
+
+/// `table[level]` is the XP required to reach `level` (1-99). Computed once - `xp_for_level`
+/// itself is an O(level) sum, and this gets called for 24 skills on every heartbeat.
+fn level_xp_table() -> &'static [u64; 100] {
+    static TABLE: OnceLock<[u64; 100]> = OnceLock::new();
+    TABLE.get_or_init(|| {
+        let mut table = [0u64; 100];
+        for level in 1..=99usize {
+            table[level] = xp_for_level(level as u32);
+        }
+        table
+    })
+}
+
+/// Levels are capped at 99 here - the milestone schedule never goes past it, so a skill's virtual
+/// level beyond 99 (e.g. from bonus XP events) doesn't matter for this purpose.
+fn level_for_xp(xp: i32) -> u32 {
+    let table = level_xp_table();
+    let xp = xp.max(0) as u64;
+    (1..=99u32).rev().find(|&level| xp >= table[level as usize]).unwrap_or(1)
+}
+
+/// Highest milestone newly crossed going from `previous_level` to `current_level`, or `None` if
+/// none was crossed. When a heartbeat jumps a skill across more than one threshold at once (e.g.
+/// a large XP-lump reward), only the highest is reported - the lower ones aren't backfilled.
+fn milestone_crossed(previous_level: u32, current_level: u32) -> Option<u32> {
+    LEVEL_MILESTONES
+        .iter()
+        .rev()
+        .find(|&&milestone| milestone > previous_level && milestone <= current_level)
+        .copied()
+}
+
+/// Skills whose level crossed a new milestone threshold this upload (see `LEVEL_MILESTONES`).
+/// A skill slot missing from `previous` (shorter array than `current`) is skipped rather than
+/// treated as a level-1 baseline - mirrors the "never diffed before" guard the other diffs use.
+fn diff_skills(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> {
+    let mut events = Vec::new();
+    for (index, &current_xp) in current.iter().enumerate() {
+        let Some(&previous_xp) = previous.get(index) else {
+            continue;
+        };
+        let Some(&skill) = SKILL_NAMES.get(index) else {
+            continue;
+        };
+        let previous_level = level_for_xp(previous_xp);
+        let current_level = level_for_xp(current_xp);
+        if let Some(milestone) = milestone_crossed(previous_level, current_level) {
+            events.push(ProgressEvent {
+                event_type: EVENT_TYPE_LEVEL_UP,
+                payload: json!({ "skill": skill, "level": milestone }),
+            });
+        }
+    }
+    events
+}
+
 /// Every milestone transition between the stored snapshot and this heartbeat's upload.
 ///
 /// Fields the upload doesn't carry, and fields that were never stored before, are skipped.
@@ -212,6 +316,9 @@ pub fn diff_progress(previous: &ProgressSnapshot, current: &GroupMember) -> Vec<
         (&previous.collection_log, &current.collection_log_v2)
     {
         events.extend(diff_collection_log(previous_log, current_log));
+    }
+    if let (Some(previous_skills), Some(current_skills)) = (&previous.skills, &current.skills) {
+        events.extend(diff_skills(previous_skills, current_skills));
     }
 
     events
@@ -365,6 +472,68 @@ mod tests {
             .collect();
         assert_eq!(page_events.len(), 1);
         assert_eq!(page_events[0].payload["page"], json!(page_name));
+    }
+
+    #[test]
+    fn level_for_xp_matches_known_boundaries() {
+        assert_eq!(level_for_xp(0), 1);
+        assert_eq!(level_for_xp(xp_for_level(2) as i32 - 1), 1);
+        assert_eq!(level_for_xp(xp_for_level(2) as i32), 2);
+        assert_eq!(level_for_xp(xp_for_level(99) as i32), 99);
+    }
+
+    fn skills_xp(agility_xp: i32) -> Vec<i32> {
+        let mut skills = vec![0i32; 24];
+        skills[0] = agility_xp; // Agility - see SKILL_NAMES.
+        skills
+    }
+
+    #[test]
+    fn crossing_a_milestone_emits_one_event() {
+        // Level 9 -> level 10 crosses the first milestone.
+        let previous = skills_xp(xp_for_level(9) as i32);
+        let current = skills_xp(xp_for_level(10) as i32);
+
+        let events = diff_skills(&previous, &current);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].event_type, EVENT_TYPE_LEVEL_UP);
+        assert_eq!(events[0].payload["skill"], json!("Agility"));
+        assert_eq!(events[0].payload["level"], json!(10));
+    }
+
+    #[test]
+    fn staying_within_a_milestone_band_emits_nothing() {
+        let previous = skills_xp(xp_for_level(11) as i32);
+        let current = skills_xp(xp_for_level(15) as i32);
+        assert!(diff_skills(&previous, &current).is_empty());
+    }
+
+    #[test]
+    fn jumping_multiple_thresholds_at_once_emits_only_the_highest() {
+        let previous = skills_xp(xp_for_level(68) as i32);
+        let current = skills_xp(xp_for_level(81) as i32);
+
+        let events = diff_skills(&previous, &current);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].payload["level"], json!(80));
+    }
+
+    #[test]
+    fn reaching_99_emits_the_99_milestone() {
+        let previous = skills_xp(xp_for_level(98) as i32);
+        let current = skills_xp(xp_for_level(99) as i32);
+
+        let events = diff_skills(&previous, &current);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].payload["level"], json!(99));
+    }
+
+    #[test]
+    fn a_skill_slot_missing_from_the_previous_snapshot_is_skipped() {
+        let previous = vec![0i32; 5]; // Shorter than current - index 10 (Herblore) is unseen.
+        let mut current = vec![0i32; 24];
+        current[10] = xp_for_level(99) as i32;
+        assert!(diff_skills(&previous, &current).is_empty());
     }
 
     #[test]

@@ -14,6 +14,7 @@ const EVENT_TYPES = [
   ["collection_log", "Collection log"],
   ["clue", "Clues"],
   ["raid", "Raids"],
+  ["level_up", "Levels"],
 ];
 
 const PAGE_LIMIT = 25;

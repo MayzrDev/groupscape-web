@@ -24,6 +24,7 @@ const TOAST_ICONS = {
   "combat-achievement": "✦",
   collection_log: "❖",
   raid: "🏆",
+  level_up: "⬆",
   ping: "📍",
 };
 

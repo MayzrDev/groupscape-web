@@ -4583,7 +4583,7 @@ pub async fn get_progress_snapshot(
 ) -> Result<Option<crate::progress_events::ProgressSnapshot>, ApiError> {
     let stmt = client
         .prepare_cached(
-            "SELECT quests, diary_vars, collection_log, combat_achievements \
+            "SELECT quests, diary_vars, collection_log, combat_achievements, skills \
              FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
         )
         .await?;
@@ -4599,6 +4599,7 @@ pub async fn get_progress_snapshot(
         diary_vars: row.try_get("diary_vars").ok().flatten(),
         collection_log: row.try_get("collection_log").ok().flatten(),
         combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+        skills: row.try_get("skills").ok().flatten(),
     }))
 }
 
@@ -4642,7 +4643,7 @@ SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
   AND (
-    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log', 'raid')
+    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log', 'raid', 'level_up')
     OR (event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
   )
   AND (event_type != 'kill' OR npc_slug = ANY($6))

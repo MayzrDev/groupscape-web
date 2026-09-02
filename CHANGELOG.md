@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.329] - 2026-09-02
 
+### Added
+- The Activity Feed and toast notifications now post a Level Up milestone whenever a group member reaches a notable skill level - every 10 levels up to 80, every 5 up to 95, then every level from 96 to 99 - each with its own skill-flavored message and icon, and 99 called out as a maxed skill.
+
 ### Changed
 - Loot Log now loads much bigger chunks of history per scroll and auto-loads further before asking you to click "Load more" again, so scrolling through a group's full loot history takes far fewer steps.
 - The item icon shown next to a Collection Log completion in the Activity Feed is now bigger and easier to see.

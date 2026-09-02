@@ -33,6 +33,8 @@ describe("activity event copy", () => {
     expect(activityBadgeLabel(event("combat_task"))).toBe("Combat task");
     expect(activityBadgeLabel(event("collection_log"))).toBe("Collection log");
     expect(activityBadgeLabel(event("loot", { clueTier: "master" }))).toBe("Clue");
+    expect(activityBadgeLabel(event("level_up", { skill: "Woodcutting", level: 60 }))).toBe("Level up");
+    expect(activityBadgeLabel(event("level_up", { skill: "Woodcutting", level: 99 }))).toBe("99");
   });
 
   it("describes kills and deaths", () => {
@@ -93,6 +95,22 @@ describe("activity event copy", () => {
     );
 
     expect(activityEventDescription(clue)).toBe("Torvesta completed a Master clue — worth 2,000,000 gp");
+  });
+
+  it("describes a skill level-up with a skill-flavored phrase", () => {
+    const woodcutting = event("level_up", { skill: "Woodcutting", level: 60 }, "Torvesta");
+    const fishing = event("level_up", { skill: "Fishing", level: 70 }, "Torvesta");
+
+    expect(activityEventDescription(woodcutting)).toBe("Torvesta chopped their way to level 60 Woodcutting");
+    expect(activityEventDescription(fishing)).toBe("Torvesta reeled in level 70 Fishing");
+    expect(activityMetaLabel(woodcutting)).toBe("Level up");
+  });
+
+  it("calls out reaching level 99 as maxed", () => {
+    const maxed = event("level_up", { skill: "Woodcutting", level: 99 }, "Torvesta");
+
+    expect(activityEventDescription(maxed)).toBe("Torvesta chopped their way to level 99 Woodcutting — maxed!");
+    expect(activityMetaLabel(maxed)).toBe("Max level!");
   });
 
   it("wraps the member and subject with the caller's formatters", () => {

@@ -3,6 +3,7 @@ import { Item } from "./item";
 import { combatAchievement } from "./combat-achievement";
 import { slugifyNpcName } from "./npc-slug";
 import { BOSS_ICON_SLUGS } from "./boss-icons";
+import { Skill } from "./skill";
 
 const COLLECTION_LOG_WIKI_URL = "https://oldschool.runescape.wiki/w/Collection_log";
 
@@ -17,6 +18,7 @@ export const ACTIVITY_EVENT_TYPES = [
   "collection_log",
   "clue",
   "raid",
+  "level_up",
 ];
 
 const BADGE_LABELS = {
@@ -32,6 +34,10 @@ const BADGE_LABELS = {
   cox: "Raid",
   tob: "Raid",
   toa: "Raid",
+  level_up: "Level up",
+  // Level 99 is discriminated into its own display type (see `activityDisplayType`) so it can
+  // carry a badge that stands out from an ordinary milestone.
+  max_level: "99",
 };
 
 // Secondary line under a toast title. Kills/deaths speak for themselves, so they have none.
@@ -48,6 +54,9 @@ export function activityDisplayType(event) {
   // Raid completions are stored under one shared `event_type: "raid"`, discriminated by
   // `payload.raidType` ("cox"/"tob"/"toa") so each raid can render its own icon/badge.
   if (event.event_type === "raid") return event.payload?.raidType || "raid";
+  // Every skill level-up shares one stored `event_type: "level_up"` - level 99 is split into its
+  // own display type purely so the badge/icon can call it out as the max-level milestone it is.
+  if (event.event_type === "level_up") return event.payload?.level === 99 ? "max_level" : "level_up";
   return event.event_type;
 }
 
@@ -92,6 +101,7 @@ export function activityMetaLabel(event) {
     const { tierLabel } = combatTaskFor(event.payload);
     return tierLabel ? `${tierLabel} combat task` : "Combat task";
   }
+  if (event.event_type === "level_up") return event.payload?.level === 99 ? "Max level!" : "Level up";
   return META_LABELS[event.event_type] || "";
 }
 
@@ -197,6 +207,40 @@ export function diaryWikiUrl(region, tier) {
   return `https://oldschool.runescape.wiki/w/${region.replace(/ /g, "_")}_Diary#${tier}`;
 }
 
+export function skillWikiUrl(skillName) {
+  return `https://oldschool.runescape.wiki/w/${skillName}`;
+}
+
+// Skill-flavored verb phrase each level-up sentence ends on, e.g. "Torvesta chopped their way to
+// level 60 Woodcutting" - every skill gets its own so the feed doesn't read as 24 copies of the
+// same generic "leveled up" line. Each phrase reads naturally immediately before "level N <Skill>".
+const SKILL_LEVEL_UP_VERBS = {
+  Agility: "vaulted their way to",
+  Attack: "sharpened their blade to",
+  Construction: "hammered out",
+  Cooking: "cooked their way to",
+  Crafting: "crafted their way to",
+  Defence: "toughened up to",
+  Farming: "harvested their way to",
+  Firemaking: "stoked the flames to",
+  Fishing: "reeled in",
+  Fletching: "carved their way to",
+  Herblore: "brewed their way to",
+  Hitpoints: "toughed it out to",
+  Hunter: "trapped their way to",
+  Magic: "conjured their way to",
+  Mining: "struck",
+  Prayer: "prayed their way to",
+  Ranged: "fired their way to",
+  Runecraft: "bound their way to",
+  Slayer: "slew their way to",
+  Smithing: "forged their way to",
+  Strength: "muscled up to",
+  Thieving: "pickpocketed their way to",
+  Woodcutting: "chopped their way to",
+  Sailing: "sailed their way to",
+};
+
 const identity = (value) => value;
 
 /// Phrasing convention for group-milestone copy across this app: "<member> <verb> <subject>"
@@ -282,6 +326,19 @@ export function activityEventDescription(event, format = {}) {
         clueWikiUrl(payload.clueTier),
         ACTIVITY_ICONS.clue
       )} — worth ${value.toLocaleString()} gp`;
+    }
+    case "level_up":
+    case "max_level": {
+      const skillName = payload.skill;
+      const level = payload.level;
+      const verb = SKILL_LEVEL_UP_VERBS[skillName] || "leveled up to";
+      const subject = wrapSubject(
+        `level ${level} ${skillName}`,
+        "level_up",
+        skillWikiUrl(skillName),
+        Skill.getIcon(skillName)
+      );
+      return level === 99 ? `${member} ${verb} ${subject} — maxed!` : `${member} ${verb} ${subject}`;
     }
     case "cox":
     case "tob":

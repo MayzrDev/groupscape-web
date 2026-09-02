@@ -195,6 +195,10 @@ toast-stack {
   --toast-color: var(--activity-raid);
 }
 
+.toast-stack__toast--level_up {
+  --toast-color: var(--activity-level-up);
+}
+
 .toast-stack__icon {
   flex: none;
   width: 22px;
