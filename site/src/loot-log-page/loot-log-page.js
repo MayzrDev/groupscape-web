@@ -18,6 +18,14 @@ const AUTO_LOAD_HARD_CAP = 20;
 // Consecutive same-member/source/type events with a gap under this are one farming session -
 // see the locked Loot Log design doc's "45-minute rolling window" rule.
 const SESSION_MERGE_WINDOW_MS = 45 * 60 * 1000;
+// A session's group card must never grow after it's been shown to the user - so the oldest
+// (trailing) card produced by a loadMore() page can't be considered "loaded" until we know its
+// 45-minute window is actually closed, which requires peeking at the next page too. Bounds how
+// many extra pages a single loadMore() call may fetch chasing that closure - same reasoning as
+// AUTO_LOAD_BURST_LIMIT: an uninterrupted same-boss farming session can span many pages, so this
+// has to give up and leave the trailing card open (it'll keep resolving on subsequent loadMore()
+// calls) rather than risk the runaway-fetch tab freeze this file has been bitten by before.
+const GROUP_CLOSE_FETCH_CAP = 5;
 const MAX_RESOLVED_ITEM_IDS = 200;
 const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k"];
 const PLACEHOLDER_INTERVAL_MS = 2500;
@@ -302,23 +310,51 @@ export class LootLogPage extends BaseElement {
     this.sentinel.classList.add("loot-log-page__sentinel--visible");
     this.sentinel.classList.add("loot-log-page__sentinel--loading");
 
-    const page = await api.getLootLog({
-      before: this.nextBefore,
-      limit: PAGE_LIMIT,
-      search: this.searchText,
-      itemIds: this.itemIds,
-    });
+    // Keep fetching until the trailing group is provably closed (see `GROUP_CLOSE_FETCH_CAP`):
+    // a page's last event always leaves its group's fate unknown - only the next page's leading
+    // event, once fetched, can tell us whether that group grows further. Events only get older
+    // from here, so as soon as one page's first event fails to extend the previous page's
+    // trailing group, that group can never grow again and it's safe to stop.
+    let trailingKey = null;
+    for (let fetches = 0; fetches < GROUP_CLOSE_FETCH_CAP; fetches++) {
+      const page = await api.getLootLog({
+        before: this.nextBefore,
+        limit: PAGE_LIMIT,
+        search: this.searchText,
+        itemIds: this.itemIds,
+      });
+      if (this.disposed) {
+        this.loadingMore = false;
+        return;
+      }
+
+      let extendedTrailing = false;
+      if (trailingKey && page.events.length) {
+        const first = page.events[0];
+        const entry = this.entryGroups.get(trailingKey);
+        if (entry && this.entryKey(first) === trailingKey) {
+          const oldestTime = new Date(entry.events[entry.events.length - 1].occurred_at).getTime();
+          const firstTime = new Date(first.occurred_at).getTime();
+          extendedTrailing = oldestTime - firstTime <= SESSION_MERGE_WINDOW_MS;
+        }
+      }
+
+      for (const event of page.events) {
+        this.loaded.push(event);
+        this.appendEvent(event);
+      }
+      this.nextBefore = page.next_before || undefined;
+      this.exhausted = !!page.scan_exhausted;
+      trailingKey = page.events.length ? this.entryKey(page.events[page.events.length - 1]) : null;
+
+      const firstFetch = fetches === 0;
+      if (!trailingKey || this.exhausted || !(firstFetch || extendedTrailing)) break;
+    }
 
     this.loadingMore = false;
     this.sentinel.classList.remove("loot-log-page__sentinel--loading");
     if (this.disposed) return;
 
-    for (const event of page.events) {
-      this.loaded.push(event);
-      this.appendEvent(event);
-    }
-    this.nextBefore = page.next_before || undefined;
-    this.exhausted = !!page.scan_exhausted;
     this.autoLoadPaused = !this.exhausted && this.autoLoadStreak >= AUTO_LOAD_BURST_LIMIT;
     this.sentinel.classList.toggle("loot-log-page__sentinel--visible", !this.exhausted);
     this.sentinel.classList.toggle("loot-log-page__sentinel--paused", this.autoLoadPaused);
