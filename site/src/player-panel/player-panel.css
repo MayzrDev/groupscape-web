@@ -71,7 +71,7 @@ player-panel + player-panel {
 
 .player-panel__minibar {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(8, 1fr);
 }
 
 player-panel.expanded .player-panel__minibar {
@@ -107,6 +107,7 @@ player-panel.expanded .player-panel__content {
 }
 
 .player-panel__collection-log img,
-.player-panel__combat-achievements img {
+.player-panel__combat-achievements img,
+.player-panel__slayer-task img {
   image-rendering: initial;
 }

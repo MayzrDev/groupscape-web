@@ -7,6 +7,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Added
 - The Activity Feed and toast notifications now post a Level Up milestone whenever a group member reaches a notable skill level - every 10 levels up to 80, every 5 up to 95, then every level from 96 to 99 - each with its own skill-flavored message and icon, and 99 called out as a maxed skill.
 - Internal: site admins can now clear a group's activity feed or loot log, and reset individual members' collection log, combat achievements, skill/XP history, or bank value history, from the admin panel.
+- Each group member's side panel now has a Slayer button - click it to see their current task with a monster icon, their assigned master with a portrait, remaining progress, streak, points, and a link to that task's wiki guide (or just their streak and points if they're between tasks).
 
 ### Changed
 - Loot Log now loads much bigger chunks of history per scroll and auto-loads further before asking you to click "Load more" again, so scrolling through a group's full loot history takes far fewer steps.

@@ -1,0 +1,173 @@
+slayer-panel {
+  display: block;
+}
+
+.slayer-panel__popover {
+  z-index: 50;
+  position: fixed;
+  width: 260px;
+  padding: 10px;
+  color: var(--primary-text);
+  box-sizing: border-box;
+}
+
+.slayer-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slayer-panel__title {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  text-shadow: 1px 1px var(--black);
+  font-size: 14px;
+  color: var(--orange);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slayer-panel__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+}
+
+.slayer-panel__stats-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slayer-panel__stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  border-radius: 3px;
+  padding: 5px 4px;
+}
+
+.slayer-panel__stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+}
+
+.slayer-panel__stat-value {
+  font-size: 15px;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.slayer-panel__no-task {
+  text-align: center;
+  padding: 14px 0 6px;
+  opacity: 0.65;
+  font-size: 14px;
+}
+
+.slayer-panel__master {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid hsl(40deg 15.79% 29.8%);
+}
+
+.slayer-panel__master-portrait {
+  width: 32px;
+  height: 32px;
+  border-radius: 3px;
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  object-fit: cover;
+  object-position: top;
+  image-rendering: initial;
+}
+
+.slayer-panel__master-name {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  text-shadow: 1px 1px var(--black);
+  font-size: 15px;
+  color: var(--orange);
+}
+
+.slayer-panel__task {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slayer-panel__task-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  object-fit: contain;
+  image-rendering: initial;
+}
+
+.slayer-panel__task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.slayer-panel__task-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.slayer-panel__task-location {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.slayer-panel__wiki-link {
+  font-size: 12px;
+  color: var(--orange);
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.slayer-panel__wiki-link:hover {
+  opacity: 1;
+}
+
+.slayer-panel__progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slayer-panel__progress-track {
+  flex: 1;
+  height: 7px;
+  border-radius: 4px;
+  background: #1c1811;
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  overflow: hidden;
+}
+
+.slayer-panel__progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #ffcf6b, var(--orange));
+}
+
+.slayer-panel__progress-frac {
+  font-size: 12px;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}

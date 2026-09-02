@@ -32,6 +32,8 @@ export class PlayerPanel extends BaseElement {
       "click",
       this.handleCombatAchievementsClick.bind(this)
     );
+    this.slayerTaskButton = this.querySelector(".player-panel__slayer-task");
+    this.eventListener(this.slayerTaskButton, "click", this.handleSlayerTaskClick.bind(this));
 
     this.followButton = this.querySelector(".player-panel__follow");
     this.eventListener(this.followButton, "click", this.handleFollowClick.bind(this));
@@ -72,6 +74,19 @@ export class PlayerPanel extends BaseElement {
     const combatAchievementsEl = document.createElement("combat-achievements");
     combatAchievementsEl.setAttribute("player-name", this.playerName);
     document.body.appendChild(combatAchievementsEl);
+  }
+
+  handleSlayerTaskClick() {
+    if (this.slayerPanelEl && this.slayerPanelEl.isConnected) {
+      this.slayerPanelEl.close();
+      return;
+    }
+
+    const slayerPanelEl = document.createElement("slayer-panel");
+    slayerPanelEl.setAttribute("player-name", this.playerName);
+    slayerPanelEl.anchor = this.slayerTaskButton;
+    document.body.appendChild(slayerPanelEl);
+    this.slayerPanelEl = slayerPanelEl;
   }
 
   handleMiniBarClick(event) {

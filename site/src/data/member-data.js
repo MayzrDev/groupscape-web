@@ -87,6 +87,13 @@ const parsedFieldMappings = [
     publishKey: "portraitUpdated",
     updatedAttribute: "portraitLastUpdate",
   },
+  {
+    sourceKey: "slayer_task",
+    targetKey: "slayerTask",
+    parser: (value) => value,
+    publishKey: "slayerTask",
+    updatedAttribute: "slayerTask",
+  },
 ];
 
 const itemFieldMappings = [

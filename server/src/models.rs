@@ -101,6 +101,19 @@ pub struct CombatAchievements {
     pub tasks: std::collections::HashMap<String, bool>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SlayerTask {
+    pub has_task: bool,
+    pub master_name: Option<String>,
+    pub task_name: Option<String>,
+    pub task_location: Option<String>,
+    pub amount_remaining: Option<i32>,
+    pub initial_amount: Option<i32>,
+    pub points: i32,
+    pub streak: i32,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupMemberName {
@@ -179,6 +192,8 @@ pub struct GroupMember {
     pub rich_presence: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub combat_achievements: Option<CombatAchievements>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slayer_task: Option<SlayerTask>,
     /// Timestamp of the character's most recent portrait mesh upload (`character_mesh.mesh_last_update`),
     /// gated by the same "since timestamp" cutoff as the telemetry fields above. Never sent by the
     /// plugin - it's server-computed in `get_group_data` so an already-open side panel knows to

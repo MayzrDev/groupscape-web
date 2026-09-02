@@ -12,6 +12,7 @@ import "./app-route/app-route.js";
 import "./map-page/map-page.js";
 import "./side-panel/side-panel.js";
 import "./player-panel/player-panel.js";
+import "./slayer-panel/slayer-panel.js";
 import "./player-stats/player-stats.js";
 import "./player-portrait/player-portrait.js";
 import "./player-inventory/player-inventory.js";

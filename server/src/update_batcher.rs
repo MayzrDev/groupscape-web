@@ -12,10 +12,10 @@ use tokio::time::{self, Duration, Instant};
 static BATCH_SIZE: usize = 5000;
 static CHUNK_SIZE: usize = 50;
 
-/// Number of columns per member update row. With 19 columns, the PostgreSQL
-/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 19 =
-/// 3449 rows when using the VALUES approach.
-const COLUMNS_PER_ROW: usize = 19;
+/// Number of columns per member update row. With 20 columns, the PostgreSQL
+/// parameter-count limit (65,535) allows a maximum chunk size of 65535 / 20 =
+/// 3276 rows when using the VALUES approach.
+const COLUMNS_PER_ROW: usize = 20;
 
 pub async fn background_worker(
     pool: Pool,
@@ -277,6 +277,9 @@ pub(crate) fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.combat_achievements.is_some() {
         older.combat_achievements = newer.combat_achievements.clone();
     }
+    if newer.slayer_task.is_some() {
+        older.slayer_task = newer.slayer_task.clone();
+    }
 
     if let Some(newer_deposited) = &newer.deposited {
         match &older.deposited {
@@ -323,7 +326,7 @@ fn build_values_statement(size: usize) -> String {
         .map(|row| {
             let offset = row * COLUMNS_PER_ROW;
             format!(
-                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::int4,${}::text[],${}::text,${}::text)",
+                "(${}::int8,${}::text,${}::int4[],${}::int4[],${}::int4[],${}::bytea,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::text,${}::int4[],${}::int4[],${}::int4[],${}::int4[],${}::int4,${}::text[],${}::text,${}::text,${}::text)",
                 offset + 1,
                 offset + 2,
                 offset + 3,
@@ -343,6 +346,7 @@ fn build_values_statement(size: usize) -> String {
                 offset + 17,
                 offset + 18,
                 offset + 19,
+                offset + 20,
             )
         })
         .collect::<Vec<_>>()
@@ -368,11 +372,12 @@ UPDATE groupscape.members AS a SET
   special_attack = COALESCE(b.special_attack, a.special_attack),
   active_prayers = COALESCE(b.active_prayers, a.active_prayers),
   rich_presence = COALESCE(b.rich_presence, a.rich_presence),
-  combat_achievements = COALESCE(b.combat_achievements, a.combat_achievements)
+  combat_achievements = COALESCE(b.combat_achievements, a.combat_achievements),
+  slayer_task = COALESCE(b.slayer_task, a.slayer_task)
 FROM (VALUES {values}) AS b(
   group_id, member_name, stats, coordinates, skills, quests, inventory,
   equipment, bank, rune_pouch, interacting, seed_vault, diary_vars, collection_log,
-  potion_storage, special_attack, active_prayers, rich_presence, combat_achievements
+  potion_storage, special_attack, active_prayers, rich_presence, combat_achievements, slayer_task
 )
 WHERE a.group_id = b.group_id AND a.member_name = b.member_name::citext
 "#
@@ -424,6 +429,10 @@ async fn process_chunk(pool: &Pool, chunk: Vec<GroupMember>) -> Option<()> {
         .iter()
         .map(|member_data| serialize_serde(&member_data.combat_achievements).unwrap_or_default())
         .collect();
+    let slayer_task_storage: Vec<Option<String>> = buffer
+        .iter()
+        .map(|member_data| serialize_serde(&member_data.slayer_task).unwrap_or_default())
+        .collect();
     let mut params: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
         Vec::with_capacity(COLUMNS_PER_ROW * chunk_size);
     for (index, member_data) in buffer.iter().enumerate() {
@@ -446,6 +455,7 @@ async fn process_chunk(pool: &Pool, chunk: Vec<GroupMember>) -> Option<()> {
         params.push(&member_data.active_prayers);
         params.push(&member_data.rich_presence);
         params.push(&combat_achievements_storage[index]);
+        params.push(&slayer_task_storage[index]);
     }
 
     if let Err(e) = client.execute(&update_stmt, &params).await {
@@ -660,6 +670,7 @@ mod tests {
             active_prayers: None,
             rich_presence: None,
             combat_achievements: None,
+            slayer_task: None,
             portrait_last_update: None,
             last_updated: None,
             events: None,

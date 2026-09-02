@@ -780,6 +780,7 @@ CASE WHEN special_attack_last_update >= $1::TIMESTAMPTZ THEN special_attack ELSE
 CASE WHEN active_prayers_last_update >= $1::TIMESTAMPTZ THEN active_prayers ELSE NULL END as active_prayers,
 CASE WHEN rich_presence_last_update >= $1::TIMESTAMPTZ THEN rich_presence ELSE NULL END as rich_presence,
 CASE WHEN combat_achievements_last_update >= $1::TIMESTAMPTZ THEN combat_achievements ELSE NULL END as combat_achievements,
+CASE WHEN slayer_task_last_update >= $1::TIMESTAMPTZ THEN slayer_task ELSE NULL END as slayer_task,
 CASE WHEN character_mesh.mesh_last_update >= $1::TIMESTAMPTZ THEN character_mesh.mesh_last_update ELSE NULL END as portrait_last_update
 FROM groupscape.members
 LEFT JOIN LATERAL (
@@ -834,6 +835,7 @@ WHERE group_id=$2
             alerts: None,
             notable_drops: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+            slayer_task: try_deserialize_json_column(&row, "slayer_task")?,
             portrait_last_update: row.try_get("portrait_last_update").ok(),
             pending: false,
         };
@@ -897,6 +899,7 @@ async fn get_pending_group_members(client: &Client, group_id: i64) -> Result<Vec
                 alerts: None,
                 notable_drops: None,
                 combat_achievements: None,
+                slayer_task: None,
                 portrait_last_update: None,
                 pending: true,
             })
@@ -921,7 +924,7 @@ SELECT color,
 last_seen_at as last_updated,
 stats, coordinates, skills, quests, inventory, equipment, bank, rune_pouch, interacting,
 seed_vault, diary_vars, collection_log, potion_storage, special_attack, active_prayers,
-rich_presence, combat_achievements
+rich_presence, combat_achievements, slayer_task
 FROM groupscape.members
 WHERE group_id=$1 AND member_name=$2
 "#,
@@ -969,6 +972,7 @@ WHERE group_id=$1 AND member_name=$2
         alerts: None,
         notable_drops: None,
         combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
+        slayer_task: try_deserialize_json_column(&row, "slayer_task")?,
         portrait_last_update: None,
         pending: false,
     }))
@@ -2744,6 +2748,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS activity_events_group_client_event_id_idx ON g
             .await?;
 
         commit_migration(&transaction, "add_activity_events_client_event_id").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_slayer_task_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.members
+ADD COLUMN IF NOT EXISTS slayer_task_last_update TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS slayer_task TEXT
+"#,
+                &[],
+            )
+            .await?;
+
+        create_timestamp_trigger(&transaction, "slayer_task").await?;
+
+        commit_migration(&transaction, "add_slayer_task_column").await?;
         transaction.commit().await?;
     }
 
