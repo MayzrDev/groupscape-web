@@ -83,7 +83,10 @@ export class ActivityFeedEvent extends BaseElement {
         const trailingSrc = secondaryIconSrc || iconSrc;
         const img = (src, modifier) =>
           src ? `<img class="activity-feed-event__subject-icon${modifier}" src="${src}" alt="" />` : "";
-        const content = `${img(leadingSrc, "--leading")}${text}${img(trailingSrc, "")}`;
+        const content = `${img(leadingSrc, " activity-feed-event__subject-icon--leading")}${text}${img(
+          trailingSrc,
+          ""
+        )}`;
         return wikiUrl
           ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="${cls}">${content}</a>`
           : `<span class="${cls}">${content}</span>`;
