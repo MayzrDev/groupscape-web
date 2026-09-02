@@ -87,6 +87,10 @@ export class SetBonusDialog extends BaseElement {
     const partial = sets.filter((set) => set.partial).sort((a, b) => a.missingItemIds.length - b.missingItemIds.length);
     const others = sets.filter((set) => !set.active && !set.partial).sort((a, b) => a.pieceCount - b.pieceCount);
 
+    if (active.length === 0 && partial.length === 0) {
+      this.othersOpen = true;
+    }
+
     const activeSection = active.length
       ? `
         <section>

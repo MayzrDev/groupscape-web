@@ -23,6 +23,8 @@ All notable changes to GroupScape web are logged here, newest first.
 - Activity Feed collection log entries now show the item's own icon in front of its name, matching the "icon, item name, log book icon" order instead of stacking both icons after the name.
 - Fixed the collection log item icon rendering oversized instead of at the same 18px size as the log book icon next to it.
 - The "Boss kill" in-game chat notification no longer fires for every NPC kill (including slayer task mobs) - it's now limited to actual tracked bosses, matching what the setting says it does.
+- Set Bonuses now defaults "Other Sets" open when you have no active or partial sets, instead of hiding everything behind a collapsed accordion.
+- Set Bonuses is now scrollable again when its contents overflow the dialog.
 
 ## [1.0.257] - 2026-09-01
 
