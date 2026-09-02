@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log's "load more" indicator no longer lingers forever near the bottom of a long history full of drop-less kills - it now gives up after a few empty attempts instead of implying there's always more to find.
 - Fixed a case where a very long, uninterrupted farming session in the Loot Log could keep quietly adding loot to a session card you'd already scrolled past, instead of that card staying as you first saw it.
 - Royal Titans kills and loot now show up in the Activity Feed - they were silently being filtered out.
+- Royal Titans now has its boss icon everywhere it's shown, instead of a blank spot.
 
 ## [1.0.299] - 2026-09-02
 
