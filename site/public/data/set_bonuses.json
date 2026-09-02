@@ -15,11 +15,6 @@
     "effect": "10% boost to melee accuracy and Strength bonus when using an Obsidian melee weapon (Toktz-xil-ak, Toktz-xil-ek, Tzhaar-ket-em, or Tzhaar-ket-om) with the full set worn; stacks with the Berserker necklace's 20% damage boost for obsidian weapons."
   },
   {
-    "name": "Ferocious Gloves",
-    "pieces": [[22981]],
-    "effect": "Flat +14 Strength bonus with no defensive bonuses and -16 Ranged/Magic attack - the best-in-slot offensive gloves for melee, surpassing Barrows gloves."
-  },
-  {
     "name": "Ahrim's Armour Set",
     "pieces": [[4708, 4856, 4857, 4858, 4859], [4710, 4862, 4863, 4864, 4865], [4712, 4868, 4869, 4870, 4871], [4714, 4874, 4875, 4876, 4877]],
     "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn."
@@ -78,6 +73,11 @@
     "name": "Virtus Robes",
     "pieces": [[26241], [26243], [26245]],
     "effect": "Each piece gives +2% magic damage for standard spells (6% total); when casting Ancient Magicks combat spells, each piece instead gives +5% magic damage, for 15% total with the full set."
+  },
+  {
+    "name": "Shayzien Armour",
+    "pieces": [[13379, 18577], [13381, 18579], [13380, 18578], [13377, 18575], [13378, 18576]],
+    "effect": "Reduces damage taken from lizardman shamans' poison attack by 100% while the full tier 5 set is worn (lower tiers grant 20% per tier)."
   },
   {
     "name": "Crystal Armour",
