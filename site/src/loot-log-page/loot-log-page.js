@@ -234,12 +234,15 @@ export class LootLogPage extends BaseElement {
   }
 
   // Appended when paging older history in (see `loadMore`) - events arrive newest-first within a
-  // page, so each new event is older than whatever's already tracked for its key.
+  // page, so each new event is older than whatever's already tracked for its key. A `frozen`
+  // entry (see `loadMore`'s GROUP_CLOSE_FETCH_CAP handling) has already been shown to the user as
+  // a finished card and must never grow again, even if a later event would otherwise fall inside
+  // its window - falls through to starting a fresh entry for that key instead.
   appendEvent(event) {
     const key = this.entryKey(event);
     const entry = this.entryGroups.get(key);
     const eventTime = new Date(event.occurred_at).getTime();
-    if (entry) {
+    if (entry && !entry.frozen) {
       const oldestTime = new Date(entry.events[entry.events.length - 1].occurred_at).getTime();
       if (oldestTime - eventTime <= SESSION_MERGE_WINDOW_MS) {
         entry.events.push(event);
@@ -248,7 +251,7 @@ export class LootLogPage extends BaseElement {
         return;
       }
     }
-    const newEntry = { key, events: [event] };
+    const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
     this.list.appendChild(newEntry.element);
@@ -257,11 +260,13 @@ export class LootLogPage extends BaseElement {
 
   // Prepended when polling for fresher events (see `poll`) - events arrive oldest-of-batch first
   // (caller reverses the incoming batch), so each new event is newer than whatever's tracked.
+  // Same `frozen` guard as `appendEvent`, though in practice a poll's fresh events landing inside
+  // a frozen (old, already-closed-out) entry's window would be a rare coincidence.
   prependEvent(event) {
     const key = this.entryKey(event);
     const entry = this.entryGroups.get(key);
     const eventTime = new Date(event.occurred_at).getTime();
-    if (entry) {
+    if (entry && !entry.frozen) {
       const newestTime = new Date(entry.events[0].occurred_at).getTime();
       if (eventTime - newestTime <= SESSION_MERGE_WINDOW_MS) {
         entry.events.unshift(event);
@@ -271,7 +276,7 @@ export class LootLogPage extends BaseElement {
         return;
       }
     }
-    const newEntry = { key, events: [event] };
+    const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
     this.list.insertBefore(newEntry.element, this.list.firstChild);
@@ -323,11 +328,15 @@ export class LootLogPage extends BaseElement {
     // Keep fetching until the trailing group is provably closed (see `GROUP_CLOSE_FETCH_CAP`):
     // a page's last event always leaves its group's fate unknown - only the next page's leading
     // event, once fetched, can tell us whether that group grows further. Events only get older
-    // from here, so as soon as one page's first event fails to extend the previous page's
-    // trailing group, that group can never grow again and it's safe to stop.
+    // from here, so as soon as one page's first event fails to extend the current trailing group,
+    // that group can never grow again and it's provably closed (no freeze needed - the window
+    // check alone blocks any future merge into it). Each new page's own tail then becomes the
+    // next trailing group to verify, chained until it's closed, exhausted, or the fetch budget
+    // runs out.
     let trailingKey = null;
     let addedThisCall = 0;
-    for (let fetches = 0; fetches < GROUP_CLOSE_FETCH_CAP; fetches++) {
+    let fetches = 0;
+    for (; fetches < GROUP_CLOSE_FETCH_CAP; fetches++) {
       const page = await api.getLootLog({
         before: this.nextBefore,
         limit: PAGE_LIMIT,
@@ -339,15 +348,17 @@ export class LootLogPage extends BaseElement {
         return;
       }
 
-      let extendedTrailing = false;
       if (trailingKey && page.events.length) {
         const first = page.events[0];
         const entry = this.entryGroups.get(trailingKey);
-        if (entry && this.entryKey(first) === trailingKey) {
-          const oldestTime = new Date(entry.events[entry.events.length - 1].occurred_at).getTime();
-          const firstTime = new Date(first.occurred_at).getTime();
-          extendedTrailing = oldestTime - firstTime <= SESSION_MERGE_WINDOW_MS;
-        }
+        const extendsTrailing =
+          entry &&
+          !entry.frozen &&
+          this.entryKey(first) === trailingKey &&
+          new Date(entry.events[entry.events.length - 1].occurred_at).getTime() -
+            new Date(first.occurred_at).getTime() <=
+            SESSION_MERGE_WINDOW_MS;
+        if (!extendsTrailing) trailingKey = null;
       }
 
       for (const event of page.events) {
@@ -357,10 +368,18 @@ export class LootLogPage extends BaseElement {
       addedThisCall += page.events.length;
       this.nextBefore = page.next_before || undefined;
       this.exhausted = !!page.scan_exhausted;
-      trailingKey = page.events.length ? this.entryKey(page.events[page.events.length - 1]) : null;
+      trailingKey = this.exhausted || !page.events.length ? null : this.entryKey(page.events[page.events.length - 1]);
 
-      const firstFetch = fetches === 0;
-      if (!trailingKey || this.exhausted || !(firstFetch || extendedTrailing)) break;
+      if (!trailingKey) break;
+    }
+
+    // Fetch budget ran out chasing a group's closure without resolving it - freeze that card so
+    // it can't keep silently growing on a future loadMore() call (see `appendEvent`'s `frozen`
+    // guard). It stays as whatever it loaded here; a real session that long may render as more
+    // than one card.
+    if (trailingKey) {
+      const openEntry = this.entryGroups.get(trailingKey);
+      if (openEntry) openEntry.frozen = true;
     }
 
     this.loadingMore = false;
