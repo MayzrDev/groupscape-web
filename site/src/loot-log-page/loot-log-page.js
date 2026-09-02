@@ -26,6 +26,7 @@ const PLACEHOLDER_FADE_MS = 400;
 export class LootLogPage extends BaseElement {
   constructor() {
     super();
+    this.disposed = false;
     this.loaded = [];
     this.nextBefore = undefined;
     this.exhausted = false;
@@ -77,12 +78,28 @@ export class LootLogPage extends BaseElement {
     });
     this.intersectionObserver.observe(this.sentinel);
 
-    this.resetAndLoad();
+    // On a hard refresh landing directly on this page, this component's connectedCallback can run
+    // before app-initializer's api.enable() finishes setting the group credentials - loading then
+    // instead of waiting for it fired requests as `/api/group/undefined/...`, which 401 and get
+    // misread as "no more history", permanently marking the page exhausted with nothing loaded.
+    // Wait for the first successful group-data fetch (the same signal app-initializer itself waits
+    // on) before loading if the group isn't ready yet.
+    if (api.groupName) {
+      this.resetAndLoad();
+    } else {
+      this.subscribeOnce("get-group-data", () => this.resetAndLoad());
+    }
     this.refreshInterval = utility.callOnInterval(this.poll.bind(this), REFRESH_INTERVAL_MS, false);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    // Stops any in-flight loadMore/poll/auto-load-loop from touching state or firing further
+    // requests once this component is torn down - e.g. the group session getting invalidated
+    // mid-request (see api.js's disable()-on-401) used to leave a stray autoLoadWhileVisible loop
+    // running against a detached component with no group credentials, hammering the API with
+    // `/api/group/undefined/...` requests that looked like a stuck "Load more".
+    this.disposed = true;
     if (this.refreshInterval) window.clearInterval(this.refreshInterval);
     if (this.intersectionObserver) this.intersectionObserver.disconnect();
     this.stopPlaceholderCycle();
@@ -117,6 +134,7 @@ export class LootLogPage extends BaseElement {
     this.autoLoadRunLength = 0;
     const step = async () => {
       if (
+        this.disposed ||
         this.autoLoadPaused ||
         this.exhausted ||
         this.autoLoadRunLength >= AUTO_LOAD_HARD_CAP ||
@@ -127,6 +145,7 @@ export class LootLogPage extends BaseElement {
       }
       this.autoLoadRunLength++;
       await this.loadMore();
+      if (this.disposed) return;
       requestAnimationFrame(step);
     };
     step();
@@ -254,13 +273,19 @@ export class LootLogPage extends BaseElement {
   }
 
   async loadSummary() {
-    this.summary = await api.getLootLogSummary({ search: this.searchText, itemIds: this.itemIds });
+    if (!api.groupName) return;
+    const summary = await api.getLootLogSummary({ search: this.searchText, itemIds: this.itemIds });
+    if (this.disposed) return;
+    this.summary = summary;
     this.renderSummary();
   }
 
   async loadMore({ manual = false } = {}) {
     if (this.loadingMore || this.exhausted) return;
     if (this.autoLoadPaused && !manual) return;
+    // No group session to load against - e.g. it was invalidated mid-view (see disconnectedCallback).
+    // Bail out before touching any state so a stray call can't leave the sentinel/button stuck.
+    if (!api.groupName) return;
     if (manual) {
       this.autoLoadPaused = false;
       this.autoLoadStreak = 0;
@@ -278,6 +303,9 @@ export class LootLogPage extends BaseElement {
       itemIds: this.itemIds,
     });
 
+    this.loadingMore = false;
+    if (this.disposed) return;
+
     for (const event of page.events) {
       this.loaded.push(event);
       this.appendEvent(event);
@@ -289,16 +317,16 @@ export class LootLogPage extends BaseElement {
     this.sentinel.classList.toggle("loot-log-page__sentinel--paused", this.autoLoadPaused);
     this.empty.classList.toggle("loot-log-page__empty--visible", this.loaded.length === 0 && this.exhausted);
     this.renderSummary();
-    this.loadingMore = false;
   }
 
   // Mirrors activity-feed-page.js's `poll` - fetches the newest page and prepends whatever is
   // newer than what's already loaded, preserving scroll position the same way.
   async poll() {
-    if (this.loadingMore || !this.loaded.length) return;
+    if (this.loadingMore || !this.loaded.length || !api.groupName) return;
 
     const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
     const page = await api.getLootLog({ search: this.searchText, itemIds: this.itemIds, limit: PAGE_LIMIT });
+    if (this.disposed) return;
     const incoming = page.events.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
     if (!incoming.length) return;
 

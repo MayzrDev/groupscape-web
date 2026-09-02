@@ -25,6 +25,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log's total gp value now sits directly above the item icons instead of floating off to the right of a wide panel.
 - Fixed the demo group (/demo) failing to (re)seed on every deploy and scheduled refresh, which could leave it stuck unavailable.
 - Fixed a rare case where scrolling the Loot Log (or Activity Feed) to load more could lock up the whole tab.
+- Fixed Loot Log and Activity Feed sometimes loading nothing and getting stuck with a "Load more" that never worked, if you refreshed directly on that page.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.

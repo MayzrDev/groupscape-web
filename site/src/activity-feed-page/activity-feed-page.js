@@ -34,6 +34,7 @@ const AUTO_LOAD_HARD_CAP = 20;
 export class ActivityFeedPage extends BaseElement {
   constructor() {
     super();
+    this.disposed = false;
     this.members = [];
     this.selectedMember = null;
     this.selectedType = null;
@@ -73,7 +74,16 @@ export class ActivityFeedPage extends BaseElement {
     }
 
     this.renderRail();
-    this.resetAndLoad();
+    // On a hard refresh landing directly on this page, this component's connectedCallback can run
+    // before app-initializer's api.enable() finishes setting the group credentials - loading then
+    // instead of waiting for it fired requests as `/api/group/undefined/...`, which read as an
+    // empty page with no way to retry. Wait for the first successful group-data fetch (the same
+    // signal app-initializer itself waits on) before loading if the group isn't ready yet.
+    if (api.groupName) {
+      this.resetAndLoad();
+    } else {
+      this.subscribeOnce("get-group-data", () => this.resetAndLoad());
+    }
 
     this.intersectionObserver = new IntersectionObserver(this.handleSentinelIntersect.bind(this), {
       root: this.scrollContainer,
@@ -86,6 +96,12 @@ export class ActivityFeedPage extends BaseElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    // Stops any in-flight loadMore/poll/auto-load-loop from touching state or firing further
+    // requests once this component is torn down - e.g. the group session getting invalidated
+    // mid-request (see api.js's disable()-on-401) used to leave a stray autoLoadWhileVisible loop
+    // running against a detached component with no group credentials, hammering the API with
+    // `/api/group/undefined/...` requests that looked like a stuck "Load more".
+    this.disposed = true;
     if (this.refreshInterval) window.clearInterval(this.refreshInterval);
     if (this.intersectionObserver) this.intersectionObserver.disconnect();
   }
@@ -122,6 +138,7 @@ export class ActivityFeedPage extends BaseElement {
     this.autoLoadRunLength = 0;
     const step = async () => {
       if (
+        this.disposed ||
         this.autoLoadPaused ||
         this.exhausted ||
         this.autoLoadRunLength >= AUTO_LOAD_HARD_CAP ||
@@ -132,6 +149,7 @@ export class ActivityFeedPage extends BaseElement {
       }
       this.autoLoadRunLength++;
       await this.loadMore();
+      if (this.disposed) return;
       requestAnimationFrame(step);
     };
     step();
@@ -257,10 +275,12 @@ export class ActivityFeedPage extends BaseElement {
   }
 
   async loadCounts() {
+    if (!api.groupName) return;
     const [typeCountEvents, memberCountEvents] = await Promise.all([
       api.getActivityEvents({ memberName: this.selectedMember, limit: COUNT_LIMIT }),
       api.getActivityEvents({ eventType: this.selectedType, limit: COUNT_LIMIT }),
     ]);
+    if (this.disposed) return;
     this.typeCountEvents = typeCountEvents;
     this.memberCountEvents = memberCountEvents;
     this.renderRail();
@@ -270,6 +290,9 @@ export class ActivityFeedPage extends BaseElement {
   async loadMore({ manual = false } = {}) {
     if (this.loadingMore || this.exhausted) return;
     if (this.autoLoadPaused && !manual) return;
+    // No group session to load against - e.g. it was invalidated mid-view (see disconnectedCallback).
+    // Bail out before touching any state so a stray call can't leave the sentinel/button stuck.
+    if (!api.groupName) return;
     if (manual) {
       this.autoLoadPaused = false;
       this.autoLoadStreak = 0;
@@ -288,6 +311,9 @@ export class ActivityFeedPage extends BaseElement {
       limit: PAGE_LIMIT,
     });
 
+    this.loadingMore = false;
+    if (this.disposed) return;
+
     for (const event of page) {
       this.loaded.push(event);
       const row = this.mergeOrCreateRow(event, { prepend: false });
@@ -300,7 +326,6 @@ export class ActivityFeedPage extends BaseElement {
     this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
     this.renderRail();
     this.renderMemberFilters();
-    this.loadingMore = false;
   }
 
   // Fetches the newest page and prepends whatever is newer than what's already loaded, leaving
@@ -308,7 +333,7 @@ export class ActivityFeedPage extends BaseElement {
   // much content height the prepend adds and offsetting scrollTop by the same amount, so a poll
   // firing while the user is scrolled down never yanks the viewport back to the top.
   async poll() {
-    if (this.loadingMore || !this.loaded.length) return;
+    if (this.loadingMore || !this.loaded.length || !api.groupName) return;
 
     const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
     const page = await api.getActivityEvents({
@@ -316,6 +341,7 @@ export class ActivityFeedPage extends BaseElement {
       eventType: this.selectedType,
       limit: PAGE_LIMIT,
     });
+    if (this.disposed) return;
     const incoming = page.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
     if (!incoming.length) return;
 
