@@ -4344,6 +4344,7 @@ pub async fn insert_activity_event_payload(
     event_type: &str,
     payload: serde_json::Value,
     client_event_id: Option<&str>,
+    occurred_at: Option<DateTime<Utc>>,
 ) -> Result<bool, ApiError> {
     // Precomputed so `list_activity_events`' `npc_slug = ANY(...)` notable-kill gate can run in
     // SQL instead of filtering rows after fetching them (see that function's doc comment).
@@ -4356,9 +4357,14 @@ pub async fn insert_activity_event_payload(
                 .map(slugify_npc_name)
         })
         .flatten();
+    // Falls back to insert time only when the plugin didn't send one (older builds, or event
+    // types that don't carry it) - a genuine `occurred_at` must win so a delayed/buffered event
+    // is stored under when it actually happened, not when it happened to reach the server (see
+    // `GameEvent::occurred_at`'s doc comment).
+    let occurred_at = occurred_at.unwrap_or_else(Utc::now);
     let stmt = client
         .prepare_cached(
-            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, payload, npc_slug, client_event_id) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (group_id, client_event_id) WHERE client_event_id IS NOT NULL DO NOTHING",
+            "INSERT INTO groupscape.activity_events (session_id, group_id, member_name, event_type, occurred_at, payload, npc_slug, client_event_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (group_id, client_event_id) WHERE client_event_id IS NOT NULL DO NOTHING",
         )
         .await?;
     let inserted = client
@@ -4369,6 +4375,7 @@ pub async fn insert_activity_event_payload(
                 &group_id,
                 &member_name,
                 &event_type,
+                &occurred_at,
                 &payload,
                 &npc_slug,
                 &client_event_id,
@@ -4546,6 +4553,7 @@ pub async fn insert_activity_event(
         event.event_type(),
         payload,
         event.event_id(),
+        event.occurred_at(),
     )
     .await
 }
@@ -4566,6 +4574,7 @@ pub async fn insert_progress_event(
         member_name,
         event.event_type,
         event.payload.clone(),
+        None,
         None,
     )
     .await?;

@@ -480,6 +480,7 @@ async fn test_out_of_scope_event_types_are_excluded_from_the_feed() {
             event_type,
             serde_json::json!({ "npcName": "Hans" }),
             None,
+            None,
         )
         .await
         .expect("insert should succeed");

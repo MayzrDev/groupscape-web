@@ -425,6 +425,20 @@ impl GameEvent {
             GameEvent::Raid(_) => None,
         }
     }
+
+    /// When the plugin captured this event, if it sent one. A resend of a buffered event (e.g.
+    /// after the client was offline or a connection drop delayed the upload) should be stored
+    /// under the moment it actually happened, not the moment it finally reached the server -
+    /// otherwise a batch of stale events flushed alongside fresh ones all land at "now" and can
+    /// wrongly appear to be one continuous farming session with events reported live.
+    pub fn occurred_at(&self) -> Option<DateTime<Utc>> {
+        match self {
+            GameEvent::Kill(kill) => kill.occurred_at,
+            GameEvent::Death(death) => death.occurred_at,
+            GameEvent::Loot(loot) => loot.occurred_at,
+            GameEvent::Raid(raid) => raid.occurred_at,
+        }
+    }
 }
 
 /// One NPC dialogue event, field names matching `InteractionEvents.onDialogue`'s transport
