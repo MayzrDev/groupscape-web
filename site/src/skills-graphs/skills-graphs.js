@@ -203,8 +203,10 @@ export class SkillsGraphs extends BaseElement {
   // the same way the old two independent generation counters did.
   triggerRefresh() {
     const generation = ++this.fetchGeneration;
-    this.fetchLeaderboard(generation);
-    this.subscribeOnce("get-group-data", () => this.createChart(generation));
+    this.subscribeOnce("get-group-data", () => {
+      this.fetchLeaderboard(generation);
+      this.createChart(generation);
+    });
   }
 
   async fetchLeaderboard(generation) {

@@ -2,6 +2,12 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.329] - 2026-09-02
+
+### Fixed
+- Fixed the Graphs tab sometimes showing the wrong group's leaderboard numbers by making sure it waits for your group's data to be ready before loading them.
+- Fixed the Activity Feed and Loot Log tabs sometimes going permanently stuck (no more loading, scrolling, or updates) after you'd navigated away from them once and come back.
+
 ## [1.0.299] - 2026-09-02
 
 ### Added

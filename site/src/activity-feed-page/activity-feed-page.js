@@ -56,6 +56,11 @@ export class ActivityFeedPage extends BaseElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // app-route reuses the same page instance across navigations (only constructs it once - see
+    // app-route.js's `enable()`), so disconnectedCallback's `disposed = true` would otherwise stick
+    // forever after the first time this page is navigated away from, silently no-op'ing every
+    // loadMore/loadCounts/poll call on every future visit.
+    this.disposed = false;
     this.render();
 
     this.rail = this.querySelector(".activity-feed-page__rail");
