@@ -4,14 +4,19 @@ import { utility } from "../utility";
 import { Item } from "../data/item";
 import { timeBounds, formatDuration, formatTimeRange } from "../data/time-range";
 
-const PAGE_LIMIT = 25;
+// Server clamps this to 100 (see get_loot_log's `query.limit.clamp(1, 100)`) - use the max so a
+// typical group's history resolves in as few round trips as possible, since every trip risks
+// landing mid-session and needing the GROUP_CLOSE_FETCH_CAP chase below.
+const PAGE_LIMIT = 100;
 const REFRESH_INTERVAL_MS = 15000;
 const SEARCH_DEBOUNCE_MS = 300;
 // Same reasoning as activity-feed-page.js's AUTO_LOAD_BURST_LIMIT - a search can scan page after
 // page of raw history without a single match (server-side scan cap notwithstanding), so bound how
 // many pages the sentinel auto-fetches before requiring a manual click, rather than trying to
 // detect "made no progress" (a near-miss search can also add a trickle of real matches per page).
-const AUTO_LOAD_BURST_LIMIT = 4;
+// Kept fairly high, unlike activity-feed's, since a real page here (see PAGE_LIMIT) already does
+// much more work per request - a burst of these covers a lot more history before pausing.
+const AUTO_LOAD_BURST_LIMIT = 10;
 // Unconditional backstop on the sentinel auto-load loop, independent of autoLoadPaused/exhausted -
 // guarantees the loop can never run away even if that state is ever wrong.
 const AUTO_LOAD_HARD_CAP = 20;
