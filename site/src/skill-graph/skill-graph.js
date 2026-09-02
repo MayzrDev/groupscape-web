@@ -555,7 +555,9 @@ export class SkillGraph extends BaseElement {
       const isGroupTotal = playerMetricData.name === RAID_GROUP_TOTAL_LABEL;
       const color = member ? `hsl(${member.hue}, 70%, 45%)` : isGroupTotal ? "hsl(32, 100%, 55%)" : "hsl(0, 0%, 60%)";
       const series = playerMetricData.metric_data || [];
-      const currentValue = series.length ? series[series.length - 1].value : 0;
+      // series is sorted newest-first (see the descending sort applied before
+      // `metricDataForGroup` is set) so the live/current value is the first entry, not the last.
+      const currentValue = series.length ? series[0].value : 0;
       const completeTimeSeries = this.generateCompleteTimeSeries(series, currentValue, (dataPoint) => dataPoint.value);
       const [totalData, changeData, cumulativeChangeData] = this.diffSeries(completeTimeSeries);
 

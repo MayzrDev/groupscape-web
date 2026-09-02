@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log's "load more" indicator no longer lingers forever near the bottom of a long history full of drop-less kills - it now gives up after a few empty attempts instead of implying there's always more to find.
 - Fixed a case where a very long, uninterrupted farming session in the Loot Log could keep quietly adding loot to a session card you'd already scrolled past, instead of that card staying as you first saw it.
 - Royal Titans kills and loot now show up in the Activity Feed - they were silently being filtered out.
+- Fixed the Boss KC graph on the Graphs tab showing a flat, wrong line instead of your group's actual kill counts.
 - Fixed Loot Log kill sessions sometimes wrongly merging an old, late-arriving batch of kills in with a fresh session, making the count and time range for that boss look wrong.
 - Royal Titans now has its boss icon everywhere it's shown, instead of a blank spot.
 - Eldric the Ice King and Branda the Fire Queen (the two Royal Titans) now show a boss icon in the Activity Feed and Loot Log instead of a blank spot.
