@@ -15,6 +15,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Health and prayer bars now stretch to fill the wider panel when you have the equipment tab open, instead of stopping short of the gear/stat columns.
 - The Set Bonuses dialog now groups sets into Active, Partial, and a collapsed "Other Sets" list instead of one flat list, and set names link out to their OSRS Wiki page.
 - Set Bonuses now tracks Shayzien armour (tier 5, full lizardman shaman poison reduction) and no longer lists Ferocious gloves, which was never a real set effect.
+- Set Bonuses now covers every skilling outfit (Graceful, Carpenter's, Farmer's, Pyromancer, Angler's, Prospector, Zealot's, Raiments of the Eye, Smiths', Rogue, Lumberjack) as well as Bloodbark and Swampbark armour, on top of the combat sets it already tracked.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.

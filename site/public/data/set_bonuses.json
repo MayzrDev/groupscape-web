@@ -1,12 +1,22 @@
 [
   {
     "name": "Void Knight Equipment",
-    "pieces": [[8842, 24182], [8839, 24177], [8840, 24179], [11665, 24185]],
+    "pieces": [
+      [8842, 24182],
+      [8839, 24177],
+      [8840, 24179],
+      [11665, 24185]
+    ],
     "effect": "+10% melee accuracy and damage while the full set (including a Void melee helm) is worn - swap in the Void ranger helm for the same 10% ranged bonus, or the Void mage helm for +45% magic accuracy only (no magic damage boost at base tier)."
   },
   {
     "name": "Elite Void Knight Equipment",
-    "pieces": [[13072, 24178], [13073, 24180], [8842, 24182], [11664, 24184]],
+    "pieces": [
+      [13072, 24178],
+      [13073, 24180],
+      [8842, 24182],
+      [11664, 24184]
+    ],
     "effect": "Upgrades the base Void bonus: with the Void ranger helm, ranged damage rises from 10% to 12.5%; with the Void mage helm, magic gains +5% damage on top of the existing 45% accuracy. No additional bonus over regular Void for the melee helm."
   },
   {
@@ -16,32 +26,62 @@
   },
   {
     "name": "Ahrim's Armour Set",
-    "pieces": [[4708, 4856, 4857, 4858, 4859], [4710, 4862, 4863, 4864, 4865], [4712, 4868, 4869, 4870, 4871], [4714, 4874, 4875, 4876, 4877]],
+    "pieces": [
+      [4708, 4856, 4857, 4858, 4859],
+      [4710, 4862, 4863, 4864, 4865],
+      [4712, 4868, 4869, 4870, 4871],
+      [4714, 4874, 4875, 4876, 4877]
+    ],
     "effect": "Successful magic attacks have a 25% chance to lower the target's Strength level by 5, while the full set (including the staff) is worn."
   },
   {
     "name": "Dharok's Armour Set",
-    "pieces": [[4716, 4880, 4881, 4882, 4883], [4718, 4886, 4887, 4888, 4889], [4720, 4892, 4893, 4894, 4895], [4722, 4898, 4899, 4900, 4901]],
+    "pieces": [
+      [4716, 4880, 4881, 4882, 4883],
+      [4718, 4886, 4887, 4888, 4889],
+      [4720, 4892, 4893, 4894, 4895],
+      [4722, 4898, 4899, 4900, 4901]
+    ],
     "effect": "The lower your remaining Hitpoints, the higher your melee damage - up to roughly double (about 98% extra) at 1 HP - while the full set (including the greataxe) is worn."
   },
   {
     "name": "Guthan's Armour Set",
-    "pieces": [[4724, 4904, 4905, 4906, 4907], [4726, 4910, 4911, 4912, 4913], [4728, 4916, 4917, 4918, 4919], [4730, 4922, 4923, 4924, 4925]],
+    "pieces": [
+      [4724, 4904, 4905, 4906, 4907],
+      [4726, 4910, 4911, 4912, 4913],
+      [4728, 4916, 4917, 4918, 4919],
+      [4730, 4922, 4923, 4924, 4925]
+    ],
     "effect": "Successful melee attacks have a 25% chance to heal you for the amount of damage dealt, while the full set (including the warspear) is worn."
   },
   {
     "name": "Karil's Armour Set",
-    "pieces": [[4732, 4928, 4929, 4930, 4931], [4734, 4934, 4935, 4936, 4937], [4736, 4940, 4941, 4942, 4943], [4738, 4946, 4947, 4948, 4949]],
+    "pieces": [
+      [4732, 4928, 4929, 4930, 4931],
+      [4734, 4934, 4935, 4936, 4937],
+      [4736, 4940, 4941, 4942, 4943],
+      [4738, 4946, 4947, 4948, 4949]
+    ],
     "effect": "Successful ranged attacks have a 25% chance to lower the target's Agility level by 20%, while the full set (including the crossbow) is worn."
   },
   {
     "name": "Torag's Armour Set",
-    "pieces": [[4745, 4952, 4953, 4954, 4955], [4747, 4958, 4959, 4960, 4961], [4749, 4964, 4965, 4966, 4967], [4751, 4970, 4971, 4972, 4973]],
+    "pieces": [
+      [4745, 4952, 4953, 4954, 4955],
+      [4747, 4958, 4959, 4960, 4961],
+      [4749, 4964, 4965, 4966, 4967],
+      [4751, 4970, 4971, 4972, 4973]
+    ],
     "effect": "Successful melee attacks have a 25% chance to lower the target's Run energy by 20%, while the full set (including the hammers) is worn."
   },
   {
     "name": "Verac's Armour Set",
-    "pieces": [[4753, 4976, 4977, 4978, 4979], [4755, 4982, 4983, 4984, 4985], [4757, 4988, 4989, 4990, 4991], [4759, 4994, 4995, 4996, 4997]],
+    "pieces": [
+      [4753, 4976, 4977, 4978, 4979],
+      [4755, 4982, 4983, 4984, 4985],
+      [4757, 4988, 4989, 4990, 4991],
+      [4759, 4994, 4995, 4996, 4997]
+    ],
     "effect": "Melee attacks have a 25% chance to ignore the target's Defence level and any active protection prayer, while the full set (including the flail) is worn."
   },
   {
@@ -75,8 +115,114 @@
     "effect": "Each piece gives +2% magic damage for standard spells (6% total); when casting Ancient Magicks combat spells, each piece instead gives +5% magic damage, for 15% total with the full set."
   },
   {
+    "name": "Graceful Outfit",
+    "pieces": [
+      [
+        11850, 11851, 13579, 13580, 13591, 13592, 13603, 13604, 13615, 13616, 13627, 13628, 13667, 13668, 21061, 21063,
+        24743, 24745, 25069, 25071, 27444, 27446, 30045, 30047
+      ],
+      [
+        11854, 11855, 13583, 13584, 13595, 13596, 13607, 13608, 13619, 13620, 13631, 13632, 13671, 13672, 21067, 21069,
+        24749, 24751, 25075, 25077, 27450, 27452, 30051, 30053
+      ],
+      [
+        11856, 11857, 13585, 13586, 13597, 13598, 13609, 13610, 13621, 13622, 13633, 13634, 13673, 13674, 21070, 21072,
+        24752, 24754, 25078, 25080, 27453, 27455, 30054, 30056
+      ],
+      [
+        11858, 11859, 13587, 13588, 13599, 13600, 13611, 13612, 13623, 13624, 13635, 13636, 13675, 13676, 21073, 21075,
+        24755, 24757, 25081, 25083, 27456, 27458, 30057, 30059
+      ],
+      [
+        11860, 11861, 13589, 13590, 13601, 13602, 13613, 13614, 13625, 13626, 13637, 13638, 13677, 13678, 21076, 21078,
+        24758, 24760, 25084, 25086, 27459, 27461, 30060, 30062
+      ],
+      [
+        11852, 11853, 13581, 13582, 13593, 13594, 13605, 13606, 13617, 13618, 13629, 13630, 13669, 13670, 21064, 21066,
+        24746, 24748, 25072, 25074, 27447, 27449, 30048, 30050
+      ]
+    ],
+    "effect": "Each piece boosts natural run energy restoration (+3-4%, 20% total for all six); wearing the full outfit (hood, top, legs, gloves, boots, cape) adds a further 10%, for 30% total. Any colourway works identically - only the graphics differ."
+  },
+  {
+    "name": "Carpenter's Outfit",
+    "pieces": [[24872], [24874], [24876], [24878]],
+    "effect": "+2.5% Construction experience while the full set is worn (0.4%/0.8%/0.6%/0.2% per piece, plus a 0.5% bonus for the complete set)."
+  },
+  {
+    "name": "Farmer's Outfit",
+    "pieces": [
+      [13646, 13647, 21253, 21254],
+      [13642, 13643],
+      [13640, 13641],
+      [13644, 13645]
+    ],
+    "effect": "+2.5% Farming experience while the full set is worn."
+  },
+  {
+    "name": "Pyromancer Outfit",
+    "pieces": [[20708], [20704], [20706], [20710]],
+    "effect": "+2.5% Firemaking experience while the full set is worn; also counts as warm clothing for the Wintertodt."
+  },
+  {
+    "name": "Angler's Outfit",
+    "pieces": [[13258], [13259], [13260], [13261]],
+    "effect": "+2.5% Fishing experience while the full set is worn."
+  },
+  {
+    "name": "Prospector Kit",
+    "pieces": [
+      [12013, 29472],
+      [12014, 29474],
+      [12015, 29476],
+      [12016, 29478]
+    ],
+    "effect": "+2.5% Mining experience while the full set is worn."
+  },
+  {
+    "name": "Zealot's Robes",
+    "pieces": [[25438], [25434], [25436], [25440]],
+    "effect": "1.25% chance per piece for a bone or ensouled head to not be consumed when sacrificed at an altar - 5% total with the full set worn."
+  },
+  {
+    "name": "Raiments of the Eye",
+    "pieces": [[26850, 26858, 26864, 26870], [26852, 26860, 26866, 26872], [26854, 26862, 26868, 26874], [26856]],
+    "effect": "Each piece grants +10% runes when Runecrafting; the full set adds a further +20%, for +60% total. Any colourway works identically."
+  },
+  {
+    "name": "Smiths' Uniform",
+    "pieces": [[27023], [27025], [27029, 27031], [27027]],
+    "effect": "Each piece gives a 20% chance to speed up an anvil Smithing action by 1 tick, up to 100% with the full set worn; also boosts Giants' Foundry experience per hour by roughly 20%."
+  },
+  {
+    "name": "Rogue Equipment",
+    "pieces": [[5554], [5553], [5556], [5555], [5557]],
+    "effect": "Guarantees double loot when pickpocketing while the full set is worn, except scroll boxes and coin pouches, which instead have a chance to grant a bonus coin pouch."
+  },
+  {
+    "name": "Lumberjack Outfit",
+    "pieces": [[10941], [10939], [10940], [10933]],
+    "effect": "+2.5% Woodcutting experience while the full set is worn."
+  },
+  {
+    "name": "Bloodbark Armour",
+    "pieces": [[25413], [25404], [25416], [25407], [25410]],
+    "effect": "Each piece increases how much blood spells heal by 2% of the damage dealt; the full set heals 35% of the damage dealt (higher still with the Ancient sceptre or Zuriel's staff wielded)."
+  },
+  {
+    "name": "Swampbark Armour",
+    "pieces": [[25398], [25389], [25401]],
+    "effect": "The helm, body, and legs each extend bind-type spell durations by 2 ticks; wearing all three adds 6 ticks (e.g. Bind goes from 8 to 14 ticks). Gauntlets and boots don't contribute to this bonus, so they aren't required for the full effect."
+  },
+  {
     "name": "Shayzien Armour",
-    "pieces": [[13379, 18577], [13381, 18579], [13380, 18578], [13377, 18575], [13378, 18576]],
+    "pieces": [
+      [13379, 18577],
+      [13381, 18579],
+      [13380, 18578],
+      [13377, 18575],
+      [13378, 18576]
+    ],
     "effect": "Reduces damage taken from lizardman shamans' poison attack by 100% while the full tier 5 set is worn (lower tiers grant 20% per tier)."
   },
   {
