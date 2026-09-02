@@ -92,9 +92,18 @@ export class ActivityFeedPage extends BaseElement {
     this.renderMemberFilters();
   }
 
+  // IntersectionObserver only calls back on a threshold crossing, not continuously while
+  // intersecting - if a page load doesn't move the sentinel, the observer would otherwise never
+  // fire again after the first auto-load. Force a fresh intersection check after each load by
+  // unobserving/reobserving, which always re-fires with the current state.
   handleSentinelIntersect(entries) {
     if (this.autoLoadPaused) return;
-    if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    this.loadMore().then(() => {
+      if (this.autoLoadPaused || this.exhausted) return;
+      this.intersectionObserver.unobserve(this.sentinel);
+      this.intersectionObserver.observe(this.sentinel);
+    });
   }
 
   // Best-effort counts, not true totals — there's no cheap way to get an exact total from a

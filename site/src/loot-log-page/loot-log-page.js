@@ -86,9 +86,19 @@ export class LootLogPage extends BaseElement {
     window.clearTimeout(this.searchDebounceTimer);
   }
 
+  // IntersectionObserver only calls back on a threshold crossing, not continuously while
+  // intersecting - a farming session collapses into one <loot-log-group> card, so loading another
+  // page doesn't move the sentinel and the observer would otherwise never fire again after the
+  // first auto-load. Force a fresh intersection check after each load by unobserving/reobserving,
+  // which always re-fires with the current state.
   handleSentinelIntersect(entries) {
     if (this.autoLoadPaused) return;
-    if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    this.loadMore().then(() => {
+      if (this.autoLoadPaused || this.exhausted) return;
+      this.intersectionObserver.unobserve(this.sentinel);
+      this.intersectionObserver.observe(this.sentinel);
+    });
   }
 
   startPlaceholderCycle() {
