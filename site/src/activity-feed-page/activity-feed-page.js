@@ -93,17 +93,34 @@ export class ActivityFeedPage extends BaseElement {
   }
 
   // IntersectionObserver only calls back on a threshold crossing, not continuously while
-  // intersecting - if a page load doesn't move the sentinel, the observer would otherwise never
-  // fire again after the first auto-load. Force a fresh intersection check after each load by
-  // unobserving/reobserving, which always re-fires with the current state.
+  // intersecting - if a page load doesn't move the sentinel, the observer never fires again.
+  // Relying on the observer's internal notification timing to drive every step of a loop proved
+  // flaky, so instead measure the sentinel's actual position directly and keep loading for as long
+  // as it's really still in view.
   handleSentinelIntersect(entries) {
     if (this.autoLoadPaused) return;
-    if (!entries.some((entry) => entry.isIntersecting)) return;
-    this.loadMore().then(() => {
-      if (this.autoLoadPaused || this.exhausted) return;
-      this.intersectionObserver.unobserve(this.sentinel);
-      this.intersectionObserver.observe(this.sentinel);
-    });
+    if (entries.some((entry) => entry.isIntersecting)) this.autoLoadWhileVisible();
+  }
+
+  isSentinelInView() {
+    const sentinelRect = this.sentinel.getBoundingClientRect();
+    const containerRect =
+      this.scrollContainer === document.documentElement
+        ? { top: 0, bottom: window.innerHeight }
+        : this.scrollContainer.getBoundingClientRect();
+    return sentinelRect.top < containerRect.bottom + 120 && sentinelRect.bottom > containerRect.top - 120;
+  }
+
+  async autoLoadWhileVisible() {
+    if (this.autoLoading) return;
+    this.autoLoading = true;
+    try {
+      while (!this.autoLoadPaused && !this.exhausted && this.isSentinelInView()) {
+        await this.loadMore();
+      }
+    } finally {
+      this.autoLoading = false;
+    }
   }
 
   // Best-effort counts, not true totals — there's no cheap way to get an exact total from a

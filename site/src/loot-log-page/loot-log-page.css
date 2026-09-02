@@ -95,7 +95,20 @@ loot-log-page {
 }
 
 .loot-log-page__list {
+  display: grid;
+  grid-template-columns: 1fr;
   margin-top: 4px;
+  container-type: inline-size;
+}
+
+/* Two session cards side by side once there's room for both fixed-width (532px) item
+   grids plus a gap - tied to the list's own rendered width via a container query rather
+   than the viewport, so it accounts for whatever sidebar width is actually on screen. */
+@container (min-width: 1120px) {
+  .loot-log-page__list {
+    grid-template-columns: 1fr 1fr;
+    column-gap: 24px;
+  }
 }
 
 .loot-log-page__sentinel {
