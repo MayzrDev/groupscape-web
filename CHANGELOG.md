@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Activity Feed collection log entries now show the item's own icon in front of its name, matching the "icon, item name, log book icon" order instead of stacking both icons after the name.
+- The "Boss kill" in-game chat notification no longer fires for every NPC kill (including slayer task mobs) - it's now limited to actual tracked bosses, matching what the setting says it does.
 
 ## [1.0.257] - 2026-09-01
 

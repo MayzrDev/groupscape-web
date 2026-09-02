@@ -612,9 +612,11 @@ pub async fn update_group_member(
                 // Kills are pushed straight to the group's connected overlays too, so other
                 // members' chat can react live - unlike vitals, this is worth a dedicated
                 // envelope rather than a value bag, and death is left off the wire since
-                // nothing consumes it yet.
+                // nothing consumes it yet. Restricted to bosses (matching the Discord kill
+                // notification's filter) since the plugin's "Boss kill" chat setting has no
+                // other way to tell a boss kill from an arbitrary slayer-task kill.
                 if let GameEvent::Kill(kill) = event {
-                    if broadcast_registry.has_subscribers(auth.group_id) {
+                    if drop_rates::is_boss(&kill.npc_name) && broadcast_registry.has_subscribers(auth.group_id) {
                         let envelope = WsEnvelope::KillEvent {
                             payload: KillEventPayload {
                                 member_name: group_member_inner.name.clone(),
