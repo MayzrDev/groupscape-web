@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.297] - 2026-09-02
+## [1.0.299] - 2026-09-02
 
 ### Fixed
 - Activity Feed collection log entries now show the item's own icon in front of its name, matching the "icon, item name, log book icon" order instead of stacking both icons after the name.
