@@ -50,7 +50,7 @@ export class SetBonusDialog extends BaseElement {
 
   renderThumb(set, className) {
     return set.image
-      ? `<div class="${className}"><img src="${set.image}" alt="" loading="lazy" /></div>`
+      ? `<a class="${className}" href="${set.wikiUrl}" target="_blank" rel="noopener"><img src="${set.image}" alt="" loading="lazy" /></a>`
       : `<div class="${className} ${className}--empty"></div>`;
   }
 

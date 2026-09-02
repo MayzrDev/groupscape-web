@@ -16,7 +16,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Set Bonuses dialog now groups sets into Active, Partial, and a collapsed "Other Sets" list instead of one flat list, and set names link out to their OSRS Wiki page.
 - Set Bonuses now tracks Shayzien armour (tier 5, full lizardman shaman poison reduction) and no longer lists Ferocious gloves, which was never a real set effect.
 - Set Bonuses now covers every skilling outfit (Graceful, Carpenter's, Farmer's, Pyromancer, Angler's, Prospector, Zealot's, Raiments of the Eye, Smiths', Rogue, Lumberjack) as well as Bloodbark and Swampbark armour, on top of the combat sets it already tracked.
-- Set Bonuses now shows each set's OSRS Wiki equipped-character image next to its entry, including all 6 Barrows sets.
+- Set Bonuses now shows each set's OSRS Wiki equipped-character image next to its entry, including all 6 Barrows sets - click a thumbnail to open that set's wiki page.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.
@@ -26,7 +26,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Fixed the collection log item icon rendering oversized instead of at the same 18px size as the log book icon next to it.
 - The "Boss kill" in-game chat notification no longer fires for every NPC kill (including slayer task mobs) - it's now limited to actual tracked bosses, matching what the setting says it does.
 - Set Bonuses now defaults "Other Sets" open when you have no active or partial sets, instead of hiding everything behind a collapsed accordion.
-- Set Bonuses is now scrollable again when its contents overflow the dialog.
+- Set Bonuses is now scrollable again when its contents overflow the dialog, including when the "Other Sets" list is long.
 
 ## [1.0.257] - 2026-09-01
 
