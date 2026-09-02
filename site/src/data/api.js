@@ -131,8 +131,12 @@ class Api {
     return `${this.groupScopeUrl}/get-activity-events`;
   }
 
-  get lootSummaryUrl() {
-    return `${this.groupScopeUrl}/get-loot-summary`;
+  get lootLogUrl() {
+    return `${this.groupScopeUrl}/get-loot-log`;
+  }
+
+  get lootLogSummaryUrl() {
+    return `${this.groupScopeUrl}/get-loot-log-summary`;
   }
 
   get itemBonusesUrl() {
@@ -556,23 +560,36 @@ class Api {
     return response.json();
   }
 
-  async getLootSummary({ memberName, sessionId, boss, clueTier, since, until, splitMode } = {}) {
+  async getLootLog({ before, limit, search, itemIds } = {}) {
     const query = new URLSearchParams();
-    if (memberName) query.set("member_name", memberName);
-    if (sessionId) query.set("session_id", sessionId);
-    if (boss) query.set("boss", boss);
-    if (clueTier) query.set("clue_tier", clueTier);
-    if (since) query.set("since", since);
-    if (until) query.set("until", until);
-    if (splitMode) query.set("split_mode", splitMode);
+    if (before) query.set("before", before);
+    if (limit) query.set("limit", limit);
+    if (search) query.set("search", search);
+    if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
 
-    const response = await fetch(`${this.lootSummaryUrl}?${query.toString()}`, {
+    const response = await fetch(`${this.lootLogUrl}?${query.toString()}`, {
       headers: {
         Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
-      return { rows: [], sources: [] };
+      return { events: [], next_before: null, scan_exhausted: true };
+    }
+    return response.json();
+  }
+
+  async getLootLogSummary({ search, itemIds } = {}) {
+    const query = new URLSearchParams();
+    if (search) query.set("search", search);
+    if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
+
+    const response = await fetch(`${this.lootLogSummaryUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.authHeader,
+      },
+    });
+    if (!response.ok) {
+      return { total_value: 0, event_count: 0 };
     }
     return response.json();
   }

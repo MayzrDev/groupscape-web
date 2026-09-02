@@ -4,8 +4,16 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.299] - 2026-09-02
 
+### Added
+- Loot Log now has a single search box that finds drops by player, monster, item name, item value, quantity, or even monster combat level - try things like ">1m", "<500k", or a boss name. It loads more results automatically as you scroll instead of being limited to a fixed time window.
+
 ### Changed
 - Loot Log entries older than 28 days are now automatically cleared out to keep things tidy.
+- Loot Log now groups drops into farming sessions per player (kills within 45 minutes of each other), showing when each session started and ended, instead of lumping a boss's entire history into one block.
+- Searching the Loot Log highlights the matching item in a session and fades the rest, making it easy to spot what you searched for.
+
+### Removed
+- Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.
 
 ### Fixed
 - Activity Feed collection log entries now show the item's own icon in front of its name, matching the "icon, item name, log book icon" order instead of stacking both icons after the name.

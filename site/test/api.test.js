@@ -36,7 +36,8 @@ describe("api", () => {
     expect(api.canKickMembersUrl).toContain("/group/iron-team/can-kick-members");
     expect(api.myPermissionsUrl).toContain("/group/iron-team/get-my-permissions");
     expect(api.activityEventsUrl).toContain("/group/iron-team/get-activity-events");
-    expect(api.lootSummaryUrl).toContain("/group/iron-team/get-loot-summary");
+    expect(api.lootLogUrl).toContain("/group/iron-team/get-loot-log");
+    expect(api.lootLogSummaryUrl).toContain("/group/iron-team/get-loot-log-summary");
     expect(api.leaderboardUrl).toContain("/group/iron-team/get-leaderboard");
   });
 
@@ -128,27 +129,51 @@ describe("api", () => {
     expect(url).not.toContain("boss=");
   });
 
-  it("getLootSummary builds the query string from provided filters and returns the parsed result", async () => {
+  it("getLootLog builds the query string from provided filters and returns the parsed page", async () => {
     api.setCredentials("iron-team", "secret-token");
 
-    const summary = { rows: [{ item_id: 995, rarity: "rare" }], sources: [] };
-    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(summary) });
+    const page = { events: [{ member_name: "Zezima", source_name: "Vorkath" }], next_before: null, scan_exhausted: true };
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(page) });
 
-    const result = await api.getLootSummary({ memberName: "Zezima", clueTier: "master" });
+    const result = await api.getLootLog({ before: "2026-01-01T00:00:00Z", limit: 25, search: "vorkath", itemIds: [995, 11286] });
 
-    expect(result).toEqual(summary);
+    expect(result).toEqual(page);
     const [url, options] = globalThis.fetch.mock.calls[0];
-    expect(url).toContain("/group/iron-team/get-loot-summary?");
-    expect(url).toContain("member_name=Zezima");
-    expect(url).toContain("clue_tier=master");
+    expect(url).toContain("/group/iron-team/get-loot-log?");
+    expect(url).toContain("before=2026-01-01T00%3A00%3A00Z");
+    expect(url).toContain("limit=25");
+    expect(url).toContain("search=vorkath");
+    expect(url).toContain("item_ids=995%2C11286");
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
   });
 
-  it("getLootSummary returns an empty result when the request fails", async () => {
+  it("getLootLog returns an empty exhausted page when the request fails", async () => {
     api.setCredentials("iron-team", "secret-token");
     globalThis.fetch.mockResolvedValueOnce({ ok: false });
 
-    expect(await api.getLootSummary()).toEqual({ rows: [], sources: [] });
+    expect(await api.getLootLog()).toEqual({ events: [], next_before: null, scan_exhausted: true });
+  });
+
+  it("getLootLogSummary builds the query string from provided filters and returns the parsed totals", async () => {
+    api.setCredentials("iron-team", "secret-token");
+
+    const summary = { total_value: 1000000, event_count: 12 };
+    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(summary) });
+
+    const result = await api.getLootLogSummary({ search: "zulrah" });
+
+    expect(result).toEqual(summary);
+    const [url, options] = globalThis.fetch.mock.calls[0];
+    expect(url).toContain("/group/iron-team/get-loot-log-summary?");
+    expect(url).toContain("search=zulrah");
+    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
+  });
+
+  it("getLootLogSummary returns zeroed totals when the request fails", async () => {
+    api.setCredentials("iron-team", "secret-token");
+    globalThis.fetch.mockResolvedValueOnce({ ok: false });
+
+    expect(await api.getLootLogSummary()).toEqual({ total_value: 0, event_count: 0 });
   });
 
   it("getActivityEvents builds the query string from provided filters and returns the parsed events", async () => {

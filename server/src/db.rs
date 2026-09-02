@@ -4710,16 +4710,16 @@ LIMIT 5000
     rows.iter().map(activity_event_from_row).collect()
 }
 
-/// All `kill` and `loot` (chest/clue) events for a group in an optional `[since, until]` range -
-/// the loot summary/split endpoints' source, unlike [`list_kill_events`] (still kill-only, used
-/// by the boss-KC leaderboard where a chest/clue has no "kill" concept).
-pub async fn list_loot_and_kill_events(
+/// One page of raw `kill`/`loot` activity events, newest-first, cursor-paginated on `before` -
+/// the Loot Log's source. Unlike the deleted `list_loot_and_kill_events` (which returned an
+/// unbounded batch for query-time pre-aggregation), this returns one row per event so the caller
+/// can derive 45-minute farming-session entries from real per-event timestamps and page through
+/// arbitrarily long history instead of hitting a hard 5000-row ceiling.
+pub async fn list_loot_and_kill_events_page(
     client: &Client,
     group_id: i64,
-    member_name: Option<&str>,
-    session_id: Option<i64>,
-    since: Option<DateTime<Utc>>,
-    until: Option<DateTime<Utc>>,
+    before: Option<DateTime<Utc>>,
+    limit: i64,
 ) -> Result<Vec<ActivityEvent>, ApiError> {
     let stmt = client
         .prepare_cached(
@@ -4728,17 +4728,14 @@ SELECT event_id, session_id, member_name, event_type, occurred_at, payload
 FROM groupscape.activity_events
 WHERE group_id=$1
   AND event_type IN ('kill', 'loot')
-  AND ($2::text IS NULL OR member_name = $2)
-    AND ($3::bigint IS NULL OR session_id = $3)
-    AND ($4::timestamptz IS NULL OR occurred_at >= $4)
-    AND ($5::timestamptz IS NULL OR occurred_at <= $5)
+  AND ($2::timestamptz IS NULL OR occurred_at < $2)
 ORDER BY occurred_at DESC
-LIMIT 5000
+LIMIT $3
 "#,
         )
         .await?;
     let rows = client
-        .query(&stmt, &[&group_id, &member_name, &session_id, &since, &until])
+        .query(&stmt, &[&group_id, &before, &limit.clamp(1, 1000)])
         .await
         .map_err(ApiError::ListKillEventsError)?;
     rows.iter().map(activity_event_from_row).collect()

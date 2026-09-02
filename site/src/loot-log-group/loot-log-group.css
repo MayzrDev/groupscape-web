@@ -47,8 +47,16 @@ loot-log-group[data-source="clue"] .loot-log-group__source-dot {
 }
 
 .loot-log-group__name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   font-size: 0.95em;
+}
+
+.loot-log-group__name player-icon img {
+  width: 12px;
+  height: 15px;
 }
 
 .loot-log-group__meta {

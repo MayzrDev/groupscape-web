@@ -19,6 +19,7 @@ pub mod error;
 pub mod item_bonuses;
 pub mod item_names;
 pub mod leaderboard;
+pub mod loot_log_search;
 pub mod loot_sources;
 pub mod models;
 pub mod notable_npcs;

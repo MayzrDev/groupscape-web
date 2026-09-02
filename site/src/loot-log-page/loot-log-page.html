@@ -1,32 +1,13 @@
 <div class="rsborder rsbackground loot-log-page__container">
   <div class="loot-log-page__summary"></div>
-  <div class="loot-log-page__toolbar-primary">
-    <div class="loot-log-page__field">
-      <label class="loot-log-page__field-label">Window</label>
-      <select class="loot-log-page__time-select">
-        <option value="30m">Last 30 minutes</option>
-        <option value="1h">Last hour</option>
-        <option value="2h">Last 2 hours</option>
-        <option value="4h">Last 4 hours</option>
-        <option value="12h">Last 12 hours</option>
-        <option value="1d" selected>Last 24h</option>
-        <option value="7d">Last 7 days</option>
-        <option value="30d">Last 30 days</option>
-        <option value="all">All retained history</option>
-        <option value="custom">Custom dates</option>
-      </select>
-    </div>
-    <input class="loot-log-page__custom-since" type="date" hidden>
-    <input class="loot-log-page__custom-until" type="date" hidden>
-    <div class="loot-log-page__field">
-      <label class="loot-log-page__field-label">Source</label>
-      <select class="loot-log-page__boss-select"><option value="">All sources</option></select>
-    </div>
-    <div class="loot-log-page__field">
-      <label class="loot-log-page__field-label">Member</label>
-      <select class="loot-log-page__member-select"></select>
-    </div>
+  <div class="loot-log-page__search-wrap">
+    <input class="loot-log-page__search" type="text" autocomplete="off" spellcheck="false" />
+    <span class="loot-log-page__search-placeholder"></span>
   </div>
   <div class="loot-log-page__list"></div>
+  <div class="loot-log-page__sentinel">
+    <span class="loot-log-page__spinner"></span>
+    <button type="button" class="loot-log-page__load-more">Load more</button>
+  </div>
   <p class="loot-log-page__empty">No loot yet — kills, chest openings, and clue caskets will show up here.</p>
 </div>

@@ -8,13 +8,13 @@ use crate::drop_rates;
 use crate::error::ApiError;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
+use crate::loot_log_search::{combat_level, numeric_clause_matches, parse_numeric_clause};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
-    GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem,
-    LootSourceCount, LootSummaryResult, LootSummaryRow, MyPermissions, PermissionFlags,
-    PermissionKey, RenameGroup,
-    UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
+    GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem, LootLogEvent,
+    LootLogItem, LootLogPage, LootLogSummary, MyPermissions, PermissionFlags, PermissionKey,
+    RenameGroup, UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
@@ -1083,33 +1083,14 @@ pub async fn get_sessions(
     Ok(web::Json(sessions))
 }
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct GetLootSummaryQuery {
-    #[serde(default)]
-    pub member_name: Option<String>,
-    #[serde(default)]
-    pub session_id: Option<i64>,
-    #[serde(default)]
-    pub boss: Option<String>,
-    #[serde(default)]
-    pub clue_tier: Option<String>,
-    #[serde(default)]
-    pub since: Option<DateTime<Utc>>,
-    #[serde(default)]
-    pub until: Option<DateTime<Utc>>,
-    #[serde(default)]
-    pub split_mode: Option<String>,
-}
-/// One normalized (source_name, source_type, clue_tier, loot, participants) view over either a
-/// `GameEvent::Kill` or `GameEvent::Loot` payload, so the summary/split endpoints below don't
-/// need parallel match arms for every field they read.
+/// One normalized (source_name, source_type, clue_tier, loot) view over either a
+/// `GameEvent::Kill` or `GameEvent::Loot` payload, so the loot log endpoints below don't need
+/// parallel match arms for every field they read.
 struct LootSourceEvent {
     source_name: String,
     source_type: &'static str,
     clue_tier: Option<String>,
     loot: Vec<LootItem>,
-    participants: Option<Vec<String>>,
 }
 /// Synthetic NPC names that have shown up in real kill/loot data from manual plugin testing -
 /// never a real drop, so they're filtered out of the Loot Log rather than needing a DB cleanup
@@ -1129,7 +1110,6 @@ fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
             source_type: "kill",
             clue_tier: None,
             loot: kill.loot.clone().unwrap_or_default(),
-            participants: kill.participants.clone(),
         }),
         GameEvent::Loot(loot_event) => Some(LootSourceEvent {
             source_name: loot_event.source_name.clone(),
@@ -1139,139 +1119,292 @@ fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
             },
             clue_tier: loot_event.clue_tier.clone(),
             loot: loot_event.loot.clone(),
-            participants: None,
         }),
         GameEvent::Death(_) => None,
         // Raid completions are stored under `event_type = "raid"`, excluded from
-        // `list_loot_and_kill_events`'s `event_type IN ('kill', 'loot')` filter entirely, and use
-        // a payload shape (`RaidCompletionPayload`) this enum doesn't even model - this arm only
-        // exists to keep the match exhaustive.
+        // `list_loot_and_kill_events_page`'s `event_type IN ('kill', 'loot')` filter entirely, and
+        // use a payload shape (`RaidCompletionPayload`) this enum doesn't even model - this arm
+        // only exists to keep the match exhaustive.
         GameEvent::Raid(_) => None,
     }
 }
-/// Query-time pivot over `kill`/`loot` activity events into per-(member, source, item) rows,
-/// joining GE value (in-process price cache, no live wiki refetch) and rarity/uniqueness
-/// (curated `drop_rates` table, skipped for clue sources - see `LootSourceEvent`) at read time -
-/// mirrors `groupscape-old`'s `GET /loot-summary`, adapted to this server's flat source name (no
-/// `contentKey` slug exists here).
-pub async fn get_loot_summary(
-    auth: Authenticated,
-    db_pool: web::Data<Pool>,
-    query: web::Query<GetLootSummaryQuery>,
-) -> Result<web::Json<LootSummaryResult>, Error> {
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    let events = db::list_loot_and_kill_events(
-        &client,
-        auth.group_id,
-        query.member_name.as_deref(),
-        query.session_id,
-        query.since,
-        query.until,
-    )
-    .await?;
-    let ge_prices = get_ge_prices_map();
+fn parse_item_ids(raw: Option<&str>) -> std::collections::HashSet<i32> {
+    raw.unwrap_or("")
+        .split(',')
+        .filter_map(|part| part.trim().parse::<i32>().ok())
+        .collect()
+}
 
-    let mut rows: HashMap<(String, String, i32), LootSummaryRow> = HashMap::new();
-    // Keyed the same way the frontend groups rows for display (source_name + source_type +
-    // clue_tier) - counted once per underlying event, unlike `rows` which is deduped per item.
-    let mut source_counts: HashMap<(String, String, Option<String>), i64> = HashMap::new();
-    for event in &events {
-        let Ok(parsed) = serde_json::from_value::<GameEvent>(event.payload.clone()) else {
-            continue;
-        };
-        let Some(source) = as_loot_source_event(&parsed) else {
-            continue;
-        };
-        if is_diagnostic_source(&source.source_name) {
-            continue;
-        }
-        // Counted before the boss/clue_tier filters below, so `sources` reflects every source
-        // present in the date/member/session scope regardless of which source is selected -
-        // that's what populates the Source dropdown, which shouldn't collapse to one option
-        // once a source is picked.
-        *source_counts
-            .entry((
-                source.source_name.clone(),
-                source.source_type.to_string(),
-                source.clue_tier.clone(),
-            ))
-            .or_insert(0) += 1;
-        if let Some(boss) = query.boss.as_deref() {
-            if drop_rates::slugify_npc_name(&source.source_name) != boss {
-                continue;
-            }
-        }
-        if let Some(tier) = query.clue_tier.as_deref() {
-            if source.clue_tier.as_deref() != Some(tier) {
-                continue;
-            }
-        }
-        for item in &source.loot {
-            let participants = source
-                .participants
-                .clone()
-                .unwrap_or_else(|| vec![event.member_name.clone()]);
-            let participant_count = participants.len().max(1) as i64;
-            let names: Vec<String> = match query.split_mode.as_deref() {
-                Some("proximity") | Some("personal") => participants.clone(),
-                _ => vec![event.member_name.clone()],
-            };
-            for member_name in names {
-                let key = (member_name.clone(), source.source_name.clone(), item.item_id);
-                let unit_value = ge_prices.get(&item.item_id).copied();
-                let drop = (source.clue_tier.is_none())
-                    .then(|| drop_rates::lookup(&source.source_name, item.item_id))
-                    .flatten();
-                // `events` is already ordered newest-first (see list_loot_and_kill_events), so
-                // the first time a (member, source, item) key is seen is its most recent
-                // occurrence - that's what the row's occurred_at should reflect for sorting.
-                let row = rows.entry(key).or_insert_with(|| LootSummaryRow {
-                    member_name,
-                    source_name: source.source_name.clone(),
-                    source_type: source.source_type.to_string(),
-                    clue_tier: source.clue_tier.clone(),
-                    item_id: item.item_id,
-                    item_name: drop.map(|d| d.name.clone()),
-                    quantity: 0,
-                    unit_value,
-                    total_value: 0,
-                    rarity: drop.map(|d| d.rarity.clone()),
-                    is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
-                    drop_rate: drop.and_then(|d| d.rate.clone()),
-                    occurred_at: event.occurred_at,
-                });
-                row.quantity += item.quantity;
-                let item_value = unit_value.unwrap_or(0) * item.quantity as i64;
-                row.total_value += if query.split_mode.as_deref() == Some("proximity") {
-                    item_value / participant_count
-                } else {
-                    item_value
-                };
-            }
+/// Builds one `LootLogEvent` from a normalized loot source, applying the search grammar (see
+/// `loot_log_search`) when `search_active`. Returns `None` when a search is active and this event
+/// matches none of it. Item-level `matched` flags are only set (`Some(_)`) when the match came
+/// from at least one item individually satisfying a value/quantity/id clause - if the event only
+/// matched via member/source-name substring or the monster-level clause, every item is left
+/// un-dimmed (`Some(true)`), since none of them individually "matched" anything.
+fn build_matching_loot_log_event(
+    source: &LootSourceEvent,
+    member_name: &str,
+    occurred_at: DateTime<Utc>,
+    ge_prices: &crate::models::GEPrices,
+    tokens: &[&str],
+    item_ids: &std::collections::HashSet<i32>,
+    search_active: bool,
+) -> Option<LootLogEvent> {
+    let mut items: Vec<LootLogItem> = Vec::with_capacity(source.loot.len());
+    for item in &source.loot {
+        let unit_value = ge_prices.get(&item.item_id).copied();
+        let total_value = unit_value.unwrap_or(0) * item.quantity as i64;
+        let drop = (source.clue_tier.is_none())
+            .then(|| drop_rates::lookup(&source.source_name, item.item_id))
+            .flatten();
+        items.push(LootLogItem {
+            item_id: item.item_id,
+            item_name: drop.map(|d| d.name.clone()),
+            quantity: item.quantity,
+            unit_value,
+            total_value,
+            rarity: drop.map(|d| d.rarity.clone()),
+            is_unique: drop.map(|d| d.is_unique).unwrap_or(false),
+            drop_rate: drop.and_then(|d| d.rate.clone()),
+            matched: None,
+        });
+    }
+
+    if !search_active {
+        return Some(LootLogEvent {
+            member_name: member_name.to_string(),
+            occurred_at,
+            source_name: source.source_name.clone(),
+            source_type: source.source_type.to_string(),
+            clue_tier: source.clue_tier.clone(),
+            items,
+        });
+    }
+
+    let numeric_clauses: Vec<_> = tokens.iter().filter_map(|t| parse_numeric_clause(t)).collect();
+    let text_tokens: Vec<String> = tokens
+        .iter()
+        .filter(|t| parse_numeric_clause(t).is_none())
+        .map(|t| t.to_lowercase())
+        .collect();
+
+    let member_lower = member_name.to_lowercase();
+    let source_lower = source.source_name.to_lowercase();
+    let mut context_matched = text_tokens
+        .iter()
+        .any(|t| member_lower.contains(t.as_str()) || source_lower.contains(t.as_str()));
+    if !context_matched {
+        if let Some(level) = combat_level(&source.source_name) {
+            context_matched = numeric_clauses
+                .iter()
+                .any(|clause| numeric_clause_matches(clause, level as i64));
         }
     }
 
-    let mut result: Vec<LootSummaryRow> = rows.into_values().collect();
-    // `rows` is a HashMap, so its iteration order (and thus the input to this sort) is randomized
-    // per request - two rows sharing an `occurred_at` (same kill event) would otherwise flip
-    // order on every refresh. item_id as a tiebreaker keeps that deterministic.
-    result.sort_by(|a, b| b.occurred_at.cmp(&a.occurred_at).then(a.item_id.cmp(&b.item_id)));
+    let mut any_item_level_matched = false;
+    for item in &mut items {
+        let id_match = item_ids.contains(&item.item_id);
+        let value_match = numeric_clauses.iter().any(|clause| {
+            numeric_clause_matches(clause, item.total_value)
+                || item
+                    .unit_value
+                    .map(|v| numeric_clause_matches(clause, v))
+                    .unwrap_or(false)
+                || numeric_clause_matches(clause, item.quantity as i64)
+        });
+        let item_matched = id_match || value_match;
+        if item_matched {
+            any_item_level_matched = true;
+        }
+        item.matched = Some(item_matched);
+    }
 
-    let sources = source_counts
-        .into_iter()
-        .map(
-            |((source_name, source_type, clue_tier), event_count)| LootSourceCount {
-                source_name,
-                source_type,
-                clue_tier,
-                event_count,
-            },
-        )
-        .collect();
+    if !(context_matched || any_item_level_matched) {
+        return None;
+    }
+    if !any_item_level_matched {
+        for item in &mut items {
+            item.matched = Some(true);
+        }
+    }
 
-    Ok(web::Json(LootSummaryResult {
-        rows: result,
-        sources,
+    Some(LootLogEvent {
+        member_name: member_name.to_string(),
+        occurred_at,
+        source_name: source.source_name.clone(),
+        source_type: source.source_type.to_string(),
+        clue_tier: source.clue_tier.clone(),
+        items,
+    })
+}
+
+fn default_loot_log_limit() -> i64 {
+    25
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetLootLogQuery {
+    #[serde(default)]
+    pub before: Option<DateTime<Utc>>,
+    #[serde(default = "default_loot_log_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub item_ids: Option<String>,
+}
+
+// Prevents a search that matches almost nothing in a huge history from doing unbounded work in
+// one request - the client just resumes from `next_before` on its next page request instead.
+const LOOT_LOG_SCAN_CAP: i64 = 5000;
+const LOOT_LOG_BATCH_SIZE: i64 = 200;
+
+/// Paginated, newest-first, one-row-per-raw-event loot log. Unlike the deleted `get_loot_summary`
+/// (which pre-aggregated into one row per (member, source, item) across the whole unbounded
+/// scope), this returns each underlying `kill`/`loot` event individually so the client can derive
+/// 45-minute farming-session entries from real per-event timestamps - aggregating first would
+/// make both the session grouping and the pagination cursor meaningless.
+pub async fn get_loot_log(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetLootLogQuery>,
+) -> Result<web::Json<LootLogPage>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let limit = query.limit.clamp(1, 100);
+    let item_ids = parse_item_ids(query.item_ids.as_deref());
+    let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
+    let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let ge_prices = get_ge_prices_map();
+
+    let mut events: Vec<LootLogEvent> = Vec::new();
+    let mut cursor = query.before;
+    let mut scanned: i64 = 0;
+    let mut scan_exhausted = false;
+    let mut next_before = cursor;
+
+    loop {
+        let batch = db::list_loot_and_kill_events_page(&client, auth.group_id, cursor, LOOT_LOG_BATCH_SIZE).await?;
+        if batch.is_empty() {
+            scan_exhausted = true;
+            break;
+        }
+        let batch_len = batch.len() as i64;
+        for row in &batch {
+            scanned += 1;
+            next_before = Some(row.occurred_at);
+            let Ok(parsed) = serde_json::from_value::<GameEvent>(row.payload.clone()) else {
+                continue;
+            };
+            let Some(source) = as_loot_source_event(&parsed) else {
+                continue;
+            };
+            if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+                continue;
+            }
+            if let Some(log_event) = build_matching_loot_log_event(
+                &source,
+                &row.member_name,
+                row.occurred_at,
+                &ge_prices,
+                &tokens,
+                &item_ids,
+                search_active,
+            ) {
+                events.push(log_event);
+                if events.len() as i64 >= limit {
+                    break;
+                }
+            }
+            if scanned >= LOOT_LOG_SCAN_CAP {
+                break;
+            }
+        }
+        if events.len() as i64 >= limit || scanned >= LOOT_LOG_SCAN_CAP {
+            break;
+        }
+        if batch_len < LOOT_LOG_BATCH_SIZE {
+            scan_exhausted = true;
+            break;
+        }
+        cursor = next_before;
+    }
+
+    Ok(web::Json(LootLogPage {
+        events,
+        next_before: if scan_exhausted { None } else { next_before },
+        scan_exhausted,
+    }))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetLootLogSummaryQuery {
+    #[serde(default)]
+    pub search: Option<String>,
+    #[serde(default)]
+    pub item_ids: Option<String>,
+}
+
+const LOOT_LOG_SUMMARY_BATCH_SIZE: i64 = 500;
+
+/// All-time (or all-matching-search) totals for the loot log's summary bar - a full unbounded
+/// scan of the group's history, applying the same search filter as `get_loot_log` so an empty
+/// search matches its all-time totals and a search narrows both consistently. Intentionally
+/// unbounded (unlike `get_loot_log`'s scan cap): this only accumulates two numbers rather than
+/// building/serializing full row objects, so the cost stays acceptable even over a long history.
+pub async fn get_loot_log_summary(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetLootLogSummaryQuery>,
+) -> Result<web::Json<LootLogSummary>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let item_ids = parse_item_ids(query.item_ids.as_deref());
+    let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
+    let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let ge_prices = get_ge_prices_map();
+
+    let mut total_value: i64 = 0;
+    let mut event_count: i64 = 0;
+    let mut cursor: Option<DateTime<Utc>> = None;
+    loop {
+        let batch =
+            db::list_loot_and_kill_events_page(&client, auth.group_id, cursor, LOOT_LOG_SUMMARY_BATCH_SIZE).await?;
+        if batch.is_empty() {
+            break;
+        }
+        let batch_len = batch.len();
+        for row in &batch {
+            let Ok(parsed) = serde_json::from_value::<GameEvent>(row.payload.clone()) else {
+                continue;
+            };
+            let Some(source) = as_loot_source_event(&parsed) else {
+                continue;
+            };
+            if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+                continue;
+            }
+            if let Some(log_event) = build_matching_loot_log_event(
+                &source,
+                &row.member_name,
+                row.occurred_at,
+                &ge_prices,
+                &tokens,
+                &item_ids,
+                search_active,
+            ) {
+                event_count += 1;
+                total_value += log_event.items.iter().map(|item| item.total_value).sum::<i64>();
+            }
+        }
+        if batch_len < LOOT_LOG_SUMMARY_BATCH_SIZE as usize {
+            break;
+        }
+        cursor = Some(batch.last().unwrap().occurred_at);
+    }
+
+    Ok(web::Json(LootLogSummary {
+        total_value,
+        event_count,
     }))
 }
 

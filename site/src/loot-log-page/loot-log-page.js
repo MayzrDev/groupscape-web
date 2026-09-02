@@ -1,21 +1,41 @@
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
-import { pubsub } from "../data/pubsub";
 import { utility } from "../utility";
-import { slugifyNpcName } from "../data/npc-slug";
+import { Item } from "../data/item";
 import { timeBounds, formatDuration, formatTimeRange } from "../data/time-range";
 
+const PAGE_LIMIT = 25;
 const REFRESH_INTERVAL_MS = 15000;
+const SEARCH_DEBOUNCE_MS = 300;
+// Same reasoning as activity-feed-page.js's AUTO_LOAD_BURST_LIMIT - a search can scan page after
+// page of raw history without a single match (server-side scan cap notwithstanding), so bound how
+// many pages the sentinel auto-fetches before requiring a manual click, rather than trying to
+// detect "made no progress" (a near-miss search can also add a trickle of real matches per page).
+const AUTO_LOAD_BURST_LIMIT = 4;
+// Consecutive same-member/source/type events with a gap under this are one farming session -
+// see the locked Loot Log design doc's "45-minute rolling window" rule.
+const SESSION_MERGE_WINDOW_MS = 45 * 60 * 1000;
+const MAX_RESOLVED_ITEM_IDS = 200;
+const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k"];
+const PLACEHOLDER_INTERVAL_MS = 2500;
+const PLACEHOLDER_FADE_MS = 400;
 
 export class LootLogPage extends BaseElement {
   constructor() {
     super();
-    this.rows = [];
-    this.sources = [];
-    this.members = [];
-    this.selectedMember = "";
-    this.selectedBoss = "";
-    this.timeWindow = "1h";
+    this.loaded = [];
+    this.nextBefore = undefined;
+    this.exhausted = false;
+    this.loadingMore = false;
+    this.autoLoadStreak = 0;
+    this.autoLoadPaused = false;
+    this.searchText = "";
+    this.itemIds = [];
+    this.summary = { total_value: 0, event_count: 0 };
+    // key (member+source+type+clueTier, see `entryKey`) -> { key, events, element } for the
+    // farming-session entry currently shown for that key, so an event within the 45-minute
+    // window extends it instead of adding a new entry.
+    this.entryGroups = new Map();
   }
 
   html() {
@@ -27,139 +47,250 @@ export class LootLogPage extends BaseElement {
     this.render();
 
     this.summaryContainer = this.querySelector(".loot-log-page__summary");
-    this.timeSelect = this.querySelector(".loot-log-page__time-select");
-    this.customSince = this.querySelector(".loot-log-page__custom-since");
-    this.customUntil = this.querySelector(".loot-log-page__custom-until");
-    this.bossSelect = this.querySelector(".loot-log-page__boss-select");
-    this.memberSelect = this.querySelector(".loot-log-page__member-select");
+    this.searchInput = this.querySelector(".loot-log-page__search");
+    this.placeholderLabel = this.querySelector(".loot-log-page__search-placeholder");
     this.list = this.querySelector(".loot-log-page__list");
+    this.sentinel = this.querySelector(".loot-log-page__sentinel");
     this.empty = this.querySelector(".loot-log-page__empty");
+    this.loadMoreButton = this.querySelector(".loot-log-page__load-more");
+    this.scrollContainer = this.closest(".authed-section__main-content") || document.documentElement;
 
-    this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
-    const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
-    if (mostRecentMembers) {
-      this.handleUpdatedMembers(mostRecentMembers);
-    }
-
-    this.eventListener(this.memberSelect, "change", () => {
-      this.selectedMember = this.memberSelect.value;
-      this.fetchLoot();
+    this.eventListener(this.loadMoreButton, "click", () => this.loadMore({ manual: true }));
+    this.eventListener(this.searchInput, "input", () => {
+      this.stopPlaceholderCycle();
+      window.clearTimeout(this.searchDebounceTimer);
+      this.searchDebounceTimer = window.setTimeout(() => this.applySearch(), SEARCH_DEBOUNCE_MS);
     });
-    this.eventListener(this.timeSelect, "change", () => {
-      this.timeWindow = this.timeSelect.value;
-      const custom = this.timeWindow === "custom";
-      this.customSince.hidden = !custom;
-      this.customUntil.hidden = !custom;
-      this.fetchLoot();
-    });
-    this.eventListener(this.customSince, "change", () => this.fetchLoot());
-    this.eventListener(this.customUntil, "change", () => this.fetchLoot());
-    this.eventListener(this.bossSelect, "change", () => {
-      this.selectedBoss = this.bossSelect.value;
-      this.fetchLoot();
+    this.eventListener(this.searchInput, "focus", () => this.stopPlaceholderCycle());
+    this.eventListener(this.searchInput, "blur", () => {
+      if (!this.searchInput.value) this.startPlaceholderCycle();
     });
 
-    this.fetchLoot();
-    this.refreshInterval = utility.callOnInterval(
-      () => {
-        this.fetchLoot();
-      },
-      REFRESH_INTERVAL_MS,
-      false
-    );
-  }
+    if (!this.searchInput.value) this.startPlaceholderCycle();
 
-  getScope() {
-    const scope = {
-      memberName: this.selectedMember || undefined,
-      boss: this.selectedBoss || undefined,
-    };
-    if (this.timeWindow !== "all") {
-      if (this.timeWindow === "custom") {
-        if (this.customSince.value) scope.since = new Date(`${this.customSince.value}T00:00:00`).toISOString();
-        if (this.customUntil.value) scope.until = new Date(`${this.customUntil.value}T23:59:59.999`).toISOString();
-        return scope;
-      }
-      const units = { "30m": 30, "1h": 60, "2h": 120, "4h": 240, "12h": 720, "1d": 1440, "7d": 10080, "30d": 43200 };
-      scope.since = new Date(Date.now() - units[this.timeWindow] * 60000).toISOString();
-    }
-    return scope;
-  }
+    this.intersectionObserver = new IntersectionObserver(this.handleSentinelIntersect.bind(this), {
+      root: this.scrollContainer,
+      rootMargin: "120px",
+    });
+    this.intersectionObserver.observe(this.sentinel);
 
-  async fetchLoot() {
-    const scope = this.getScope();
-    const summary = await api.getLootSummary(scope);
-    this.rows = summary.rows;
-    this.sources = summary.sources;
-    this.renderBossOptions();
-    this.renderList();
-    this.renderSummary();
-  }
-
-  // Options come from `this.sources` - the current scope's (date range + member + session)
-  // per-source event counts, unaffected by the boss/clue filter itself (see server's
-  // get_loot_summary) - so the dropdown only ever offers sources actually looted in range, and
-  // picking one doesn't collapse the list down to just that option.
-  renderBossOptions() {
-    const seen = new Map();
-    for (const source of this.sources) {
-      if (source.source_type === "clue") continue;
-      const slug = slugifyNpcName(source.source_name);
-      if (!seen.has(slug)) seen.set(slug, { slug, name: source.source_name, source_type: source.source_type });
-    }
-    const sources = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
-    const current = this.selectedBoss;
-    const bossOptions = sources.filter((source) => source.source_type === "kill");
-    const chestOptions = sources.filter((source) => source.source_type === "chest");
-    const optgroup = (label, options) =>
-      options.length
-        ? `<optgroup label="${label}">${options
-            .map((source) => `<option value="${source.slug}">${source.name}</option>`)
-            .join("")}</optgroup>`
-        : "";
-    this.bossSelect.innerHTML = `<option value="">All sources</option>${optgroup("Bosses", bossOptions)}${optgroup(
-      "Chests & Minigames",
-      chestOptions
-    )}`;
-    this.bossSelect.value = sources.some((source) => source.slug === current) ? current : "";
+    this.resetAndLoad();
+    this.refreshInterval = utility.callOnInterval(this.poll.bind(this), REFRESH_INTERVAL_MS, false);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this.refreshInterval) window.clearInterval(this.refreshInterval);
+    if (this.intersectionObserver) this.intersectionObserver.disconnect();
+    this.stopPlaceholderCycle();
+    window.clearTimeout(this.searchDebounceTimer);
   }
 
-  handleUpdatedMembers(members) {
-    this.members = members.filter((member) => member.name !== "@SHARED");
-    this.renderMemberOptions();
+  handleSentinelIntersect(entries) {
+    if (this.autoLoadPaused) return;
+    if (entries.some((entry) => entry.isIntersecting)) this.loadMore();
   }
 
-  renderMemberOptions() {
-    if (!this.memberSelect) return;
-    const previousValue = this.memberSelect.value || this.selectedMember;
-    this.memberSelect.innerHTML = `
-      <option value="">All members</option>
-      ${this.members.map((member) => `<option value="${member.name}">${member.name}</option>`).join("")}
-    `;
-    this.memberSelect.value = previousValue;
+  startPlaceholderCycle() {
+    if (!this.placeholderLabel || this.placeholderInterval) return;
+    this.placeholderIndex = 0;
+    this.placeholderLabel.textContent = PLACEHOLDER_EXAMPLES[0];
+    this.placeholderLabel.classList.remove("loot-log-page__search-placeholder--hidden");
+    this.placeholderInterval = window.setInterval(() => {
+      this.placeholderLabel.classList.add("loot-log-page__search-placeholder--hidden");
+      window.setTimeout(() => {
+        this.placeholderIndex = (this.placeholderIndex + 1) % PLACEHOLDER_EXAMPLES.length;
+        this.placeholderLabel.textContent = PLACEHOLDER_EXAMPLES[this.placeholderIndex];
+        this.placeholderLabel.classList.remove("loot-log-page__search-placeholder--hidden");
+      }, PLACEHOLDER_FADE_MS);
+    }, PLACEHOLDER_INTERVAL_MS);
+  }
+
+  stopPlaceholderCycle() {
+    if (this.placeholderInterval) {
+      window.clearInterval(this.placeholderInterval);
+      this.placeholderInterval = null;
+    }
+    if (this.placeholderLabel) this.placeholderLabel.classList.add("loot-log-page__search-placeholder--hidden");
+  }
+
+  // Heuristic client-side item-name resolution: the server has no full item-name table (only
+  // curated drop_rates entries), so it can't search on item name itself - the client resolves
+  // matching item ids from the full catalog (Item.itemDetails) and sends them as `item_ids` for
+  // the server to test against each event's loot. Capped so a broad query can't blow up the URL.
+  resolveItemIds(query) {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length || !Item.itemDetails) return [];
+    const ids = [];
+    for (const [id, details] of Object.entries(Item.itemDetails)) {
+      const name = (details.name || "").toLowerCase();
+      if (words.some((word) => name.includes(word))) {
+        ids.push(Number(id));
+        if (ids.length >= MAX_RESOLVED_ITEM_IDS) break;
+      }
+    }
+    return ids;
+  }
+
+  applySearch() {
+    const raw = this.searchInput.value.trim();
+    this.searchText = raw;
+    this.itemIds = this.resolveItemIds(raw);
+    this.resetAndLoad();
+  }
+
+  entryKey(event) {
+    return `${event.member_name}|${event.source_name}|${event.source_type}|${event.clue_tier || ""}`;
+  }
+
+  buildGroupData(entry) {
+    const newest = entry.events[0];
+    return {
+      memberName: newest.member_name,
+      sourceName: newest.source_name,
+      sourceType: newest.source_type,
+      clueTier: newest.clue_tier,
+      events: entry.events,
+    };
+  }
+
+  // Appended when paging older history in (see `loadMore`) - events arrive newest-first within a
+  // page, so each new event is older than whatever's already tracked for its key.
+  appendEvent(event) {
+    const key = this.entryKey(event);
+    const entry = this.entryGroups.get(key);
+    const eventTime = new Date(event.occurred_at).getTime();
+    if (entry) {
+      const oldestTime = new Date(entry.events[entry.events.length - 1].occurred_at).getTime();
+      if (oldestTime - eventTime <= SESSION_MERGE_WINDOW_MS) {
+        entry.events.push(event);
+        entry.element.group = this.buildGroupData(entry);
+        entry.element.update();
+        return;
+      }
+    }
+    const newEntry = { key, events: [event] };
+    newEntry.element = document.createElement("loot-log-group");
+    newEntry.element.group = this.buildGroupData(newEntry);
+    this.list.appendChild(newEntry.element);
+    this.entryGroups.set(key, newEntry);
+  }
+
+  // Prepended when polling for fresher events (see `poll`) - events arrive oldest-of-batch first
+  // (caller reverses the incoming batch), so each new event is newer than whatever's tracked.
+  prependEvent(event) {
+    const key = this.entryKey(event);
+    const entry = this.entryGroups.get(key);
+    const eventTime = new Date(event.occurred_at).getTime();
+    if (entry) {
+      const newestTime = new Date(entry.events[0].occurred_at).getTime();
+      if (eventTime - newestTime <= SESSION_MERGE_WINDOW_MS) {
+        entry.events.unshift(event);
+        entry.element.group = this.buildGroupData(entry);
+        entry.element.update();
+        this.list.insertBefore(entry.element, this.list.firstChild);
+        return;
+      }
+    }
+    const newEntry = { key, events: [event] };
+    newEntry.element = document.createElement("loot-log-group");
+    newEntry.element.group = this.buildGroupData(newEntry);
+    this.list.insertBefore(newEntry.element, this.list.firstChild);
+    this.entryGroups.set(key, newEntry);
+  }
+
+  async resetAndLoad() {
+    this.loaded = [];
+    this.nextBefore = undefined;
+    this.exhausted = false;
+    this.autoLoadStreak = 0;
+    this.autoLoadPaused = false;
+    this.entryGroups = new Map();
+    this.list.innerHTML = "";
+    this.empty.classList.remove("loot-log-page__empty--visible");
+    this.sentinel.classList.remove("loot-log-page__sentinel--paused");
+    await Promise.all([this.loadMore(), this.loadSummary()]);
+  }
+
+  async loadSummary() {
+    this.summary = await api.getLootLogSummary({ search: this.searchText, itemIds: this.itemIds });
+    this.renderSummary();
+  }
+
+  async loadMore({ manual = false } = {}) {
+    if (this.loadingMore || this.exhausted) return;
+    if (this.autoLoadPaused && !manual) return;
+    if (manual) {
+      this.autoLoadPaused = false;
+      this.autoLoadStreak = 0;
+      this.sentinel.classList.remove("loot-log-page__sentinel--paused");
+    } else {
+      this.autoLoadStreak++;
+    }
+    this.loadingMore = true;
+    this.sentinel.classList.add("loot-log-page__sentinel--visible");
+
+    const page = await api.getLootLog({
+      before: this.nextBefore,
+      limit: PAGE_LIMIT,
+      search: this.searchText,
+      itemIds: this.itemIds,
+    });
+
+    for (const event of page.events) {
+      this.loaded.push(event);
+      this.appendEvent(event);
+    }
+    this.nextBefore = page.next_before || undefined;
+    this.exhausted = !!page.scan_exhausted;
+    this.autoLoadPaused = !this.exhausted && this.autoLoadStreak >= AUTO_LOAD_BURST_LIMIT;
+    this.sentinel.classList.toggle("loot-log-page__sentinel--visible", !this.exhausted);
+    this.sentinel.classList.toggle("loot-log-page__sentinel--paused", this.autoLoadPaused);
+    this.empty.classList.toggle("loot-log-page__empty--visible", this.loaded.length === 0 && this.exhausted);
+    this.renderSummary();
+    this.loadingMore = false;
+  }
+
+  // Mirrors activity-feed-page.js's `poll` - fetches the newest page and prepends whatever is
+  // newer than what's already loaded, preserving scroll position the same way.
+  async poll() {
+    if (this.loadingMore || !this.loaded.length) return;
+
+    const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
+    const page = await api.getLootLog({ search: this.searchText, itemIds: this.itemIds, limit: PAGE_LIMIT });
+    const incoming = page.events.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
+    if (!incoming.length) return;
+
+    const scrollTopBefore = this.scrollContainer.scrollTop;
+    const heightBefore = this.list.scrollHeight;
+
+    for (const event of [...incoming].reverse()) {
+      this.loaded.unshift(event);
+      this.prependEvent(event);
+    }
+
+    if (scrollTopBefore > 0) {
+      const delta = this.list.scrollHeight - heightBefore;
+      this.scrollContainer.scrollTop = scrollTopBefore + delta;
+    }
+
+    await this.loadSummary();
   }
 
   renderSummary() {
     if (!this.summaryContainer) return;
-    if (this.rows.length === 0) {
+    if (this.loaded.length === 0 && this.summary.event_count === 0) {
       this.summaryContainer.innerHTML = "";
       return;
     }
-    const totalValue = this.rows.reduce((sum, row) => sum + row.total_value, 0);
-    const eventCount = this.sources.reduce((sum, source) => sum + source.event_count, 0);
     this.summaryContainer.innerHTML = `
       <div class="loot-log-page__summary-stats">
         <div class="loot-log-page__summary-card">
-          <div class="loot-log-page__summary-n">${totalValue.toLocaleString()}</div>
+          <div class="loot-log-page__summary-n">${this.summary.total_value.toLocaleString()}</div>
           <div class="loot-log-page__summary-l">Total Value</div>
         </div>
         <div class="loot-log-page__summary-card">
-          <div class="loot-log-page__summary-n">${eventCount.toLocaleString()}</div>
+          <div class="loot-log-page__summary-n">${this.summary.event_count.toLocaleString()}</div>
           <div class="loot-log-page__summary-l">Events</div>
         </div>
         <div class="loot-log-page__summary-card loot-log-page__summary-card--session">
@@ -170,60 +301,18 @@ export class LootLogPage extends BaseElement {
     `;
   }
 
-  // First kill -> last kill across the current scope's rows, not a detected play-session
-  // boundary - just the span the selected time window's activity actually covers.
+  // First loaded event -> last loaded event, not a detected play-session boundary - just the
+  // span of what's currently paged in (loading more history extends it).
   sessionDuration() {
-    const { first, last } = timeBounds(this.rows);
+    if (!this.loaded.length) return "0m";
+    const { first, last } = timeBounds(this.loaded);
     return formatDuration(first, last);
   }
 
   sessionRange() {
-    const { first, last } = timeBounds(this.rows);
+    if (!this.loaded.length) return "";
+    const { first, last } = timeBounds(this.loaded);
     return formatTimeRange(first, last);
-  }
-
-  // Rows arrive newest-first from the server, so grouping by first appearance in `this.rows`
-  // preserves that order at the group level too - most-recently-active source first.
-  groupedRows() {
-    const sourceCounts = new Map();
-    for (const source of this.sources) {
-      sourceCounts.set(this.sourceKey(source.source_name, source.source_type, source.clue_tier), source.event_count);
-    }
-
-    const groups = new Map();
-    const order = [];
-    for (const row of this.rows) {
-      const key = this.sourceKey(row.source_name, row.source_type, row.clue_tier);
-      if (!groups.has(key)) {
-        groups.set(key, {
-          sourceName: row.source_name,
-          sourceType: row.source_type,
-          clueTier: row.clue_tier,
-          eventCount: sourceCounts.get(key) || 0,
-          showKillers: !this.selectedMember,
-          rows: [],
-        });
-        order.push(key);
-      }
-      groups.get(key).rows.push(row);
-    }
-    return order.map((key) => groups.get(key));
-  }
-
-  sourceKey(sourceName, sourceType, clueTier) {
-    return `${sourceName} ${sourceType} ${clueTier || ""}`;
-  }
-
-  renderList() {
-    if (!this.list) return;
-    this.list.innerHTML = "";
-    this.empty.classList.toggle("loot-log-page__empty--visible", this.rows.length === 0);
-
-    for (const group of this.groupedRows()) {
-      const groupElement = document.createElement("loot-log-group");
-      groupElement.group = group;
-      this.list.appendChild(groupElement);
-    }
   }
 }
 

@@ -209,7 +209,8 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/update-group-member").route(web::post().to(authed::update_group_member)))
             .service(web::resource("/get-activity-events").route(web::get().to(authed::get_activity_events)))
             .service(web::resource("/get-sessions").route(web::get().to(authed::get_sessions)))
-            .service(web::resource("/get-loot-summary").route(web::get().to(authed::get_loot_summary)))
+            .service(web::resource("/get-loot-log").route(web::get().to(authed::get_loot_log)))
+            .service(web::resource("/get-loot-log-summary").route(web::get().to(authed::get_loot_log_summary)))
             .service(web::resource("/am-i-logged-in").route(web::get().to(authed::am_i_logged_in)))
             .service(web::resource("/am-i-in-group").route(web::get().to(authed::am_i_in_group)))
             .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
@@ -275,9 +276,14 @@ async fn main() -> std::io::Result<()> {
                     .route(web::get().to(authed::get_sessions)),
             )
             .service(
-                web::resource("/get-loot-summary")
+                web::resource("/get-loot-log")
                     .wrap(grouped_character_middleware())
-                    .route(web::get().to(authed::get_loot_summary)),
+                    .route(web::get().to(authed::get_loot_log)),
+            )
+            .service(
+                web::resource("/get-loot-log-summary")
+                    .wrap(grouped_character_middleware())
+                    .route(web::get().to(authed::get_loot_log_summary)),
             )
             .service(
                 web::resource("/am-i-logged-in")
@@ -399,7 +405,8 @@ async fn main() -> std::io::Result<()> {
             ))
             .service(web::resource("/get-activity-events").route(web::get().to(authed::get_activity_events)))
             .service(web::resource("/get-sessions").route(web::get().to(authed::get_sessions)))
-            .service(web::resource("/get-loot-summary").route(web::get().to(authed::get_loot_summary)))
+            .service(web::resource("/get-loot-log").route(web::get().to(authed::get_loot_log)))
+            .service(web::resource("/get-loot-log-summary").route(web::get().to(authed::get_loot_log_summary)))
             .service(web::resource("/get-skill-data").route(web::get().to(authed::get_skill_data)))
             .service(web::resource("/get-metric-data").route(web::get().to(authed::get_metric_data)))
             .service(web::resource("/get-leaderboard").route(web::get().to(authed::get_leaderboard)))

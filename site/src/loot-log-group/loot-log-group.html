@@ -6,12 +6,11 @@
         : `<span class="loot-log-group__source-dot"></span>`
     }
     <div>
-      <div class="loot-log-group__name">${this.sourceLabel}</div>
-      ${
-        this.group.eventCount
-          ? `<div class="loot-log-group__meta">${this.group.eventCount.toLocaleString()} ${this.countLabel} &middot; ${this.timeRangeLabel}</div>`
-          : ""
-      }
+      <div class="loot-log-group__name">
+        <player-icon player-name="${this.group.memberName}"></player-icon>
+        <span>${this.sourceLabel}</span>
+      </div>
+      <div class="loot-log-group__meta">${this.group.events.length.toLocaleString()} ${this.countLabel} &middot; ${this.timeRangeLabel}</div>
     </div>
   </div>
   <div class="loot-log-group__total">${this.totalValue.toLocaleString()} gp</div>

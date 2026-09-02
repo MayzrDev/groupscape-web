@@ -10,6 +10,7 @@ loot-log-tile {
   background: var(--elevated);
   border: 2px solid var(--rarity-common);
   border-radius: 4px;
+  transition: opacity 0.2s ease;
 }
 
 loot-log-tile[data-rarity="uncommon"] {
@@ -27,6 +28,12 @@ loot-log-tile[data-rarity="very_rare"] {
 loot-log-tile[data-unique="true"] {
   border-color: var(--rarity-unique);
   box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.35), 0 0 8px rgba(255, 215, 0, 0.25);
+}
+
+/* Search is active and this item specifically failed an item-level clause while the rest of its
+   session entry matched some other way - see loot-log-tile.js's `matched` handling. */
+loot-log-tile[data-dimmed="true"] {
+  opacity: 0.35;
 }
 
 .loot-log-tile__link {
@@ -61,48 +68,4 @@ loot-log-tile item-box {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   opacity: 0.7;
-}
-
-.loot-log-tile__tt-breakdown {
-  display: inline-block;
-  margin-top: 4px;
-  font-size: 0.85em;
-  opacity: 0.85;
-}
-
-.loot-log-tile__killers {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  display: flex;
-}
-
-.loot-log-tile__killers > * + * {
-  margin-left: -7px;
-}
-
-.loot-log-tile__killer,
-.loot-log-tile__killer-more {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--background);
-  border: 1px solid rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.loot-log-tile__killer player-icon img {
-  width: 11px;
-  height: 14px;
-}
-
-.loot-log-tile__killer-more {
-  font-size: 8px;
-  font-weight: 700;
-  color: var(--primary-text);
-  text-shadow: none;
-  opacity: 0.75;
 }

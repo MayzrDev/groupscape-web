@@ -11,6 +11,9 @@ const COUNT_LABELS = {
   clue: "caskets",
 };
 
+// One farming-session "entry" - consecutive same-member/source/type events <=45min apart (see
+// loot-log-page.js's `appendEvent`/`prependEvent`), not a boss-wide group across the whole scope
+// like this component used to render.
 export class LootLogGroup extends BaseElement {
   constructor() {
     super();
@@ -22,35 +25,49 @@ export class LootLogGroup extends BaseElement {
 
   connectedCallback() {
     super.connectedCallback();
+    this.update();
+  }
+
+  // Callable again (not just on first mount) so loot-log-page.js can extend this entry with a
+  // newly-merged event in place, instead of tearing down and recreating the component.
+  update() {
     this.setAttribute("data-source", this.group.sourceType);
     if (this.group.sourceType === "clue" && this.group.clueTier) {
       this.style.setProperty("--clue-tier-color", `var(--clue-${this.group.clueTier})`);
     }
     this.render();
+    this.buildTiles();
+  }
+
+  buildTiles() {
     const grid = this.querySelector(".loot-log-group__grid");
-    for (const row of this.mergedRows()) {
+    grid.innerHTML = "";
+    for (const item of this.mergedItems()) {
       const tile = document.createElement("loot-log-tile");
-      tile.row = row;
-      tile.showKillers = this.group.showKillers;
+      tile.item = item;
       grid.appendChild(tile);
     }
   }
 
-  // Server sends one row per (member, source, item); items unrecognized by the client's item
-  // table (no name/image/value to render) are dropped rather than shown blank, and rows for the
-  // same item dropped by different members are folded into one tile with a summed quantity.
-  mergedRows() {
+  // Server sends one row per (event, item); items unrecognized by the client's item table (no
+  // name/image/value to render) are dropped rather than shown blank, and rows for the same item
+  // across the entry's merged events are folded into one tile with a summed quantity. `matched`
+  // is OR'd across contributing events - undefined (no search active) stays undefined.
+  mergedItems() {
     const merged = new Map();
-    for (const row of this.group.rows) {
-      if (!Item.exists(row.item_id)) continue;
-      if (!merged.has(row.item_id)) {
-        merged.set(row.item_id, { ...row, quantity: 0, total_value: 0, killers: [], killerBreakdown: [] });
+    for (const event of this.group.events) {
+      for (const item of event.items) {
+        if (!Item.exists(item.item_id)) continue;
+        if (!merged.has(item.item_id)) {
+          merged.set(item.item_id, { ...item, quantity: 0, total_value: 0, matched: undefined });
+        }
+        const entry = merged.get(item.item_id);
+        entry.quantity += item.quantity;
+        entry.total_value += item.total_value;
+        if (item.matched !== null && item.matched !== undefined) {
+          entry.matched = entry.matched || item.matched;
+        }
       }
-      const entry = merged.get(row.item_id);
-      entry.quantity += row.quantity;
-      entry.total_value += row.total_value;
-      entry.killers.push(row.member_name);
-      entry.killerBreakdown.push({ memberName: row.member_name, quantity: row.quantity });
     }
     return [...merged.values()];
   }
@@ -76,11 +93,10 @@ export class LootLogGroup extends BaseElement {
     return COUNT_LABELS[this.group.sourceType] || "events";
   }
 
-  // First kill -> last kill for this source alone, so a boss farmed across several days shows
-  // that span instead of just a kill count - the page-level session card only covers the whole
-  // scoped window, not per-source granularity.
+  // Span of this session entry alone (first event -> last event, merged within the 45-minute
+  // window) - a boss farmed for hours shows that whole span, not just an event count.
   get timeRangeLabel() {
-    const { first, last } = timeBounds(this.group.rows);
+    const { first, last } = timeBounds(this.group.events);
     return formatTimeRange(first, last);
   }
 
@@ -98,7 +114,7 @@ export class LootLogGroup extends BaseElement {
   }
 
   get totalValue() {
-    return this.group.rows.reduce((sum, row) => sum + row.total_value, 0);
+    return this.mergedItems().reduce((sum, item) => sum + item.total_value, 0);
   }
 }
 customElements.define("loot-log-group", LootLogGroup);

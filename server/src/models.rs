@@ -720,17 +720,14 @@ pub struct ActivityEvent {
     pub payload: serde_json::Value,
 }
 
-/// One aggregated (member, source, item) row for the loot summary endpoint - a query-time
-/// pivot over `kill`/`loot` activity events, mirroring `groupscape-old`'s `LootSummaryRow`.
+/// One item entry within a [`LootLogEvent`] - the loot log's per-event, per-item view (unlike
+/// the deleted `LootSummaryRow`, this doesn't pre-aggregate across events, so the client can do
+/// the 45-minute session merge itself from raw per-event timestamps).
 #[derive(Serialize)]
-pub struct LootSummaryRow {
-    pub member_name: String,
-    pub source_name: String,
-    /// "kill" | "chest" | "clue"
-    pub source_type: String,
-    /// "beginner".."master" - only set when `source_type` is "clue".
-    pub clue_tier: Option<String>,
+pub struct LootLogItem {
     pub item_id: i32,
+    /// Only set when the item is in the curated `drop_rates` table - `None` falls back
+    /// client-side to the full item catalog (see loot-log-tile.js's `itemName` getter).
     pub item_name: Option<String>,
     pub quantity: i32,
     pub unit_value: Option<i64>,
@@ -738,8 +735,46 @@ pub struct LootSummaryRow {
     pub rarity: Option<String>,
     pub is_unique: bool,
     pub drop_rate: Option<String>,
-    /// Most recent contributing event's `occurred_at` - the loot log sorts on this, newest first.
+    /// Whether this specific item satisfied an item-level search clause (value/quantity/id),
+    /// used to dim non-matching items within an otherwise-matched session entry. `None` when no
+    /// search is active, or when the event matched by a non-item clause (member/source/level) -
+    /// see `loot_log_search`/`authed::build_matching_loot_log_event` for the dimming rule.
+    pub matched: Option<bool>,
+}
+
+/// One raw `kill`/`loot` activity event, normalized for the Loot Log page. The client groups
+/// these into farming-session "entries" (consecutive same member/source events <=45min apart) -
+/// see loot-log-page.js.
+#[derive(Serialize)]
+pub struct LootLogEvent {
+    pub member_name: String,
     pub occurred_at: DateTime<Utc>,
+    pub source_name: String,
+    /// "kill" | "chest" | "clue"
+    pub source_type: String,
+    /// "beginner".."master" - only set when `source_type` is "clue".
+    pub clue_tier: Option<String>,
+    pub items: Vec<LootLogItem>,
+}
+
+/// One page of `get-loot-log`, newest-first.
+#[derive(Serialize)]
+pub struct LootLogPage {
+    pub events: Vec<LootLogEvent>,
+    /// Cursor for the next page - `None` means there's no more raw history to scan (see
+    /// `scan_exhausted`).
+    pub next_before: Option<DateTime<Utc>>,
+    /// True when `next_before` is `None` because history truly ended, as opposed to the server
+    /// just hitting its per-request scan cap (in which case there may still be more).
+    pub scan_exhausted: bool,
+}
+
+/// All-time (or all-matching-search) totals for the loot log's summary bar - a full unbounded
+/// scan since it only needs to accumulate two numbers, unlike `get_loot_log`'s paginated rows.
+#[derive(Serialize)]
+pub struct LootLogSummary {
+    pub total_value: i64,
+    pub event_count: i64,
 }
 
 /// Wire shape for `GET .../get-item-bonuses` - the equip-screen bonus panel's Attack/Defence/
@@ -769,24 +804,6 @@ pub struct CombatStyleBonuses {
     pub crush: i32,
     pub magic: i32,
     pub ranged: i32,
-}
-
-/// Count of loot-granting events (kills, chest openings, or clue caskets) for one source, keyed
-/// the same way the frontend groups `LootSummaryRow`s (source_name + source_type + clue_tier).
-/// `get_loot_summary`'s rows are deduped to one per (member, source, item), so they can't carry
-/// this count themselves - it's tallied separately over the same event scan.
-#[derive(Serialize)]
-pub struct LootSourceCount {
-    pub source_name: String,
-    pub source_type: String,
-    pub clue_tier: Option<String>,
-    pub event_count: i64,
-}
-
-#[derive(Serialize)]
-pub struct LootSummaryResult {
-    pub rows: Vec<LootSummaryRow>,
-    pub sources: Vec<LootSourceCount>,
 }
 
 #[derive(Serialize)]
