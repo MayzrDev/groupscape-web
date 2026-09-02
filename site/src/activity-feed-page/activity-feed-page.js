@@ -27,6 +27,9 @@ const REFRESH_INTERVAL_MS = 15000;
 // sentinel is allowed to auto-fetch in a row regardless of how much they added, and require a
 // manual click to keep going past that - bounds the worst case to a fixed, fast amount of work.
 const AUTO_LOAD_BURST_LIMIT = 4;
+// Unconditional backstop on the sentinel auto-load loop, independent of autoLoadPaused/exhausted -
+// guarantees the loop can never run away even if that state is ever wrong.
+const AUTO_LOAD_HARD_CAP = 20;
 
 export class ActivityFeedPage extends BaseElement {
   constructor() {
@@ -94,9 +97,11 @@ export class ActivityFeedPage extends BaseElement {
 
   // IntersectionObserver only calls back on a threshold crossing, not continuously while
   // intersecting - if a page load doesn't move the sentinel, the observer never fires again.
-  // Relying on the observer's internal notification timing to drive every step of a loop proved
-  // flaky, so instead measure the sentinel's actual position directly and keep loading for as long
-  // as it's really still in view.
+  // A tight `while` loop chaining `await`s on quick-resolving promises never actually yields to
+  // the browser's render/input loop (recursive microtasks starve it even though each step is
+  // "async"), which is how a past version of this froze the tab. Pace each step through
+  // requestAnimationFrame instead, and cap the run length unconditionally as a backstop in case
+  // autoLoadPaused/exhausted are ever wrong.
   handleSentinelIntersect(entries) {
     if (this.autoLoadPaused) return;
     if (entries.some((entry) => entry.isIntersecting)) this.autoLoadWhileVisible();
@@ -111,16 +116,25 @@ export class ActivityFeedPage extends BaseElement {
     return sentinelRect.top < containerRect.bottom + 120 && sentinelRect.bottom > containerRect.top - 120;
   }
 
-  async autoLoadWhileVisible() {
+  autoLoadWhileVisible() {
     if (this.autoLoading) return;
     this.autoLoading = true;
-    try {
-      while (!this.autoLoadPaused && !this.exhausted && this.isSentinelInView()) {
-        await this.loadMore();
+    this.autoLoadRunLength = 0;
+    const step = async () => {
+      if (
+        this.autoLoadPaused ||
+        this.exhausted ||
+        this.autoLoadRunLength >= AUTO_LOAD_HARD_CAP ||
+        !this.isSentinelInView()
+      ) {
+        this.autoLoading = false;
+        return;
       }
-    } finally {
-      this.autoLoading = false;
-    }
+      this.autoLoadRunLength++;
+      await this.loadMore();
+      requestAnimationFrame(step);
+    };
+    step();
   }
 
   // Best-effort counts, not true totals — there's no cheap way to get an exact total from a

@@ -12,6 +12,9 @@ const SEARCH_DEBOUNCE_MS = 300;
 // many pages the sentinel auto-fetches before requiring a manual click, rather than trying to
 // detect "made no progress" (a near-miss search can also add a trickle of real matches per page).
 const AUTO_LOAD_BURST_LIMIT = 4;
+// Unconditional backstop on the sentinel auto-load loop, independent of autoLoadPaused/exhausted -
+// guarantees the loop can never run away even if that state is ever wrong.
+const AUTO_LOAD_HARD_CAP = 20;
 // Consecutive same-member/source/type events with a gap under this are one farming session -
 // see the locked Loot Log design doc's "45-minute rolling window" rule.
 const SESSION_MERGE_WINDOW_MS = 45 * 60 * 1000;
@@ -89,9 +92,11 @@ export class LootLogPage extends BaseElement {
   // IntersectionObserver only calls back on a threshold crossing, not continuously while
   // intersecting - a farming session collapses into one <loot-log-group> card, so loading another
   // page can leave the sentinel exactly where it was and the observer never fires again.
-  // Re-observing after each load forces a fresh callback, but relying on the observer's internal
-  // notification timing to drive every step of a loop proved flaky, so instead measure the
-  // sentinel's actual position directly and keep loading for as long as it's really still in view.
+  // A tight `while` loop chaining `await`s on quick-resolving promises never actually yields to
+  // the browser's render/input loop (recursive microtasks starve it even though each step is
+  // "async"), which is how a past version of this froze the tab. Pace each step through
+  // requestAnimationFrame instead, and cap the run length unconditionally as a backstop in case
+  // autoLoadPaused/exhausted are ever wrong.
   handleSentinelIntersect(entries) {
     if (this.autoLoadPaused) return;
     if (entries.some((entry) => entry.isIntersecting)) this.autoLoadWhileVisible();
@@ -106,16 +111,25 @@ export class LootLogPage extends BaseElement {
     return sentinelRect.top < containerRect.bottom + 120 && sentinelRect.bottom > containerRect.top - 120;
   }
 
-  async autoLoadWhileVisible() {
+  autoLoadWhileVisible() {
     if (this.autoLoading) return;
     this.autoLoading = true;
-    try {
-      while (!this.autoLoadPaused && !this.exhausted && this.isSentinelInView()) {
-        await this.loadMore();
+    this.autoLoadRunLength = 0;
+    const step = async () => {
+      if (
+        this.autoLoadPaused ||
+        this.exhausted ||
+        this.autoLoadRunLength >= AUTO_LOAD_HARD_CAP ||
+        !this.isSentinelInView()
+      ) {
+        this.autoLoading = false;
+        return;
       }
-    } finally {
-      this.autoLoading = false;
-    }
+      this.autoLoadRunLength++;
+      await this.loadMore();
+      requestAnimationFrame(step);
+    };
+    step();
   }
 
   startPlaceholderCycle() {
