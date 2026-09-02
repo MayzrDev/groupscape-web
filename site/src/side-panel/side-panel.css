@@ -113,10 +113,10 @@ button.side-panel__mobile-toggle {
   }
 }
 
-/* The vitals bars and tab-icon row shouldn't stretch along with the widened side panel above -
-   they stay at the panel's normal content width while the equipment tab's content grows past
-   them on the right. */
-.player-panel--equipment-active .player-panel__header,
+/* The tab-icon row shouldn't stretch along with the widened side panel above - it stays at the
+   panel's normal content width while the equipment tab's content grows past it on the right.
+   The vitals bars (.player-panel__header) are exempt from this and stretch to the full widened
+   width instead, since player-stats already fills its container with width: 100%. */
 .player-panel--equipment-active .player-panel__minibar {
   width: 314px;
 }

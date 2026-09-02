@@ -11,6 +11,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log entries older than 28 days are now automatically cleared out to keep things tidy.
 - Loot Log now groups drops into farming sessions per player (kills within 45 minutes of each other), showing when each session started and ended, instead of lumping a boss's entire history into one block.
 - Searching the Loot Log highlights the matching item in a session and fades the rest, making it easy to spot what you searched for.
+- Health and prayer bars now stretch to fill the wider panel when you have the equipment tab open, instead of stopping short of the gear/stat columns.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.
