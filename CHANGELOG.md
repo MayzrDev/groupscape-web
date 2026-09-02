@@ -8,6 +8,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Fixed the Graphs tab sometimes showing the wrong group's leaderboard numbers by making sure it waits for your group's data to be ready before loading them.
 - Fixed the Activity Feed and Loot Log tabs sometimes going permanently stuck (no more loading, scrolling, or updates) after you'd navigated away from them once and come back.
 - Fixed Loot Log session cards sometimes growing more loot after they'd already loaded, when scrolling further back added drops to a session you'd already seen.
+- Loot Log's "load more" indicator no longer lingers forever near the bottom of a long history full of drop-less kills - it now gives up after a few empty attempts instead of implying there's always more to find.
 
 ## [1.0.299] - 2026-09-02
 

@@ -41,6 +41,12 @@ export class LootLogPage extends BaseElement {
     this.loadingMore = false;
     this.autoLoadStreak = 0;
     this.autoLoadPaused = false;
+    // Total events added since the streak last reset (manual click or resetAndLoad) - lets
+    // loadMore() tell "still making progress, just needs another click" apart from "repeatedly
+    // scanned and found nothing", so the sentinel can hide itself in the latter case instead of
+    // dangling a "Load more" that's unlikely to ever surface anything (see `autoLoadGaveUp`).
+    this.autoLoadStreakEventsAdded = 0;
+    this.autoLoadGaveUp = false;
     this.searchText = "";
     this.itemIds = [];
     this.summary = { total_value: 0, event_count: 0 };
@@ -278,6 +284,8 @@ export class LootLogPage extends BaseElement {
     this.exhausted = false;
     this.autoLoadStreak = 0;
     this.autoLoadPaused = false;
+    this.autoLoadStreakEventsAdded = 0;
+    this.autoLoadGaveUp = false;
     this.entryGroups = new Map();
     this.list.innerHTML = "";
     this.empty.classList.remove("loot-log-page__empty--visible");
@@ -302,6 +310,8 @@ export class LootLogPage extends BaseElement {
     if (manual) {
       this.autoLoadPaused = false;
       this.autoLoadStreak = 0;
+      this.autoLoadStreakEventsAdded = 0;
+      this.autoLoadGaveUp = false;
       this.sentinel.classList.remove("loot-log-page__sentinel--paused");
     } else {
       this.autoLoadStreak++;
@@ -316,6 +326,7 @@ export class LootLogPage extends BaseElement {
     // from here, so as soon as one page's first event fails to extend the previous page's
     // trailing group, that group can never grow again and it's safe to stop.
     let trailingKey = null;
+    let addedThisCall = 0;
     for (let fetches = 0; fetches < GROUP_CLOSE_FETCH_CAP; fetches++) {
       const page = await api.getLootLog({
         before: this.nextBefore,
@@ -343,6 +354,7 @@ export class LootLogPage extends BaseElement {
         this.loaded.push(event);
         this.appendEvent(event);
       }
+      addedThisCall += page.events.length;
       this.nextBefore = page.next_before || undefined;
       this.exhausted = !!page.scan_exhausted;
       trailingKey = page.events.length ? this.entryKey(page.events[page.events.length - 1]) : null;
@@ -355,9 +367,17 @@ export class LootLogPage extends BaseElement {
     this.sentinel.classList.remove("loot-log-page__sentinel--loading");
     if (this.disposed) return;
 
+    this.autoLoadStreakEventsAdded += addedThisCall;
     this.autoLoadPaused = !this.exhausted && this.autoLoadStreak >= AUTO_LOAD_BURST_LIMIT;
-    this.sentinel.classList.toggle("loot-log-page__sentinel--visible", !this.exhausted);
-    this.sentinel.classList.toggle("loot-log-page__sentinel--paused", this.autoLoadPaused);
+    // The server's raw-row scan is capped per request (see get_loot_log's LOOT_LOG_SCAN_CAP), so
+    // a long run of loot-less kills near the end of a group's history can repeatedly report "not
+    // exhausted" without ever actually surfacing anything new. Once a full auto-load burst has
+    // come back completely empty, treat it the same as exhausted for display purposes - a "Load
+    // more" that's already proven fruitless a few times in a row isn't worth dangling in front of
+    // the user, even though it's not a mathematically certain end of history.
+    this.autoLoadGaveUp = this.autoLoadPaused && this.autoLoadStreakEventsAdded === 0;
+    this.sentinel.classList.toggle("loot-log-page__sentinel--visible", !this.exhausted && !this.autoLoadGaveUp);
+    this.sentinel.classList.toggle("loot-log-page__sentinel--paused", this.autoLoadPaused && !this.autoLoadGaveUp);
     this.empty.classList.toggle("loot-log-page__empty--visible", this.loaded.length === 0 && this.exhausted);
     this.renderSummary();
   }
