@@ -77,13 +77,16 @@ export class ActivityFeedEvent extends BaseElement {
         const cls = `activity-feed-event__subject${variant === "death" ? " activity-feed-event__subject--death" : ""}${
           variant === "clue" ? " activity-feed-event__subject--clue" : ""
         }`;
-        const icons = [iconSrc, secondaryIconSrc]
-          .filter(Boolean)
-          .map((src) => `<img class="activity-feed-event__subject-icon" src="${src}" alt="" />`)
-          .join("");
+        // A second icon (currently only the collection-log item case) means the first icon leads
+        // the name instead of trailing it - e.g. "<item icon> Fire element staff crown <log icon>".
+        const leadingSrc = secondaryIconSrc ? iconSrc : null;
+        const trailingSrc = secondaryIconSrc || iconSrc;
+        const img = (src, modifier) =>
+          src ? `<img class="activity-feed-event__subject-icon${modifier}" src="${src}" alt="" />` : "";
+        const content = `${img(leadingSrc, "--leading")}${text}${img(trailingSrc, "")}`;
         return wikiUrl
-          ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="${cls}">${text}${icons}</a>`
-          : `<span class="${cls}">${text}${icons}</span>`;
+          ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="${cls}">${content}</a>`
+          : `<span class="${cls}">${content}</span>`;
       },
     });
   }

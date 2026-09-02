@@ -109,6 +109,11 @@ a.activity-feed-event__subject:hover {
   margin-left: 2px;
 }
 
+.activity-feed-event__subject-icon--leading {
+  margin-left: 0;
+  margin-right: 4px;
+}
+
 .activity-feed-event__subject--death {
   color: var(--red);
 }
