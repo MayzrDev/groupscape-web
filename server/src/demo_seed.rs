@@ -134,7 +134,7 @@ WHERE group_id=$1 AND member_name=$2
         equipment[2] = 12954; // shield slot: dragon defender
         equipment[3] = 1;
         let rune_pouch = vec![561, 1000, 555, 1000, 562, 500, -1, 0];
-        let bank = vec![995, 5_000_000 + index as i64 * 250_000, 536, 500, 6570, 1];
+        let bank = vec![995, 5_000_000 + index as i32 * 250_000, 536, 500, 6570, 1];
 
         client
             .execute(
