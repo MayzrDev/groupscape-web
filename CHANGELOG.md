@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.350] - 2026-09-02
+
+### Changed
+- The Activity Feed's "no events yet" message now mentions quests and diaries too, not just kills and deaths.
+
 ## [1.0.329] - 2026-09-02
 
 ### Added
