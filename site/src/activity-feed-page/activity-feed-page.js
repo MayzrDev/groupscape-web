@@ -302,6 +302,7 @@ export class ActivityFeedPage extends BaseElement {
     }
     this.loadingMore = true;
     this.sentinel.classList.add("activity-feed-page__sentinel--visible");
+    this.sentinel.classList.add("activity-feed-page__sentinel--loading");
 
     const before = this.loaded.length ? this.loaded[this.loaded.length - 1].occurred_at : undefined;
     const page = await api.getActivityEvents({
@@ -312,6 +313,7 @@ export class ActivityFeedPage extends BaseElement {
     });
 
     this.loadingMore = false;
+    this.sentinel.classList.remove("activity-feed-page__sentinel--loading");
     if (this.disposed) return;
 
     for (const event of page) {

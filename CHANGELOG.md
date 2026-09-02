@@ -27,6 +27,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Fixed the demo group (/demo) failing to (re)seed on every deploy and scheduled refresh, which could leave it stuck unavailable.
 - Fixed a rare case where scrolling the Loot Log (or Activity Feed) to load more could lock up the whole tab.
 - Fixed Loot Log and Activity Feed sometimes loading nothing and getting stuck with a "Load more" that never worked, if you refreshed directly on that page.
+- Loot Log and Activity Feed no longer show an endlessly-spinning loading icon once a page has actually finished loading - it only spins while genuinely fetching more, and sits still the rest of the time.
 
 ### Removed
 - Removed the Loot Log's time window, boss, and member filter dropdowns - the new search box covers all of that in one place.

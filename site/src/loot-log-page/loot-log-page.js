@@ -295,6 +295,7 @@ export class LootLogPage extends BaseElement {
     }
     this.loadingMore = true;
     this.sentinel.classList.add("loot-log-page__sentinel--visible");
+    this.sentinel.classList.add("loot-log-page__sentinel--loading");
 
     const page = await api.getLootLog({
       before: this.nextBefore,
@@ -304,6 +305,7 @@ export class LootLogPage extends BaseElement {
     });
 
     this.loadingMore = false;
+    this.sentinel.classList.remove("loot-log-page__sentinel--loading");
     if (this.disposed) return;
 
     for (const event of page.events) {

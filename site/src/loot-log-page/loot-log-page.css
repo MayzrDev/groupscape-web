@@ -141,17 +141,26 @@ loot-log-page {
   display: inline-block;
 }
 
+/* Static ring by default - the sentinel is visible whenever there's simply more history to
+   scroll to, not necessarily while a request is in flight, and a spinner that never stops
+   turning reads as "stuck loading forever" even when it's just idle. Only actually spin it
+   while `--loading` is applied (see loadMore() toggling it around the real fetch). */
 .loot-log-page__spinner {
   width: 13px;
   height: 13px;
   border-radius: 50%;
   border: 2px solid var(--light-border);
+  opacity: 0.6;
+}
+
+.loot-log-page__sentinel--loading .loot-log-page__spinner {
   border-top-color: var(--orange);
+  opacity: 1;
   animation: loot-log-page-spin 0.7s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loot-log-page__spinner {
+  .loot-log-page__sentinel--loading .loot-log-page__spinner {
     animation: none;
   }
 }

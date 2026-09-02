@@ -161,17 +161,26 @@ activity-feed-page {
   display: inline-block;
 }
 
+/* Static ring by default - the sentinel is visible whenever there's simply more history to
+   scroll to, not necessarily while a request is in flight, and a spinner that never stops
+   turning reads as "stuck loading forever" even when it's just idle. Only actually spin it
+   while `--loading` is applied (see loadMore() toggling it around the real fetch). */
 .activity-feed-page__spinner {
   width: 13px;
   height: 13px;
   border-radius: 50%;
   border: 2px solid var(--light-border);
+  opacity: 0.6;
+}
+
+.activity-feed-page__sentinel--loading .activity-feed-page__spinner {
   border-top-color: var(--orange);
+  opacity: 1;
   animation: activity-feed-page-spin 0.7s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .activity-feed-page__spinner {
+  .activity-feed-page__sentinel--loading .activity-feed-page__spinner {
     animation: none;
   }
 }
