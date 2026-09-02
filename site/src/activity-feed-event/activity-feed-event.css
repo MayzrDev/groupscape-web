@@ -93,6 +93,16 @@ activity-feed-event.activity-feed-event--enter {
   font-weight: 600;
 }
 
+.activity-feed-event__line player-icon {
+  vertical-align: -3px;
+  margin-right: 3px;
+}
+
+.activity-feed-event__line player-icon img {
+  width: 14px;
+  height: 18px;
+}
+
 a.activity-feed-event__subject {
   text-decoration: none;
 }

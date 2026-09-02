@@ -1,6 +1,7 @@
 import { BaseElement } from "../base-element/base-element";
 import { activityBadgeLabel, activityDisplayType, activityEventDescription } from "../data/activity-event-copy";
 import { Item } from "../data/item";
+import { groupData } from "../data/group-data";
 
 const RELATIVE_UNITS = [
   ["y", 31536000],
@@ -72,7 +73,13 @@ export class ActivityFeedEvent extends BaseElement {
 
   descriptionHtml() {
     return activityEventDescription(this.event, {
-      member: (name) => `<span class="activity-feed-event__member">${name}</span>`,
+      member: (name) => {
+        // Merged raid completions wrap a joined name list ("A, B, and C") through this same
+        // hook (see activityEventDescription's "cox"/"tob"/"toa" branch) - that's never a real
+        // member key, so the icon only renders for the single-member case.
+        const icon = groupData.members.has(name) ? `<player-icon player-name="${name}"></player-icon>` : "";
+        return `${icon}<span class="activity-feed-event__member">${name}</span>`;
+      },
       subject: (text, variant, wikiUrl, iconSrc, secondaryIconSrc) => {
         const cls = `activity-feed-event__subject${variant === "death" ? " activity-feed-event__subject--death" : ""}${
           variant === "clue" ? " activity-feed-event__subject--clue" : ""

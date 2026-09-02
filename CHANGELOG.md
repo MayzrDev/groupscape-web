@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Loot Log now has a single search box that finds drops by player, monster, item name, item value, quantity, or even monster combat level - try things like ">1m", "<500k", or a boss name. It loads more results automatically as you scroll instead of being limited to a fixed time window.
+- Activity Feed entries now show the member's hue-coloured helmet icon in front of their name, matching the icon used on the map and side panels.
 
 ### Changed
 - Loot Log entries older than 28 days are now automatically cleared out to keep things tidy.
