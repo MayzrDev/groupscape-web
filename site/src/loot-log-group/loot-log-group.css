@@ -11,6 +11,9 @@ loot-log-group {
   padding-bottom: 6px;
   border-bottom: 1px solid var(--light-border);
   margin-bottom: 8px;
+  /* Matches the grid's fixed width (10 * 46px items + 9 * 8px gaps) so the total
+     lines up above the grid's right edge instead of the wider container's. */
+  max-width: 532px;
 }
 
 .loot-log-group__name-wrap {
