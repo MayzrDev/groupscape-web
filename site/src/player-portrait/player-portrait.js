@@ -74,6 +74,12 @@ export class PlayerPortrait extends BaseElement {
       const [mostRecentTimestamp] = pubsub.getMostRecent(`portraitUpdated:${this.playerName}`) || [];
       this.lastLoadedPortraitTimestamp = mostRecentTimestamp ?? null;
       this.subscribe(`portraitUpdated:${this.playerName}`, this.handlePortraitUpdated.bind(this));
+    } else if (this.accountCharacterId) {
+      // No live group-data poll to piggyback on for the account-characters pages, so instead
+      // catch up whenever the tab comes back into view (e.g. the user tabbed away, updated their
+      // gear/appearance in-game, then tabbed back) rather than only ever loading once at mount.
+      this.eventListener(document, "visibilitychange", this.handleVisibilityChange.bind(this));
+      this.eventListener(window, "focus", this.loadPortrait.bind(this));
     }
 
     this.loadPortrait();
@@ -90,6 +96,10 @@ export class PlayerPortrait extends BaseElement {
     if (timestamp === this.lastLoadedPortraitTimestamp) return;
     this.lastLoadedPortraitTimestamp = timestamp;
     this.loadPortrait();
+  }
+
+  handleVisibilityChange() {
+    if (document.visibilityState === "visible") this.loadPortrait();
   }
 
   disconnectedCallback() {
