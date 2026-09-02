@@ -53,4 +53,8 @@ export const BOSS_COMBAT_LEVELS = {
   chaos_fanatic: 202,
   crazy_archaeologist: 204,
   deranged_archaeologist: 276,
+  spindel: 464,
+  the_nex: 1001,
+  shellbane_gryphon: 235,
+  phosanis_nightmare: 1024,
 };

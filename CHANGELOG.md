@@ -22,6 +22,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Royal Titans now has its boss icon everywhere it's shown, instead of a blank spot.
 - Eldric the Ice King and Branda the Fire Queen (the two Royal Titans) now show a boss icon in the Activity Feed and Loot Log instead of a blank spot.
 - Artio, Calvar'ion, Chaos Fanatic, Crazy Archaeologist, Deranged Archaeologist, Doom of Mokhaiotl, Hespori, Scurrius, Sol Heredit, Mad Angel, Maggot King, Shellbane Gryphon, The Mimic, and the Gauntlet/Corrupted Gauntlet bosses now show up in the Activity Feed with their boss icon - their kills and loot were being silently filtered out before.
+- Spindel, the Royal Titans, Phosani's Nightmare, and Moons of Peril (Blood Moon, Blue Moon, Eclipse Moon) now show up in the Activity Feed with their boss icon instead of being silently filtered out.
+- Fixed Royal Titans' boss icon not showing up anywhere on the site - it was never added despite earlier attempts to fix it.
+- Corrected Doom of Mokhaiotl's combat level shown on its boss card - it was wrong.
 
 ## [1.0.299] - 2026-09-02
 

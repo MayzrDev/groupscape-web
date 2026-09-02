@@ -80,6 +80,10 @@ static NOTABLE_NPCS: LazyLock<HashSet<String>> = LazyLock::new(|| {
         "The Mimic",
         "Crystalline Hunllef",
         "Corrupted Hunllef",
+        "Spindel",
+        "Blood Moon",
+        "Blue Moon",
+        "Eclipse Moon",
         // Major quest bosses.
         "Delrith",
         "Elvarg",
