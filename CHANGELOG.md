@@ -21,6 +21,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Fixed Loot Log kill sessions sometimes wrongly merging an old, late-arriving batch of kills in with a fresh session, making the count and time range for that boss look wrong.
 - Royal Titans now has its boss icon everywhere it's shown, instead of a blank spot.
 - Eldric the Ice King and Branda the Fire Queen (the two Royal Titans) now show a boss icon in the Activity Feed and Loot Log instead of a blank spot.
+- Artio, Calvar'ion, Chaos Fanatic, Crazy Archaeologist, Deranged Archaeologist, Doom of Mokhaiotl, Hespori, Scurrius, Sol Heredit, Mad Angel, Maggot King, Shellbane Gryphon, The Mimic, and the Gauntlet/Corrupted Gauntlet bosses now show up in the Activity Feed with their boss icon - their kills and loot were being silently filtered out before.
 
 ## [1.0.299] - 2026-09-02
 
