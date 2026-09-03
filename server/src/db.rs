@@ -4648,6 +4648,30 @@ pub async fn get_progress_snapshot(
     }))
 }
 
+/// Clears a member's stored skills snapshot so their next heartbeat starts a fresh baseline
+/// instead of diffing against it - used when `progress_events::looks_like_stale_skills_baseline`
+/// flags a heartbeat's level-up batch as implausibly large, which means `previous` itself is bad
+/// rather than that the player genuinely crossed that many thresholds at once. This trades a
+/// silent gap in that one member's skill-progress history for guaranteeing the flood can't repeat
+/// on their next upload.
+pub async fn reset_member_skills_snapshot(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.members SET skills=NULL, skills_last_update=NULL \
+             WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(|e| ApiError::AdminDbError("ResetMemberSkillsSnapshotError".to_string(), e))?;
+    Ok(())
+}
+
 fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {
     Ok(ActivityEvent {
         id: row.try_get("event_id")?,

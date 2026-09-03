@@ -663,7 +663,26 @@ pub async fn update_group_member(
         if let Some(previous) =
             db::get_progress_snapshot(&client, auth.group_id, &group_member_inner.name).await?
         {
-            let progress_events = progress_events::diff_progress(&previous, &group_member_inner);
+            let mut progress_events = progress_events::diff_progress(&previous, &group_member_inner);
+            // A heartbeat that would post an implausible number of level-ups means the stored
+            // `skills` snapshot itself is stale/wrong (see `looks_like_stale_skills_baseline`'s
+            // doc comment), not that the player genuinely crossed that many thresholds at once.
+            // Drop the level-up batch and re-baseline so the next heartbeat starts fresh instead
+            // of flooding the feed with the account's whole level-up history.
+            if progress_events::looks_like_stale_skills_baseline(&progress_events) {
+                log::warn!(
+                    "suppressing implausible level-up batch and re-baselining skills: group_id={} member={} level_up_count={}",
+                    auth.group_id,
+                    group_member_inner.name,
+                    progress_events
+                        .iter()
+                        .filter(|event| event.event_type == progress_events::EVENT_TYPE_LEVEL_UP)
+                        .count(),
+                );
+                progress_events.retain(|event| event.event_type != progress_events::EVENT_TYPE_LEVEL_UP);
+                db::reset_member_skills_snapshot(&client, auth.group_id, &group_member_inner.name)
+                    .await?;
+            }
             if !progress_events.is_empty() {
                 let session_id = db::ensure_open_session(&client, auth.group_id).await?;
                 for event in &progress_events {

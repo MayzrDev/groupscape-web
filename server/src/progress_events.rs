@@ -260,6 +260,22 @@ fn level_for_xp(xp: i32) -> u32 {
     (1..=99u32).rev().find(|&level| xp >= table[level as usize]).unwrap_or(1)
 }
 
+/// Ceiling on how many `level_up` events a *single heartbeat* can plausibly produce. Legitimate
+/// jumps - a big XP-lump reward on one skill, or a raid completion nudging several skills over a
+/// threshold at once - stay well under this. A heartbeat that blows past it is a signal that
+/// `previous` itself is stale or wrong (e.g. it's carrying an unrelated account's history) rather
+/// than that the player genuinely crossed this many thresholds since the last upload - see
+/// `authed.rs`'s handling of `diff_progress`, which drops the level-up batch and re-baselines the
+/// stored skills snapshot when this is exceeded instead of posting it.
+pub const MAX_PLAUSIBLE_LEVEL_UPS_PER_HEARTBEAT: usize = 6;
+
+/// True if `events` contains more `level_up` entries than a single heartbeat could plausibly
+/// produce from real play - see `MAX_PLAUSIBLE_LEVEL_UPS_PER_HEARTBEAT`.
+pub fn looks_like_stale_skills_baseline(events: &[ProgressEvent]) -> bool {
+    events.iter().filter(|event| event.event_type == EVENT_TYPE_LEVEL_UP).count()
+        > MAX_PLAUSIBLE_LEVEL_UPS_PER_HEARTBEAT
+}
+
 /// Every milestone newly crossed going from `previous_level` to `current_level`, in ascending
 /// order. When a heartbeat jumps a skill across more than one threshold at once (e.g. a large
 /// XP-lump reward), all of them are backfilled rather than only the highest.
@@ -486,6 +502,10 @@ mod tests {
         skills
     }
 
+    fn all_skills_xp(xp: i32) -> Vec<i32> {
+        vec![xp; 24]
+    }
+
     #[test]
     fn crossing_a_milestone_emits_one_event() {
         // Level 9 -> level 10 crosses the first milestone.
@@ -514,6 +534,29 @@ mod tests {
         let events = diff_skills(&previous, &current);
         let levels: Vec<_> = events.iter().map(|event| event.payload["level"].clone()).collect();
         assert_eq!(levels, vec![json!(70), json!(80)]);
+    }
+
+    #[test]
+    fn a_stale_baseline_spanning_every_skill_is_flagged_implausible() {
+        // A stale/wrong `previous` (e.g. an unrelated account's old row) diffed against a
+        // near-maxed character crosses every milestone on every skill at once - nothing like
+        // real play produces this in a single heartbeat.
+        let previous = all_skills_xp(xp_for_level(1) as i32);
+        let current = all_skills_xp(xp_for_level(99) as i32);
+
+        let events = diff_skills(&previous, &current);
+        assert!(looks_like_stale_skills_baseline(&events));
+    }
+
+    #[test]
+    fn a_genuine_multi_skill_jump_is_not_flagged_implausible() {
+        // A raid completion or similar nudging a handful of skills over one threshold each is
+        // real, plausible play and must not trip the stale-baseline guard.
+        let previous = skills_xp(xp_for_level(68) as i32);
+        let current = skills_xp(xp_for_level(81) as i32);
+
+        let events = diff_skills(&previous, &current);
+        assert!(!looks_like_stale_skills_baseline(&events));
     }
 
     #[test]
