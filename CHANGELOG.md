@@ -17,6 +17,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Added icons for dozens of slayer tasks (cows, greater demons, revenants, black dragons, and many more) that were showing a generic unknown-task icon.
 
 ### Changed
+- The Slayer task panel's task icon and name are now part of one clickable card that links to the Old School RuneScape Wiki guide, instead of just a small text link.
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
 - The "Join our Discord" button now sits in the bottom-left corner instead of bottom-right.
 - Internal: removed unused CI workflows for Docker image publishing and cache validation - deploy already builds images locally on the server, these weren't part of the real pipeline.

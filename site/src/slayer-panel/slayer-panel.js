@@ -122,29 +122,24 @@ export class SlayerPanel extends BaseElement {
     // through fine - fall back to a placeholder rather than literally printing "null".
     const taskName = task.taskName ?? "Unknown task";
     const taskIcon = slayerData.taskIconUrl(task.taskName);
+    const wikiUrl = task.taskName ? slayerData.taskWikiUrl(task.taskName) : null;
+
+    const taskTag = wikiUrl ? "a" : "div";
+    const taskAttrs = wikiUrl
+      ? `href="${wikiUrl}" target="_blank" rel="noopener" class="slayer-panel__task slayer-panel__task--clickable"`
+      : `class="slayer-panel__task"`;
 
     return `
       ${this.renderMaster()}
 
-      <div class="slayer-panel__task">
+      <${taskTag} ${taskAttrs}>
         <img class="slayer-panel__task-icon" src="${taskIcon}" alt="${taskName}" />
         <div class="slayer-panel__task-body">
           <span class="slayer-panel__task-name">${taskName}</span>
           ${task.taskLocation ? `<span class="slayer-panel__task-location">${task.taskLocation}</span>` : ""}
-          ${
-            task.taskName
-              ? `
-          <a
-            href="${slayerData.taskWikiUrl(task.taskName)}"
-            target="_blank"
-            rel="noopener"
-            class="slayer-panel__wiki-link"
-          >View slayer guide &#8599;</a>
-          `
-              : ""
-          }
+          ${wikiUrl ? `<span class="slayer-panel__wiki-link">View slayer guide &#8599;</span>` : ""}
         </div>
-      </div>
+      </${taskTag}>
 
       <div class="slayer-panel__progress">
         <div class="slayer-panel__progress-track">

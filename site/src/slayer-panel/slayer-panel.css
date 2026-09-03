@@ -130,6 +130,36 @@ slayer-panel {
   display: flex;
   gap: 8px;
   margin-bottom: 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 4px;
+  margin-left: -4px;
+  margin-right: -4px;
+}
+
+.slayer-panel__task--clickable {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+}
+
+.slayer-panel__task--clickable:hover {
+  background: rgba(255, 152, 31, 0.1);
+  border-color: hsl(40deg 15.79% 29.8%);
+}
+
+.slayer-panel__task--clickable:active {
+  background: rgba(255, 152, 31, 0.18);
+  transform: scale(0.98);
+}
+
+.slayer-panel__task--clickable:hover .slayer-panel__task-name {
+  color: var(--orange);
+}
+
+.slayer-panel__task--clickable:hover .slayer-panel__wiki-link {
+  opacity: 1;
 }
 
 .slayer-panel__task-icon {
