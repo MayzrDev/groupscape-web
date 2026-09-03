@@ -10,6 +10,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
+- The "Join our Discord" button now sits in the bottom-left corner instead of bottom-right.
 
 ### Fixed
 - Clue scroll toast notifications now show the proper scroll icon and tier color instead of a plain bullet.
