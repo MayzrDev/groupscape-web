@@ -241,6 +241,15 @@ export class ActivityFeedPage extends BaseElement {
   // (see `KILL_MERGE_WINDOW_MS`) instead of creating a new one. Returns the row to insert, or
   // null when the event was merged into an already-rendered row instead.
   mergeOrCreateRow(event, { prepend }) {
+    // A death ends whatever kill streak was building for that member - the next kill of the same
+    // boss (whichever direction in time it's encountered from, see `loadMore` vs `poll`) should
+    // start a fresh aggregated row rather than folding into the one from before the death.
+    if (activityDisplayType(event) === "death") {
+      for (const key of this.feedGroups.keys()) {
+        if (key.startsWith(`${event.member_name}|`)) this.feedGroups.delete(key);
+      }
+    }
+
     if (activityDisplayType(event) === "kill") {
       const key = killGroupKey(event);
       const group = this.feedGroups.get(key);

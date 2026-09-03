@@ -94,6 +94,14 @@ export class ToastStack extends BaseElement {
   }
 
   handleToast(toast) {
+    // A death ends whatever kill streak was building for that member - the next kill of the same
+    // boss should spawn a fresh toast rather than folding into the one from before the death.
+    if (toast.event && activityDisplayType(toast.event) === "death") {
+      for (const key of this.killToastGroups.keys()) {
+        if (key.startsWith(`${toast.event.member_name}|`)) this.killToastGroups.delete(key);
+      }
+    }
+
     const isKillToast = toast.event && activityDisplayType(toast.event) === "kill";
     if (isKillToast && this.mergeIntoExistingKillToast(toast)) return;
 
