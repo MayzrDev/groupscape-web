@@ -10,6 +10,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 - Boss slayer tasks now show that boss's own icon in the Slayer task panel instead of a generic unknown-task icon - covers every boss assignable via the "Boss" task, not just the Desert Treasure II bosses.
 - A handful of new items from today's OSRS update now show up correctly with names and icons (the elemental diamond/amulet set, Necklace of fangs).
+- Added support for tracking kills of 36 more bosses and quest bosses in the activity feed and Loot Log's boss filter (including Brutus and Demonic Brutus), and backfilled combat levels for 26 already-tracked bosses that were missing one.
 
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
