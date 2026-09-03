@@ -11,6 +11,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Boss slayer tasks now show that boss's own icon in the Slayer task panel instead of a generic unknown-task icon - covers every boss assignable via the "Boss" task, not just the Desert Treasure II bosses.
 - A handful of new items from today's OSRS update now show up correctly with names and icons (the elemental diamond/amulet set, Necklace of fangs).
 - Added support for tracking kills of 36 more bosses and quest bosses in the activity feed and Loot Log's boss filter (including Brutus and Demonic Brutus), and backfilled combat levels for 26 already-tracked bosses that were missing one.
+- Toast notifications now show a small countdown bar and auto-dismiss after 5 minutes; a kill toast that gets updated with another kill resets its timer instead of expiring mid-streak.
 
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.

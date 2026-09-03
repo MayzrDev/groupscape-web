@@ -15,6 +15,9 @@ const RELATIVE_TIME_TICK_MS = 1000;
 // doc below), a ping is a live "look here now" callout - it auto-dismisses so the stack doesn't
 // fill up with stale pings from a session left open a while.
 const PING_TOAST_LIFETIME_MS = 20000;
+// Activity-event toasts still auto-dismiss eventually so a long-unattended session doesn't build
+// up a stack forever, but on a much longer timer than pings since they're meant to sit around.
+const TOAST_LIFETIME_MS = 5 * 60 * 1000;
 
 const TOAST_ICONS = {
   kill: "⚔",
@@ -40,7 +43,8 @@ function relativeTime(fromDate) {
 }
 
 // Toasts are meant to sit in the corner while the app runs unattended, so they stay on screen
-// until the player dismisses them rather than auto-expiring after a few seconds.
+// for a long time (see `TOAST_LIFETIME_MS`) rather than auto-expiring after a few seconds -
+// but they do eventually clear themselves out if left unattended long enough.
 export class ToastStack extends BaseElement {
   constructor() {
     super();
@@ -90,6 +94,7 @@ export class ToastStack extends BaseElement {
     group.el.classList.remove("toast-stack__toast--pulse");
     void group.el.offsetWidth;
     group.el.classList.add("toast-stack__toast--pulse");
+    this.startLifetimeTimer(group.el);
     return true;
   }
 
@@ -115,18 +120,21 @@ export class ToastStack extends BaseElement {
       el.style.setProperty("--toast-color", `var(--clue-${toast.event.payload.clueTier})`);
     }
     el.innerHTML = `
-      <div class="toast-stack__icon">${TOAST_ICONS[toast.type] || "•"}</div>
-      <div class="toast-stack__body">
-        <div class="toast-stack__title">${this.titleHtml(toast)}</div>
-        <div class="toast-stack__meta">
-          ${
-            this.metaHtml(toast)
-              ? `<span>${this.metaHtml(toast)}</span><span class="toast-stack__dot">&middot;</span>`
-              : ""
-          }
-          <span class="toast-stack__time"></span>
+      <div class="toast-stack__content">
+        <div class="toast-stack__icon">${TOAST_ICONS[toast.type] || "•"}</div>
+        <div class="toast-stack__body">
+          <div class="toast-stack__title">${this.titleHtml(toast)}</div>
+          <div class="toast-stack__meta">
+            ${
+              this.metaHtml(toast)
+                ? `<span>${this.metaHtml(toast)}</span><span class="toast-stack__dot">&middot;</span>`
+                : ""
+            }
+            <span class="toast-stack__time"></span>
+          </div>
         </div>
       </div>
+      <div class="toast-stack__bar"><div class="toast-stack__bar-fill"></div></div>
       <button class="toast-stack__close" type="button" aria-label="Dismiss">&times;</button>
     `;
     this.eventListener(
@@ -166,10 +174,31 @@ export class ToastStack extends BaseElement {
 
     if (toast.type === "ping") {
       setTimeout(() => this.dismiss(el), PING_TOAST_LIFETIME_MS);
+    } else {
+      this.startLifetimeTimer(el);
     }
   }
 
+  // (Re)starts the long auto-dismiss timer and snaps the depleting bar back to full. Called both
+  // for a freshly-created toast and for a kill toast that got merged into in place, so a live
+  // kill streak keeps refreshing its toast's lifetime instead of it expiring mid-streak.
+  startLifetimeTimer(el) {
+    if (el._lifetimeTimeout) window.clearTimeout(el._lifetimeTimeout);
+    el.dataset.lifetimeStart = Date.now();
+    el._lifetimeTimeout = window.setTimeout(() => this.dismiss(el), TOAST_LIFETIME_MS);
+    this.updateLifetimeBar(el);
+  }
+
+  updateLifetimeBar(el) {
+    const fill = el.querySelector(".toast-stack__bar-fill");
+    if (!fill || !el.dataset.lifetimeStart) return;
+    const elapsed = Date.now() - Number(el.dataset.lifetimeStart);
+    const remaining = Math.max(0, 1 - elapsed / TOAST_LIFETIME_MS);
+    fill.style.width = `${remaining * 100}%`;
+  }
+
   dismiss(el) {
+    if (el._lifetimeTimeout) window.clearTimeout(el._lifetimeTimeout);
     el.classList.add("toast-stack__toast--leaving");
     el.addEventListener("animationend", () => el.remove());
     // Fallback in case prefers-reduced-motion skips the leave animation entirely.
@@ -195,7 +224,10 @@ export class ToastStack extends BaseElement {
   }
 
   tickTimestamps() {
-    this.list.querySelectorAll(".toast-stack__toast").forEach((el) => this.updateTimestamp(el));
+    this.list.querySelectorAll(".toast-stack__toast").forEach((el) => {
+      this.updateTimestamp(el);
+      this.updateLifetimeBar(el);
+    });
   }
 
   updateTimestamp(el) {
