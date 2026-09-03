@@ -23,6 +23,7 @@ const TOAST_ICONS = {
   diary: "⛰",
   "combat-achievement": "✦",
   collection_log: "❖",
+  clue: "📜",
   raid: "🏆",
   level_up: "⬆",
   ping: "📍",
@@ -100,6 +101,11 @@ export class ToastStack extends BaseElement {
     el.className = `toast-stack__toast toast-stack__toast--${toast.type}`;
     el.href = toast.type === "ping" ? "/group/map" : toast.event ? activityLinkFor(toast.event) : "/group/activity";
     el.dataset.occurredAt = toast.event?.occurred_at || new Date().toISOString();
+    // Clue tiers share one "clue" toast type but each gets its own color, matching the activity
+    // feed's per-tier treatment (see activity-feed-event.js).
+    if (toast.type === "clue" && toast.event?.payload?.clueTier) {
+      el.style.setProperty("--toast-color", `var(--clue-${toast.event.payload.clueTier})`);
+    }
     el.innerHTML = `
       <div class="toast-stack__icon">${TOAST_ICONS[toast.type] || "•"}</div>
       <div class="toast-stack__body">

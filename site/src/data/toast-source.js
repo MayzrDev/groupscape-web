@@ -12,8 +12,12 @@ const TOAST_TYPE_BY_EVENT_TYPE = {
   combat_task: "combat-achievement",
 };
 
-function toastTypeFor(eventType) {
-  return TOAST_TYPE_BY_EVENT_TYPE[eventType] || eventType;
+// Mirrors activity-event-copy.js's `activityDisplayType` for the one case that matters to toast
+// styling: clue caskets are stored as `loot` events discriminated by `payload.clueTier`, so a raw
+// `event_type` lookup would otherwise send them out untyped (bullet icon, default color).
+function toastTypeFor(event) {
+  if (event.event_type === "loot" && event.payload?.clueTier) return "clue";
+  return TOAST_TYPE_BY_EVENT_TYPE[event.event_type] || event.event_type;
 }
 
 class ToastSource {
@@ -51,7 +55,7 @@ class ToastSource {
     this.sawFirstPoll = true;
 
     for (const event of newEvents) {
-      pubsub.publish("toast", { type: toastTypeFor(event.event_type), event });
+      pubsub.publish("toast", { type: toastTypeFor(event), event });
     }
   }
 }

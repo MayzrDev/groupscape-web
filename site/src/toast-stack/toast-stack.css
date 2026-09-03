@@ -3,6 +3,11 @@ toast-stack {
   right: 16px;
   bottom: 16px;
   z-index: 900;
+  display: flex;
+  flex-direction: column;
+  /* Caps total height to the viewport so the clear button (first child, pinned above the list)
+     can't be pushed off-screen by a tall stack - the list scrolls internally instead. */
+  max-height: calc(100vh - 32px);
   pointer-events: none;
 }
 
@@ -11,6 +16,10 @@ toast-stack {
   flex-direction: column-reverse;
   align-items: flex-end;
   gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  pointer-events: auto;
 }
 
 .toast-stack__clear[hidden] {

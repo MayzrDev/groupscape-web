@@ -69,6 +69,25 @@ describe("toast-source", () => {
     expect(published[0].event.event_type).toBe("combat_task");
   });
 
+  it("routes clue casket loot events onto their own clue toast type", async () => {
+    api.getActivityEvents.mockResolvedValue([{ id: 1, event_type: "kill", member_name: "Alice", payload: {} }]);
+    toastSource.enabled = true;
+    await toastSource.poll();
+
+    api.getActivityEvents.mockResolvedValue([
+      { id: 1, event_type: "kill", member_name: "Alice", payload: {} },
+      { id: 2, event_type: "loot", member_name: "Bob", payload: { clueTier: "hard", loot: [] } },
+    ]);
+    const published = [];
+    pubsub.subscribe("toast", (toast) => published.push(toast), false);
+
+    await toastSource.poll();
+
+    expect(published).toHaveLength(1);
+    expect(published[0].type).toBe("clue");
+    expect(published[0].event.event_type).toBe("loot");
+  });
+
   it("does nothing once disabled", async () => {
     toastSource.enabled = false;
     await toastSource.poll();
