@@ -11,11 +11,38 @@ slayer-panel {
   margin-bottom: 8px;
 }
 
-.slayer-panel__stat {
+.slayer-panel__streak-ledger {
+  flex: 3;
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.slayer-panel__streak-cell {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
+  padding: 5px 4px;
+}
+
+.slayer-panel__streak-cell + .slayer-panel__streak-cell {
+  border-left: 1px solid hsl(40deg 15.79% 24%);
+}
+
+.slayer-panel__streak-cell--active {
+  background: rgba(255, 152, 31, 0.08);
+}
+
+.slayer-panel__points-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 2px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid hsl(40deg 15.79% 29.8%);
@@ -24,7 +51,7 @@ slayer-panel {
 }
 
 .slayer-panel__stat-label {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
   opacity: 0.65;
@@ -36,6 +63,10 @@ slayer-panel {
   font-variant-numeric: tabular-nums;
 }
 
+.slayer-panel__stat-value--empty {
+  opacity: 0.5;
+}
+
 .slayer-panel__no-task {
   text-align: center;
   padding: 14px 0 6px;
@@ -43,23 +74,50 @@ slayer-panel {
   font-size: 14px;
 }
 
-.slayer-panel__master {
+.slayer-panel__master-banner {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid hsl(40deg 15.79% 29.8%);
+  padding: 5px 8px;
+  background: linear-gradient(90deg, rgba(255, 152, 31, 0.1), transparent);
+  border: 1px solid hsl(40deg 15.79% 24%);
+  border-left: 3px solid var(--orange);
+  border-radius: 3px;
+  text-decoration: none;
+  color: inherit;
 }
 
-.slayer-panel__master-portrait {
-  width: 32px;
-  height: 32px;
-  border-radius: 3px;
+.slayer-panel__master-banner:hover {
+  background: linear-gradient(90deg, rgba(255, 152, 31, 0.18), transparent);
+}
+
+.slayer-panel__master-chathead {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 50%;
   border: 1px solid hsl(40deg 15.79% 29.8%);
   object-fit: cover;
   object-position: top;
   image-rendering: initial;
+}
+
+.slayer-panel__master-chathead--fallback {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.slayer-panel__master-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slayer-panel__master-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.65;
 }
 
 .slayer-panel__master-name {

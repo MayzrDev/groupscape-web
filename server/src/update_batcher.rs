@@ -1,6 +1,6 @@
 use crate::db::serialize_serde;
 use crate::error::ApiError;
-use crate::models::{GroupMember, SHARED_MEMBER};
+use crate::models::{GroupMember, SlayerTask, SHARED_MEMBER};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::{Client, Pool};
 use futures_util::stream::{self, StreamExt};
@@ -225,6 +225,31 @@ fn merge_deposited(older: &[i32], newer: &[i32]) -> Vec<i32> {
     result
 }
 
+/// Every `SlayerTask` field except the 3 streak buckets takes the same full-overwrite treatment
+/// as the rest of `merge_group_member` - `newer` is a complete snapshot of everything else. The
+/// buckets are special-cased because the plugin only ever reports the one bucket matching the
+/// task's `master_name`; the other 2 have to survive from `older` or they'd blank out the moment
+/// the player takes a task from a different master.
+fn merge_slayer_task(older: Option<&SlayerTask>, newer: &SlayerTask) -> SlayerTask {
+    let mut merged = newer.clone();
+    merged.streak_normal = older.and_then(|t| t.streak_normal);
+    merged.streak_mortimer = older.and_then(|t| t.streak_mortimer);
+    merged.streak_wildy = older.and_then(|t| t.streak_wildy);
+
+    // The plugin only sends `master_name` while a task is active - without it we can't tell
+    // which bucket `newer.streak` belongs to, so leave all 3 buckets as carried forward above.
+    if let Some(master_name) = &newer.master_name {
+        let bucket = match master_name.trim().to_lowercase().as_str() {
+            "krystilia" => &mut merged.streak_wildy,
+            "mortimer" => &mut merged.streak_mortimer,
+            _ => &mut merged.streak_normal,
+        };
+        *bucket = Some(newer.streak);
+    }
+
+    merged
+}
+
 pub(crate) fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.stats.is_some() {
         older.stats = newer.stats.clone();
@@ -277,8 +302,8 @@ pub(crate) fn merge_group_member(older: &mut GroupMember, newer: &GroupMember) {
     if newer.combat_achievements.is_some() {
         older.combat_achievements = newer.combat_achievements.clone();
     }
-    if newer.slayer_task.is_some() {
-        older.slayer_task = newer.slayer_task.clone();
+    if let Some(newer_task) = &newer.slayer_task {
+        older.slayer_task = Some(merge_slayer_task(older.slayer_task.as_ref(), newer_task));
     }
 
     if let Some(newer_deposited) = &newer.deposited {
@@ -373,7 +398,17 @@ UPDATE groupscape.members AS a SET
   active_prayers = COALESCE(b.active_prayers, a.active_prayers),
   rich_presence = COALESCE(b.rich_presence, a.rich_presence),
   combat_achievements = COALESCE(b.combat_achievements, a.combat_achievements),
-  slayer_task = COALESCE(b.slayer_task, a.slayer_task)
+  -- A plain COALESCE would let one batch flush window's slayer_task blob fully replace the
+  -- stored row, wiping out streak_normal/streak_mortimer/streak_wildy buckets this flush never
+  -- touched (they're only carried forward in-memory across updates seen within the same window,
+  -- see merge_slayer_task). Shallow jsonb-merging over the stored row instead keeps whichever
+  -- bucket keys the incoming blob omits (skip_serializing_if omits an untouched None bucket
+  -- rather than writing it as null), letting b's other fields still fully overwrite as normal.
+  slayer_task = CASE
+    WHEN b.slayer_task IS NULL THEN a.slayer_task
+    WHEN a.slayer_task IS NULL THEN b.slayer_task
+    ELSE (a.slayer_task::jsonb || b.slayer_task::jsonb)::text
+  END
 FROM (VALUES {values}) AS b(
   group_id, member_name, stats, coordinates, skills, quests, inventory,
   equipment, bank, rune_pouch, interacting, seed_vault, diary_vars, collection_log,
@@ -811,6 +846,71 @@ mod tests {
 
         merge_group_member(&mut older, &newer);
         assert_eq!(older.deposited, Some(vec![5, 10]));
+    }
+
+    // -- merge_slayer_task --
+
+    fn make_slayer_task(master_name: Option<&str>, streak: i32) -> SlayerTask {
+        SlayerTask {
+            has_task: master_name.is_some(),
+            master_name: master_name.map(|s| s.to_string()),
+            task_name: None,
+            task_location: None,
+            amount_remaining: None,
+            initial_amount: None,
+            points: 0,
+            streak,
+            streak_normal: None,
+            streak_mortimer: None,
+            streak_wildy: None,
+        }
+    }
+
+    #[test]
+    fn test_merge_slayer_task_buckets_by_master() {
+        let normal = merge_slayer_task(None, &make_slayer_task(Some("Duradel"), 42));
+        assert_eq!(normal.streak_normal, Some(42));
+        assert_eq!(normal.streak_mortimer, None);
+        assert_eq!(normal.streak_wildy, None);
+
+        let mortimer = merge_slayer_task(None, &make_slayer_task(Some("Mortimer"), 12));
+        assert_eq!(mortimer.streak_mortimer, Some(12));
+        assert_eq!(mortimer.streak_normal, None);
+
+        let wildy = merge_slayer_task(None, &make_slayer_task(Some("Krystilia"), 9));
+        assert_eq!(wildy.streak_wildy, Some(9));
+        assert_eq!(wildy.streak_normal, None);
+    }
+
+    #[test]
+    fn test_merge_slayer_task_carries_forward_other_buckets() {
+        let mut older = make_slayer_task(Some("Duradel"), 41);
+        older.streak_normal = Some(41);
+        older.streak_mortimer = Some(12);
+        older.streak_wildy = Some(9);
+
+        let newer = make_slayer_task(Some("Duradel"), 42);
+        let merged = merge_slayer_task(Some(&older), &newer);
+
+        assert_eq!(merged.streak_normal, Some(42));
+        assert_eq!(merged.streak_mortimer, Some(12));
+        assert_eq!(merged.streak_wildy, Some(9));
+    }
+
+    #[test]
+    fn test_merge_slayer_task_no_master_name_leaves_buckets_untouched() {
+        let mut older = make_slayer_task(None, 0);
+        older.streak_normal = Some(41);
+        older.streak_mortimer = Some(12);
+        older.streak_wildy = Some(9);
+
+        // No active task -> plugin sends streak but not master_name.
+        let newer = make_slayer_task(None, 41);
+        let merged = merge_slayer_task(Some(&older), &newer);
+
+        assert_eq!(merged.streak_normal, Some(41));
+        assert_eq!(merged.streak_mortimer, Some(12));
+        assert_eq!(merged.streak_wildy, Some(9));
     }
 
     #[test]

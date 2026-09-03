@@ -112,6 +112,20 @@ pub struct SlayerTask {
     pub initial_amount: Option<i32>,
     pub points: i32,
     pub streak: i32,
+    /// The 3 independently-tracked "tasks completed" counters game-side (Krystilia's wilderness
+    /// tasks and Mortimer's Managing Miscellania tasks each keep their own, everything else feeds
+    /// the shared "normal" counter - see `SlayerTaskState`'s streak switch). The plugin only ever
+    /// sends the single counter matching whatever master is current in `streak`; these 3 fields
+    /// are derived and persisted server-side in `update_batcher::merge_slayer_task` by bucketing
+    /// each incoming `streak` under `master_name`, carrying the other 2 buckets forward from the
+    /// stored row so they don't blank out when the player switches masters. `None` means that
+    /// bucket has never been observed yet, not that it's zero.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub streak_normal: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub streak_mortimer: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub streak_wildy: Option<i32>,
 }
 
 #[derive(Deserialize)]

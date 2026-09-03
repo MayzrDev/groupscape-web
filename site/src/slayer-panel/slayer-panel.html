@@ -1,9 +1,10 @@
 <div class="slayer-panel__stats-row">
-  <div class="slayer-panel__stat">
-    <span class="slayer-panel__stat-label">Streak</span>
-    <span class="slayer-panel__stat-value">${this.streak()}</span>
+  <div class="slayer-panel__streak-ledger">
+    ${this.renderStreakCell("normal", "Normal", this.streakNormal())}
+    ${this.renderStreakCell("mortimer", "Mortimer", this.streakMortimer())}
+    ${this.renderStreakCell("wildy", "Wildy", this.streakWildy())}
   </div>
-  <div class="slayer-panel__stat">
+  <div class="slayer-panel__points-box">
     <span class="slayer-panel__stat-label">Points</span>
     <span class="slayer-panel__stat-value">${this.points()}</span>
   </div>

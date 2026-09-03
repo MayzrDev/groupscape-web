@@ -12,6 +12,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - A handful of new items from today's OSRS update now show up correctly with names and icons (the elemental diamond/amulet set, Necklace of fangs).
 - Added support for tracking kills of 36 more bosses and quest bosses in the activity feed and Loot Log's boss filter (including Brutus and Demonic Brutus), and backfilled combat levels for 26 already-tracked bosses that were missing one.
 - Toast notifications now show a small countdown bar and auto-dismiss after 5 minutes; a kill toast that gets updated with another kill resets its timer instead of expiring mid-streak.
+- Slayer panel now shows your regular, Mortimer, and Wilderness task streaks side by side, instead of just whichever one matches your current task - the other two no longer disappear when you switch masters.
+- Slayer master is now shown as a clickable portrait that links to their Old School RuneScape Wiki page, including 4 masters that weren't shown before (Mortimer, Aya, Achtryn, Kuradal).
+- Added icons for dozens of slayer tasks (cows, greater demons, revenants, black dragons, and many more) that were showing a generic unknown-task icon.
 
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
