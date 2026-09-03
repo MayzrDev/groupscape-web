@@ -7,6 +7,10 @@ loot-log-page {
   min-height: 300px;
   padding: 14px 16px 18px;
   box-sizing: border-box;
+  /* Container query context for .loot-log-page__list below - has to live on an ancestor,
+     not the queried element itself (a self-referencing container query, where the same
+     element both establishes containment and reads @container, silently never matches). */
+  container-type: inline-size;
 }
 
 .loot-log-page__summary-stats {
@@ -98,13 +102,15 @@ loot-log-page {
   display: grid;
   grid-template-columns: 1fr;
   margin-top: 4px;
-  container-type: inline-size;
 }
 
 /* Two session cards side by side once there's room for both fixed-width (532px) item
-   grids plus a gap - tied to the list's own rendered width via a container query rather
-   than the viewport, so it accounts for whatever sidebar width is actually on screen. */
-@container (min-width: 1120px) {
+   grids plus a gap - tied to .loot-log-page__container's rendered width via a container
+   query rather than the viewport, so it accounts for whatever sidebar width is actually on
+   screen. A size container query measures the container's content-box, so its own padding
+   (see .loot-log-page__container) is already excluded - the threshold is just the cards'
+   own minimum: 532 * 2 + 24 gap = 1088px. */
+@container (min-width: 1088px) {
   .loot-log-page__list {
     grid-template-columns: 1fr 1fr;
     column-gap: 24px;

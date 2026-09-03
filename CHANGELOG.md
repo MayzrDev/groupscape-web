@@ -7,6 +7,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Fixed
 - Clue scroll toast notifications now show the proper scroll icon and tier color instead of a plain bullet.
 - The toast stack's "Clear all" button no longer gets pushed off-screen when a lot of notifications pile up - the list now scrolls within the screen instead.
+- The Loot Log now actually shows two farming-session cards side by side on wide screens instead of leaving empty space next to a single column.
 
 ## [1.0.350] - 2026-09-02
 
