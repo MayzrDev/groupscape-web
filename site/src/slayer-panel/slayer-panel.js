@@ -19,6 +19,7 @@ export class SlayerPanel extends BaseElement {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
     this.subscribeOnce("get-group-data", this.init.bind(this));
+    this.subscribe(`slayerTask:${this.playerName}`, this.render.bind(this));
   }
 
   disconnectedCallback() {
@@ -74,6 +75,11 @@ export class SlayerPanel extends BaseElement {
     return Math.max(0, Math.min(100, Math.round((this.amountDone() / task.initialAmount) * 100)));
   }
 
+  // Task is still assigned (hasTask) but fully killed - the player hasn't turned it in yet.
+  isTaskComplete() {
+    return this.member.slayerTask.amountRemaining <= 0;
+  }
+
   renderNoTask() {
     return `<div class="slayer-panel__no-task">No task</div>`;
   }
@@ -117,6 +123,7 @@ export class SlayerPanel extends BaseElement {
 
   renderTask() {
     const task = this.member.slayerTask;
+    const complete = this.isTaskComplete();
     // The plugin can occasionally fail to resolve a task's name off the game's own DB tables
     // (see SlayerTaskState#resolveTaskName) while amountRemaining/initialAmount still come
     // through fine - fall back to a placeholder rather than literally printing "null".
@@ -125,15 +132,19 @@ export class SlayerPanel extends BaseElement {
     const wikiUrl = task.taskName ? slayerData.taskWikiUrl(task.taskName) : null;
 
     const taskTag = wikiUrl ? "a" : "div";
+    const taskClass = `slayer-panel__task${complete ? " slayer-panel__task--complete" : ""}`;
     const taskAttrs = wikiUrl
-      ? `href="${wikiUrl}" target="_blank" rel="noopener" class="slayer-panel__task slayer-panel__task--clickable"`
-      : `class="slayer-panel__task"`;
+      ? `href="${wikiUrl}" target="_blank" rel="noopener" class="${taskClass} slayer-panel__task--clickable"`
+      : `class="${taskClass}"`;
 
     return `
       ${this.renderMaster()}
 
       <${taskTag} ${taskAttrs}>
-        <img class="slayer-panel__task-icon" src="${taskIcon}" alt="${taskName}" />
+        <div class="slayer-panel__task-icon-wrap">
+          <img class="slayer-panel__task-icon" src="${taskIcon}" alt="${taskName}" />
+          ${complete ? `<span class="slayer-panel__task-check">&#10003;</span>` : ""}
+        </div>
         <div class="slayer-panel__task-body">
           <span class="slayer-panel__task-name">${taskName}</span>
           ${task.taskLocation ? `<span class="slayer-panel__task-location">${task.taskLocation}</span>` : ""}
@@ -142,11 +153,28 @@ export class SlayerPanel extends BaseElement {
       </${taskTag}>
 
       <div class="slayer-panel__progress">
-        <div class="slayer-panel__progress-track">
-          <div class="slayer-panel__progress-fill" style="width: ${this.progressPercent()}%"></div>
+        <div class="slayer-panel__progress-track${complete ? " slayer-panel__progress-track--complete" : ""}">
+          <div class="slayer-panel__progress-fill${
+            complete ? " slayer-panel__progress-fill--complete" : ""
+          }" style="width: ${this.progressPercent()}%"></div>
         </div>
-        <span class="slayer-panel__progress-frac">${this.amountDone()}/${task.initialAmount}</span>
+        <span class="slayer-panel__progress-frac${
+          complete ? " slayer-panel__progress-frac--complete" : ""
+        }">${this.amountDone()}/${task.initialAmount}</span>
       </div>
+
+      ${
+        complete
+          ? `
+        <div class="slayer-panel__complete-banner">
+          <span class="slayer-panel__complete-msg">Task complete</span>
+          <span class="slayer-panel__complete-sub">Return to ${
+            task.masterName ?? "your slayer master"
+          } for a new assignment</span>
+        </div>
+      `
+          : ""
+      }
     `;
   }
 }

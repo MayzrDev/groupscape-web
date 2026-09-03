@@ -15,6 +15,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Slayer panel now shows your regular, Mortimer, and Wilderness task streaks side by side, instead of just whichever one matches your current task - the other two no longer disappear when you switch masters.
 - Slayer master is now shown as a clickable portrait that links to their Old School RuneScape Wiki page, including 4 masters that weren't shown before (Mortimer, Aya, Achtryn, Kuradal).
 - Added icons for dozens of slayer tasks (cows, greater demons, revenants, black dragons, and many more) that were showing a generic unknown-task icon.
+- Slayer task panel now shows a "Task complete" banner and green progress bar once you've killed enough for your current task, so you know to head back to your slayer master.
 
 ### Changed
 - The Slayer task panel's task icon and name are now part of one clickable card that links to the Old School RuneScape Wiki guide, instead of just a small text link.
@@ -30,6 +31,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The toast stack's "Clear all" button no longer gets pushed off-screen when a lot of notifications pile up - the list now scrolls within the screen instead.
 - The Loot Log now actually shows two farming-session cards side by side on wide screens instead of leaving empty space next to a single column.
 - Slayer task panel no longer shows a literal "null" for the assigning master when that name hasn't been captured yet - it's just omitted.
+- Slayer task progress, kill count, and streaks now update live instead of only refreshing when you close and reopen the panel.
 - Slayer task progress now shows kills done so far out of the total (e.g. 2/45) instead of kills remaining out of the total.
 - Slayer task panel no longer shows a literal "null" for the task name when it occasionally fails to resolve - the name and wiki link are omitted instead.
 - Activity feed and toast notifications no longer merge kills from before and after a death into one streak - a death now starts a fresh kill count for that boss.

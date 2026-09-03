@@ -162,12 +162,40 @@ slayer-panel {
   opacity: 1;
 }
 
+.slayer-panel__task-icon-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
 .slayer-panel__task-icon {
   width: 34px;
   height: 34px;
   flex-shrink: 0;
   object-fit: contain;
   image-rendering: initial;
+}
+
+.slayer-panel__task--complete {
+  border-color: rgba(13, 193, 13, 0.35);
+  background: rgba(13, 193, 13, 0.06);
+}
+
+.slayer-panel__task-check {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--green);
+  border: 2px solid hsl(29deg 20% 7%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: #06280a;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .slayer-panel__task-body {
@@ -224,4 +252,39 @@ slayer-panel {
   opacity: 0.8;
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
+}
+
+.slayer-panel__progress-track--complete {
+  border-color: rgba(13, 193, 13, 0.4);
+}
+
+.slayer-panel__progress-fill--complete {
+  background: linear-gradient(90deg, #57e057, var(--green));
+}
+
+.slayer-panel__progress-frac--complete {
+  color: #6be86b;
+  font-weight: 600;
+}
+
+.slayer-panel__complete-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(13, 193, 13, 0.1);
+  border: 1px solid rgba(13, 193, 13, 0.35);
+  border-radius: 3px;
+}
+
+.slayer-panel__complete-msg {
+  font-size: 12px;
+  color: #6be86b;
+  font-weight: 600;
+}
+
+.slayer-panel__complete-sub {
+  font-size: 11px;
+  opacity: 0.65;
 }
