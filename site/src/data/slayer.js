@@ -1,5 +1,3 @@
-import { bossIconFor } from "./activity-event-copy";
-
 // Headshot/portrait icons for the current real OSRS slayer masters, downloaded from the OSRS
 // wiki (Special:FilePath/<Master name>.png) and bundled locally under
 // /icons/slayer/masters/<key>.png - see CLAUDE.md's asset-sourcing convention (no runtime
@@ -17,8 +15,9 @@ const SLAYER_MASTER_ICONS = {
   krystilia: "krystilia",
 };
 
-// Task monster -> local icon key, under /icons/slayer/monsters/<key>.png. Covers the common
-// slayer task monster pool; anything not listed here falls back to UNKNOWN_TASK_ICON.
+// Task target (regular monster or assignable boss) -> local icon key, under
+// /icons/slayer/monsters/<key>.png. Covers the full slayer task pool; anything not listed here
+// falls back to UNKNOWN_TASK_ICON.
 const SLAYER_MONSTER_ICONS = {
   "aberrant spectres": "aberrant-spectres",
   "abyssal demons": "abyssal-demons",
@@ -83,6 +82,44 @@ const SLAYER_MONSTER_ICONS = {
   waterfiends: "waterfiends",
   wyrms: "wyrms",
   zombies: "zombies",
+
+  // Every boss assignable via the generic "Boss" slayer task (the task unlocked by the 200-point
+  // "Like a boss" reward, given by Duradel/Kuradal, Konar, Nieve/Steve, and Krystilia) - see
+  // GroupScapeTrackerPlugin#resolveBossTaskId. Same render-icon style as every other task above,
+  // downloaded from the wiki - not the smaller Hiscore-style icon used elsewhere on the site
+  // (boss-icons.js's BOSS_ICON_SLUGS).
+  "the leviathan": "the-leviathan",
+  "the whisperer": "the-whisperer",
+  vardorvis: "vardorvis",
+  "duke sucellus": "duke-sucellus",
+  "abyssal sire": "abyssal-sire",
+  "alchemical hydra": "alchemical-hydra",
+  cerberus: "cerberus",
+  "thermonuclear smoke devil": "thermonuclear-smoke-devil",
+  kraken: "kraken",
+  "grotesque guardians": "grotesque-guardians",
+  "dagannoth rex": "dagannoth-rex",
+  "dagannoth prime": "dagannoth-prime",
+  "dagannoth supreme": "dagannoth-supreme",
+  "kalphite queen": "kalphite-queen",
+  "giant mole": "giant-mole",
+  sarachnis: "sarachnis",
+  "k'ril tsutsaroth": "kril-tsutsaroth",
+  "kree'arra": "kreearra",
+  "commander zilyana": "commander-zilyana",
+  "general graardor": "general-graardor",
+  "vet'ion": "vetion",
+  callisto: "callisto",
+  venenatis: "venenatis",
+  scorpia: "scorpia",
+  "chaos elemental": "chaos-elemental",
+  "chaos fanatic": "chaos-fanatic",
+  "crazy archaeologist": "crazy-archaeologist",
+  "king black dragon": "king-black-dragon",
+  vorkath: "vorkath",
+  zulrah: "zulrah",
+  "phantom muspah": "phantom-muspah",
+  araxxor: "araxxor",
 };
 
 const UNKNOWN_TASK_ICON = "/icons/slayer/monsters/unknown-task.png";
@@ -102,9 +139,6 @@ class SlayerData {
   }
 
   taskIconUrl(taskName) {
-    const bossIcon = bossIconFor(taskName);
-    if (bossIcon) return bossIcon;
-
     const key = SLAYER_MONSTER_ICONS[normalize(taskName)];
     return key ? `/icons/slayer/monsters/${key}.png` : UNKNOWN_TASK_ICON;
   }
