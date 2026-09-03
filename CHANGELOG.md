@@ -19,6 +19,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Loot Log now actually shows two farming-session cards side by side on wide screens instead of leaving empty space next to a single column.
 - Slayer task panel no longer shows a literal "null" for the assigning master when that name hasn't been captured yet - it's just omitted.
 - Slayer task progress now shows kills done so far out of the total (e.g. 2/45) instead of kills remaining out of the total.
+- Slayer task panel no longer shows a literal "null" for the task name when it occasionally fails to resolve - the name and wiki link are omitted instead.
 
 ## [1.0.350] - 2026-09-02
 

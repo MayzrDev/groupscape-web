@@ -59,6 +59,10 @@ export class SlayerPanel extends BaseElement {
 
   renderTask() {
     const task = this.member.slayerTask;
+    // The plugin can occasionally fail to resolve a task's name off the game's own DB tables
+    // (see SlayerTaskState#resolveTaskName) while amountRemaining/initialAmount still come
+    // through fine - fall back to a placeholder rather than literally printing "null".
+    const taskName = task.taskName ?? "Unknown task";
     const masterIcon = slayerData.masterIconUrl(task.masterName);
     const taskIcon = slayerData.taskIconUrl(task.taskName);
 
@@ -77,16 +81,22 @@ export class SlayerPanel extends BaseElement {
       }
 
       <div class="slayer-panel__task">
-        <img class="slayer-panel__task-icon" src="${taskIcon}" alt="${task.taskName}" />
+        <img class="slayer-panel__task-icon" src="${taskIcon}" alt="${taskName}" />
         <div class="slayer-panel__task-body">
-          <span class="slayer-panel__task-name">${task.taskName}</span>
+          <span class="slayer-panel__task-name">${taskName}</span>
           ${task.taskLocation ? `<span class="slayer-panel__task-location">${task.taskLocation}</span>` : ""}
+          ${
+            task.taskName
+              ? `
           <a
             href="${slayerData.taskWikiUrl(task.taskName)}"
             target="_blank"
             rel="noopener"
             class="slayer-panel__wiki-link"
           >View slayer guide &#8599;</a>
+          `
+              : ""
+          }
         </div>
       </div>
 
