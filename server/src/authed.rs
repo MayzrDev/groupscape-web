@@ -1148,6 +1148,110 @@ fn parse_item_ids(raw: Option<&str>) -> std::collections::HashSet<i32> {
         .collect()
 }
 
+/// Which of the Loot Log page's four filter categories are active - "boss" and "other" both
+/// split `source_type == "kill"` further (see [`LootLogCategories::matches`]), keyed off the
+/// same curated [`crate::notable_npcs`] list the activity feed uses to decide "is this worth
+/// calling out". `None`/empty/unparseable input means all four are active, matching the client's
+/// own default-all-selected state - this endpoint never needs to distinguish "no filter" from
+/// "every category explicitly on".
+struct LootLogCategories {
+    boss: bool,
+    other: bool,
+    chest: bool,
+    clue: bool,
+}
+impl LootLogCategories {
+    fn parse(raw: Option<&str>) -> Self {
+        let raw = raw.unwrap_or("").trim();
+        if raw.is_empty() {
+            return Self { boss: true, other: true, chest: true, clue: true };
+        }
+        let parts: std::collections::HashSet<&str> = raw.split(',').map(str::trim).collect();
+        Self {
+            boss: parts.contains("boss"),
+            other: parts.contains("other"),
+            chest: parts.contains("chest"),
+            clue: parts.contains("clue"),
+        }
+    }
+
+    fn matches(&self, source: &LootSourceEvent) -> bool {
+        match source.source_type {
+            "kill" => {
+                if crate::notable_npcs::is_notable(&source.source_name) {
+                    self.boss
+                } else {
+                    self.other
+                }
+            }
+            "chest" => self.chest,
+            "clue" => self.clue,
+            _ => true,
+        }
+    }
+}
+
+#[cfg(test)]
+mod loot_log_categories_tests {
+    use super::*;
+
+    fn source(source_type: &'static str, source_name: &str) -> LootSourceEvent {
+        LootSourceEvent {
+            source_name: source_name.to_string(),
+            source_type,
+            clue_tier: None,
+            loot: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn no_query_param_matches_everything() {
+        let categories = LootLogCategories::parse(None);
+        assert!(categories.matches(&source("kill", "Vorkath")));
+        assert!(categories.matches(&source("kill", "Goblin")));
+        assert!(categories.matches(&source("chest", "Chambers of Xeric")));
+        assert!(categories.matches(&source("clue", "Master Casket")));
+    }
+
+    #[test]
+    fn empty_or_whitespace_param_matches_everything() {
+        assert!(LootLogCategories::parse(Some("")).matches(&source("kill", "Goblin")));
+        assert!(LootLogCategories::parse(Some("  ")).matches(&source("kill", "Goblin")));
+    }
+
+    #[test]
+    fn splits_kill_events_into_boss_and_other() {
+        let bosses_only = LootLogCategories::parse(Some("boss"));
+        assert!(bosses_only.matches(&source("kill", "Vorkath")));
+        assert!(!bosses_only.matches(&source("kill", "Goblin")));
+
+        let other_only = LootLogCategories::parse(Some("other"));
+        assert!(!other_only.matches(&source("kill", "Vorkath")));
+        assert!(other_only.matches(&source("kill", "Goblin")));
+    }
+
+    #[test]
+    fn filters_chest_and_clue_independently() {
+        let chest_only = LootLogCategories::parse(Some("chest"));
+        assert!(chest_only.matches(&source("chest", "Barrows")));
+        assert!(!chest_only.matches(&source("clue", "Master Casket")));
+        assert!(!chest_only.matches(&source("kill", "Vorkath")));
+
+        let clue_only = LootLogCategories::parse(Some("clue"));
+        assert!(clue_only.matches(&source("clue", "Master Casket")));
+        assert!(!clue_only.matches(&source("chest", "Barrows")));
+    }
+
+    #[test]
+    fn accepts_multiple_comma_separated_categories() {
+        let boss_and_chest = LootLogCategories::parse(Some("boss,chest"));
+        assert!(boss_and_chest.matches(&source("kill", "Vorkath")));
+        assert!(boss_and_chest.matches(&source("chest", "Barrows")));
+        assert!(!boss_and_chest.matches(&source("kill", "Goblin")));
+        assert!(!boss_and_chest.matches(&source("clue", "Master Casket")));
+    }
+}
+
 /// Builds one `LootLogEvent` from a normalized loot source, applying the search grammar (see
 /// `loot_log_search`) when `search_active`. Returns `None` when a search is active and this event
 /// matches none of it. Item-level `matched` flags are only set (`Some(_)`) when the match came
@@ -1265,6 +1369,9 @@ pub struct GetLootLogQuery {
     pub search: Option<String>,
     #[serde(default)]
     pub item_ids: Option<String>,
+    /// Comma-separated subset of "boss","other","chest","clue" - see [`LootLogCategories`].
+    #[serde(default)]
+    pub categories: Option<String>,
 }
 
 // Prevents a search that matches almost nothing in a huge history from doing unbounded work in
@@ -1287,6 +1394,7 @@ pub async fn get_loot_log(
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
     let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
     let mut events: Vec<LootLogEvent> = Vec::new();
@@ -1312,6 +1420,9 @@ pub async fn get_loot_log(
                 continue;
             };
             if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+                continue;
+            }
+            if !categories.matches(&source) {
                 continue;
             }
             if let Some(log_event) = build_matching_loot_log_event(
@@ -1356,6 +1467,9 @@ pub struct GetLootLogSummaryQuery {
     pub search: Option<String>,
     #[serde(default)]
     pub item_ids: Option<String>,
+    /// Comma-separated subset of "boss","other","chest","clue" - see [`LootLogCategories`].
+    #[serde(default)]
+    pub categories: Option<String>,
 }
 
 const LOOT_LOG_SUMMARY_BATCH_SIZE: i64 = 500;
@@ -1372,10 +1486,11 @@ pub async fn get_loot_log_summary(
     query: web::Query<GetLootLogSummaryQuery>,
 ) -> Result<web::Json<LootLogSummary>, Error> {
     let cache_key = format!(
-        "v1:loot-log-summary:{}:{}:{}",
+        "v1:loot-log-summary:{}:{}:{}:{}",
         auth.group_id,
         query.search.as_deref().unwrap_or(""),
-        query.item_ids.as_deref().unwrap_or("")
+        query.item_ids.as_deref().unwrap_or(""),
+        query.categories.as_deref().unwrap_or("")
     );
     if let Some(cached) = redis.get_json::<LootLogSummary>(&cache_key).await {
         return Ok(web::Json(cached));
@@ -1384,6 +1499,7 @@ pub async fn get_loot_log_summary(
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
     let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
     let mut total_value: i64 = 0;
@@ -1404,6 +1520,9 @@ pub async fn get_loot_log_summary(
                 continue;
             };
             if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+                continue;
+            }
+            if !categories.matches(&source) {
                 continue;
             }
             if let Some(log_event) = build_matching_loot_log_event(

@@ -560,12 +560,13 @@ class Api {
     return response.json();
   }
 
-  async getLootLog({ before, limit, search, itemIds } = {}) {
+  async getLootLog({ before, limit, search, itemIds, categories } = {}) {
     const query = new URLSearchParams();
     if (before) query.set("before", before);
     if (limit) query.set("limit", limit);
     if (search) query.set("search", search);
     if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
+    if (categories && categories.length) query.set("categories", categories.join(","));
 
     const response = await fetch(`${this.lootLogUrl}?${query.toString()}`, {
       headers: {
@@ -578,10 +579,11 @@ class Api {
     return response.json();
   }
 
-  async getLootLogSummary({ search, itemIds } = {}) {
+  async getLootLogSummary({ search, itemIds, categories } = {}) {
     const query = new URLSearchParams();
     if (search) query.set("search", search);
     if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
+    if (categories && categories.length) query.set("categories", categories.join(","));
 
     const response = await fetch(`${this.lootLogSummaryUrl}?${query.toString()}`, {
       headers: {

@@ -43,6 +43,10 @@
      in-game casket colors since that's already how players read clue tier at a glance. */
   --loot-source-chest: #c9962b;
   --loot-source-kill: var(--rarity-common);
+  /* Loot Log filter pill accent for the "Bosses" category (splits source_type "kill" further,
+     see loot-log-page.js) - reuses the combat-achievement purple rather than inventing a new
+     hue, since both mark "notable boss-related" content. */
+  --loot-source-boss: var(--activity-combat-task);
   --clue-beginner: #b0b0b0;
   --clue-easy: #f2f2f2;
   --clue-medium: #4fa8e0;

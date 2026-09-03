@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Loot Log session headers (monster, clue tier, chest/raid names) are now clickable and link to the matching Old School RuneScape Wiki page.
+- Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 
 ### Fixed
 - Clue scroll toast notifications now show the proper scroll icon and tier color instead of a plain bullet.

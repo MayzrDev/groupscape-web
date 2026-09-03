@@ -54,6 +54,80 @@ loot-log-page {
   opacity: 0.65;
 }
 
+.loot-log-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.loot-log-page__filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.8em;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--light-border);
+  background: transparent;
+  color: var(--primary-text);
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.loot-log-page__filter-chip:hover {
+  opacity: 0.85;
+}
+
+.loot-log-page__filter-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.loot-log-page__filter-chip[data-category="boss"] .loot-log-page__filter-chip-dot {
+  background: var(--loot-source-boss);
+}
+
+.loot-log-page__filter-chip[data-category="other"] .loot-log-page__filter-chip-dot {
+  background: var(--loot-source-kill);
+}
+
+.loot-log-page__filter-chip[data-category="chest"] .loot-log-page__filter-chip-dot {
+  background: var(--loot-source-chest);
+}
+
+.loot-log-page__filter-chip[data-category="clue"] .loot-log-page__filter-chip-dot {
+  background: var(--clue-master);
+}
+
+.loot-log-page__filter-chip--active {
+  opacity: 1;
+  background: var(--elevated);
+}
+
+.loot-log-page__filter-chip[data-category="boss"].loot-log-page__filter-chip--active {
+  border-color: var(--loot-source-boss);
+  color: var(--loot-source-boss);
+}
+
+.loot-log-page__filter-chip[data-category="other"].loot-log-page__filter-chip--active {
+  border-color: var(--loot-source-kill);
+  color: var(--loot-source-kill);
+}
+
+.loot-log-page__filter-chip[data-category="chest"].loot-log-page__filter-chip--active {
+  border-color: var(--loot-source-chest);
+  color: var(--loot-source-chest);
+}
+
+.loot-log-page__filter-chip[data-category="clue"].loot-log-page__filter-chip--active {
+  border-color: var(--clue-master);
+  color: var(--clue-master);
+}
+
 .loot-log-page__search-wrap {
   position: relative;
   margin-bottom: 10px;

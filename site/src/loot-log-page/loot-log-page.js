@@ -35,6 +35,31 @@ const MAX_RESOLVED_ITEM_IDS = 200;
 const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k"];
 const PLACEHOLDER_INTERVAL_MS = 2500;
 const PLACEHOLDER_FADE_MS = 400;
+const FILTER_CATEGORIES = [
+  { key: "boss", label: "Bosses" },
+  { key: "other", label: "Other kills" },
+  { key: "chest", label: "Chests" },
+  { key: "clue", label: "Clues" },
+];
+const ALL_CATEGORY_KEYS = FILTER_CATEGORIES.map((c) => c.key);
+// Deselecting the last active pill snaps back to all-selected (see toggleCategory) rather than
+// letting the filter go to "show nothing", so this key only ever needs to store a real subset.
+const CATEGORIES_STORAGE_KEY = "groupscape:loot-log-categories";
+
+// Restores the last-selected filter pills across visits. Falls back to all-selected on a first
+// visit, a corrupted value, or a stored subset that's since gone empty/invalid - the filter
+// pills must always resolve to a real, non-empty subset of FILTER_CATEGORIES.
+function loadPersistedCategories() {
+  let stored;
+  try {
+    stored = JSON.parse(window.localStorage.getItem(CATEGORIES_STORAGE_KEY));
+  } catch {
+    return [...ALL_CATEGORY_KEYS];
+  }
+  if (!Array.isArray(stored) || !stored.length) return [...ALL_CATEGORY_KEYS];
+  const valid = stored.filter((key) => ALL_CATEGORY_KEYS.includes(key));
+  return valid.length ? valid : [...ALL_CATEGORY_KEYS];
+}
 
 export class LootLogPage extends BaseElement {
   constructor() {
@@ -54,6 +79,7 @@ export class LootLogPage extends BaseElement {
     this.autoLoadGaveUp = false;
     this.searchText = "";
     this.itemIds = [];
+    this.categories = loadPersistedCategories();
     this.summary = { total_value: 0, event_count: 0 };
     // key (member+source+type+clueTier, see `entryKey`) -> { key, events, element } for the
     // farming-session entry currently shown for that key, so an event within the 45-minute
@@ -75,6 +101,12 @@ export class LootLogPage extends BaseElement {
     this.render();
 
     this.summaryContainer = this.querySelector(".loot-log-page__summary");
+    this.filtersContainer = this.querySelector(".loot-log-page__filters");
+    this.renderFilters();
+    this.eventListener(this.filtersContainer, "click", (event) => {
+      const chip = event.target.closest(".loot-log-page__filter-chip");
+      if (chip) this.toggleCategory(chip.dataset.category);
+    });
     this.searchInput = this.querySelector(".loot-log-page__search");
     this.placeholderLabel = this.querySelector(".loot-log-page__search-placeholder");
     this.list = this.querySelector(".loot-log-page__list");
@@ -216,6 +248,37 @@ export class LootLogPage extends BaseElement {
     return ids;
   }
 
+  renderFilters() {
+    this.filtersContainer.innerHTML = FILTER_CATEGORIES.map(({ key, label }) => {
+      const active = this.categories.includes(key);
+      return `
+        <button
+          type="button"
+          class="loot-log-page__filter-chip${active ? " loot-log-page__filter-chip--active" : ""}"
+          data-category="${key}"
+        >
+          <span class="loot-log-page__filter-chip-dot"></span>${label}
+        </button>
+      `;
+    }).join("");
+  }
+
+  // Deselecting the last active pill snaps back to all-selected rather than leaving the filter
+  // in a "show nothing" state - see loadPersistedCategories's same invariant for storage.
+  toggleCategory(key) {
+    const active = this.categories.includes(key);
+    if (active && this.categories.length === 1) {
+      this.categories = [...ALL_CATEGORY_KEYS];
+    } else if (active) {
+      this.categories = this.categories.filter((k) => k !== key);
+    } else {
+      this.categories = [...this.categories, key];
+    }
+    window.localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(this.categories));
+    this.renderFilters();
+    this.resetAndLoad();
+  }
+
   applySearch() {
     const raw = this.searchInput.value.trim();
     this.searchText = raw;
@@ -305,7 +368,11 @@ export class LootLogPage extends BaseElement {
 
   async loadSummary() {
     if (!api.groupName) return;
-    const summary = await api.getLootLogSummary({ search: this.searchText, itemIds: this.itemIds });
+    const summary = await api.getLootLogSummary({
+      search: this.searchText,
+      itemIds: this.itemIds,
+      categories: this.categories,
+    });
     if (this.disposed) return;
     this.summary = summary;
     this.renderSummary();
@@ -347,6 +414,7 @@ export class LootLogPage extends BaseElement {
         limit: PAGE_LIMIT,
         search: this.searchText,
         itemIds: this.itemIds,
+        categories: this.categories,
       });
       if (this.disposed) {
         this.loadingMore = false;
@@ -412,7 +480,12 @@ export class LootLogPage extends BaseElement {
     if (this.loadingMore || !this.loaded.length || !api.groupName) return;
 
     const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
-    const page = await api.getLootLog({ search: this.searchText, itemIds: this.itemIds, limit: PAGE_LIMIT });
+    const page = await api.getLootLog({
+      search: this.searchText,
+      itemIds: this.itemIds,
+      categories: this.categories,
+      limit: PAGE_LIMIT,
+    });
     if (this.disposed) return;
     const incoming = page.events.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
     if (!incoming.length) return;

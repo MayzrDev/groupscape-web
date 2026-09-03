@@ -135,7 +135,13 @@ describe("api", () => {
     const page = { events: [{ member_name: "Zezima", source_name: "Vorkath" }], next_before: null, scan_exhausted: true };
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(page) });
 
-    const result = await api.getLootLog({ before: "2026-01-01T00:00:00Z", limit: 25, search: "vorkath", itemIds: [995, 11286] });
+    const result = await api.getLootLog({
+      before: "2026-01-01T00:00:00Z",
+      limit: 25,
+      search: "vorkath",
+      itemIds: [995, 11286],
+      categories: ["boss", "chest"],
+    });
 
     expect(result).toEqual(page);
     const [url, options] = globalThis.fetch.mock.calls[0];
@@ -144,6 +150,7 @@ describe("api", () => {
     expect(url).toContain("limit=25");
     expect(url).toContain("search=vorkath");
     expect(url).toContain("item_ids=995%2C11286");
+    expect(url).toContain("categories=boss%2Cchest");
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
   });
 
@@ -160,12 +167,13 @@ describe("api", () => {
     const summary = { total_value: 1000000, event_count: 12 };
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(summary) });
 
-    const result = await api.getLootLogSummary({ search: "zulrah" });
+    const result = await api.getLootLogSummary({ search: "zulrah", categories: ["boss"] });
 
     expect(result).toEqual(summary);
     const [url, options] = globalThis.fetch.mock.calls[0];
     expect(url).toContain("/group/iron-team/get-loot-log-summary?");
     expect(url).toContain("search=zulrah");
+    expect(url).toContain("categories=boss");
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
   });
 
