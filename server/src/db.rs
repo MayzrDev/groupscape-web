@@ -195,9 +195,22 @@ pub async fn ensure_member_for_linked_character(
         };
     }
 
+    // Resets the progress-snapshot columns along with tagging account_hash: this row may have
+    // been ticking along for a while under the legacy unauthenticated/name-matched heartbeat path
+    // (see the `linked_to_this_group` comment in authed.rs), so whatever it's already carrying
+    // isn't a meaningful "previous" to diff the newly-linked character's first heartbeat against.
+    // Nulling them makes that first heartbeat behave like any other member's first-ever upload -
+    // `progress_events::diff_progress` skips a `None` field entirely - so linking establishes a
+    // fresh baseline instead of replaying the account's whole milestone history at once.
     let claim_stmt = client
         .prepare_cached(
-            "UPDATE groupscape.members SET account_hash=$1 WHERE group_id=$2 AND member_name=$3 AND account_hash IS NULL",
+            "UPDATE groupscape.members SET account_hash=$1, \
+             skills=NULL, skills_last_update=NULL, \
+             quests=NULL, quests_last_update=NULL, \
+             diary_vars=NULL, diary_vars_last_update=NULL, \
+             collection_log=NULL, collection_log_last_update=NULL, \
+             combat_achievements=NULL, combat_achievements_last_update=NULL \
+             WHERE group_id=$2 AND member_name=$3 AND account_hash IS NULL",
         )
         .await?;
     let claimed = client

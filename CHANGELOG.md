@@ -26,6 +26,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Slayer task progress now shows kills done so far out of the total (e.g. 2/45) instead of kills remaining out of the total.
 - Slayer task panel no longer shows a literal "null" for the task name when it occasionally fails to resolve - the name and wiki link are omitted instead.
 - Activity feed and toast notifications no longer merge kills from before and after a death into one streak - a death now starts a fresh kill count for that boss.
+- Linking a character to a group no longer floods the activity feed with every level-up milestone it already had - milestones now only post for progress made after linking.
 
 ## [1.0.350] - 2026-09-02
 
