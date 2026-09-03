@@ -8,10 +8,15 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log session headers (monster, clue tier, chest/raid names) are now clickable and link to the matching Old School RuneScape Wiki page.
 - Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 
+### Changed
+- The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
+
 ### Fixed
 - Clue scroll toast notifications now show the proper scroll icon and tier color instead of a plain bullet.
 - The toast stack's "Clear all" button no longer gets pushed off-screen when a lot of notifications pile up - the list now scrolls within the screen instead.
 - The Loot Log now actually shows two farming-session cards side by side on wide screens instead of leaving empty space next to a single column.
+- Slayer task panel no longer shows a literal "null" for the assigning master when that name hasn't been captured yet - it's just omitted.
+- Slayer task progress now shows kills done so far out of the total (e.g. 2/45) instead of kills remaining out of the total.
 
 ## [1.0.350] - 2026-09-02
 

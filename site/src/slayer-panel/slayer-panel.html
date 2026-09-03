@@ -1,21 +1,12 @@
-<div class="slayer-panel__popover metal-border rsbackground">
-  <div class="slayer-panel__header">
-    <span class="slayer-panel__title">${this.playerName}'s Slayer Task</span>
-    <button type="button" class="slayer-panel__close" title="Close">
-      <img src="/ui/1731-0.png" alt="Close" title="Close" />
-    </button>
+<div class="slayer-panel__stats-row">
+  <div class="slayer-panel__stat">
+    <span class="slayer-panel__stat-label">Streak</span>
+    <span class="slayer-panel__stat-value">${this.streak()}</span>
   </div>
-
-  <div class="slayer-panel__stats-row">
-    <div class="slayer-panel__stat">
-      <span class="slayer-panel__stat-label">Streak</span>
-      <span class="slayer-panel__stat-value">${this.streak()}</span>
-    </div>
-    <div class="slayer-panel__stat">
-      <span class="slayer-panel__stat-label">Points</span>
-      <span class="slayer-panel__stat-value">${this.points()}</span>
-    </div>
+  <div class="slayer-panel__stat">
+    <span class="slayer-panel__stat-label">Points</span>
+    <span class="slayer-panel__stat-value">${this.points()}</span>
   </div>
-
-  ${this.hasTask() ? this.renderTask() : this.renderNoTask()}
 </div>
+
+${this.hasTask() ? this.renderTask() : this.renderNoTask()}
