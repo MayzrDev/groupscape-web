@@ -582,6 +582,7 @@ pub enum DropSourceType {
 pub struct NotableDropEvent {
     pub source_type: DropSourceType,
     pub source_name: String,
+    pub item_id: i32,
     pub item_name: String,
     pub item_value: i64,
     pub total_value: i64,

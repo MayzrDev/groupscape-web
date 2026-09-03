@@ -614,6 +614,7 @@ pub async fn update_group_member(
                     auth.group_id,
                     group_member_inner.name.clone(),
                     event.clone(),
+                    config.web_origin.clone(),
                 );
 
                 // Kills are pushed straight to the group's connected overlays too, so other
@@ -679,6 +680,7 @@ pub async fn update_group_member(
                         auth.group_id,
                         group_member_inner.name.clone(),
                         event.clone(),
+                        config.web_origin.clone(),
                     );
                 }
             }
@@ -723,7 +725,13 @@ pub async fn update_group_member(
                 }
             }
 
-            discord::dispatch_drop_webhook(db_pool.get_ref().clone(), auth.group_id, message);
+            discord::dispatch_drop_webhook(
+                db_pool.get_ref().clone(),
+                auth.group_id,
+                message,
+                drop.item_id,
+                config.web_origin.clone(),
+            );
         }
     }
 

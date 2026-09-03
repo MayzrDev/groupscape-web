@@ -139,11 +139,18 @@ fn total_loot_value(items: &[crate::models::LootItem], ge_prices: &GEPrices) -> 
         .sum()
 }
 
-fn send_webhook_embed_sync(url: &str, title: &str, description: &str, color: u32) -> Result<(), ureq::Error> {
-    ureq::post(url)
-        .send_json(serde_json::json!({
-            "embeds": [{ "title": title, "description": description, "color": color }],
-        }))?;
+fn send_webhook_embed_sync(
+    url: &str,
+    title: &str,
+    description: &str,
+    color: u32,
+    thumbnail_url: Option<&str>,
+) -> Result<(), ureq::Error> {
+    let mut embed = serde_json::json!({ "title": title, "description": description, "color": color });
+    if let Some(thumbnail_url) = thumbnail_url {
+        embed["thumbnail"] = serde_json::json!({ "url": thumbnail_url });
+    }
+    ureq::post(url).send_json(serde_json::json!({ "embeds": [embed] }))?;
     Ok(())
 }
 
@@ -157,6 +164,7 @@ pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
             "GroupScape",
             "This channel is now connected to a GroupScape group.",
             TEST_COLOR,
+            None,
         )
         .map_err(|err| ApiError::DiscordWebhookInvalidError(err.to_string()))
     })
@@ -165,12 +173,57 @@ pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
 }
 
 async fn send_webhook_embed(url: String, title: &'static str, description: String, color: u32) {
+    send_webhook_embed_with_thumbnail(url, title, description, color, None).await;
+}
+
+async fn send_webhook_embed_with_thumbnail(
+    url: String,
+    title: &'static str,
+    description: String,
+    color: u32,
+    thumbnail_url: Option<String>,
+) {
     let _ = task::spawn_blocking(move || {
-        if let Err(err) = send_webhook_embed_sync(&url, title, &description, color) {
+        if let Err(err) = send_webhook_embed_sync(&url, title, &description, color, thumbnail_url.as_deref()) {
             log::warn!("discord: webhook send failed: {}", err);
         }
     })
     .await;
+}
+
+/// Absolute URL to a boss's self-hosted RuneLite-hiscore-style icon (see `site/src/data/
+/// boss-icons.js` / `site/public/icons/hiscore/bosses/`), for the "Kill" embed's thumbnail.
+/// Not every boss has a downloaded icon in that set - a miss just means Discord's embed proxy
+/// fails to fetch the thumbnail and silently omits it, so this doesn't need to check existence.
+fn boss_icon_url(web_origin: &str, npc_name: &str) -> String {
+    format!(
+        "{}/icons/hiscore/bosses/{}.png",
+        web_origin.trim_end_matches('/'),
+        drop_rates::slugify_npc_name(npc_name)
+    )
+}
+
+/// Absolute URL to an item's self-hosted icon (see `site/src/data/item.js`'s `Item.imageUrl`),
+/// for the "Drops"/"Drop" embed's thumbnail. Uses the base (non-stacked) icon regardless of
+/// quantity - the stack-count sprite variants `Item.imageUrl` picks between exist for in-app
+/// legibility at a glance, not worth threading through here for a one-off Discord thumbnail.
+fn item_icon_url(web_origin: &str, item_id: i32) -> String {
+    format!("{}/icons/items/{}.webp", web_origin.trim_end_matches('/'), item_id)
+}
+
+/// Absolute URL to the quest-point difficulty icon matching a quest's difficulty, for the
+/// "Quest" embed's thumbnail - mirrors `Quest.icon` in `site/src/data/quest.js`. Quests don't
+/// have individual icons in this app, only one per difficulty tier.
+fn quest_icon_url(web_origin: &str, difficulty: Option<&str>) -> Option<String> {
+    let file = match difficulty {
+        Some("Novice") => "3399-0.png",
+        Some("Intermediate") => "3400-0.png",
+        Some("Experienced") => "3402-0.png",
+        Some("Master") => "3403-0.png",
+        Some("Grandmaster") | Some("Special") => "3404-0.png",
+        _ => return None,
+    };
+    Some(format!("{}/icons/{}", web_origin.trim_end_matches('/'), file))
 }
 
 /// Fire-and-forget, mirroring `push::dispatch_alert_push` - a dead or misconfigured webhook must
@@ -182,6 +235,7 @@ pub fn dispatch_event_webhook(
     group_id: i64,
     member_name: String,
     event: GameEvent,
+    web_origin: String,
 ) {
     tokio::spawn(async move {
         let client = match db_pool.get().await {
@@ -227,7 +281,9 @@ pub fn dispatch_event_webhook(
                             description = format!("{} — loot worth {} gp", description, format_gp(value));
                         }
                     }
-                    send_webhook_embed(webhook_url.clone(), "Kill", description, KILL_COLOR).await;
+                    let thumbnail = boss_icon_url(&web_origin, &kill.npc_name);
+                    send_webhook_embed_with_thumbnail(webhook_url.clone(), "Kill", description, KILL_COLOR, Some(thumbnail))
+                        .await;
                 }
                 if settings.notify_drops {
                     if let Some(loot) = &kill.loot {
@@ -240,7 +296,14 @@ pub fn dispatch_event_webhook(
                                 lines.join(", "),
                                 kill.npc_name
                             );
-                            send_webhook_embed(webhook_url, "Drops", description, LOOT_COLOR).await;
+                            // Thumbnail highlights the single most valuable priced item in the
+                            // drop - mirroring the plugin's own notable-drop "highlight" pick -
+                            // rather than trying to show every item in one embed image.
+                            let thumbnail = loot
+                                .iter()
+                                .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+                                .map(|item| item_icon_url(&web_origin, item.item_id));
+                            send_webhook_embed_with_thumbnail(webhook_url, "Drops", description, LOOT_COLOR, thumbnail).await;
                         }
                     }
                 }
@@ -265,7 +328,12 @@ pub fn dispatch_event_webhook(
                             lines.join(", "),
                             loot_event.source_name
                         );
-                        send_webhook_embed(webhook_url, "Drops", description, LOOT_COLOR).await;
+                        let thumbnail = loot_event
+                            .loot
+                            .iter()
+                            .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
+                            .map(|item| item_icon_url(&web_origin, item.item_id));
+                        send_webhook_embed_with_thumbnail(webhook_url, "Drops", description, LOOT_COLOR, thumbnail).await;
                     }
                 }
             }
@@ -316,7 +384,7 @@ pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String) {
 /// Discord embed, when the group has a webhook configured and `notify_drops` is on. Notable
 /// drops aren't a `GameEvent` (they're never stored, see `update_group_member`), so this takes
 /// the pre-built message directly rather than matching over the enum like the function above.
-pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String) {
+pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item_id: i32, web_origin: String) {
     tokio::spawn(async move {
         let client = match db_pool.get().await {
             Ok(client) => client,
@@ -340,7 +408,8 @@ pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String) {
             return;
         }
 
-        send_webhook_embed(webhook_url, "Drop", message, DROP_COLOR).await;
+        let thumbnail = item_icon_url(&web_origin, item_id);
+        send_webhook_embed_with_thumbnail(webhook_url, "Drop", message, DROP_COLOR, Some(thumbnail)).await;
     });
 }
 
@@ -357,6 +426,7 @@ pub fn dispatch_progress_webhook(
     group_id: i64,
     member_name: String,
     event: crate::progress_events::ProgressEvent,
+    web_origin: String,
 ) {
     use crate::progress_events::{EVENT_TYPE_COLLECTION_LOG, EVENT_TYPE_COMBAT_TASK, EVENT_TYPE_DIARY, EVENT_TYPE_QUEST};
 
@@ -384,10 +454,12 @@ pub fn dispatch_progress_webhook(
             EVENT_TYPE_QUEST if settings.notify_quests => {
                 let quest_id = event.payload["quest_id"].as_i64().unwrap_or_default() as i32;
                 let name = crate::quest_ids::quest_name(quest_id).unwrap_or("a quest");
+                let thumbnail = quest_icon_url(&web_origin, crate::quest_ids::quest_difficulty(quest_id));
                 Some((
                     "Quest",
                     format!("{} completed {}", member_name, name),
                     QUEST_COLOR,
+                    thumbnail,
                 ))
             }
             EVENT_TYPE_DIARY if settings.notify_diaries => {
@@ -397,6 +469,7 @@ pub fn dispatch_progress_webhook(
                     "Diary",
                     format!("{} completed the {} {} diary", member_name, region, tier),
                     DIARY_COLOR,
+                    None,
                 ))
             }
             EVENT_TYPE_COMBAT_TASK if settings.notify_combat_achievements && event.payload["kind"] == "boss" => {
@@ -405,6 +478,7 @@ pub fn dispatch_progress_webhook(
                     "Combat achievements",
                     format!("{} completed every combat achievement for {}", member_name, boss),
                     COMBAT_TASK_COLOR,
+                    None,
                 ))
             }
             EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "page" => {
@@ -413,13 +487,14 @@ pub fn dispatch_progress_webhook(
                     "Collection log",
                     format!("{} completed the {} collection log page", member_name, page),
                     COLLECTION_LOG_COLOR,
+                    None,
                 ))
             }
             _ => None,
         };
 
-        if let Some((title, description, color)) = post {
-            send_webhook_embed(webhook_url, title, description, color).await;
+        if let Some((title, description, color, thumbnail)) = post {
+            send_webhook_embed_with_thumbnail(webhook_url, title, description, color, thumbnail).await;
         }
     });
 }

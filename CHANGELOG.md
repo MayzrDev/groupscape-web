@@ -5,6 +5,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ## [1.0.351] - 2026-09-03
 
 ### Added
+- Discord kill, drop, and quest completion notifications now show a matching boss/item/quest icon.
 - Loot Log session headers (monster, clue tier, chest/raid names) are now clickable and link to the matching Old School RuneScape Wiki page.
 - Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 - Boss slayer tasks now show that boss's own icon in the Slayer task panel instead of a generic unknown-task icon - covers every boss assignable via the "Boss" task, not just the Desert Treasure II bosses.

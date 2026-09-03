@@ -14,6 +14,8 @@ struct QuestEntry {
     hidden: bool,
     #[serde(default)]
     name: String,
+    #[serde(default)]
+    difficulty: String,
 }
 
 /// Quest ids in the same order the plugin's `quests` byte array is indexed.
@@ -45,6 +47,15 @@ static QUEST_NAMES: LazyLock<HashMap<i32, String>> = LazyLock::new(|| {
         .collect()
 });
 
+static QUEST_DIFFICULTIES: LazyLock<HashMap<i32, String>> = LazyLock::new(|| {
+    let data: HashMap<String, QuestEntry> =
+        serde_json::from_str(include_str!("content/quest_data.json"))
+            .expect("content/quest_data.json must parse");
+    data.into_iter()
+        .filter_map(|(quest_id, entry)| quest_id.parse::<i32>().ok().map(|id| (id, entry.difficulty)))
+        .collect()
+});
+
 /// The quest id stored at `index` of an uploaded `quests` byte array, or `None` if the array is
 /// longer than the catalog this server knows about (a newer plugin/game release).
 pub fn quest_id_at(index: usize) -> Option<i32> {
@@ -56,6 +67,14 @@ pub fn quest_id_at(index: usize) -> Option<i32> {
 /// for the activity feed instead).
 pub fn quest_name(quest_id: i32) -> Option<&'static str> {
     QUEST_NAMES.get(&quest_id).map(String::as_str)
+}
+
+/// Difficulty string ("Novice", "Intermediate", ...) for a quest id, as it appears in
+/// `content/quest_data.json` - used by the Discord "Quest completions" notification to pick a
+/// matching difficulty icon (see `discord::quest_icon_url`, mirroring `Quest.icon` in
+/// `site/src/data/quest.js`).
+pub fn quest_difficulty(quest_id: i32) -> Option<&'static str> {
+    QUEST_DIFFICULTIES.get(&quest_id).map(String::as_str)
 }
 
 #[cfg(test)]
