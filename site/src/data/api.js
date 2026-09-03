@@ -115,10 +115,6 @@ class Api {
     return `${this.groupScopeUrl}/get-leaderboard`;
   }
 
-  get metricDataUrl() {
-    return `${this.groupScopeUrl}/get-metric-data`;
-  }
-
   get captchaEnabledUrl() {
     return `${this.baseUrl}/captcha-enabled`;
   }
@@ -503,36 +499,16 @@ class Api {
     return response.json();
   }
 
-  async getLeaderboard(metric, window, boss, skill, raidType, raidDifficulty) {
+  async getLeaderboard(metric, window, skill) {
     const query = new URLSearchParams({ metric, window });
-    if (boss) query.set("boss", boss);
     if (skill && metric === "xp") query.set("skill", skill);
-    if (raidType && metric === "raid_completions") query.set("raid_type", raidType);
-    if (raidDifficulty && metric === "raid_completions") query.set("raid_difficulty", raidDifficulty);
     const response = await fetch(`${this.leaderboardUrl}?${query.toString()}`, {
       headers: {
         Authorization: this.authHeader,
       },
     });
     if (!response.ok) {
-      return { metric, window, boss: boss || null, available_bosses: [], entries: [] };
-    }
-    return response.json();
-  }
-
-  async getMetricData(metric, period, boss, raidType, raidDifficulty, groupBy) {
-    const query = new URLSearchParams({ metric, period });
-    if (boss) query.set("boss", boss);
-    if (raidType && metric === "raid_completions") query.set("raid_type", raidType);
-    if (raidDifficulty && metric === "raid_completions") query.set("raid_difficulty", raidDifficulty);
-    if (groupBy && metric === "raid_completions") query.set("group_by", groupBy);
-    const response = await fetch(`${this.metricDataUrl}?${query.toString()}`, {
-      headers: {
-        Authorization: this.authHeader,
-      },
-    });
-    if (!response.ok) {
-      return [];
+      return { metric, window, available_bosses: [], entries: [] };
     }
     return response.json();
   }

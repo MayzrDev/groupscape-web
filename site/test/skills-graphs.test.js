@@ -14,12 +14,7 @@ describe("skills-graphs windowForPeriod", () => {
 });
 
 describe("skills-graphs formatLeaderboardValue", () => {
-  it("formats gp_earned as currency-style", () => {
-    expect(formatLeaderboardValue("gp_earned", 1234567)).toBe("1,234,567 gp");
-  });
-
-  it("formats xp and boss_kc as plain locale numbers with no gp suffix", () => {
-    expect(formatLeaderboardValue("xp", 1234567)).toBe("1,234,567");
-    expect(formatLeaderboardValue("boss_kc", 42)).toBe("42");
+  it("formats as a plain locale number", () => {
+    expect(formatLeaderboardValue(1234567)).toBe("1,234,567");
   });
 });

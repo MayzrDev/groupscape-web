@@ -34,55 +34,9 @@ const periodLabels = {
 // hourly, kept for 1 day) and only differ in how many trailing hourly buckets are shown.
 const hourlyPeriods = new Set(["Hour1", "Hour6", "Hour12", "Day"]);
 
-const metricLabels = {
-  xp: "XP",
-  boss_kc: "Boss KC",
-  gp_earned: "GP Earned",
-  raid_completions: "Raid Completions",
-};
-
-const metricAxisLabels = {
-  xp: "XP Gain",
-  boss_kc: "KC Gained",
-  gp_earned: "GP Earned",
-  raid_completions: "Completions",
-};
-
-const raidTypeLabels = {
-  all: "All Raids",
-  cox: "Chambers of Xeric",
-  tob: "Theatre of Blood",
-  toa: "Tombs of Amascut",
-};
-
-const raidDifficultyLabels = {
-  regular: "Regular",
-  cm: "Challenge Mode",
-  entry: "Entry",
-  normal: "Normal",
-  expert: "Expert",
-};
-
-// Kept in sync with the server's `RAID_GROUP_TOTAL_LABEL` - no real member is ever named this,
-// so it's safe to special-case as the raid-completions chart's single aggregate line.
-const RAID_GROUP_TOTAL_LABEL = "Group Total";
-
-function formatMetricValue(metric, value) {
-  if (value === null || value === undefined || isNaN(value)) return "—";
-  if (metric === "gp_earned") {
-    return `${Math.round(value).toLocaleString()} gp`;
-  }
-  if (metric === "boss_kc") {
-    return Math.round(value).toLocaleString();
-  }
-  return value.toLocaleString();
-}
-
 export class SkillGraph extends BaseElement {
   constructor() {
     super();
-    this.metric = "xp";
-    this.boss = "";
   }
 
   html() {
@@ -93,11 +47,6 @@ export class SkillGraph extends BaseElement {
     super.connectedCallback();
     this.period = this.getAttribute("data-period");
     this.skillName = this.getAttribute("skill-name");
-    this.metric = this.getAttribute("metric") || "xp";
-    this.boss = this.getAttribute("boss") || "";
-    this.raidType = this.getAttribute("raid-type") || "all";
-    this.raidDifficulty = this.getAttribute("raid-difficulty") || "all";
-    this.groupBy = this.getAttribute("group-by") || "member";
     this.render();
     this.tableContainer = this.querySelector(".skill-graph__table-container");
     this.ctx = this.querySelector("canvas").getContext("2d");
@@ -116,7 +65,7 @@ export class SkillGraph extends BaseElement {
     if (!this.isConnected) return;
     this.currentGroupData = groupData;
     this.dates = SkillGraph.datesForPeriod(this.period);
-    const dataSets = this.metric === "xp" ? this.dataSets(this.skillName) : this.metricDataSets();
+    const dataSets = this.dataSets(this.skillName);
 
     this.createChart(dataSets);
     this.createTable(dataSets);
@@ -161,11 +110,6 @@ export class SkillGraph extends BaseElement {
   }
 
   createTable(dataSets) {
-    if (this.metric !== "xp") {
-      this.createMetricTable(dataSets);
-      return;
-    }
-
     const dataSetsSkills = {
       [this.skillName]: dataSets,
     };
@@ -200,22 +144,22 @@ export class SkillGraph extends BaseElement {
     const hours = periodHours[SkillGraph.normalizedPeriod(this.period)] ?? 1;
 
     const formatXp = (xp) => {
-      if (xp === null || xp === undefined) return "\u2014";
+      if (xp === null || xp === undefined) return "—";
       if (xp >= 1000000) return (xp / 1000000).toFixed(2) + "M";
       if (xp >= 10000) return (xp / 1000).toFixed(1) + "k";
       return xp.toLocaleString();
     };
 
     const formatLevel = (data) => {
-      if (data.currentLevel === null) return "\u2014";
+      if (data.currentLevel === null) return "—";
       if (data.levelsGained > 0) {
-        return `${data.currentLevel - data.levelsGained} \u2192 ${data.currentLevel}`;
+        return `${data.currentLevel - data.levelsGained} → ${data.currentLevel}`;
       }
       return `${data.currentLevel}`;
     };
 
     const formatXpToNext = (data) => {
-      if (data.xpToNextLevel === null) return "\u2014";
+      if (data.xpToNextLevel === null) return "—";
       if (data.currentLevel !== null && data.currentLevel >= 99) return "Max";
       return formatXp(data.xpToNextLevel);
     };
@@ -325,76 +269,6 @@ export class SkillGraph extends BaseElement {
 `;
   }
 
-  createMetricTable(dataSets) {
-    const hours = periodHours[SkillGraph.normalizedPeriod(this.period)] ?? 1;
-    const metricLabel = metricLabels[this.metric] || this.metric;
-
-    const rows = dataSets.map((dataSet) => {
-      let gain = dataSet.data[dataSet.data.length - 1];
-      if (isNaN(gain)) gain = 0;
-      return { label: dataSet.label, gain, color: dataSet.borderColor };
-    });
-    rows.sort((a, b) => b.gain - a.gain);
-
-    let groupTotalGain = 0;
-    let activeCount = 0;
-    let topContributor = null;
-    let topGain = 0;
-    const tableRows = rows.map((entry, idx) => {
-      groupTotalGain += entry.gain;
-      if (entry.gain > 0) activeCount++;
-      if (entry.gain > topGain) {
-        topGain = entry.gain;
-        topContributor = entry.label;
-      }
-      const perHour = entry.gain > 0 ? entry.gain / hours : 0;
-      const sign = entry.gain > 0 ? "+" : "";
-      const perHourSign = perHour > 0 ? "+" : "";
-
-      return `
-<tr class="skill-graph__player-row">
-  <td class="skill-graph__rank">${idx + 1}</td>
-  <td class="skill-graph__player-cell">
-    <span class="skill-graph__player-dot" style="background: ${entry.color}"></span>${entry.label}
-  </td>
-  <td class="skill-graph__xp-change-data">${sign}${formatMetricValue(this.metric, entry.gain)}</td>
-  <td class="skill-graph__xp-hour-data">${perHourSign}${formatMetricValue(this.metric, perHour)}</td>
-</tr>
-`;
-    });
-
-    const totalSign = groupTotalGain > 0 ? "+" : "";
-    const avgGain = rows.length > 0 ? groupTotalGain / rows.length : 0;
-
-    const summaryParts = [
-      `<span>Total ${metricLabel}: ${totalSign}${formatMetricValue(this.metric, groupTotalGain)}</span>`,
-      `<span>Avg: ${totalSign}${formatMetricValue(this.metric, avgGain)}</span>`,
-      `<span>Active: ${activeCount}/${rows.length}</span>`,
-    ];
-    if (topContributor) {
-      summaryParts.push(`<span>Top: ${topContributor} (+${formatMetricValue(this.metric, topGain)})</span>`);
-    }
-
-    this.tableContainer.innerHTML = `
-<div class="skill-graph__summary">${summaryParts.join("")}</div>
-<div class="skill-graph__table-scroll">
-<table>
-  <thead>
-    <tr>
-      <th class="skill-graph__rank-header">#</th>
-      <th>Player</th>
-      <th>${metricLabel} Change</th>
-      <th>${metricLabel}/Hr</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${tableRows.join("")}
-  </tbody>
-</table>
-</div>
-`;
-  }
-
   createChart(dataSets) {
     if (this.chart) this.chart.destroy();
 
@@ -428,7 +302,7 @@ export class SkillGraph extends BaseElement {
         max: max + 1,
         title: {
           display: true,
-          text: metricAxisLabels[this.metric] || "XP Gain",
+          text: "XP Gain",
         },
         ticks: {
           callback: function (value) {
@@ -488,29 +362,10 @@ export class SkillGraph extends BaseElement {
   chartTitle() {
     const periodLabel = periodLabels[SkillGraph.normalizedPeriod(this.period)] || this.period;
 
-    if (this.metric === "xp") {
-      if (this.skillName && this.skillName !== SkillName.Overall) {
-        return `${this.skillName} XP - ${periodLabel}`;
-      }
-      return `XP - ${periodLabel}`;
+    if (this.skillName && this.skillName !== SkillName.Overall) {
+      return `${this.skillName} XP - ${periodLabel}`;
     }
-
-    if (this.metric === "boss_kc") {
-      if (this.boss) {
-        return `${this.boss} KC - ${periodLabel}`;
-      }
-      return `Boss KC (All Bosses) - ${periodLabel}`;
-    }
-
-    if (this.metric === "raid_completions") {
-      const raidLabel = raidTypeLabels[this.raidType] || "All Raids";
-      const difficultyLabel = raidDifficultyLabels[this.raidDifficulty];
-      const suffix = difficultyLabel ? ` (${difficultyLabel})` : "";
-      return `${raidLabel}${suffix} Completions - ${periodLabel}`;
-    }
-
-    const metricLabel = metricLabels[this.metric] || this.metric;
-    return `${metricLabel} - ${periodLabel}`;
+    return `XP - ${periodLabel}`;
   }
 
   dataSets(skillName) {
@@ -548,41 +403,6 @@ export class SkillGraph extends BaseElement {
     return result;
   }
 
-  metricDataSets() {
-    const result = [];
-    for (const playerMetricData of this.metricDataForGroup || []) {
-      const member = this.currentGroupData.members.get(playerMetricData.name);
-      const isGroupTotal = playerMetricData.name === RAID_GROUP_TOTAL_LABEL;
-      const color = member ? `hsl(${member.hue}, 70%, 45%)` : isGroupTotal ? "hsl(32, 100%, 55%)" : "hsl(0, 0%, 60%)";
-      const series = playerMetricData.metric_data || [];
-      // series is sorted newest-first (see the descending sort applied before
-      // `metricDataForGroup` is set) so the live/current value is the first entry, not the last.
-      const currentValue = series.length ? series[0].value : 0;
-      const completeTimeSeries = this.generateCompleteTimeSeries(series, currentValue, (dataPoint) => dataPoint.value);
-      const [totalData, changeData, cumulativeChangeData] = this.diffSeries(completeTimeSeries);
-
-      result.push({
-        type: "line",
-        label: playerMetricData.name,
-        data: cumulativeChangeData,
-        borderColor: color,
-        backgroundColor: hslToHsla(color, 0.12),
-        fill: true,
-        tension: 0.3,
-        pointBorderWidth: 0,
-        pointHoverBorderWidth: 2,
-        pointHoverBorderColor: "white",
-        pointHoverRadius: 5,
-        pointRadius: 0,
-        borderWidth: 2,
-        changeData,
-        totalXpData: totalData,
-      });
-    }
-
-    return result;
-  }
-
   diffSeries(completeTimeSeries) {
     const changeData = [0];
     const cumulativeChangeData = [0];
@@ -604,10 +424,9 @@ export class SkillGraph extends BaseElement {
     return [completeTimeSeries, changeData, cumulativeChangeData];
   }
 
-  // Generalized bucketing/forward-fill used by both the XP path (series of {time, data})
-  // and the generic metric path (series of {time, value}). `valueFn` extracts the
-  // metric-specific scalar from a raw series item; `currentValue` overrides the final bucket
-  // the same way the XP path always ends on the live current XP rather than a stale snapshot.
+  // Bucketing/forward-fill for a series of {time, data} snapshots. `valueFn` extracts the
+  // skill's xp from a raw snapshot; `currentValue` overrides the final bucket so the series
+  // always ends on the live current XP rather than a stale snapshot.
   generateCompleteTimeSeries(series, currentValue, valueFn) {
     const bucketedData = new Map();
     const earliestDateInPeriod = SkillGraph.truncatedDateForPeriod(this.dates[0], this.period);

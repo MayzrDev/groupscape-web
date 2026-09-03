@@ -41,48 +41,37 @@ describe("api", () => {
     expect(api.leaderboardUrl).toContain("/group/iron-team/get-leaderboard");
   });
 
-  it("getLeaderboard builds the query string from metric/window/boss and returns the parsed result", async () => {
+  it("getLeaderboard builds the query string from metric/window and returns the parsed result", async () => {
     api.setCredentials("iron-team", "secret-token");
 
-    const result = { metric: "boss_kc", window: "daily", boss: "Vorkath", available_bosses: ["Vorkath"], entries: [] };
+    const result = { metric: "xp", window: "daily", available_bosses: [], entries: [] };
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(result) });
 
-    const actual = await api.getLeaderboard("boss_kc", "daily", "Vorkath");
+    const actual = await api.getLeaderboard("xp", "daily");
 
     expect(actual).toEqual(result);
     const [url, options] = globalThis.fetch.mock.calls[0];
     expect(url).toContain("/group/iron-team/get-leaderboard?");
-    expect(url).toContain("metric=boss_kc");
+    expect(url).toContain("metric=xp");
     expect(url).toContain("window=daily");
-    expect(url).toContain("boss=Vorkath");
     expect(options).toEqual({ headers: { Authorization: "secret-token" } });
-  });
-
-  it("getLeaderboard omits the boss param when not provided", async () => {
-    api.setCredentials("iron-team", "secret-token");
-    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
-
-    await api.getLeaderboard("xp", "weekly");
-
-    const [url] = globalThis.fetch.mock.calls[0];
-    expect(url).not.toContain("boss=");
   });
 
   it("getLeaderboard includes the skill param only for the xp metric", async () => {
     api.setCredentials("iron-team", "secret-token");
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
 
-    await api.getLeaderboard("xp", "daily", undefined, "Woodcutting");
+    await api.getLeaderboard("xp", "daily", "Woodcutting");
 
     const [url] = globalThis.fetch.mock.calls[0];
     expect(url).toContain("skill=Woodcutting");
   });
 
-  it("getLeaderboard omits the skill param for non-xp metrics", async () => {
+  it("getLeaderboard omits the skill param when not provided", async () => {
     api.setCredentials("iron-team", "secret-token");
     globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
 
-    await api.getLeaderboard("boss_kc", "daily", "Vorkath", "Woodcutting");
+    await api.getLeaderboard("xp", "weekly");
 
     const [url] = globalThis.fetch.mock.calls[0];
     expect(url).not.toContain("skill=");
@@ -95,38 +84,9 @@ describe("api", () => {
     expect(await api.getLeaderboard("xp", "daily")).toEqual({
       metric: "xp",
       window: "daily",
-      boss: null,
       available_bosses: [],
       entries: [],
     });
-  });
-
-  it("getMetricData builds the query string from metric/period/boss and returns the parsed result", async () => {
-    api.setCredentials("iron-team", "secret-token");
-
-    const payload = [{ name: "Zezima", metric_data: [{ time: "2026-01-01T00:00:00Z", value: 5 }] }];
-    globalThis.fetch.mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue(payload) });
-
-    const result = await api.getMetricData("boss_kc", "Week", "Vorkath");
-
-    expect(result).toBe(payload);
-    const [url, options] = globalThis.fetch.mock.calls[0];
-    expect(url).toContain("/group/iron-team/get-metric-data?");
-    expect(url).toContain("metric=boss_kc");
-    expect(url).toContain("period=Week");
-    expect(url).toContain("boss=Vorkath");
-    expect(options).toEqual({ headers: { Authorization: "secret-token" } });
-  });
-
-  it("getMetricData omits the boss param when not provided and returns [] on failure", async () => {
-    api.setCredentials("iron-team", "secret-token");
-    globalThis.fetch.mockResolvedValueOnce({ ok: false });
-
-    const result = await api.getMetricData("gp_earned", "Day");
-
-    expect(result).toEqual([]);
-    const [url] = globalThis.fetch.mock.calls[0];
-    expect(url).not.toContain("boss=");
   });
 
   it("getLootLog builds the query string from provided filters and returns the parsed page", async () => {

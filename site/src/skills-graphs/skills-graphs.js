@@ -17,29 +17,9 @@ export const windowForPeriod = {
   Year: "all_time",
 };
 
-export function formatLeaderboardValue(metric, value) {
-  if (metric === "gp_earned") {
-    return `${Math.round(value).toLocaleString()} gp`;
-  }
+export function formatLeaderboardValue(value) {
   return Math.round(value).toLocaleString();
 }
-
-// CoX's only split is Regular vs Challenge Mode; ToA buckets its raw invocation level into the
-// game's own Entry/Normal/Expert tiers (see the server's `toa_tier`). ToB has no difficulty
-// split yet (Hard Mode detection isn't implemented), so it gets no sub-select at all.
-const raidDifficultyOptionsByType = {
-  cox: [
-    { value: "all", label: "All Difficulties" },
-    { value: "regular", label: "Regular" },
-    { value: "cm", label: "Challenge Mode" },
-  ],
-  toa: [
-    { value: "all", label: "All Difficulties" },
-    { value: "entry", label: "Entry" },
-    { value: "normal", label: "Normal" },
-    { value: "expert", label: "Expert" },
-  ],
-};
 
 export class SkillsGraphs extends BaseElement {
   constructor() {
@@ -64,50 +44,25 @@ export class SkillsGraphs extends BaseElement {
     // Single source of truth for both the chart and the leaderboard.
     this.state = {
       period: "Day",
-      metric: "xp",
       skill: "Overall",
-      boss: "",
-      raidType: "all",
-      raidDifficulty: "all",
-      groupBy: "member",
     };
     this.fetchGeneration = 0;
 
     this.chartContainer = this.querySelector(".skills-graphs__chart-container");
     this.periodButtons = this.querySelectorAll(".skills-graphs__period-btn");
     this.refreshButton = this.querySelector(".skills-graphs__refresh");
-    this.metricSelect = this.querySelector(".skills-graphs__metric-select");
     this.skillSelect = this.querySelector(".skills-graphs__skill-select");
-    this.skillSelectContainer = this.querySelector(".skills-graphs__sub-select-container--skill");
-    this.bossSelect = this.querySelector(".skills-graphs__boss-select");
-    this.bossSelectContainer = this.querySelector(".skills-graphs__sub-select-container--boss");
-    this.raidTypeSelect = this.querySelector(".skills-graphs__raid-type-select");
-    this.raidTypeSelectContainer = this.querySelector(".skills-graphs__sub-select-container--raid-type");
-    this.raidDifficultySelect = this.querySelector(".skills-graphs__raid-difficulty-select");
-    this.raidDifficultySelectContainer = this.querySelector(".skills-graphs__sub-select-container--raid-difficulty");
-    this.groupByContainer = this.querySelector(".skills-graphs__sub-select-container--group-by");
-    this.groupByButtons = this.querySelectorAll(".skills-graphs__group-by-btn");
     this.leaderboardList = this.querySelector(".skills-graphs__leaderboard-list");
     this.leaderboardEmpty = this.querySelector(".skills-graphs__leaderboard-empty");
 
     this.state.skill = this.skillSelect.value;
-    this.state.raidType = this.raidTypeSelect.value;
 
     this.periodButtons.forEach((btn) => {
       this.eventListener(btn, "click", this.handlePeriodChange.bind(this));
     });
     this.eventListener(this.refreshButton, "click", this.handleRefreshClicked.bind(this));
-    this.eventListener(this.metricSelect, "change", this.handleMetricChange.bind(this));
     this.eventListener(this.skillSelect, "change", this.handleSkillSelectChange.bind(this));
-    this.eventListener(this.bossSelect, "change", this.handleBossSelectChange.bind(this));
-    this.eventListener(this.raidTypeSelect, "change", this.handleRaidTypeChange.bind(this));
-    this.eventListener(this.raidDifficultySelect, "change", this.handleRaidDifficultyChange.bind(this));
-    this.groupByButtons.forEach((btn) => {
-      this.eventListener(btn, "click", this.handleGroupByChange.bind(this));
-    });
 
-    this.updateRaidDifficultyOptions();
-    this.updateSubSelectVisibility();
     this.triggerRefresh();
   }
 
@@ -115,74 +70,8 @@ export class SkillsGraphs extends BaseElement {
     super.disconnectedCallback();
   }
 
-  updateSubSelectVisibility() {
-    const isRaids = this.state.metric === "raid_completions";
-    this.skillSelectContainer.classList.toggle("visible", this.state.metric === "xp");
-    this.bossSelectContainer.classList.toggle("visible", this.state.metric === "boss_kc");
-    this.raidTypeSelectContainer.classList.toggle("visible", isRaids);
-    this.groupByContainer.classList.toggle("visible", isRaids);
-    const hasDifficulty = isRaids && !!raidDifficultyOptionsByType[this.state.raidType];
-    this.raidDifficultySelectContainer.classList.toggle("visible", hasDifficulty);
-  }
-
-  updateRaidDifficultyOptions() {
-    const options = raidDifficultyOptionsByType[this.state.raidType];
-    if (!options) {
-      this.state.raidDifficulty = "all";
-      return;
-    }
-    const previousValue = this.state.raidDifficulty;
-    this.raidDifficultySelect.innerHTML = options.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
-    const stillValid = options.some((o) => o.value === previousValue);
-    this.raidDifficultySelect.value = stillValid ? previousValue : "all";
-    this.state.raidDifficulty = this.raidDifficultySelect.value;
-  }
-
-  handleMetricChange() {
-    this.state.metric = this.metricSelect.value;
-    if (this.state.metric === "xp") {
-      this.state.skill = this.skillSelect.value || "Overall";
-    } else if (this.state.metric === "boss_kc") {
-      this.state.boss = this.bossSelect.value || "";
-    } else {
-      this.state.boss = "";
-    }
-    if (this.state.metric === "raid_completions") {
-      this.state.raidType = this.raidTypeSelect.value || "all";
-      this.updateRaidDifficultyOptions();
-    }
-    this.updateSubSelectVisibility();
-    this.triggerRefresh();
-  }
-
   handleSkillSelectChange() {
     this.state.skill = this.skillSelect.value;
-    this.triggerRefresh();
-  }
-
-  handleBossSelectChange() {
-    this.state.boss = this.bossSelect.value;
-    this.triggerRefresh();
-  }
-
-  handleRaidTypeChange() {
-    this.state.raidType = this.raidTypeSelect.value;
-    this.state.raidDifficulty = "all";
-    this.updateRaidDifficultyOptions();
-    this.updateSubSelectVisibility();
-    this.triggerRefresh();
-  }
-
-  handleRaidDifficultyChange() {
-    this.state.raidDifficulty = this.raidDifficultySelect.value;
-    this.triggerRefresh();
-  }
-
-  handleGroupByChange(event) {
-    this.state.groupBy = event.currentTarget.dataset.groupBy;
-    this.groupByButtons.forEach((btn) => {
-      btn.classList.toggle("active", btn.dataset.groupBy === this.state.groupBy);
-    });
     this.triggerRefresh();
   }
 
@@ -211,23 +100,10 @@ export class SkillsGraphs extends BaseElement {
 
   async fetchLeaderboard(generation) {
     try {
-      const isXp = this.state.metric === "xp";
-      const isRaids = this.state.metric === "raid_completions";
-      const skillParam = isXp && this.state.skill && this.state.skill !== "Overall" ? this.state.skill : undefined;
-      const bossParam = this.state.metric === "boss_kc" ? this.state.boss || undefined : undefined;
-      const raidTypeParam = isRaids ? this.state.raidType : undefined;
-      const raidDifficultyParam = isRaids ? this.state.raidDifficulty : undefined;
+      const skillParam = this.state.skill && this.state.skill !== "Overall" ? this.state.skill : undefined;
 
-      const result = await api.getLeaderboard(
-        this.state.metric,
-        windowForPeriod[this.state.period] || "daily",
-        bossParam,
-        skillParam,
-        raidTypeParam,
-        raidDifficultyParam
-      );
+      const result = await api.getLeaderboard("xp", windowForPeriod[this.state.period] || "daily", skillParam);
       if (generation !== this.fetchGeneration) return;
-      this.renderBossOptions(result.available_bosses || []);
       this.renderLeaderboard(result.entries || []);
     } catch (err) {
       if (generation !== this.fetchGeneration) return;
@@ -236,16 +112,6 @@ export class SkillsGraphs extends BaseElement {
       this.leaderboardEmpty.textContent = `Failed to load ${err}`;
       this.leaderboardEmpty.classList.add("skills-graphs__leaderboard-empty--visible");
     }
-  }
-
-  renderBossOptions(bosses) {
-    if (this.state.metric !== "boss_kc") return;
-    const previousValue = this.bossSelect.value || this.state.boss;
-    this.bossSelect.innerHTML = `
-      <option value="">All Bosses</option>
-      ${bosses.map((boss) => `<option value="${boss}">${boss}</option>`).join("")}
-    `;
-    this.bossSelect.value = previousValue;
   }
 
   renderLeaderboard(entries) {
@@ -279,7 +145,7 @@ export class SkillsGraphs extends BaseElement {
 
       const value = document.createElement("span");
       value.classList.add("skills-graphs__leaderboard-value");
-      value.textContent = formatLeaderboardValue(this.state.metric, entry.value);
+      value.textContent = formatLeaderboardValue(entry.value);
       row.appendChild(value);
 
       this.leaderboardList.appendChild(row);
@@ -298,54 +164,23 @@ export class SkillsGraphs extends BaseElement {
     this.appendChild(overlay);
 
     try {
-      const isXp = this.state.metric === "xp";
-      const isRaids = this.state.metric === "raid_completions";
-      const dataPromise = isXp
-        ? api.getSkillData(this.state.period)
-        : api.getMetricData(
-            this.state.metric,
-            this.state.period,
-            this.state.boss || undefined,
-            isRaids ? this.state.raidType : undefined,
-            isRaids ? this.state.raidDifficulty : undefined,
-            isRaids ? this.state.groupBy : undefined
-          );
-      const [rawData] = await Promise.all([dataPromise, this.waitForChartjs()]);
+      const [rawData] = await Promise.all([api.getSkillData(this.state.period), this.waitForChartjs()]);
       if (generation !== this.fetchGeneration) return;
 
       rawData.sort((a, b) => a.name.localeCompare(b.name));
 
       const skillGraph = document.createElement("skill-graph");
       skillGraph.setAttribute("data-period", this.state.period);
-      skillGraph.setAttribute("metric", this.state.metric);
 
-      if (isXp) {
-        rawData.forEach((playerSkillData) => {
-          playerSkillData.skill_data.forEach((x) => {
-            x.time = new Date(x.time);
-            x.data = GroupData.transformSkillsFromStorage(x.data);
-          });
-          playerSkillData.skill_data.sort((a, b) => b.time - a.time);
+      rawData.forEach((playerSkillData) => {
+        playerSkillData.skill_data.forEach((x) => {
+          x.time = new Date(x.time);
+          x.data = GroupData.transformSkillsFromStorage(x.data);
         });
-        skillGraph.skillDataForGroup = rawData;
-        skillGraph.setAttribute("skill-name", this.state.skill);
-      } else {
-        rawData.forEach((playerMetricData) => {
-          playerMetricData.metric_data.forEach((x) => {
-            x.time = new Date(x.time);
-          });
-          playerMetricData.metric_data.sort((a, b) => b.time - a.time);
-        });
-        skillGraph.metricDataForGroup = rawData;
-        if (this.state.metric === "boss_kc") {
-          skillGraph.setAttribute("boss", this.state.boss || "");
-        }
-        if (this.state.metric === "raid_completions") {
-          skillGraph.setAttribute("raid-type", this.state.raidType || "all");
-          skillGraph.setAttribute("raid-difficulty", this.state.raidDifficulty || "all");
-          skillGraph.setAttribute("group-by", this.state.groupBy || "member");
-        }
-      }
+        playerSkillData.skill_data.sort((a, b) => b.time - a.time);
+      });
+      skillGraph.skillDataForGroup = rawData;
+      skillGraph.setAttribute("skill-name", this.state.skill);
 
       overlay.remove();
       this.chartContainer.innerHTML = "";
