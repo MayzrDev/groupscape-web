@@ -29,6 +29,9 @@ public/*.map
 coverage/
 nocommit
 
+# OSRS data pipeline scratch output
+scripts/osrs-data/new-bosses-report.json
+
 # Playwright
 playwright-report/
 test-results/

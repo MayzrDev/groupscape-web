@@ -8,13 +8,16 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log session headers (monster, clue tier, chest/raid names) are now clickable and link to the matching Old School RuneScape Wiki page.
 - Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 - Boss slayer tasks now show that boss's own icon in the Slayer task panel instead of a generic unknown-task icon - covers every boss assignable via the "Boss" task, not just the Desert Treasure II bosses.
+- A handful of new items from today's OSRS update now show up correctly with names and icons (the elemental diamond/amulet set, Necklace of fangs).
 
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
 - The "Join our Discord" button now sits in the bottom-left corner instead of bottom-right.
 - Internal: removed unused CI workflows for Docker image publishing and cache validation - deploy already builds images locally on the server, these weren't part of the real pipeline.
+- Internal: added an automated pipeline that pulls item and boss data from the OSRS Wiki, plus a weekly scheduled check, so item names/icons/alch values stay current after game updates instead of drifting.
 
 ### Fixed
+- Corrected outdated high alchemy values (and a couple of stale names) across several hundred items.
 - Clue scroll toast notifications now show the proper scroll icon and tier color instead of a plain bullet.
 - The toast stack's "Clear all" button no longer gets pushed off-screen when a lot of notifications pile up - the list now scrolls within the screen instead.
 - The Loot Log now actually shows two farming-session cards side by side on wide screens instead of leaving empty space next to a single column.
