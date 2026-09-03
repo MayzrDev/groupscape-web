@@ -113,6 +113,21 @@ export class LootLogGroup extends BaseElement {
     return BOSS_ICON_SLUGS.has(slug) ? `/icons/hiscore/bosses/${slug}.png` : null;
   }
 
+  // Wiki page for this group's source, following the same conventions used elsewhere in the app
+  // (activity-event-copy.js for kills, collection-log-page.js for clues): kills go through the
+  // NPC lookup redirect since the same monster name can have multiple wiki pages by combat level;
+  // clues and chests map straight to a page title since both are unambiguous exact names.
+  get wikiLink() {
+    const group = this.group;
+    if (group.sourceType === "clue" && group.clueTier) {
+      return `https://oldschool.runescape.wiki/w/Clue_scroll_(${group.clueTier})`;
+    }
+    if (group.sourceType === "kill") {
+      return `https://oldschool.runescape.wiki/w/Special:Lookup?type=npc&name=${encodeURIComponent(group.sourceName)}`;
+    }
+    return `https://oldschool.runescape.wiki/w/${group.sourceName.replace(/ /g, "_")}`;
+  }
+
   get totalValue() {
     return this.mergedItems().reduce((sum, item) => sum + item.total_value, 0);
   }

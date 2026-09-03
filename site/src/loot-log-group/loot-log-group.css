@@ -57,6 +57,15 @@ loot-log-group[data-source="clue"] .loot-log-group__source-dot {
   font-size: 0.95em;
 }
 
+.loot-log-group__source-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.loot-log-group__source-link:hover {
+  text-decoration: underline;
+}
+
 .loot-log-group__name player-icon img {
   width: 12px;
   height: 15px;

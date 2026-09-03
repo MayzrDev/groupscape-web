@@ -1,14 +1,16 @@
 <div class="loot-log-group__header">
   <div class="loot-log-group__name-wrap">
-    ${
-      this.iconUrl
-        ? `<img class="loot-log-group__boss-icon" src="${this.iconUrl}" alt="" />`
-        : `<span class="loot-log-group__source-dot"></span>`
-    }
+    <a class="loot-log-group__source-link" href="${this.wikiLink}" target="_blank" rel="noopener noreferrer">
+      ${
+        this.iconUrl
+          ? `<img class="loot-log-group__boss-icon" src="${this.iconUrl}" alt="" />`
+          : `<span class="loot-log-group__source-dot"></span>`
+      }
+    </a>
     <div>
       <div class="loot-log-group__name">
         <player-icon player-name="${this.group.memberName}"></player-icon>
-        <span>${this.sourceLabel}</span>
+        <a class="loot-log-group__source-link" href="${this.wikiLink}" target="_blank" rel="noopener noreferrer">${this.sourceLabel}</a>
       </div>
       <div class="loot-log-group__meta">${this.group.events.length.toLocaleString()} ${this.countLabel} &middot; ${this.timeRangeLabel}</div>
     </div>
