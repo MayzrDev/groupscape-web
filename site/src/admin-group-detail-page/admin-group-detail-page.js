@@ -182,7 +182,7 @@ export class AdminGroupDetailPage extends BaseElement {
 
   clearLogs() {
     confirmDialogManager.confirm({
-      headline: "Clear logs?",
+      headline: "Clear activity &amp; loot logs?",
       body: `Every activity feed and loot log entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
       yesCallback: () =>
         this.runAction(async () => {
