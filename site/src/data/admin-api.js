@@ -68,16 +68,8 @@ class AdminApi {
     return response;
   }
 
-  async clearActivityFeed(groupId) {
-    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-activity-feed`, {
-      method: "POST",
-      headers: this.authHeaders,
-    });
-    return response;
-  }
-
-  async clearLootLog(groupId) {
-    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-loot-log`, {
+  async clearLogs(groupId) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/clear-logs`, {
       method: "POST",
       headers: this.authHeaders,
     });

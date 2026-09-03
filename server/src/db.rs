@@ -5047,43 +5047,18 @@ pub async fn admin_delete_group(client: &mut Client, group_id: i64) -> Result<()
     Ok(())
 }
 
-/// Deletes every row the activity feed view surfaces for a group (mirrors `list_activity_events`'s
-/// event_type/clue-tier filter). Kept separate from `admin_clear_loot_log` because the feed and
-/// loot log read the same table with overlapping event_types (e.g. `kill`) and there's no
-/// per-row "which view(s) showed this" flag to preserve - a row shared by both views is deleted
-/// outright by whichever clear runs first.
-pub async fn admin_clear_activity_feed(client: &Client, group_id: i64) -> Result<u64, ApiError> {
+/// Deletes every row the activity feed and Loot Log views surface for a group (union of
+/// `list_activity_events`'s and `list_loot_and_kill_events_page`'s event_type filters). The two
+/// views read the same table with overlapping event_types (e.g. `kill`), so admins clear them
+/// together rather than picking which view's rows to keep.
+pub async fn admin_clear_logs(client: &Client, group_id: i64) -> Result<u64, ApiError> {
     let stmt = client
-        .prepare_cached(
-            r#"
-DELETE FROM groupscape.activity_events
-WHERE group_id = $1
-  AND (
-    event_type IN ('kill', 'death', 'quest', 'diary', 'combat_task', 'collection_log', 'raid', 'level_up')
-    OR (event_type = 'loot' AND payload->>'clueTier' IS NOT NULL)
-  )
-"#,
-        )
+        .prepare_cached("DELETE FROM groupscape.activity_events WHERE group_id = $1")
         .await?;
     client
         .execute(&stmt, &[&group_id])
         .await
-        .map_err(|e| ApiError::AdminDbError("AdminClearActivityFeedError".to_string(), e))
-}
-
-/// Deletes every row the Loot Log view surfaces for a group (mirrors
-/// `list_loot_and_kill_events_page`'s event_type filter). See `admin_clear_activity_feed` for why
-/// a row shared by both views is deleted outright rather than hidden from just this one.
-pub async fn admin_clear_loot_log(client: &Client, group_id: i64) -> Result<u64, ApiError> {
-    let stmt = client
-        .prepare_cached(
-            "DELETE FROM groupscape.activity_events WHERE group_id = $1 AND event_type IN ('kill', 'loot')",
-        )
-        .await?;
-    client
-        .execute(&stmt, &[&group_id])
-        .await
-        .map_err(|e| ApiError::AdminDbError("AdminClearLootLogError".to_string(), e))
+        .map_err(|e| ApiError::AdminDbError("AdminClearLogsError".to_string(), e))
 }
 
 const CLEARABLE_MEMBER_DATA_TYPES: &[&str] = &[

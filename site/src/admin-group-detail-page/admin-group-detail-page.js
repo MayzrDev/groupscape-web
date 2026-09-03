@@ -40,8 +40,7 @@ export class AdminGroupDetailPage extends BaseElement {
       "click",
       this.viewAsMember.bind(this)
     );
-    this.eventListener(this.querySelector(".admin-data-mgmt__clear-feed"), "click", this.clearActivityFeed.bind(this));
-    this.eventListener(this.querySelector(".admin-data-mgmt__clear-loot"), "click", this.clearLootLog.bind(this));
+    this.eventListener(this.querySelector(".admin-data-mgmt__clear-logs"), "click", this.clearLogs.bind(this));
     this.eventListener(
       this.querySelector(".admin-data-mgmt__clear-selected"),
       "click",
@@ -181,27 +180,14 @@ export class AdminGroupDetailPage extends BaseElement {
     this.refreshSelectionState();
   }
 
-  clearActivityFeed() {
+  clearLogs() {
     confirmDialogManager.confirm({
-      headline: "Clear activity feed?",
-      body: `Every activity feed entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
+      headline: "Clear logs?",
+      body: `Every activity feed and loot log entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
       yesCallback: () =>
         this.runAction(async () => {
-          const response = await adminApi.clearActivityFeed(this.groupId);
-          if (!response.ok) throw new Error("Failed to clear activity feed");
-        }),
-      noCallback: () => {},
-    });
-  }
-
-  clearLootLog() {
-    confirmDialogManager.confirm({
-      headline: "Clear loot log?",
-      body: `Every loot log entry for ${this.group.group_name} will be permanently deleted. This cannot be undone.`,
-      yesCallback: () =>
-        this.runAction(async () => {
-          const response = await adminApi.clearLootLog(this.groupId);
-          if (!response.ok) throw new Error("Failed to clear loot log");
+          const response = await adminApi.clearLogs(this.groupId);
+          if (!response.ok) throw new Error("Failed to clear logs");
         }),
       noCallback: () => {},
     });

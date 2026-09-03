@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The "Join our Discord" button now sits in the bottom-left corner instead of bottom-right.
 - Internal: removed unused CI workflows for Docker image publishing and cache validation - deploy already builds images locally on the server, these weren't part of the real pipeline.
 - Internal: added an automated pipeline that pulls item and boss data from the OSRS Wiki, plus a weekly scheduled check, so item names/icons/alch values stay current after game updates instead of drifting.
+- Admin "Clear activity feed" and "Clear loot log" buttons are now a single "Clear logs" button, since both cleared the same underlying log data.
 
 ### Fixed
 - Corrected outdated high alchemy values (and a couple of stale names) across several hundred items.

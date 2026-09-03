@@ -171,8 +171,8 @@ pub async fn delete_group(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[post("/groups/{group_id}/clear-activity-feed")]
-pub async fn clear_activity_feed(
+#[post("/groups/{group_id}/clear-logs")]
+pub async fn clear_logs(
     _auth: AdminAuthenticated,
     path: web::Path<i64>,
     db_pool: web::Data<Pool>,
@@ -183,34 +183,10 @@ pub async fn clear_activity_feed(
         return Err(ApiError::AdminNotFoundError.into());
     }
 
-    let deleted = db::admin_clear_activity_feed(&client, group_id).await?;
+    let deleted = db::admin_clear_logs(&client, group_id).await?;
     db::admin_record_audit_log(
         &client,
-        "group.clear_activity_feed",
-        Some("group"),
-        Some(&group_id.to_string()),
-        Some(json!({ "rows_deleted": deleted })),
-    )
-    .await?;
-    Ok(HttpResponse::Ok().finish())
-}
-
-#[post("/groups/{group_id}/clear-loot-log")]
-pub async fn clear_loot_log(
-    _auth: AdminAuthenticated,
-    path: web::Path<i64>,
-    db_pool: web::Data<Pool>,
-) -> Result<HttpResponse, Error> {
-    let group_id = path.into_inner();
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-    if db::admin_get_group(&client, group_id).await?.is_none() {
-        return Err(ApiError::AdminNotFoundError.into());
-    }
-
-    let deleted = db::admin_clear_loot_log(&client, group_id).await?;
-    db::admin_record_audit_log(
-        &client,
-        "group.clear_loot_log",
+        "group.clear_logs",
         Some("group"),
         Some(&group_id.to_string()),
         Some(json!({ "rows_deleted": deleted })),
