@@ -1,6 +1,6 @@
 {
   "name": "groupscape",
-  "version": "1.0.359",
+  "version": "1.0.360",
   "description": "",
   "dependencies": {
     "three": "^0.169.0"
@@ -21,6 +21,7 @@
     "husky": "^7.0.2",
     "jsdom": "^17.0.0",
     "prettier": "^2.4.1",
+    "sharp": "^0.35.4",
     "terser": "^5.16.5",
     "vitest": "^1.6.0",
     "winston": "^3.3.3"
@@ -42,6 +43,8 @@
     "format:check": "prettier --check src/",
     "fix": "npm run lint -- --fix",
     "generate-component": "node scripts/generate-component.js",
+    "update-items": "node scripts/osrs-data/fetch-items.mjs",
+    "detect-bosses": "node scripts/osrs-data/detect-new-bosses.mjs",
     "prepare": "cd .. && husky install site/.husky",
     "version:bump": "node scripts/bump-version.js && git add package.json",
     "precommit": "npm run version:bump && npm run format:check && npm run lint"
