@@ -1,3 +1,5 @@
+import { bossIconFor } from "./activity-event-copy";
+
 // Headshot/portrait icons for the current real OSRS slayer masters, downloaded from the OSRS
 // wiki (Special:FilePath/<Master name>.png) and bundled locally under
 // /icons/slayer/masters/<key>.png - see CLAUDE.md's asset-sourcing convention (no runtime
@@ -100,6 +102,9 @@ class SlayerData {
   }
 
   taskIconUrl(taskName) {
+    const bossIcon = bossIconFor(taskName);
+    if (bossIcon) return bossIcon;
+
     const key = SLAYER_MONSTER_ICONS[normalize(taskName)];
     return key ? `/icons/slayer/monsters/${key}.png` : UNKNOWN_TASK_ICON;
   }

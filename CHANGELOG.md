@@ -8,6 +8,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log session headers (monster, clue tier, chest/raid names) are now clickable and link to the matching Old School RuneScape Wiki page.
 - Loot Log now has filter pills (Bosses, Other kills, Chests, Clues) above the search bar, all on by default - toggle them to narrow the list and totals to just what you want to see. Your selection is remembered next time you visit.
 
+### Added
+- Boss slayer tasks (Leviathan, Whisperer, Vardorvis, Duke Sucellus, etc.) now show that boss's own icon in the Slayer task panel instead of a generic unknown-task icon.
+
 ### Changed
 - The Slayer task button now opens a docked panel below the minibar, matching how the bag and stats panels behave, instead of a separate floating popover.
 - The "Join our Discord" button now sits in the bottom-left corner instead of bottom-right.
