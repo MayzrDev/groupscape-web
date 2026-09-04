@@ -5,7 +5,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ## [1.0.383] - 2026-09-04
 
 ### Changed
-- Discord boss kill and death notifications no longer spam a new message per kill/death - a repeat kill or death on the same boss within an hour now edits the previous message's count in place instead.
+- Discord boss kill and death notifications no longer spam a new message per kill/death - a repeat kill or death on the same boss within an hour now edits the previous message's count in place instead, including deaths with no identified killer.
 
 ### Added
 - Group settings' Discord Drops notification now has a "Unique drops only" option - turn it on and only drops that are actually unique to that boss/source get posted, ignoring the minimum-value threshold entirely.

@@ -591,13 +591,15 @@ pub async fn count_kills_for_member_npc(
     Ok(count as i64)
 }
 
-/// Total deaths recorded for `member_name` to `killer_name` in this group, all-time - the
+/// Total deaths recorded for `member_name` in this group with the given killer, all-time - the
 /// "Deaths: n" field on a repeat Discord death message, mirroring `count_kills_for_member_npc`.
+/// `killer_name: None` counts deaths with no identified killer (see `DeathEvent::killer_name`'s
+/// doc comment) rather than every death regardless of killer.
 pub async fn count_deaths_for_member_npc(
     client: &Client,
     group_id: i64,
     member_name: &str,
-    killer_name: &str,
+    killer_name: Option<&str>,
 ) -> Result<i64, ApiError> {
     let stmt = client
         .prepare_cached(
@@ -621,7 +623,7 @@ LIMIT 5000
         .filter_map(|row| row.try_get::<_, serde_json::Value>("payload").ok())
         .filter(|payload| {
             serde_json::from_value::<GameEvent>(payload.clone()).is_ok_and(|event| {
-                matches!(event, GameEvent::Death(death) if death.killer_name.as_deref() == Some(killer_name))
+                matches!(event, GameEvent::Death(death) if death.killer_name.as_deref() == killer_name)
             })
         })
         .count();

@@ -378,33 +378,51 @@ async fn edit_webhook_embed_rich(
 /// up the channel.
 const WEBHOOK_MESSAGE_EDIT_TTL: Duration = Duration::from_secs(60 * 60);
 
-/// (group, member, boss/killer). Kills and deaths use separate cache maps below even though both
-/// key on this same shape - a "killed Zulrah" message and a "died to Zulrah" message for the same
-/// member must never be confused for one another's edit target.
-type MessageCacheKey = (i64, String, String);
-
-/// In-memory only (see `dispatch_event_webhook`'s doc comment on loading settings fresh each
-/// call) - resets on server restart, which just means the next kill after a deploy posts a new
-/// message rather than editing one from before the restart. Value pairs the last "Kill" embed's
-/// Discord message id with when it was last touched.
-static KILL_MESSAGE_CACHE: LazyLock<Mutex<HashMap<MessageCacheKey, (String, Instant)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-/// Same as `KILL_MESSAGE_CACHE` but for "Death" embeds - kept as a separate map (not merged by
-/// giving the key a variant tag) so a kill and a death against the same boss can never collide.
-static DEATH_MESSAGE_CACHE: LazyLock<Mutex<HashMap<MessageCacheKey, (String, Instant)>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn cached_message(cache: &Mutex<HashMap<MessageCacheKey, (String, Instant)>>, key: &MessageCacheKey) -> Option<String> {
-    let cache = cache.lock().unwrap();
-    cache
-        .get(key)
-        .filter(|(_, last_touched)| last_touched.elapsed() < WEBHOOK_MESSAGE_EDIT_TTL)
-        .map(|(message_id, _)| message_id.clone())
+/// What a tracked "Kill"/"Death" message was about, so a later event can tell whether it's a
+/// repeat of *this* message specifically rather than just "some message for this member" - a kill
+/// on Zulrah and a death to Zulrah (or a death with no known killer at all) are different things
+/// and must never edit each other's message.
+#[derive(Clone, PartialEq, Eq)]
+enum WebhookEventKind {
+    Kill(String),
+    /// `None` covers a death with no identified killer (`DeathEvent::killer_name` is best-effort)
+    /// - those still get grouped/edited together as long as nothing else interrupts them.
+    Death(Option<String>),
 }
 
-fn store_message(cache: &Mutex<HashMap<MessageCacheKey, (String, Instant)>>, key: MessageCacheKey, message_id: String) {
-    cache.lock().unwrap().insert(key, (message_id, Instant::now()));
+/// Only one entry is kept per (group, member): the *last* Kill/Death message posted for them,
+/// regardless of what it was about. A new event only edits that message when it matches the same
+/// `WebhookEventKind` and is still within `WEBHOOK_MESSAGE_EDIT_TTL` - any other message posted for
+/// this member in between (a different boss, a death with no killer, etc.) already overwrote this
+/// entry, which is exactly the "no other message has been posted since" check: there's nothing else
+/// to consult.
+type MemberKey = (i64, String);
+
+struct LastMemberMessage {
+    message_id: String,
+    kind: WebhookEventKind,
+    touched: Instant,
+}
+
+/// In-memory only (see `dispatch_event_webhook`'s doc comment on loading settings fresh each
+/// call) - resets on server restart, which just means the next event after a deploy posts a new
+/// message rather than editing one from before the restart.
+static LAST_MEMBER_MESSAGE: LazyLock<Mutex<HashMap<MemberKey, LastMemberMessage>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn cached_message_for(member_key: &MemberKey, kind: &WebhookEventKind) -> Option<String> {
+    let cache = LAST_MEMBER_MESSAGE.lock().unwrap();
+    cache
+        .get(member_key)
+        .filter(|entry| entry.kind == *kind && entry.touched.elapsed() < WEBHOOK_MESSAGE_EDIT_TTL)
+        .map(|entry| entry.message_id.clone())
+}
+
+fn store_last_message(member_key: MemberKey, kind: WebhookEventKind, message_id: String) {
+    LAST_MEMBER_MESSAGE
+        .lock()
+        .unwrap()
+        .insert(member_key, LastMemberMessage { message_id, kind, touched: Instant::now() });
 }
 
 /// Absolute URL to a boss's self-hosted RuneLite-hiscore-style icon (see `site/src/data/
@@ -561,8 +579,9 @@ pub fn dispatch_event_webhook(
                         }
                     }
                     let thumbnail = boss_icon_url(&web_origin, &kill.npc_name);
-                    let cache_key: MessageCacheKey = (group_id, member_name.clone(), kill.npc_name.clone());
-                    let edited_id = match cached_message(&KILL_MESSAGE_CACHE, &cache_key) {
+                    let member_key: MemberKey = (group_id, member_name.clone());
+                    let kind = WebhookEventKind::Kill(kill.npc_name.clone());
+                    let edited_id = match cached_message_for(&member_key, &kind) {
                         Some(message_id) => {
                             let edited = edit_webhook_embed_rich(
                                 webhook_url.clone(),
@@ -595,7 +614,7 @@ pub fn dispatch_event_webhook(
                         }
                     };
                     if let Some(message_id) = message_id {
-                        store_message(&KILL_MESSAGE_CACHE, cache_key, message_id);
+                        store_last_message(member_key, kind, message_id);
                     }
                 }
                 if let Some(loot) = &kill.loot {
@@ -643,64 +662,62 @@ pub fn dispatch_event_webhook(
             }
             GameEvent::Death(death) => {
                 if settings.notify_deaths {
-                    match &death.killer_name {
-                        // Known killer: mirrors the "Kill" flow above - a repeat death to the same
-                        // NPC within `WEBHOOK_MESSAGE_EDIT_TTL` edits the last death message (with a
-                        // bumped "Deaths" count) instead of posting a new one, but only when that
-                        // last message actually was a death message for this member+NPC pair -
-                        // `DEATH_MESSAGE_CACHE` only ever holds ids of messages posted from this
-                        // branch, so that's guaranteed by construction.
-                        Some(killer) => {
-                            let count = db::count_deaths_for_member_npc(&client, group_id, &member_name, killer)
-                                .await
-                                .unwrap_or_else(|err| {
-                                    log::warn!("discord: failed to load death count: {}", err);
-                                    0
-                                });
-                            let description = format!("{} died to [{}]({})", member_name, killer, wiki_url(killer));
-                            let fields = vec![("Deaths".to_string(), count.to_string())];
-                            let thumbnail = boss_icon_url(&web_origin, killer);
-                            let cache_key: MessageCacheKey = (group_id, member_name.clone(), killer.clone());
-                            let edited_id = match cached_message(&DEATH_MESSAGE_CACHE, &cache_key) {
-                                Some(message_id) => {
-                                    let edited = edit_webhook_embed_rich(
-                                        webhook_url.clone(),
-                                        message_id.clone(),
-                                        "Death",
-                                        description.clone(),
-                                        DEATH_COLOR,
-                                        Some(thumbnail.clone()),
-                                        fields.clone(),
-                                        Some(member_name.clone()),
-                                    )
-                                    .await;
-                                    edited.then_some(message_id)
-                                }
-                                None => None,
-                            };
-                            let message_id = match edited_id {
-                                Some(message_id) => Some(message_id),
-                                None => {
-                                    send_webhook_embed_rich_get_id(
-                                        webhook_url,
-                                        "Death",
-                                        description,
-                                        DEATH_COLOR,
-                                        Some(thumbnail),
-                                        fields,
-                                        Some(member_name.clone()),
-                                    )
-                                    .await
-                                }
-                            };
-                            if let Some(message_id) = message_id {
-                                store_message(&DEATH_MESSAGE_CACHE, cache_key, message_id);
-                            }
+                    // Mirrors the "Kill" flow above, including for an unidentified killer (see
+                    // `WebhookEventKind::Death`'s doc comment) - a repeat death within
+                    // `WEBHOOK_MESSAGE_EDIT_TTL` edits the last death message (with a bumped
+                    // "Deaths" count) instead of posting a new one, as long as nothing else was
+                    // posted for this member in between (`LAST_MEMBER_MESSAGE` only ever holds the
+                    // single most recent message per member, so a differing `WebhookEventKind`
+                    // already means that check fails).
+                    let killer = death.killer_name.clone();
+                    let count = db::count_deaths_for_member_npc(&client, group_id, &member_name, killer.as_deref())
+                        .await
+                        .unwrap_or_else(|err| {
+                            log::warn!("discord: failed to load death count: {}", err);
+                            0
+                        });
+                    let description = match &killer {
+                        Some(killer) => format!("{} died to [{}]({})", member_name, killer, wiki_url(killer)),
+                        None => format!("{} died", member_name),
+                    };
+                    let fields = vec![("Deaths".to_string(), count.to_string())];
+                    let thumbnail = killer.as_deref().map(|killer| boss_icon_url(&web_origin, killer));
+                    let member_key: MemberKey = (group_id, member_name.clone());
+                    let kind = WebhookEventKind::Death(killer);
+                    let edited_id = match cached_message_for(&member_key, &kind) {
+                        Some(message_id) => {
+                            let edited = edit_webhook_embed_rich(
+                                webhook_url.clone(),
+                                message_id.clone(),
+                                "Death",
+                                description.clone(),
+                                DEATH_COLOR,
+                                thumbnail.clone(),
+                                fields.clone(),
+                                Some(member_name.clone()),
+                            )
+                            .await;
+                            edited.then_some(message_id)
                         }
+                        None => None,
+                    };
+                    let message_id = match edited_id {
+                        Some(message_id) => Some(message_id),
                         None => {
-                            let description = format!("{} died", member_name);
-                            send_webhook_embed_with_thumbnail(webhook_url, "Death", description, DEATH_COLOR, None).await;
+                            send_webhook_embed_rich_get_id(
+                                webhook_url,
+                                "Death",
+                                description,
+                                DEATH_COLOR,
+                                thumbnail,
+                                fields,
+                                Some(member_name.clone()),
+                            )
+                            .await
                         }
+                    };
+                    if let Some(message_id) = message_id {
+                        store_last_message(member_key, kind, message_id);
                     }
                 }
             }
