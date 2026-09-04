@@ -57,7 +57,7 @@ const LOOT_LOG_CACHE_TTL_SECS: u64 = 3600;
 /// `activity_log_version_key`'s doc comment.
 const ACTIVITY_LOG_CACHE_TTL_SECS: u64 = 3600;
 
-fn loot_log_version_key(group_id: i64) -> String {
+pub(crate) fn loot_log_version_key(group_id: i64) -> String {
     format!("v1:loot-log-version:{}", group_id)
 }
 

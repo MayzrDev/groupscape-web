@@ -1,5 +1,5 @@
 use crate::admin_auth_middleware::AdminAuthenticated;
-use crate::authed::activity_log_version_key;
+use crate::authed::{activity_log_version_key, loot_log_version_key};
 use crate::cache::RedisCache;
 use crate::crypto;
 use crate::db;
@@ -179,6 +179,7 @@ pub async fn clear_logs(
     _auth: AdminAuthenticated,
     path: web::Path<i64>,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
 ) -> Result<HttpResponse, Error> {
     let group_id = path.into_inner();
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
@@ -187,6 +188,8 @@ pub async fn clear_logs(
     }
 
     let deleted = db::admin_clear_logs(&client, group_id).await?;
+    redis.incr(&activity_log_version_key(group_id)).await;
+    redis.incr(&loot_log_version_key(group_id)).await;
     db::admin_record_audit_log(
         &client,
         "group.clear_logs",
@@ -233,8 +236,10 @@ pub async fn clear_member_data(
 }
 
 /// Deletes activity feed rows an admin picked in the moderation view, for every member of the
-/// group. Bumps `activity_log_version_key` so the version-counter cache in
-/// `authed::get_activity_events` (see its doc comment) doesn't keep serving deleted rows.
+/// group. Bumps both `activity_log_version_key` and `loot_log_version_key` - the deleted rows
+/// can include kill/loot event types the Loot Log view also reads off the same table (see
+/// `db::admin_clear_logs`'s doc comment), so a deleted kill would otherwise keep showing there
+/// even after the activity feed cache is invalidated.
 #[post("/groups/{group_id}/activity-events/delete")]
 pub async fn delete_activity_events(
     _auth: AdminAuthenticated,
@@ -255,6 +260,7 @@ pub async fn delete_activity_events(
 
     let deleted = db::admin_delete_activity_events(&client, group_id, &body.ids).await?;
     redis.incr(&activity_log_version_key(group_id)).await;
+    redis.incr(&loot_log_version_key(group_id)).await;
     db::admin_record_audit_log(
         &client,
         "group.delete_activity_events",
