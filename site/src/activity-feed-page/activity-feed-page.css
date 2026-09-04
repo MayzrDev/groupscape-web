@@ -106,6 +106,102 @@ activity-feed-page {
   gap: 6px;
 }
 
+.activity-feed-page__select-toggle {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.8em;
+  color: var(--admin-accent);
+  background: var(--admin-accent-soft);
+  border: 1px solid var(--admin-accent);
+  border-radius: 2px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.activity-feed-page__select-toggle:hover {
+  background: var(--admin-accent);
+  color: white;
+}
+
+/* Selecting mode repurposes each row as a tap target - see activity-feed-page.js's
+   handleRowClick(). */
+.activity-feed-page__list--selecting activity-feed-event {
+  cursor: pointer;
+}
+
+.activity-feed-page__list--selecting activity-feed-event:hover {
+  background: var(--elevated);
+}
+
+/* Fixed bar at the bottom of the viewport (not just this page's panel) so it reads as a global
+   moderation action, consistent with admin-view-banner's fixed top banner. */
+.activity-feed-page__mod-bar {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 900;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.9em;
+  color: var(--primary-text);
+  background: #1b1b1b;
+  border: 1px solid var(--admin-accent);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.activity-feed-page__mod-bar--visible {
+  display: flex;
+}
+
+.activity-feed-page__mod-count {
+  font-weight: bold;
+  color: var(--admin-accent);
+}
+
+.activity-feed-page__mod-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.activity-feed-page__mod-cancel,
+.activity-feed-page__mod-delete {
+  font-family: inherit;
+  font-size: 0.9em;
+  border-radius: 2px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.activity-feed-page__mod-cancel {
+  color: var(--primary-text);
+  background: transparent;
+  border: 1px solid var(--light-border);
+}
+
+.activity-feed-page__mod-cancel:hover {
+  background: var(--elevated);
+}
+
+.activity-feed-page__mod-delete {
+  color: white;
+  background: var(--admin-accent);
+  border: 1px solid var(--admin-accent);
+}
+
+.activity-feed-page__mod-delete:hover {
+  filter: brightness(1.1);
+}
+
+.activity-feed-page__mod-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+
 .activity-feed-page__member-chip {
   display: flex;
   align-items: center;

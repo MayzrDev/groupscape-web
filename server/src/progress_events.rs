@@ -151,6 +151,26 @@ fn collection_log_quantities(flat: &[i32]) -> HashMap<i32, i32> {
     quantities
 }
 
+/// Merges a flat `[item_id, quantity, ...]` delta onto a stored baseline of the same shape,
+/// returning the new full state to persist. Each item id in `delta` replaces (not adds to) its
+/// baseline quantity - both `collection_log_v2` and `collection_log_sync` deltas always carry the
+/// plugin's latest known true count for an item, never a partial increment. Used by
+/// `authed::update_group_member` to fold both delta fields onto the stored row before the
+/// batcher's plain latest-value-wins write, since that write can't read the old row itself.
+pub fn merge_collection_log(baseline: &[i32], delta: &[i32]) -> Vec<i32> {
+    let mut quantities = collection_log_quantities(baseline);
+    for pair in delta.chunks_exact(2) {
+        let item_id = collection_log_content::canonical_item_id(pair[0]);
+        if item_id <= 0 {
+            continue;
+        }
+        quantities.insert(item_id, pair[1]);
+    }
+    let mut merged: Vec<(i32, i32)> = quantities.into_iter().collect();
+    merged.sort_unstable();
+    merged.into_iter().flat_map(|(id, qty)| [id, qty]).collect()
+}
+
 fn page_is_complete(items: &[i32], quantities: &HashMap<i32, i32>) -> bool {
     items
         .iter()
@@ -382,6 +402,28 @@ mod tests {
                 .map(|task_id| (task_id.to_string(), true))
                 .collect(),
         }
+    }
+
+    #[test]
+    fn merge_collection_log_adds_new_items_onto_baseline() {
+        let baseline = vec![100, 1, 200, 3];
+        let delta = vec![300, 1];
+        let merged = merge_collection_log(&baseline, &delta);
+        assert_eq!(merged, vec![100, 1, 200, 3, 300, 1]);
+    }
+
+    #[test]
+    fn merge_collection_log_replaces_existing_quantity_rather_than_summing() {
+        let baseline = vec![100, 1];
+        let delta = vec![100, 5];
+        let merged = merge_collection_log(&baseline, &delta);
+        assert_eq!(merged, vec![100, 5]);
+    }
+
+    #[test]
+    fn merge_collection_log_on_empty_baseline_is_just_the_delta() {
+        let merged = merge_collection_log(&[], &[100, 1, 200, 2]);
+        assert_eq!(merged, vec![100, 1, 200, 2]);
     }
 
     #[test]
@@ -631,6 +673,7 @@ mod tests {
             deposited: None,
             diary_vars: Some(vec![0xffffffffu32 as i32; 62]),
             collection_log_v2: Some(vec![4151, 1]),
+            collection_log_sync: None,
             potion_storage: None,
             special_attack: None,
             active_prayers: None,

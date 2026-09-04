@@ -890,6 +890,7 @@ WHERE group_id=$2
             shared_bank: Option::None,
             deposited: Option::None,
             collection_log_v2: row.try_get("collection_log").ok(),
+            collection_log_sync: None,
             potion_storage: row.try_get("potion_storage").ok(),
             special_attack: row.try_get("special_attack").ok(),
             active_prayers: row.try_get("active_prayers").ok(),
@@ -954,6 +955,7 @@ async fn get_pending_group_members(client: &Client, group_id: i64) -> Result<Vec
                 shared_bank: None,
                 deposited: None,
                 collection_log_v2: None,
+                collection_log_sync: None,
                 potion_storage: None,
                 special_attack: None,
                 active_prayers: None,
@@ -1027,6 +1029,7 @@ WHERE group_id=$1 AND member_name=$2
         shared_bank: Option::None,
         deposited: Option::None,
         collection_log_v2: row.try_get("collection_log").ok(),
+        collection_log_sync: None,
         potion_storage: row.try_get("potion_storage").ok(),
         special_attack: row.try_get("special_attack").ok(),
         active_prayers: row.try_get("active_prayers").ok(),
@@ -5176,6 +5179,23 @@ pub async fn admin_clear_logs(client: &Client, group_id: i64) -> Result<u64, Api
         .execute(&stmt, &[&group_id])
         .await
         .map_err(|e| ApiError::AdminDbError("AdminClearLogsError".to_string(), e))
+}
+
+/// Deletes specific activity feed rows an admin selected from the moderation view. Scoped by
+/// `group_id` as well as `id` so a stale/tampered id list can never reach into another group's
+/// rows.
+pub async fn admin_delete_activity_events(
+    client: &Client,
+    group_id: i64,
+    ids: &[i64],
+) -> Result<u64, ApiError> {
+    let stmt = client
+        .prepare_cached("DELETE FROM groupscape.activity_events WHERE group_id = $1 AND id = ANY($2)")
+        .await?;
+    client
+        .execute(&stmt, &[&group_id, &ids])
+        .await
+        .map_err(|e| ApiError::AdminDbError("AdminDeleteActivityEventsError".to_string(), e))
 }
 
 const CLEARABLE_MEMBER_DATA_TYPES: &[&str] = &[

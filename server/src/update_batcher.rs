@@ -711,6 +711,7 @@ mod tests {
             deposited: None,
             diary_vars: None,
             collection_log_v2: None,
+            collection_log_sync: None,
             potion_storage: None,
             special_attack: None,
             active_prayers: None,

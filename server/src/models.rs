@@ -196,6 +196,13 @@ pub struct GroupMember {
     pub diary_vars: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub collection_log_v2: Option<Vec<i32>>,
+    // Items the plugin only saw via a bulk collection log widget scan (e.g. the player just
+    // opened their log to browse), with no matching live drop signal - see
+    // `CollectionLogV2Manager` in the plugin. Never diffed for Discord/activity-feed events;
+    // `update_group_member` merges it into `collection_log_v2`'s stored baseline before the
+    // batcher writes it, then clears it so it never reaches storage under its own name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collection_log_sync: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub potion_storage: Option<Vec<i32>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1336,6 +1343,14 @@ pub struct AdminClearMemberDataItem {
 #[serde(deny_unknown_fields)]
 pub struct AdminClearMemberDataRequest {
     pub items: Vec<AdminClearMemberDataItem>,
+}
+
+/// Ids of specific `activity_events` rows an admin picked from the activity feed to delete for
+/// everyone - see `db::admin_delete_activity_events`.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AdminDeleteActivityEventsRequest {
+    pub ids: Vec<i64>,
 }
 
 

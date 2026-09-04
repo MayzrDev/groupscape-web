@@ -571,6 +571,13 @@ pub async fn update_group_member(
         ArrayFormat::Flat,
     )?;
     validate_member_prop_length(
+        "collection_log_sync",
+        &group_member_inner.collection_log_sync,
+        0,
+        4000,
+        ArrayFormat::Flat,
+    )?;
+    validate_member_prop_length(
         "potion_storage",
         &group_member_inner.potion_storage,
         0,
@@ -697,10 +704,10 @@ pub async fn update_group_member(
     // `update_batcher.rs`).
     {
         let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
-        if let Some(previous) =
-            db::get_progress_snapshot(&client, auth.group_id, &group_member_inner.name).await?
-        {
-            let mut progress_events = progress_events::diff_progress(&previous, &group_member_inner);
+        let previous_snapshot =
+            db::get_progress_snapshot(&client, auth.group_id, &group_member_inner.name).await?;
+        if let Some(previous) = &previous_snapshot {
+            let mut progress_events = progress_events::diff_progress(previous, &group_member_inner);
             // A heartbeat that would post an implausible number of level-ups means the stored
             // `skills` snapshot itself is stale/wrong (see `looks_like_stale_skills_baseline`'s
             // doc comment), not that the player genuinely crossed that many thresholds at once.
@@ -765,6 +772,31 @@ pub async fn update_group_member(
                     }
                 }
             }
+        }
+
+        // `collection_log_v2`/`collection_log_sync` above were diffed (and, for `_v2`, dispatched
+        // to Discord/the activity feed) as raw deltas - `_v2` only ever carries genuinely live
+        // drops, `_sync` bulk backfill from the player opening their log to browse. Now that the
+        // diff is done, fold both onto the stored baseline so what actually reaches the batcher
+        // (and therefore `COALESCE`-replaces the DB row - see `update_batcher::build_update_sql`)
+        // is the full merged state, not a partial array that would wipe out everything the delta
+        // didn't happen to mention. `_sync` is `.take()`n since it has no column of its own -
+        // it only ever exists to feed this merge.
+        if group_member_inner.collection_log_v2.is_some()
+            || group_member_inner.collection_log_sync.is_some()
+        {
+            let baseline: &[i32] = previous_snapshot
+                .as_ref()
+                .and_then(|p| p.collection_log.as_deref())
+                .unwrap_or(&[]);
+            let mut merged = baseline.to_vec();
+            if let Some(live) = &group_member_inner.collection_log_v2 {
+                merged = progress_events::merge_collection_log(&merged, live);
+            }
+            if let Some(sync) = group_member_inner.collection_log_sync.take() {
+                merged = progress_events::merge_collection_log(&merged, &sync);
+            }
+            group_member_inner.collection_log_v2 = Some(merged);
         }
     }
 

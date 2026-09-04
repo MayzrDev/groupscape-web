@@ -1,12 +1,15 @@
 use crate::admin_auth_middleware::AdminAuthenticated;
+use crate::authed::activity_log_version_key;
+use crate::cache::RedisCache;
 use crate::crypto;
 use crate::db;
 use crate::error::ApiError;
 use crate::models::{
     AdminAccountsQuery, AdminAccountsResponse, AdminAccountsSummary, AdminAddAccountToGroup,
-    AdminAuditLogResponse, AdminClearMemberDataRequest, AdminGroupsQuery, AdminGroupsResponse,
-    AdminModerationRequest, AdminPageQuery, AdminPasswordResetResponse, AdminSearchQuery,
-    AdminSearchResponse, AdminSetAccountUsername, AdminSetAccountStatus,
+    AdminAuditLogResponse, AdminClearMemberDataRequest, AdminDeleteActivityEventsRequest,
+    AdminGroupsQuery, AdminGroupsResponse, AdminModerationRequest, AdminPageQuery,
+    AdminPasswordResetResponse, AdminSearchQuery, AdminSearchResponse, AdminSetAccountUsername,
+    AdminSetAccountStatus,
 };
 use actix_web::{delete, get, post, web, Error, HttpResponse};
 use deadpool_postgres::{Client, Pool};
@@ -224,6 +227,40 @@ pub async fn clear_member_data(
         Some("group"),
         Some(&group_id.to_string()),
         Some(json!({ "items": items, "item_count": item_count })),
+    )
+    .await?;
+    Ok(HttpResponse::Ok().finish())
+}
+
+/// Deletes activity feed rows an admin picked in the moderation view, for every member of the
+/// group. Bumps `activity_log_version_key` so the version-counter cache in
+/// `authed::get_activity_events` (see its doc comment) doesn't keep serving deleted rows.
+#[post("/groups/{group_id}/activity-events/delete")]
+pub async fn delete_activity_events(
+    _auth: AdminAuthenticated,
+    path: web::Path<i64>,
+    body: web::Json<AdminDeleteActivityEventsRequest>,
+    db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
+) -> Result<HttpResponse, Error> {
+    let group_id = path.into_inner();
+    if body.ids.is_empty() {
+        return Ok(HttpResponse::Ok().finish());
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if db::admin_get_group(&client, group_id).await?.is_none() {
+        return Err(ApiError::AdminNotFoundError.into());
+    }
+
+    let deleted = db::admin_delete_activity_events(&client, group_id, &body.ids).await?;
+    redis.incr(&activity_log_version_key(group_id)).await;
+    db::admin_record_audit_log(
+        &client,
+        "group.delete_activity_events",
+        Some("group"),
+        Some(&group_id.to_string()),
+        Some(json!({ "ids": body.ids, "rows_deleted": deleted })),
     )
     .await?;
     Ok(HttpResponse::Ok().finish())

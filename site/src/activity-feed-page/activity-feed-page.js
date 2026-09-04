@@ -1,5 +1,8 @@
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
+import { adminApi } from "../data/admin-api";
+import { adminViewSession } from "../data/admin-view-session";
+import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { pubsub } from "../data/pubsub";
 import { utility } from "../utility";
 import { activityDisplayType, killGroupKey, KILL_MERGE_WINDOW_MS } from "../data/activity-event-copy";
@@ -49,6 +52,11 @@ export class ActivityFeedPage extends BaseElement {
     // key (member+boss, see `killGroupKey`) -> { event, row } for the kill currently shown as the
     // aggregated row for that key, so a repeat kill can be folded in rather than adding a row.
     this.feedGroups = new Map();
+    // Only a site admin viewing this group read-only (see `admin-view-session.js`) can moderate
+    // the feed - a real member never sees the select/delete controls.
+    this.isAdmin = false;
+    this.selecting = false;
+    this.selectedIds = new Set();
   }
 
   html() {
@@ -72,6 +80,31 @@ export class ActivityFeedPage extends BaseElement {
     this.loadMoreButton = this.querySelector(".activity-feed-page__load-more");
     this.eventListener(this.loadMoreButton, "click", () => this.loadMore({ manual: true }));
     this.scrollContainer = this.closest(".authed-section__main-content") || document.documentElement;
+
+    // Moderation controls (select rows, delete for everyone) are gated to a site admin's
+    // read-only group-view session (see `admin-view-session.js`) - never available to a regular
+    // member, including a group's own owner/admin.
+    const adminView = adminViewSession.get();
+    this.isAdmin = Boolean(adminView);
+    this.adminGroupId = adminView?.groupId;
+    this.selectToggle = this.querySelector(".activity-feed-page__select-toggle");
+    this.modBar = this.querySelector(".activity-feed-page__mod-bar");
+    this.modCount = this.querySelector(".activity-feed-page__mod-count");
+    this.modDeleteButton = this.querySelector(".activity-feed-page__mod-delete");
+    if (this.isAdmin) {
+      // `adminApi` (the /api/admin-scoped client used by the admin panel) is separate from the
+      // `api` singleton this page normally talks to - the admin-view session only wires the
+      // latter (see app-initializer.js's `loadAdminView`), so seed `adminApi`'s bearer token here
+      // before the moderation delete call needs it.
+      adminApi.setCredentials(adminView.adminToken);
+      this.selectToggle.hidden = false;
+      this.eventListener(this.selectToggle, "click", () => this.setSelecting(!this.selecting));
+      this.eventListener(this.list, "click", this.handleRowClick.bind(this));
+      this.eventListener(this.querySelector(".activity-feed-page__mod-cancel"), "click", () =>
+        this.setSelecting(false)
+      );
+      this.eventListener(this.modDeleteButton, "click", () => this.confirmDeleteSelected());
+    }
 
     this.subscribe("members-updated", this.handleUpdatedMembers.bind(this));
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
@@ -286,7 +319,84 @@ export class ActivityFeedPage extends BaseElement {
     this.list.innerHTML = "";
     this.empty.classList.remove("activity-feed-page__empty--visible");
     this.sentinel.classList.remove("activity-feed-page__sentinel--paused");
+    // The list is about to be wiped and rebuilt, so any selected rows are about to become stale
+    // DOM references - drop out of selecting mode rather than carry them over.
+    if (this.isAdmin) this.setSelecting(false);
     await Promise.all([this.loadMore(), this.loadCounts()]);
+  }
+
+  setSelecting(selecting) {
+    this.selecting = selecting;
+    if (!selecting) {
+      this.selectedIds.clear();
+      for (const row of this.list.children) {
+        row.classList.remove("activity-feed-event--selected");
+      }
+    }
+    this.selectToggle.textContent = selecting ? "Cancel select" : "Select";
+    this.list.classList.toggle("activity-feed-page__list--selecting", selecting);
+    this.modBar.classList.toggle("activity-feed-page__mod-bar--visible", selecting);
+    this.updateModCount();
+  }
+
+  updateModCount() {
+    this.modCount.textContent = this.selectedIds.size;
+    this.modDeleteButton.disabled = this.selectedIds.size === 0;
+  }
+
+  handleRowClick(e) {
+    if (!this.selecting) return;
+    const row = e.target.closest("activity-feed-event");
+    if (!row || !row.event) return;
+    // Selecting mode repurposes the whole row as the tap target, including what would otherwise
+    // be an outbound wiki link (see activity-feed-event.js's `subject` renderer) - never navigate
+    // away from moderation because of a click meant to select.
+    e.preventDefault();
+
+    const id = row.event.id;
+    if (this.selectedIds.has(id)) {
+      this.selectedIds.delete(id);
+      row.classList.remove("activity-feed-event--selected");
+    } else {
+      this.selectedIds.add(id);
+      row.classList.add("activity-feed-event--selected");
+    }
+    this.updateModCount();
+  }
+
+  confirmDeleteSelected() {
+    const ids = [...this.selectedIds];
+    if (!ids.length) return;
+    confirmDialogManager.confirm({
+      headline: `Delete ${ids.length} event${ids.length === 1 ? "" : "s"}?`,
+      body: "These events are removed from the activity feed for every member of this group. This cannot be undone.",
+      yesCallback: () => this.deleteSelected(ids),
+      noCallback: () => {},
+    });
+  }
+
+  async deleteSelected(ids) {
+    const response = await adminApi.deleteActivityEvents(this.adminGroupId, ids);
+    if (!response.ok) return;
+
+    const idSet = new Set(ids);
+    this.loaded = this.loaded.filter((event) => !idSet.has(event.id));
+    this.typeCountEvents = this.typeCountEvents.filter((event) => !idSet.has(event.id));
+    this.memberCountEvents = this.memberCountEvents.filter((event) => !idSet.has(event.id));
+    // A deleted event may be the one a later same-boss kill would otherwise merge into (see
+    // `mergeOrCreateRow`) - drop it so that merge starts a fresh row instead of resurrecting the
+    // deleted one's content.
+    for (const [key, group] of this.feedGroups) {
+      if (idSet.has(group.event.id)) this.feedGroups.delete(key);
+    }
+    for (const row of Array.from(this.list.children)) {
+      if (row.event && idSet.has(row.event.id)) row.remove();
+    }
+
+    this.setSelecting(false);
+    this.renderRail();
+    this.renderMemberFilters();
+    this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
   }
 
   async loadCounts() {

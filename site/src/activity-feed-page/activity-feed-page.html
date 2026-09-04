@@ -3,6 +3,7 @@
   <div class="activity-feed-page__main">
     <div class="activity-feed-page__head">
       <h3>Activity Feed</h3>
+      <button type="button" class="activity-feed-page__select-toggle" hidden>Select</button>
       <div class="activity-feed-page__member-filters"></div>
     </div>
     <div class="activity-feed-page__list"></div>
@@ -11,5 +12,12 @@
       <button type="button" class="activity-feed-page__load-more">Load more</button>
     </div>
     <p class="activity-feed-page__empty">No events yet — kills, quests, diaries, and more will show up here as they happen.</p>
+  </div>
+</div>
+<div class="activity-feed-page__mod-bar">
+  <span><span class="activity-feed-page__mod-count">0</span> selected</span>
+  <div class="activity-feed-page__mod-actions">
+    <button type="button" class="activity-feed-page__mod-cancel">Cancel</button>
+    <button type="button" class="activity-feed-page__mod-delete" disabled>Delete</button>
   </div>
 </div>

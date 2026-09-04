@@ -85,6 +85,15 @@ class AdminApi {
     return response;
   }
 
+  async deleteActivityEvents(groupId, ids) {
+    const response = await fetch(`${this.baseUrl}/groups/${groupId}/activity-events/delete`, {
+      method: "POST",
+      headers: { ...this.authHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    return response;
+  }
+
   async deleteCharacter(characterId) {
     const response = await fetch(`${this.baseUrl}/characters/${characterId}`, {
       method: "DELETE",

@@ -2,6 +2,14 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.392] - 2026-09-05
+
+### Added
+- Site admins viewing a group can now select individual activity feed events and delete them for everyone in the group.
+
+### Fixed
+- Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.
+
 ## [1.0.383] - 2026-09-04
 
 ### Changed

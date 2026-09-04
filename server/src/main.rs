@@ -382,6 +382,7 @@ async fn main() -> std::io::Result<()> {
             .service(admin::delete_group)
             .service(admin::clear_logs)
             .service(admin::clear_member_data)
+            .service(admin::delete_activity_events)
             .service(admin::delete_character)
             .service(admin::unlink_character_from_group)
             .service(admin::list_audit_log)
