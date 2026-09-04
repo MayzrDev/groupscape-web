@@ -17,6 +17,7 @@ use crate::models::{
     LootLogItem, LootLogPage, LootLogSummary, MyPermissions, PermissionFlags, PermissionKey,
     RenameGroup, UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
+use crate::notable_npcs;
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
 use crate::progress_events;
 use crate::push;
@@ -624,7 +625,7 @@ pub async fn update_group_member(
                 // notification's filter) since the plugin's "Boss kill" chat setting has no
                 // other way to tell a boss kill from an arbitrary slayer-task kill.
                 if let GameEvent::Kill(kill) = event {
-                    if drop_rates::is_boss(&kill.npc_name) && broadcast_registry.has_subscribers(auth.group_id) {
+                    if notable_npcs::is_notable(&kill.npc_name) && broadcast_registry.has_subscribers(auth.group_id) {
                         let envelope = WsEnvelope::KillEvent {
                             payload: KillEventPayload {
                                 member_name: group_member_inner.name.clone(),

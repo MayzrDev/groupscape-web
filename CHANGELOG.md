@@ -7,6 +7,11 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Fixed
 - Regular, Mortimer, and Wilderness slayer streaks now actually keep updating as you complete tasks, instead of getting stuck at whatever value they first showed.
 - Discord boss kill notifications now fire for every tracked boss, not just the ~30 with a curated drop table - bosses like Corporeal Beast, TzTok-Jad, Skotizo, and Duke Sucellus were being silently skipped even with kill notifications turned on.
+- The same live overlay/websocket kill event had the same gap - fixed to match.
+- Fixed several boss drops in the Loot Log showing the wrong name or icon (e.g. Theatre of Blood, Chambers of Xeric, Tempoross, and Nightmare of Ashihama pets were pointing at the wrong item).
+
+### Added
+- Added Loot Log rarity data for 41 more bosses that previously had none, including Corporeal Beast, TzTok-Jad, TzKal-Zuk, Duke Sucellus, The Leviathan, The Whisperer, Vardorvis, Araxxor, Yama, the Royal Titans, the Blood/Blue/Eclipse Moons, and more.
 
 ## [1.0.351] - 2026-09-03
 

@@ -261,8 +261,7 @@ pub fn dispatch_event_webhook(
             GameEvent::Kill(kill) => {
                 // Regular NPCs (guards, random monsters) aren't posted - only bosses, matching
                 // what a group actually wants pinged in Discord. Uses the same curated boss list
-                // as the activity feed (`notable_npcs`), not `drop_rates::is_boss` - that one only
-                // covers bosses with a curated drop table, which is a much smaller set.
+                // as the activity feed (`notable_npcs`).
                 if settings.notify_kills && notable_npcs::is_notable(&kill.npc_name) {
                     // Prefer the account's real in-game KC (parsed client-side from the "kill
                     // count is" chat line); only fall back to counting this server's own kill
