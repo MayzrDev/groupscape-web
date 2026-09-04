@@ -189,6 +189,20 @@ function normalize(name) {
   return `${name ?? ""}`.trim().toLowerCase();
 }
 
+// The plugin resolves task names off the game's own DB tables (see SlayerTaskState#resolveTaskName),
+// which don't consistently use the same plural/singular form as our icon keys - e.g. the
+// "Cockatrices" task resolves to the singular "Cockatrice". Try the exact name first, then the
+// pluralized/singularized form, before giving up and falling back to UNKNOWN_TASK_ICON.
+function resolveMonsterKey(taskName) {
+  const name = normalize(taskName);
+  if (SLAYER_MONSTER_ICONS[name]) return SLAYER_MONSTER_ICONS[name];
+  if (SLAYER_MONSTER_ICONS[`${name}s`]) return SLAYER_MONSTER_ICONS[`${name}s`];
+  if (name.endsWith("s") && SLAYER_MONSTER_ICONS[name.slice(0, -1)]) {
+    return SLAYER_MONSTER_ICONS[name.slice(0, -1)];
+  }
+  return null;
+}
+
 function wikiTitle(name) {
   return encodeURIComponent(`${name}`.trim().replace(/\s+/g, "_"));
 }
@@ -200,7 +214,7 @@ class SlayerData {
   }
 
   taskIconUrl(taskName) {
-    const key = SLAYER_MONSTER_ICONS[normalize(taskName)];
+    const key = resolveMonsterKey(taskName);
     return key ? `/icons/slayer/monsters/${key}.png` : UNKNOWN_TASK_ICON;
   }
 

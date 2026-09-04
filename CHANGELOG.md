@@ -10,6 +10,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord notifications for kills, diaries, quests, collection log, and raids now show an icon and link straight to the relevant Old School RuneScape Wiki page; kills and boss kill counts are now shown as proper fields instead of run-on text.
 - Discord can now post skill level-up notifications, with a configurable "post every 1/5/10 levels" interval in group settings (level 99 always posts).
 
+### Fixed
+- Cockatrice slayer tasks now show the cockatrice icon instead of an unknown-task placeholder, plus the same fix for any other task whose singular/plural name didn't match our icon list.
+
 ## [1.0.376] - 2026-09-04
 
 ### Fixed
