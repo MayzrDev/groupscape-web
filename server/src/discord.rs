@@ -101,6 +101,7 @@ const QUEST_COLOR: u32 = 0xC9962B;
 const DIARY_COLOR: u32 = 0x29C2B0;
 const PET_COLOR: u32 = 0xFF7AC6;
 const CLUE_COLOR: u32 = 0x3BA7D6;
+const LEVEL_UP_COLOR: u32 = 0x52C41A;
 
 /// `{quantity}x {name} ({value}, {drop rate})` lines for the unified "Drops" notification -
 /// shared by kill loot, chest/clue loot, since both format the same way once resolved to a
@@ -349,6 +350,12 @@ fn collection_log_icon_url(web_origin: &str, page: &str) -> String {
     } else {
         wiki_icon_url("Collection log.png")
     }
+}
+
+/// Thumbnail for the "Level up" embed, keyed off the skill's own wiki icon file (e.g.
+/// "Agility icon.png").
+fn skill_icon_url(skill: &str) -> String {
+    wiki_icon_url(&format!("{} icon.png", skill))
 }
 
 /// Thumbnail for the "Raid" embed, keyed off the raid's own wiki icon file.
@@ -619,8 +626,8 @@ pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item
 }
 
 /// Fire-and-forget, mirroring `dispatch_event_webhook` above - posts a `ProgressEvent` (quest,
-/// diary, combat-achievement, or collection-log milestone) as a Discord embed when the matching
-/// notify setting is on.
+/// diary, combat-achievement, collection-log, or skill level-up milestone) as a Discord embed when
+/// the matching notify setting is on.
 ///
 /// Per-item collection-log events are far too frequent to post individually (thousands of log
 /// slots) - only the page-completion variant (`kind: "page"` in the payload) is posted, matching
@@ -634,7 +641,9 @@ pub fn dispatch_progress_webhook(
     event: crate::progress_events::ProgressEvent,
     web_origin: String,
 ) {
-    use crate::progress_events::{EVENT_TYPE_COLLECTION_LOG, EVENT_TYPE_COMBAT_TASK, EVENT_TYPE_DIARY, EVENT_TYPE_QUEST};
+    use crate::progress_events::{
+        EVENT_TYPE_COLLECTION_LOG, EVENT_TYPE_COMBAT_TASK, EVENT_TYPE_DIARY, EVENT_TYPE_LEVEL_UP, EVENT_TYPE_QUEST,
+    };
 
     tokio::spawn(async move {
         let client = match db_pool.get().await {
@@ -728,6 +737,30 @@ pub fn dispatch_progress_webhook(
                     Some(collection_log_icon_url(&web_origin, page)),
                     Vec::new(),
                 ))
+            }
+            // Level 99 always posts regardless of the configured interval - see
+            // `DiscordWebhookSettings::level_up_interval`'s doc comment.
+            EVENT_TYPE_LEVEL_UP if settings.notify_level_ups => {
+                let skill = event.payload["skill"].as_str().unwrap_or("a skill");
+                let level = event.payload["level"].as_i64().unwrap_or_default();
+                let interval = i64::from(settings.level_up_interval.max(1));
+                if level != 99 && level % interval != 0 {
+                    None
+                } else {
+                    Some((
+                        "Level up",
+                        format!(
+                            "{} reached level {} [{}]({})",
+                            member_name,
+                            level,
+                            skill,
+                            wiki_url(skill)
+                        ),
+                        LEVEL_UP_COLOR,
+                        Some(skill_icon_url(skill)),
+                        Vec::new(),
+                    ))
+                }
             }
             _ => None,
         };

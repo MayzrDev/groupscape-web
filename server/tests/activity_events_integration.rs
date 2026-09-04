@@ -519,6 +519,8 @@ async fn test_discord_webhook_settings_default_to_disabled_and_all_notify_true()
     assert!(settings.notify_diaries);
     assert!(settings.notify_pets);
     assert!(settings.notify_clues);
+    assert!(settings.notify_level_ups);
+    assert_eq!(settings.level_up_interval, 10);
 }
 
 #[tokio::test]
@@ -543,6 +545,8 @@ async fn test_discord_webhook_settings_round_trip() {
         notify_diaries: true,
         notify_pets: true,
         notify_clues: true,
+        notify_level_ups: true,
+        level_up_interval: 10,
     };
     db::update_discord_webhook_settings(&client, group_id, &updated)
         .await
@@ -583,6 +587,8 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_diaries: true,
             notify_pets: true,
             notify_clues: true,
+            notify_level_ups: true,
+            level_up_interval: 10,
         },
     )
     .await
@@ -605,6 +611,8 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_diaries: true,
             notify_pets: true,
             notify_clues: true,
+            notify_level_ups: true,
+            level_up_interval: 10,
         },
     )
     .await
@@ -642,6 +650,8 @@ async fn test_discord_webhook_settings_scoped_per_group() {
             notify_diaries: true,
             notify_pets: true,
             notify_clues: true,
+            notify_level_ups: true,
+            level_up_interval: 10,
         },
     )
     .await

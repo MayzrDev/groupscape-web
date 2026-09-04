@@ -285,6 +285,38 @@ fn milestones_crossed(previous_level: u32, current_level: u32) -> impl Iterator<
         .filter(move |&milestone| milestone > previous_level && milestone <= current_level)
 }
 
+/// Every individual level a skill crossed this upload, regardless of `LEVEL_MILESTONES` - feeds
+/// Discord's own configurable posting interval (`DiscordWebhookSettings::level_up_interval`),
+/// which is deliberately decoupled from the activity feed's fixed milestone schedule below. Not
+/// persisted to `activity_events` - the caller only uses this to fire Discord dispatches directly,
+/// which then filter by the group's interval setting at dispatch time.
+///
+/// Same "skip a skill slot missing from `previous`" guard as `diff_skills`. Callers are expected to
+/// only invoke this when `diff_skills`/`looks_like_stale_skills_baseline` on the same
+/// previous/current pair didn't flag the upload as an implausible baseline jump - that check
+/// already bounds how many thresholds (and therefore how many individual levels) a legitimate
+/// heartbeat can cross.
+pub fn diff_skills_fine(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> {
+    let mut events = Vec::new();
+    for (index, &current_xp) in current.iter().enumerate() {
+        let Some(&previous_xp) = previous.get(index) else {
+            continue;
+        };
+        let Some(&skill) = SKILL_NAMES.get(index) else {
+            continue;
+        };
+        let previous_level = level_for_xp(previous_xp);
+        let current_level = level_for_xp(current_xp);
+        for level in (previous_level + 1)..=current_level {
+            events.push(ProgressEvent {
+                event_type: EVENT_TYPE_LEVEL_UP,
+                payload: json!({ "skill": skill, "level": level }),
+            });
+        }
+    }
+    events
+}
+
 /// Skills whose level crossed a new milestone threshold this upload (see `LEVEL_MILESTONES`).
 /// A skill slot missing from `previous` (shorter array than `current`) is skipped rather than
 /// treated as a level-1 baseline - mirrors the "never diffed before" guard the other diffs use.

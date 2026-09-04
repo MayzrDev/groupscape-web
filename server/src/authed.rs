@@ -670,7 +670,8 @@ pub async fn update_group_member(
             // doc comment), not that the player genuinely crossed that many thresholds at once.
             // Drop the level-up batch and re-baseline so the next heartbeat starts fresh instead
             // of flooding the feed with the account's whole level-up history.
-            if progress_events::looks_like_stale_skills_baseline(&progress_events) {
+            let skills_baseline_is_stale = progress_events::looks_like_stale_skills_baseline(&progress_events);
+            if skills_baseline_is_stale {
                 log::warn!(
                     "suppressing implausible level-up batch and re-baselining skills: group_id={} member={} level_up_count={}",
                     auth.group_id,
@@ -695,13 +696,36 @@ pub async fn update_group_member(
                         event,
                     )
                     .await?;
-                    discord::dispatch_progress_webhook(
-                        db_pool.get_ref().clone(),
-                        auth.group_id,
-                        group_member_inner.name.clone(),
-                        event.clone(),
-                        config.web_origin.clone(),
-                    );
+                    // Level-ups are dispatched separately below at Discord's own configurable
+                    // per-level granularity, decoupled from this loop's fixed milestone schedule
+                    // (see `progress_events::diff_skills_fine`) - dispatching them here too would
+                    // double-post.
+                    if event.event_type != progress_events::EVENT_TYPE_LEVEL_UP {
+                        discord::dispatch_progress_webhook(
+                            db_pool.get_ref().clone(),
+                            auth.group_id,
+                            group_member_inner.name.clone(),
+                            event.clone(),
+                            config.web_origin.clone(),
+                        );
+                    }
+                }
+            }
+            // Not gated on `!progress_events.is_empty()` above - that only reflects the coarse
+            // milestone schedule, which can be empty even when finer per-level crossings exist.
+            if !skills_baseline_is_stale {
+                if let (Some(previous_skills), Some(current_skills)) =
+                    (&previous.skills, &group_member_inner.skills)
+                {
+                    for event in progress_events::diff_skills_fine(previous_skills, current_skills) {
+                        discord::dispatch_progress_webhook(
+                            db_pool.get_ref().clone(),
+                            auth.group_id,
+                            group_member_inner.name.clone(),
+                            event,
+                            config.web_origin.clone(),
+                        );
+                    }
                 }
             }
         }

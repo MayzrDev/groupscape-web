@@ -215,6 +215,24 @@
       <input class="group-settings__discord-notify-checkbox" type="checkbox" id="discord-notify__diaries" />
       <label for="discord-notify__diaries"></label>
     </div>
+
+    <div class="group-settings__discord-notify-row" data-key="notify_level_ups">
+      <span class="group-settings__discord-notify-dot group-settings__discord-notify-dot--level"></span>
+      <div class="group-settings__discord-notify-copy">
+        <div class="group-settings__discord-notify-title">Level ups</div>
+        <div class="group-settings__discord-notify-desc">A member reaches a skill level that's a multiple of the interval below. Level 99 always posts.</div>
+        <div class="group-settings__discord-drops-threshold">
+          <label for="discord-level-up-interval">Post every</label>
+          <select class="group-settings__discord-level-up-interval" id="discord-level-up-interval">
+            <option value="1">level</option>
+            <option value="5">5 levels</option>
+            <option value="10">10 levels</option>
+          </select>
+        </div>
+      </div>
+      <input class="group-settings__discord-notify-checkbox" type="checkbox" id="discord-notify__level_ups" />
+      <label for="discord-notify__level_ups"></label>
+    </div>
   </div>
 
   <h3>Appearance settings</h3>

@@ -331,6 +331,10 @@ group-settings {
   background: #3ba7d6;
 }
 
+.group-settings__discord-notify-dot--level {
+  background: #52c41a;
+}
+
 .group-settings__discord-notify-group-label {
   margin: 0.9em 0 0.1em;
   font-size: 0.72em;
@@ -367,6 +371,11 @@ group-settings {
 
 .group-settings__discord-drops-min-value {
   width: 5em;
+  font-size: 0.85em;
+  padding: 2px 5px;
+}
+
+.group-settings__discord-level-up-interval {
   font-size: 0.85em;
   padding: 2px 5px;
 }

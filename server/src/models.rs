@@ -1239,6 +1239,14 @@ pub struct DiscordWebhookSettings {
     /// Split out of `notify_drops` - a clue casket opening posts as its own "Clue casket" embed
     /// (with a tier field) instead of riding the generic "Drops" line when this is on.
     pub notify_clues: bool,
+    /// A member reaches a skill level that's a multiple of `level_up_interval` (level 99 always
+    /// posts regardless). Decoupled from the activity feed's own fixed milestone schedule (see
+    /// `progress_events::diff_skills_fine`) - Discord's cadence is independently configurable.
+    pub notify_level_ups: bool,
+    /// Post only when the reached level is a multiple of this (e.g. 5 -> 70, 75, 80, 85...), plus
+    /// level 99 unconditionally. One of 1, 5, or 10 - not validated server-side beyond that it's
+    /// a positive divisor check at dispatch time (`level % interval == 0`).
+    pub level_up_interval: i32,
 }
 
 #[derive(Deserialize)]

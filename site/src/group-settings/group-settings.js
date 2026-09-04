@@ -126,6 +126,8 @@ export class GroupSettings extends BaseElement {
       "change",
       this.handleDiscordDropsUniqueOnlyChange.bind(this)
     );
+    this.discordLevelUpIntervalSelect = this.querySelector(".group-settings__discord-level-up-interval");
+    this.eventListener(this.discordLevelUpIntervalSelect, "change", this.saveDiscordSettings.bind(this));
 
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
@@ -408,6 +410,7 @@ export class GroupSettings extends BaseElement {
     this.updateDiscordDropsParsedPreview();
     this.discordDropsUniqueOnlyCheckbox.checked = !!settings.drops_unique_only;
     this.updateDiscordDropsUniqueOnlyLock();
+    this.discordLevelUpIntervalSelect.value = String(settings.level_up_interval ?? 10);
   }
 
   // The min-value field is meaningless once unique-only is on (drop_lines ignores it server-side),
@@ -445,6 +448,7 @@ export class GroupSettings extends BaseElement {
     }
     this.discordDropsUniqueOnlyCheckbox.disabled = !connected;
     this.discordDropsMinValueInput.disabled = !connected || this.discordDropsUniqueOnlyCheckbox.checked;
+    this.discordLevelUpIntervalSelect.disabled = !connected;
     this.querySelector(".group-settings__discord-lock-note").style.display = connected ? "none" : "";
   }
 
@@ -466,6 +470,7 @@ export class GroupSettings extends BaseElement {
     const parsedMinValue = parseGpShorthand(this.discordDropsMinValueInput.value);
     settings.drops_min_value = parsedMinValue ?? this.lastSavedDiscordSettings?.drops_min_value ?? 250_000;
     settings.drops_unique_only = this.discordDropsUniqueOnlyCheckbox.checked;
+    settings.level_up_interval = parseInt(this.discordLevelUpIntervalSelect.value, 10) || 10;
 
     try {
       loadingScreenManager.showLoadingScreen();
