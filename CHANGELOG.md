@@ -12,6 +12,8 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Cockatrice slayer tasks now show the cockatrice icon instead of an unknown-task placeholder, plus the same fix for any other task whose singular/plural name didn't match our icon list.
+- Loot log item grid now wraps to fit narrow screens instead of overflowing off the edge on mobile.
+- Combat Achievements page is usable on mobile now - member rows collapse into cards instead of a squeezed, unreadable table.
 
 ## [1.0.376] - 2026-09-04
 

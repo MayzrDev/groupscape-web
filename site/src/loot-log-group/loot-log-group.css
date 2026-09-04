@@ -13,7 +13,7 @@ loot-log-group {
   margin-bottom: 8px;
   /* Matches the grid's fixed width (10 * 46px items + 9 * 8px gaps) so the total
      lines up above the grid's right edge instead of the wider container's. */
-  max-width: 532px;
+  /* max-width: 640px; */
 }
 
 .loot-log-group__name-wrap {
@@ -88,6 +88,6 @@ loot-log-group[data-source="clue"] .loot-log-group__source-dot {
 
 .loot-log-group__grid {
   display: grid;
-  grid-template-columns: repeat(10, 46px);
+  grid-template-columns: repeat(auto-fill, 48px);
   gap: 8px;
 }

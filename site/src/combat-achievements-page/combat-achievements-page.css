@@ -312,3 +312,167 @@ combat-achievements-page {
   color: #ffd700;
   opacity: 1;
 }
+
+.combat-achievements-page__sort-row {
+  display: none;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.combat-achievements-page__sort-chip {
+  flex-shrink: 0;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--light-border);
+  background: transparent;
+  color: var(--primary-text);
+  opacity: 0.7;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.combat-achievements-page__sort-chip--active {
+  opacity: 1;
+  color: var(--orange);
+  border-color: var(--orange);
+  background: rgba(255, 152, 31, 0.1);
+}
+
+.combat-achievements-page__cards {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.combat-achievements-page__card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--light-border);
+  border-radius: 6px;
+  padding: 10px 11px 9px;
+  cursor: pointer;
+}
+
+.combat-achievements-page__card--group {
+  background: rgba(255, 152, 31, 0.05);
+  border-color: rgba(255, 152, 31, 0.25);
+  cursor: default;
+}
+
+.combat-achievements-page__card:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.combat-achievements-page__card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+
+.combat-achievements-page__card-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.combat-achievements-page__card-sub {
+  font-size: 10.5px;
+  opacity: 0.65;
+  margin-top: 1px;
+}
+
+.combat-achievements-page__card-stats {
+  text-align: right;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.combat-achievements-page__card-stats .combat-achievements-page__points {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.combat-achievements-page__card-tiers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 10px;
+}
+
+.combat-achievements-page__card-tier {
+  --tc: var(--tier-easy);
+}
+.combat-achievements-page__card-tier--medium {
+  --tc: var(--tier-medium);
+}
+.combat-achievements-page__card-tier--hard {
+  --tc: var(--tier-hard);
+}
+.combat-achievements-page__card-tier--elite {
+  --tc: var(--tier-elite);
+}
+.combat-achievements-page__card-tier--master {
+  --tc: var(--tier-master);
+}
+.combat-achievements-page__card-tier--grandmaster {
+  --tc: var(--tier-grandmaster);
+}
+
+.combat-achievements-page__card-tier-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 9.5px;
+  color: var(--tc);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 2px;
+}
+
+.combat-achievements-page__card-tier-frac {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--primary-text);
+}
+
+.combat-achievements-page__card-tier-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--light-border);
+  overflow: hidden;
+}
+
+.combat-achievements-page__card-tier-track--complete {
+  border-color: var(--green);
+  box-shadow: 0 0 0 1px var(--green) inset;
+}
+
+.combat-achievements-page__card-tier-fill {
+  display: block;
+  height: 100%;
+  background: var(--tc);
+}
+
+@media (max-width: 600px) {
+  .combat-achievements-page__sort-row {
+    display: flex;
+  }
+
+  .combat-achievements-page__cards {
+    display: flex;
+  }
+
+  .combat-achievements-page__table {
+    display: none;
+  }
+}
