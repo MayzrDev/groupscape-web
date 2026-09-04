@@ -956,7 +956,7 @@ pub fn dispatch_progress_webhook(
             EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "item" => {
                 let item_id = event.payload["item_id"].as_i64().unwrap_or_default() as i32;
                 let quantity = event.payload["quantity"].as_i64().unwrap_or(1);
-                let name = item_names::display(item_id);
+                let name = item_names::name(item_id).unwrap_or("an item");
                 Some((
                     "Collection log",
                     format!(
@@ -964,7 +964,7 @@ pub fn dispatch_progress_webhook(
                         member_name,
                         if quantity > 1 { format!("{}x ", quantity) } else { String::new() },
                         name,
-                        wiki_url(&name)
+                        item_names::wiki_link(item_id)
                     ),
                     COLLECTION_LOG_COLOR,
                     Some(item_icon_url(&web_origin, item_id)),

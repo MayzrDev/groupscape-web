@@ -10,6 +10,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Fixed
 - Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.
 - Site admin activity feed delete was failing with a server error instead of deleting the selected events.
+- Discord collection log notifications were posting a garbled double-link instead of a clean item name/link.
 
 ## [1.0.383] - 2026-09-04
 
