@@ -69,10 +69,11 @@ async fn main() -> std::io::Result<()> {
     }
     config.web_origin = std::env::var("WEB_ORIGIN").unwrap_or_default();
     let config = config;
-    // Optional short-TTL response cache for read-heavy aggregate endpoints (leaderboard,
-    // metric-data, sessions, loot log summary) - see server::cache::RedisCache. Absent or
-    // unreachable REDIS_URL just disables caching; every request still works, straight to
-    // Postgres, exactly as it did before this existed.
+    // Optional response cache for read-heavy aggregate endpoints (leaderboard, metric-data,
+    // sessions, loot log summary - all short-TTL; loot log itself is version-invalidated on
+    // write) - see server::cache::RedisCache. Absent or unreachable REDIS_URL just disables
+    // caching; every request still works, straight to Postgres, exactly as it did before this
+    // existed.
     let redis_cache = web::Data::new(
         server::cache::RedisCache::connect(std::env::var("REDIS_URL").ok()).await,
     );

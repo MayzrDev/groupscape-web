@@ -44,6 +44,33 @@ use tokio::sync::mpsc;
 /// avoiding the need to thread explicit cache-invalidation calls through that hot write path.
 const CACHE_TTL_SECS: u64 = 15;
 
+/// `get_loot_log` (unlike the other three cached endpoints above) is keyed off an explicit
+/// per-group version counter rather than a short TTL: it has far more cache-key variations
+/// (pagination cursor x limit x search x categories) for a TTL to keep warm across, so instead
+/// each cached page is tagged with the group's current counter value and stays valid until a new
+/// kill/loot event bumps it (see the `redis.incr` call beside `insert_activity_event` below) -
+/// giving instant invalidation on write instead of up-to-CACHE_TTL_SECS staleness. `LOOT_LOG_CACHE_TTL_SECS`
+/// is still applied underneath as a safety net so an orphaned entry (e.g. after a Redis restart
+/// resets the counter to 0) can't linger forever.
+const LOOT_LOG_CACHE_TTL_SECS: u64 = 3600;
+/// Safety-net TTL underneath `get_activity_events`'s version-counter invalidation - see
+/// `activity_log_version_key`'s doc comment.
+const ACTIVITY_LOG_CACHE_TTL_SECS: u64 = 3600;
+
+fn loot_log_version_key(group_id: i64) -> String {
+    format!("v1:loot-log-version:{}", group_id)
+}
+
+/// Same version-counter invalidation as `loot_log_version_key`, but for `get_activity_events` -
+/// bumped on every successful `insert_activity_event`/`insert_progress_event` write (any event
+/// type, unlike the loot log's Kill/Loot-only filter) and, for raid completions specifically, at
+/// each of `raid_merge`'s three write points (initial insert, a later reporter merging in, and
+/// the merge-window finalize) since all three change what a cached feed page would show for that
+/// row.
+pub(crate) fn activity_log_version_key(group_id: i64) -> String {
+    format!("v1:activity-log-version:{}", group_id)
+}
+
 #[delete("/delete-group-member")]
 pub async fn delete_group_member(
     req: HttpRequest,
@@ -378,6 +405,7 @@ pub async fn update_group_member(
     raid_merge_registry: web::Data<raid_merge::RaidMergeRegistry>,
     db_pool: web::Data<Pool>,
     config: web::Data<Config>,
+    redis: web::Data<RedisCache>,
 ) -> Result<HttpResponse, Error> {
     crate::demo::reject_if_demo(auth.group_id)?;
     if group_member.name.eq(SHARED_MEMBER) {
@@ -567,6 +595,7 @@ pub async fn update_group_member(
                     raid_merge::handle_raid_completion(
                         &client,
                         db_pool.clone(),
+                        redis.get_ref().clone(),
                         raid_merge_registry.clone(),
                         broadcast_registry.clone(),
                         auth.group_id,
@@ -610,6 +639,13 @@ pub async fn update_group_member(
                 if !inserted {
                     continue;
                 }
+                // Keeps get_loot_log's/get_activity_events's per-group cached pages from going
+                // stale instead of relying on a TTL - see loot_log_version_key's/
+                // activity_log_version_key's doc comments.
+                if matches!(event, GameEvent::Kill(_) | GameEvent::Loot(_)) {
+                    redis.incr(&loot_log_version_key(auth.group_id)).await;
+                }
+                redis.incr(&activity_log_version_key(auth.group_id)).await;
                 discord::dispatch_event_webhook(
                     db_pool.get_ref().clone(),
                     auth.group_id,
@@ -696,6 +732,7 @@ pub async fn update_group_member(
                         event,
                     )
                     .await?;
+                    redis.incr(&activity_log_version_key(auth.group_id)).await;
                     // Level-ups are dispatched separately below at Discord's own configurable
                     // per-level granularity, decoupled from this loop's fixed milestone schedule
                     // (see `progress_events::diff_skills_fine`) - dispatching them here too would
@@ -1108,8 +1145,23 @@ pub struct GetActivityEventsQuery {
 pub async fn get_activity_events(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetActivityEventsQuery>,
 ) -> Result<web::Json<Vec<ActivityEvent>>, Error> {
+    let version = redis.get_i64(&activity_log_version_key(auth.group_id)).await;
+    let cache_key = format!(
+        "v1:activity-log:{}:{}:{}:{}:{}:{}",
+        auth.group_id,
+        version,
+        query.member_name.as_deref().unwrap_or(""),
+        query.event_type.as_deref().unwrap_or(""),
+        query.before.map(|d| d.to_rfc3339()).unwrap_or_default(),
+        query.limit,
+    );
+    if let Some(cached) = redis.get_json::<Vec<ActivityEvent>>(&cache_key).await {
+        return Ok(web::Json(cached));
+    }
+
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let events = db::list_activity_events(
         &client,
@@ -1120,6 +1172,7 @@ pub async fn get_activity_events(
         query.limit,
     )
     .await?;
+    redis.set_json(&cache_key, &events, ACTIVITY_LOG_CACHE_TTL_SECS).await;
     Ok(web::Json(events))
 }
 
@@ -1439,10 +1492,26 @@ const LOOT_LOG_BATCH_SIZE: i64 = 200;
 pub async fn get_loot_log(
     auth: Authenticated,
     db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
     query: web::Query<GetLootLogQuery>,
 ) -> Result<web::Json<LootLogPage>, Error> {
-    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let limit = query.limit.clamp(1, 100);
+    let version = redis.get_i64(&loot_log_version_key(auth.group_id)).await;
+    let cache_key = format!(
+        "v1:loot-log:{}:{}:{}:{}:{}:{}:{}",
+        auth.group_id,
+        version,
+        query.before.map(|d| d.to_rfc3339()).unwrap_or_default(),
+        limit,
+        query.search.as_deref().unwrap_or(""),
+        query.item_ids.as_deref().unwrap_or(""),
+        query.categories.as_deref().unwrap_or(""),
+    );
+    if let Some(cached) = redis.get_json::<LootLogPage>(&cache_key).await {
+        return Ok(web::Json(cached));
+    }
+
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
     let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
@@ -1505,11 +1574,13 @@ pub async fn get_loot_log(
         cursor = next_before;
     }
 
-    Ok(web::Json(LootLogPage {
+    let page = LootLogPage {
         events,
         next_before: if scan_exhausted { None } else { next_before },
         scan_exhausted,
-    }))
+    };
+    redis.set_json(&cache_key, &page, LOOT_LOG_CACHE_TTL_SECS).await;
+    Ok(web::Json(page))
 }
 
 #[derive(Deserialize)]

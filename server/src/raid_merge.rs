@@ -1,3 +1,5 @@
+use crate::authed::activity_log_version_key;
+use crate::cache::RedisCache;
 use crate::db;
 use crate::discord;
 use crate::error::ApiError;
@@ -75,6 +77,7 @@ impl Default for RaidMergeRegistry {
 pub async fn handle_raid_completion(
     client: &Client,
     db_pool: Data<Pool>,
+    redis: RedisCache,
     registry: Data<RaidMergeRegistry>,
     broadcast_registry: Data<GroupBroadcastRegistry>,
     group_id: i64,
@@ -88,12 +91,15 @@ pub async fn handle_raid_completion(
     let mut pending = registry.pending.lock().await;
     if let Some(&event_id) = pending.get(&key) {
         drop(pending);
-        return db::append_raid_participant(client, event_id, &member_name, &event, &ge_prices).await;
+        db::append_raid_participant(client, event_id, &member_name, &event, &ge_prices).await?;
+        redis.incr(&activity_log_version_key(group_id)).await;
+        return Ok(());
     }
 
     let event_id =
         db::insert_raid_completion(client, group_id, session_id, &member_name, &event, &ge_prices)
             .await?;
+    redis.incr(&activity_log_version_key(group_id)).await;
     pending.insert(key.clone(), event_id);
     drop(pending);
 
@@ -117,6 +123,7 @@ pub async fn handle_raid_completion(
             }
         };
         drop(finalize_client);
+        redis.incr(&activity_log_version_key(group_id)).await;
 
         let message = finalized.to_message();
         if broadcast_registry.has_subscribers(group_id) {

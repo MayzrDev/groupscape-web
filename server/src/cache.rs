@@ -66,6 +66,33 @@ impl RedisCache {
         };
         let _ = tokio::time::timeout(COMMAND_TIMEOUT, conn.set_ex::<_, _, ()>(key, raw, ttl_secs)).await;
     }
+
+    /// Increments a counter key (creating it at 1 if absent). Used as a cheap invalidation
+    /// signal: callers fold the counter's current value into their cache key so a write-path
+    /// `incr` makes every previously cached key for that scope unreachable without an explicit
+    /// delete. A no-op when the cache is disabled/unreachable - the counter just stays implicitly
+    /// at 0 forever, which is harmless since `get_i64` also returns 0 in that case.
+    pub async fn incr(&self, key: &str) {
+        let Some(mut conn) = self.conn.clone() else {
+            return;
+        };
+        let _ = tokio::time::timeout(COMMAND_TIMEOUT, conn.incr::<_, _, ()>(key, 1)).await;
+    }
+
+    /// Reads a counter key written by [`Self::incr`], defaulting to 0 when absent, disabled, or
+    /// on any read failure/timeout - safe as a cache-key component either way, since a wrong
+    /// (stale) version just means a cache miss rather than serving wrong data.
+    pub async fn get_i64(&self, key: &str) -> i64 {
+        let Some(mut conn) = self.conn.clone() else {
+            return 0;
+        };
+        tokio::time::timeout(COMMAND_TIMEOUT, conn.get::<_, Option<i64>>(key))
+            .await
+            .ok()
+            .and_then(|res| res.ok())
+            .flatten()
+            .unwrap_or(0)
+    }
 }
 
 #[cfg(test)]

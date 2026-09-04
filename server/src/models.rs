@@ -754,7 +754,7 @@ pub(crate) fn format_gp(value: i64) -> String {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ActivityEvent {
     pub id: i64,
     pub session_id: i64,
@@ -767,7 +767,7 @@ pub struct ActivityEvent {
 /// One item entry within a [`LootLogEvent`] - the loot log's per-event, per-item view (unlike
 /// the deleted `LootSummaryRow`, this doesn't pre-aggregate across events, so the client can do
 /// the 45-minute session merge itself from raw per-event timestamps).
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LootLogItem {
     pub item_id: i32,
     /// Only set when the item is in the curated `drop_rates` table - `None` falls back
@@ -789,7 +789,7 @@ pub struct LootLogItem {
 /// One raw `kill`/`loot` activity event, normalized for the Loot Log page. The client groups
 /// these into farming-session "entries" (consecutive same member/source events <=45min apart) -
 /// see loot-log-page.js.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LootLogEvent {
     pub member_name: String,
     pub occurred_at: DateTime<Utc>,
@@ -802,7 +802,7 @@ pub struct LootLogEvent {
 }
 
 /// One page of `get-loot-log`, newest-first.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct LootLogPage {
     pub events: Vec<LootLogEvent>,
     /// Cursor for the next page - `None` means there's no more raw history to scan (see

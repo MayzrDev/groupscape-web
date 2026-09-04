@@ -207,6 +207,13 @@ function wikiTitle(name) {
   return encodeURIComponent(`${name}`.trim().replace(/\s+/g, "_"));
 }
 
+// Some tasks name a group of creatures rather than a single wiki-titled monster (e.g. "Warped
+// creatures" covers warped jellies/terrorbirds/tortoises/etc), so the plain task-name URL
+// 404s/redirects wrong. The wiki keeps a dedicated Slayer_task/<Task> page for these instead.
+const TASK_WIKI_OVERRIDES = {
+  "warped creatures": "Slayer_task/Warped_creatures",
+};
+
 class SlayerData {
   masterIconUrl(masterName) {
     const key = SLAYER_MASTER_ICONS[normalize(masterName)];
@@ -219,6 +226,8 @@ class SlayerData {
   }
 
   taskWikiUrl(taskName) {
+    const override = TASK_WIKI_OVERRIDES[normalize(taskName)];
+    if (override) return `https://oldschool.runescape.wiki/w/${override}`;
     return `https://oldschool.runescape.wiki/w/${wikiTitle(taskName)}`;
   }
 
