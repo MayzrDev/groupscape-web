@@ -5182,15 +5182,17 @@ pub async fn admin_clear_logs(client: &Client, group_id: i64) -> Result<u64, Api
 }
 
 /// Deletes specific activity feed rows an admin selected from the moderation view. Scoped by
-/// `group_id` as well as `id` so a stale/tampered id list can never reach into another group's
-/// rows.
+/// `group_id` as well as `event_id` so a stale/tampered id list can never reach into another
+/// group's rows.
 pub async fn admin_delete_activity_events(
     client: &Client,
     group_id: i64,
     ids: &[i64],
 ) -> Result<u64, ApiError> {
     let stmt = client
-        .prepare_cached("DELETE FROM groupscape.activity_events WHERE group_id = $1 AND id = ANY($2)")
+        .prepare_cached(
+            "DELETE FROM groupscape.activity_events WHERE group_id = $1 AND event_id = ANY($2)",
+        )
         .await?;
     client
         .execute(&stmt, &[&group_id, &ids])
