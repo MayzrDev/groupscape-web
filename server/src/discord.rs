@@ -4,6 +4,7 @@ use crate::drop_rates;
 use crate::error::ApiError;
 use crate::item_names;
 use crate::models::{format_gp, GameEvent, GEPrices};
+use crate::notable_npcs;
 use crate::unauthed;
 use deadpool_postgres::Pool;
 use serde::Deserialize;
@@ -258,10 +259,11 @@ pub fn dispatch_event_webhook(
 
         match event {
             GameEvent::Kill(kill) => {
-                // Regular NPCs (guards, monsters with no drop table curated in
-                // `content/drop_rates.json`) aren't posted - only bosses, matching what a group
-                // actually wants pinged in Discord.
-                if settings.notify_kills && drop_rates::is_boss(&kill.npc_name) {
+                // Regular NPCs (guards, random monsters) aren't posted - only bosses, matching
+                // what a group actually wants pinged in Discord. Uses the same curated boss list
+                // as the activity feed (`notable_npcs`), not `drop_rates::is_boss` - that one only
+                // covers bosses with a curated drop table, which is a much smaller set.
+                if settings.notify_kills && notable_npcs::is_notable(&kill.npc_name) {
                     // Prefer the account's real in-game KC (parsed client-side from the "kill
                     // count is" chat line); only fall back to counting this server's own kill
                     // log when that line didn't arrive in time, e.g. right at plugin startup.

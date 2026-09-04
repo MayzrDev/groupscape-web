@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Regular, Mortimer, and Wilderness slayer streaks now actually keep updating as you complete tasks, instead of getting stuck at whatever value they first showed.
+- Discord boss kill notifications now fire for every tracked boss, not just the ~30 with a curated drop table - bosses like Corporeal Beast, TzTok-Jad, Skotizo, and Duke Sucellus were being silently skipped even with kill notifications turned on.
 
 ## [1.0.351] - 2026-09-03
 
