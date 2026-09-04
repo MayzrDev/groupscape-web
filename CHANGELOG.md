@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.376] - 2026-09-04
+
+### Fixed
+- Regular, Mortimer, and Wilderness slayer streaks now actually keep updating as you complete tasks, instead of getting stuck at whatever value they first showed.
+
 ## [1.0.351] - 2026-09-03
 
 ### Added

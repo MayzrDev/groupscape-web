@@ -137,6 +137,17 @@ fn deduplicate_batch(buffer: Vec<GroupMember>) -> Vec<GroupMember> {
             match dedup_map.get_mut(&key) {
                 Some(existing) => merge_group_member(existing, &item),
                 None => {
+                    let mut item = item;
+                    // The plugin never populates the streak buckets itself (they're
+                    // server-derived, see SlayerTask's doc comment) - without running this
+                    // through merge_slayer_task, a member's first update in a batch window
+                    // would carry a slayer_task blob with all 3 buckets None, which the
+                    // flush's jsonb merge treats as "untouched" and never actually sets the
+                    // current bucket in the DB. Most windows only see one update per member,
+                    // so skipping this left streaks effectively never updating.
+                    if let Some(task) = &item.slayer_task {
+                        item.slayer_task = Some(merge_slayer_task(None, task));
+                    }
                     dedup_map.insert(key, item);
                 }
             }
