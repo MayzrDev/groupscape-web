@@ -212,6 +212,17 @@ fn item_icon_url(web_origin: &str, item_id: i32) -> String {
     format!("{}/icons/items/{}.webp", web_origin.trim_end_matches('/'), item_id)
 }
 
+/// Wiki article URL for a page title - an NPC's death killer, a combat-achievement task, or a
+/// boss's combat-achievement group. Spaces become underscores (the wiki's page-title convention)
+/// before percent-encoding the rest, so e.g. "Kree'arra" resolves to the wiki's real page.
+/// Mirrors `wikiTitle`/`taskWikiUrl`/`bossWikiUrl` in `site/src/data/combat-achievement.js`.
+fn wiki_url(page_title: &str) -> String {
+    format!(
+        "https://oldschool.runescape.wiki/w/{}",
+        urlencoding::encode(&page_title.trim().replace(' ', "_"))
+    )
+}
+
 /// Absolute URL to the quest-point difficulty icon matching a quest's difficulty, for the
 /// "Quest" embed's thumbnail - mirrors `Quest.icon` in `site/src/data/quest.js`. Quests don't
 /// have individual icons in this app, only one per difficulty tier.
@@ -312,10 +323,11 @@ pub fn dispatch_event_webhook(
             GameEvent::Death(death) => {
                 if settings.notify_deaths {
                     let description = match &death.killer_name {
-                        Some(killer) => format!("{} died to {}", member_name, killer),
+                        Some(killer) => format!("{} died to [{}]({})", member_name, killer, wiki_url(killer)),
                         None => format!("{} died", member_name),
                     };
-                    send_webhook_embed(webhook_url, "Death", description, DEATH_COLOR).await;
+                    let thumbnail = death.killer_name.as_deref().map(|killer| boss_icon_url(&web_origin, killer));
+                    send_webhook_embed_with_thumbnail(webhook_url, "Death", description, DEATH_COLOR, thumbnail).await;
                 }
             }
             GameEvent::Loot(loot_event) => {
@@ -418,10 +430,11 @@ pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item
 /// diary, combat-achievement, or collection-log milestone) as a Discord embed when the matching
 /// notify setting is on.
 ///
-/// Per-task combat-achievement and per-item collection-log events are far too frequent to post
-/// individually (hundreds of tasks / thousands of log slots) - only the boss-group and
-/// page-completion variants of those two event types (`kind: "boss"` / `kind: "page"` in the
-/// payload) are posted, matching the milestone framing the settings row describes.
+/// Per-item collection-log events are far too frequent to post individually (thousands of log
+/// slots) - only the page-completion variant (`kind: "page"` in the payload) is posted, matching
+/// the milestone framing the settings row describes. Combat-achievement tasks post individually
+/// (each linked to its wiki page), plus a boss-completion post (`kind: "boss"`) linked to the
+/// boss's wiki page.
 pub fn dispatch_progress_webhook(
     db_pool: Pool,
     group_id: i64,
@@ -475,9 +488,21 @@ pub fn dispatch_progress_webhook(
             }
             EVENT_TYPE_COMBAT_TASK if settings.notify_combat_achievements && event.payload["kind"] == "boss" => {
                 let boss = event.payload["boss"].as_str().unwrap_or("a boss");
+                let url = wiki_url(boss);
                 Some((
                     "Combat achievements",
-                    format!("{} completed every combat achievement for {}", member_name, boss),
+                    format!("{} completed every combat achievement for [{}]({})", member_name, boss, url),
+                    COMBAT_TASK_COLOR,
+                    None,
+                ))
+            }
+            EVENT_TYPE_COMBAT_TASK if settings.notify_combat_achievements && event.payload["kind"].is_null() => {
+                let task_id = event.payload["task_id"].as_i64().unwrap_or_default();
+                let task = crate::combat_achievement_content::task_name(task_id).unwrap_or("a combat task");
+                let url = wiki_url(task);
+                Some((
+                    "Combat achievements",
+                    format!("{} completed the combat task [{}]({})", member_name, task, url),
                     COMBAT_TASK_COLOR,
                     None,
                 ))

@@ -12,6 +12,7 @@ use std::sync::LazyLock;
 #[derive(Deserialize)]
 struct RawTask {
     id: i64,
+    name: String,
     #[serde(default)]
     boss: Option<String>,
 }
@@ -48,6 +49,23 @@ static BOSS_GROUPS: LazyLock<Vec<(String, Vec<i64>)>> = LazyLock::new(|| {
 
 pub fn boss_groups() -> &'static [(String, Vec<i64>)] {
     &BOSS_GROUPS
+}
+
+/// Task id -> display name, for the per-task Discord webhook post.
+static TASK_NAMES: LazyLock<HashMap<i64, String>> = LazyLock::new(|| {
+    let catalog: HashMap<String, Vec<RawTask>> =
+        serde_json::from_str(include_str!("content/combat_achievement_tasks.json"))
+            .expect("content/combat_achievement_tasks.json must parse");
+
+    catalog
+        .into_values()
+        .flatten()
+        .map(|task| (task.id, task.name))
+        .collect()
+});
+
+pub fn task_name(task_id: i64) -> Option<&'static str> {
+    TASK_NAMES.get(&task_id).map(String::as_str)
 }
 
 #[cfg(test)]

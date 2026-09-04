@@ -13,6 +13,9 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Added
 - Added Loot Log rarity data for 41 more bosses that previously had none, including Corporeal Beast, TzTok-Jad, TzKal-Zuk, Duke Sucellus, The Leviathan, The Whisperer, Vardorvis, Araxxor, Yama, the Royal Titans, the Blood/Blue/Eclipse Moons, and more.
 
+### Changed
+- Discord combat achievement notifications now fire for every completed combat task (not just full-boss completions), and every notification links straight to the task's or boss's Old School RuneScape Wiki page.
+
 ## [1.0.351] - 2026-09-03
 
 ### Added
