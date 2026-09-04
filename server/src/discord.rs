@@ -8,6 +8,9 @@ use crate::notable_npcs;
 use crate::unauthed;
 use deadpool_postgres::Pool;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+use std::time::{Duration, Instant};
 use tokio::task;
 
 const AUTHORIZE_URL: &str = "https://discord.com/oauth2/authorize";
@@ -188,15 +191,14 @@ async fn send_pet_embeds(
     }
 }
 
-fn send_webhook_embed_sync(
-    url: &str,
+fn build_embed_json(
     title: &str,
     description: &str,
     color: u32,
     thumbnail_url: Option<&str>,
     fields: &[(&str, &str)],
     footer: Option<&str>,
-) -> Result<(), ureq::Error> {
+) -> serde_json::Value {
     let mut embed = serde_json::json!({ "title": title, "description": description, "color": color });
     if let Some(thumbnail_url) = thumbnail_url {
         embed["thumbnail"] = serde_json::json!({ "url": thumbnail_url });
@@ -210,7 +212,58 @@ fn send_webhook_embed_sync(
     if let Some(footer) = footer {
         embed["footer"] = serde_json::json!({ "text": footer });
     }
+    embed
+}
+
+fn send_webhook_embed_sync(
+    url: &str,
+    title: &str,
+    description: &str,
+    color: u32,
+    thumbnail_url: Option<&str>,
+    fields: &[(&str, &str)],
+    footer: Option<&str>,
+) -> Result<(), ureq::Error> {
+    let embed = build_embed_json(title, description, color, thumbnail_url, fields, footer);
     ureq::post(url).send_json(serde_json::json!({ "embeds": [embed] }))?;
+    Ok(())
+}
+
+/// Same as `send_webhook_embed_sync` but requests Discord return the created message (`?wait=true`,
+/// otherwise a webhook post gets a bare 204) and hands back its id, so a later kill on the same
+/// boss/member can edit this message in place instead of posting a new one (see `KILL_MESSAGE_CACHE`).
+fn send_webhook_embed_get_id_sync(
+    url: &str,
+    title: &str,
+    description: &str,
+    color: u32,
+    thumbnail_url: Option<&str>,
+    fields: &[(&str, &str)],
+    footer: Option<&str>,
+) -> Result<String, ureq::Error> {
+    let embed = build_embed_json(title, description, color, thumbnail_url, fields, footer);
+    let separator = if url.contains('?') { "&" } else { "?" };
+    let wait_url = format!("{}{}wait=true", url, separator);
+    let mut response = ureq::post(&wait_url).send_json(serde_json::json!({ "embeds": [embed] }))?;
+    let body: serde_json::Value = response.body_mut().read_json()?;
+    Ok(body["id"].as_str().unwrap_or_default().to_string())
+}
+
+/// PATCHes a previously-sent webhook message in place (Discord's `PATCH .../messages/{id}`
+/// endpoint) - used to bump a "Kill" embed's count instead of posting a fresh message per kill.
+fn edit_webhook_embed_sync(
+    url: &str,
+    message_id: &str,
+    title: &str,
+    description: &str,
+    color: u32,
+    thumbnail_url: Option<&str>,
+    fields: &[(&str, &str)],
+    footer: Option<&str>,
+) -> Result<(), ureq::Error> {
+    let embed = build_embed_json(title, description, color, thumbnail_url, fields, footer);
+    let edit_url = format!("{}/messages/{}", url.trim_end_matches('/'), message_id);
+    ureq::patch(&edit_url).send_json(serde_json::json!({ "embeds": [embed] }))?;
     Ok(())
 }
 
@@ -270,6 +323,88 @@ async fn send_webhook_embed_rich(
         }
     })
     .await;
+}
+
+/// Async wrapper around `send_webhook_embed_get_id_sync` - see that function's docs.
+async fn send_webhook_embed_rich_get_id(
+    url: String,
+    title: &'static str,
+    description: String,
+    color: u32,
+    thumbnail_url: Option<String>,
+    fields: Vec<(String, String)>,
+    footer: Option<String>,
+) -> Option<String> {
+    task::spawn_blocking(move || {
+        let fields: Vec<(&str, &str)> = fields.iter().map(|(name, value)| (name.as_str(), value.as_str())).collect();
+        send_webhook_embed_get_id_sync(&url, title, &description, color, thumbnail_url.as_deref(), &fields, footer.as_deref())
+            .map_err(|err| log::warn!("discord: webhook send failed: {}", err))
+            .ok()
+    })
+    .await
+    .unwrap_or(None)
+}
+
+/// Async wrapper around `edit_webhook_embed_sync`. Returns whether the edit succeeded - a `false`
+/// (e.g. the message was deleted, or is older than 14 days and Discord rejects the edit) tells the
+/// caller to fall back to posting a fresh message instead.
+async fn edit_webhook_embed_rich(
+    url: String,
+    message_id: String,
+    title: &'static str,
+    description: String,
+    color: u32,
+    thumbnail_url: Option<String>,
+    fields: Vec<(String, String)>,
+    footer: Option<String>,
+) -> bool {
+    task::spawn_blocking(move || {
+        let fields: Vec<(&str, &str)> = fields.iter().map(|(name, value)| (name.as_str(), value.as_str())).collect();
+        match edit_webhook_embed_sync(&url, &message_id, title, &description, color, thumbnail_url.as_deref(), &fields, footer.as_deref()) {
+            Ok(()) => true,
+            Err(err) => {
+                log::warn!("discord: webhook edit failed: {}", err);
+                false
+            }
+        }
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// Time a "Kill"/"Death" embed can still be edited in place for a repeat kill/death on the same
+/// boss+member, past which a new event posts a fresh message instead - keeps a kill or death after
+/// a long gap (next session, days later) from silently editing a message that's since scrolled far
+/// up the channel.
+const WEBHOOK_MESSAGE_EDIT_TTL: Duration = Duration::from_secs(60 * 60);
+
+/// (group, member, boss/killer). Kills and deaths use separate cache maps below even though both
+/// key on this same shape - a "killed Zulrah" message and a "died to Zulrah" message for the same
+/// member must never be confused for one another's edit target.
+type MessageCacheKey = (i64, String, String);
+
+/// In-memory only (see `dispatch_event_webhook`'s doc comment on loading settings fresh each
+/// call) - resets on server restart, which just means the next kill after a deploy posts a new
+/// message rather than editing one from before the restart. Value pairs the last "Kill" embed's
+/// Discord message id with when it was last touched.
+static KILL_MESSAGE_CACHE: LazyLock<Mutex<HashMap<MessageCacheKey, (String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Same as `KILL_MESSAGE_CACHE` but for "Death" embeds - kept as a separate map (not merged by
+/// giving the key a variant tag) so a kill and a death against the same boss can never collide.
+static DEATH_MESSAGE_CACHE: LazyLock<Mutex<HashMap<MessageCacheKey, (String, Instant)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn cached_message(cache: &Mutex<HashMap<MessageCacheKey, (String, Instant)>>, key: &MessageCacheKey) -> Option<String> {
+    let cache = cache.lock().unwrap();
+    cache
+        .get(key)
+        .filter(|(_, last_touched)| last_touched.elapsed() < WEBHOOK_MESSAGE_EDIT_TTL)
+        .map(|(message_id, _)| message_id.clone())
+}
+
+fn store_message(cache: &Mutex<HashMap<MessageCacheKey, (String, Instant)>>, key: MessageCacheKey, message_id: String) {
+    cache.lock().unwrap().insert(key, (message_id, Instant::now()));
 }
 
 /// Absolute URL to a boss's self-hosted RuneLite-hiscore-style icon (see `site/src/data/
@@ -426,16 +561,42 @@ pub fn dispatch_event_webhook(
                         }
                     }
                     let thumbnail = boss_icon_url(&web_origin, &kill.npc_name);
-                    send_webhook_embed_rich(
-                        webhook_url.clone(),
-                        "Kill",
-                        description,
-                        KILL_COLOR,
-                        Some(thumbnail),
-                        fields,
-                        Some(member_name.clone()),
-                    )
-                    .await;
+                    let cache_key: MessageCacheKey = (group_id, member_name.clone(), kill.npc_name.clone());
+                    let edited_id = match cached_message(&KILL_MESSAGE_CACHE, &cache_key) {
+                        Some(message_id) => {
+                            let edited = edit_webhook_embed_rich(
+                                webhook_url.clone(),
+                                message_id.clone(),
+                                "Kill",
+                                description.clone(),
+                                KILL_COLOR,
+                                Some(thumbnail.clone()),
+                                fields.clone(),
+                                Some(member_name.clone()),
+                            )
+                            .await;
+                            edited.then_some(message_id)
+                        }
+                        None => None,
+                    };
+                    let message_id = match edited_id {
+                        Some(message_id) => Some(message_id),
+                        None => {
+                            send_webhook_embed_rich_get_id(
+                                webhook_url.clone(),
+                                "Kill",
+                                description,
+                                KILL_COLOR,
+                                Some(thumbnail),
+                                fields,
+                                Some(member_name.clone()),
+                            )
+                            .await
+                        }
+                    };
+                    if let Some(message_id) = message_id {
+                        store_message(&KILL_MESSAGE_CACHE, cache_key, message_id);
+                    }
                 }
                 if let Some(loot) = &kill.loot {
                     let (pets, rest) = split_pets(loot);
@@ -482,12 +643,65 @@ pub fn dispatch_event_webhook(
             }
             GameEvent::Death(death) => {
                 if settings.notify_deaths {
-                    let description = match &death.killer_name {
-                        Some(killer) => format!("{} died to [{}]({})", member_name, killer, wiki_url(killer)),
-                        None => format!("{} died", member_name),
-                    };
-                    let thumbnail = death.killer_name.as_deref().map(|killer| boss_icon_url(&web_origin, killer));
-                    send_webhook_embed_with_thumbnail(webhook_url, "Death", description, DEATH_COLOR, thumbnail).await;
+                    match &death.killer_name {
+                        // Known killer: mirrors the "Kill" flow above - a repeat death to the same
+                        // NPC within `WEBHOOK_MESSAGE_EDIT_TTL` edits the last death message (with a
+                        // bumped "Deaths" count) instead of posting a new one, but only when that
+                        // last message actually was a death message for this member+NPC pair -
+                        // `DEATH_MESSAGE_CACHE` only ever holds ids of messages posted from this
+                        // branch, so that's guaranteed by construction.
+                        Some(killer) => {
+                            let count = db::count_deaths_for_member_npc(&client, group_id, &member_name, killer)
+                                .await
+                                .unwrap_or_else(|err| {
+                                    log::warn!("discord: failed to load death count: {}", err);
+                                    0
+                                });
+                            let description = format!("{} died to [{}]({})", member_name, killer, wiki_url(killer));
+                            let fields = vec![("Deaths".to_string(), count.to_string())];
+                            let thumbnail = boss_icon_url(&web_origin, killer);
+                            let cache_key: MessageCacheKey = (group_id, member_name.clone(), killer.clone());
+                            let edited_id = match cached_message(&DEATH_MESSAGE_CACHE, &cache_key) {
+                                Some(message_id) => {
+                                    let edited = edit_webhook_embed_rich(
+                                        webhook_url.clone(),
+                                        message_id.clone(),
+                                        "Death",
+                                        description.clone(),
+                                        DEATH_COLOR,
+                                        Some(thumbnail.clone()),
+                                        fields.clone(),
+                                        Some(member_name.clone()),
+                                    )
+                                    .await;
+                                    edited.then_some(message_id)
+                                }
+                                None => None,
+                            };
+                            let message_id = match edited_id {
+                                Some(message_id) => Some(message_id),
+                                None => {
+                                    send_webhook_embed_rich_get_id(
+                                        webhook_url,
+                                        "Death",
+                                        description,
+                                        DEATH_COLOR,
+                                        Some(thumbnail),
+                                        fields,
+                                        Some(member_name.clone()),
+                                    )
+                                    .await
+                                }
+                            };
+                            if let Some(message_id) = message_id {
+                                store_message(&DEATH_MESSAGE_CACHE, cache_key, message_id);
+                            }
+                        }
+                        None => {
+                            let description = format!("{} died", member_name);
+                            send_webhook_embed_with_thumbnail(webhook_url, "Death", description, DEATH_COLOR, None).await;
+                        }
+                    }
                 }
             }
             GameEvent::Loot(loot_event) if loot_event.source_type == crate::models::LootSourceType::Clue => {

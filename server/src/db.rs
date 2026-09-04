@@ -591,6 +591,43 @@ pub async fn count_kills_for_member_npc(
     Ok(count as i64)
 }
 
+/// Total deaths recorded for `member_name` to `killer_name` in this group, all-time - the
+/// "Deaths: n" field on a repeat Discord death message, mirroring `count_kills_for_member_npc`.
+pub async fn count_deaths_for_member_npc(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    killer_name: &str,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT payload
+FROM groupscape.activity_events
+WHERE group_id=$1
+  AND event_type='death'
+  AND member_name=$2
+ORDER BY occurred_at DESC
+LIMIT 5000
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&group_id, &member_name])
+        .await
+        .map_err(ApiError::ListKillEventsError)?;
+    let count = rows
+        .iter()
+        .filter_map(|row| row.try_get::<_, serde_json::Value>("payload").ok())
+        .filter(|payload| {
+            serde_json::from_value::<GameEvent>(payload.clone()).is_ok_and(|event| {
+                matches!(event, GameEvent::Death(death) if death.killer_name.as_deref() == Some(killer_name))
+            })
+        })
+        .count();
+    Ok(count as i64)
+}
+
 pub struct HomepageStats {
     pub active_groups: i64,
     pub bound_accounts: i64,
