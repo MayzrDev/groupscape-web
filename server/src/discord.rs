@@ -99,6 +99,8 @@ const COMBAT_TASK_COLOR: u32 = 0xC084FC;
 const COLLECTION_LOG_COLOR: u32 = 0x6C8CFF;
 const QUEST_COLOR: u32 = 0xC9962B;
 const DIARY_COLOR: u32 = 0x29C2B0;
+const PET_COLOR: u32 = 0xFF7AC6;
+const CLUE_COLOR: u32 = 0x3BA7D6;
 
 /// `{quantity}x {name} ({value}, {drop rate})` lines for the unified "Drops" notification -
 /// shared by kill loot, chest/clue loot, since both format the same way once resolved to a
@@ -154,16 +156,58 @@ fn total_loot_value(items: &[crate::models::LootItem], ge_prices: &GEPrices) -> 
         .sum()
 }
 
+/// Splits a loot list into (pets, everything else) - pets get their own "Pet" embed instead of
+/// riding the generic "Drops" line, so they're excluded from whatever the caller does with the
+/// second half of this split.
+fn split_pets(items: &[crate::models::LootItem]) -> (Vec<crate::models::LootItem>, Vec<crate::models::LootItem>) {
+    items.iter().cloned().partition(|item| crate::pets::is_pet_item(item.item_id))
+}
+
+/// Posts one "Pet" embed per pet item found in a drop - in practice always at most one, but a
+/// list keeps this correct if RuneLite ever correlates more than one pet drop into a single event.
+async fn send_pet_embeds(
+    webhook_url: &str,
+    member_name: &str,
+    source_name: &str,
+    pets: &[crate::models::LootItem],
+    web_origin: &str,
+) {
+    for pet in pets {
+        let description = format!("{} received a pet: {}", member_name, item_names::display(pet.item_id));
+        send_webhook_embed_rich(
+            webhook_url.to_string(),
+            "Pet",
+            description,
+            PET_COLOR,
+            Some(item_icon_url(web_origin, pet.item_id)),
+            vec![("Source".to_string(), source_name.to_string())],
+            Some(member_name.to_string()),
+        )
+        .await;
+    }
+}
+
 fn send_webhook_embed_sync(
     url: &str,
     title: &str,
     description: &str,
     color: u32,
     thumbnail_url: Option<&str>,
+    fields: &[(&str, &str)],
+    footer: Option<&str>,
 ) -> Result<(), ureq::Error> {
     let mut embed = serde_json::json!({ "title": title, "description": description, "color": color });
     if let Some(thumbnail_url) = thumbnail_url {
         embed["thumbnail"] = serde_json::json!({ "url": thumbnail_url });
+    }
+    if !fields.is_empty() {
+        embed["fields"] = serde_json::json!(fields
+            .iter()
+            .map(|(name, value)| serde_json::json!({ "name": name, "value": value, "inline": true }))
+            .collect::<Vec<_>>());
+    }
+    if let Some(footer) = footer {
+        embed["footer"] = serde_json::json!({ "text": footer });
     }
     ureq::post(url).send_json(serde_json::json!({ "embeds": [embed] }))?;
     Ok(())
@@ -180,15 +224,13 @@ pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
             "This channel is now connected to a GroupScape group.",
             TEST_COLOR,
             None,
+            &[],
+            None,
         )
         .map_err(|err| ApiError::DiscordWebhookInvalidError(err.to_string()))
     })
     .await
     .unwrap_or_else(|err| Err(ApiError::DiscordWebhookInvalidError(err.to_string())))
-}
-
-async fn send_webhook_embed(url: String, title: &'static str, description: String, color: u32) {
-    send_webhook_embed_with_thumbnail(url, title, description, color, None).await;
 }
 
 async fn send_webhook_embed_with_thumbnail(
@@ -198,8 +240,31 @@ async fn send_webhook_embed_with_thumbnail(
     color: u32,
     thumbnail_url: Option<String>,
 ) {
+    send_webhook_embed_rich(url, title, description, color, thumbnail_url, Vec::new(), None).await;
+}
+
+/// Full-featured embed send - fields and a footer (the member's name) on top of the thumbnail
+/// every embed already had. The simpler wrappers above cover the embeds that don't need either.
+async fn send_webhook_embed_rich(
+    url: String,
+    title: &'static str,
+    description: String,
+    color: u32,
+    thumbnail_url: Option<String>,
+    fields: Vec<(String, String)>,
+    footer: Option<String>,
+) {
     let _ = task::spawn_blocking(move || {
-        if let Err(err) = send_webhook_embed_sync(&url, title, &description, color, thumbnail_url.as_deref()) {
+        let fields: Vec<(&str, &str)> = fields.iter().map(|(name, value)| (name.as_str(), value.as_str())).collect();
+        if let Err(err) = send_webhook_embed_sync(
+            &url,
+            title,
+            &description,
+            color,
+            thumbnail_url.as_deref(),
+            &fields,
+            footer.as_deref(),
+        ) {
             log::warn!("discord: webhook send failed: {}", err);
         }
     })
@@ -252,6 +317,51 @@ fn quest_icon_url(web_origin: &str, difficulty: Option<&str>) -> Option<String> 
     Some(format!("{}/icons/{}", web_origin.trim_end_matches('/'), file))
 }
 
+/// Direct link to a wiki-hosted file, for the embeds that have no self-hosted icon set of their
+/// own (diaries, combat achievements, collection log, raids, pets, clue caskets) - cheaper than
+/// downloading and maintaining another icon set for a handful of fixed, slow-changing images. Same
+/// silent-miss tolerance as `boss_icon_url`: a renamed/missing wiki file just drops the thumbnail.
+fn wiki_icon_url(file_name: &str) -> String {
+    format!(
+        "https://oldschool.runescape.wiki/w/Special:FilePath/{}",
+        urlencoding::encode(file_name)
+    )
+}
+
+/// Thumbnail for the "Diary" embed - one generic achievement-diary icon rather than one per
+/// region, since the wiki has no reliably-named per-region icon file to key off of.
+fn diary_icon_url() -> String {
+    wiki_icon_url("Achievement Diaries.png")
+}
+
+/// Thumbnail for the "Combat achievements" embed - one generic icon rather than per-tier, since
+/// task payloads don't carry a tier (only a task id) to key a per-tier icon off of.
+fn combat_achievement_icon_url() -> String {
+    wiki_icon_url("Combat Achievements icon.png")
+}
+
+/// Thumbnail for the "Collection log" embed - the completed page's own boss icon when the page is
+/// a notable boss (reusing `boss_icon_url`'s self-hosted set), otherwise a generic log icon for
+/// skilling/minigame pages that don't have one.
+fn collection_log_icon_url(web_origin: &str, page: &str) -> String {
+    if notable_npcs::is_notable(page) {
+        boss_icon_url(web_origin, page)
+    } else {
+        wiki_icon_url("Collection log.png")
+    }
+}
+
+/// Thumbnail for the "Raid" embed, keyed off the raid's own wiki icon file.
+fn raid_icon_url(raid_type: crate::models::RaidType) -> String {
+    wiki_icon_url(&format!("{} icon.png", raid_type.display_name()))
+}
+
+/// Thumbnail for the "Clue casket" embed - reward caskets are real (untradeable) items named
+/// "Reward casket (<tier>)" in-game, matching the wiki's file naming for their icon.
+fn clue_casket_icon_url(tier: &str) -> String {
+    wiki_icon_url(&format!("Reward casket ({}).png", tier.to_lowercase()))
+}
+
 /// Fire-and-forget, mirroring `push::dispatch_alert_push` - a dead or misconfigured webhook must
 /// never fail the telemetry upload that triggered it. Loads this group's webhook settings fresh
 /// on every call rather than threading them through from the caller, since `update_group_member`
@@ -300,22 +410,35 @@ pub fn dispatch_event_webhook(
                                 0
                             }),
                     };
-                    let mut description = format!("{} killed {} (KC: {})", member_name, kill.npc_name, kc);
+                    let description = format!("{} killed [{}]({})", member_name, kill.npc_name, wiki_url(&kill.npc_name));
+                    let mut fields = vec![("Kill count".to_string(), kc.to_string())];
                     if let Some(loot) = &kill.loot {
                         let value = total_loot_value(loot, &unauthed::get_ge_prices_map());
                         if value > 0 {
-                            description = format!("{} — loot worth {} gp", description, format_gp(value));
+                            fields.push(("Loot value".to_string(), format!("{} gp", format_gp(value))));
                         }
                     }
                     let thumbnail = boss_icon_url(&web_origin, &kill.npc_name);
-                    send_webhook_embed_with_thumbnail(webhook_url.clone(), "Kill", description, KILL_COLOR, Some(thumbnail))
-                        .await;
+                    send_webhook_embed_rich(
+                        webhook_url.clone(),
+                        "Kill",
+                        description,
+                        KILL_COLOR,
+                        Some(thumbnail),
+                        fields,
+                        Some(member_name.clone()),
+                    )
+                    .await;
                 }
-                if settings.notify_drops {
-                    if let Some(loot) = &kill.loot {
+                if let Some(loot) = &kill.loot {
+                    let (pets, rest) = split_pets(loot);
+                    if settings.notify_pets && !pets.is_empty() {
+                        send_pet_embeds(&webhook_url, &member_name, &kill.npc_name, &pets, &web_origin).await;
+                    }
+                    if settings.notify_drops {
                         let ge_prices = unauthed::get_ge_prices_map();
                         let lines = drop_lines(
-                            loot,
+                            &rest,
                             &ge_prices,
                             settings.drops_min_value,
                             settings.drops_unique_only,
@@ -323,19 +446,29 @@ pub fn dispatch_event_webhook(
                         );
                         if !lines.is_empty() {
                             let description = format!(
-                                "{} received {} from {}",
+                                "{} received {} from [{}]({})",
                                 member_name,
                                 lines.join(", "),
-                                kill.npc_name
+                                kill.npc_name,
+                                wiki_url(&kill.npc_name)
                             );
                             // Thumbnail highlights the single most valuable priced item in the
                             // drop - mirroring the plugin's own notable-drop "highlight" pick -
                             // rather than trying to show every item in one embed image.
-                            let thumbnail = loot
+                            let thumbnail = rest
                                 .iter()
                                 .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
                                 .map(|item| item_icon_url(&web_origin, item.item_id));
-                            send_webhook_embed_with_thumbnail(webhook_url, "Drops", description, LOOT_COLOR, thumbnail).await;
+                            send_webhook_embed_rich(
+                                webhook_url.clone(),
+                                "Drops",
+                                description,
+                                LOOT_COLOR,
+                                thumbnail,
+                                Vec::new(),
+                                Some(member_name.clone()),
+                            )
+                            .await;
                         }
                     }
                 }
@@ -350,11 +483,35 @@ pub fn dispatch_event_webhook(
                     send_webhook_embed_with_thumbnail(webhook_url, "Death", description, DEATH_COLOR, thumbnail).await;
                 }
             }
+            GameEvent::Loot(loot_event) if loot_event.source_type == crate::models::LootSourceType::Clue => {
+                if settings.notify_clues && !loot_event.loot.is_empty() {
+                    let tier = loot_event.clue_tier.as_deref().unwrap_or("unknown");
+                    let ge_prices = unauthed::get_ge_prices_map();
+                    let lines = drop_lines(&loot_event.loot, &ge_prices, 0, false, &loot_event.source_name);
+                    if !lines.is_empty() {
+                        let description = format!("{} opened a {} casket: {}", member_name, tier, lines.join(", "));
+                        send_webhook_embed_rich(
+                            webhook_url,
+                            "Clue casket",
+                            description,
+                            CLUE_COLOR,
+                            Some(clue_casket_icon_url(tier)),
+                            vec![("Tier".to_string(), tier.to_string())],
+                            Some(member_name.clone()),
+                        )
+                        .await;
+                    }
+                }
+            }
             GameEvent::Loot(loot_event) => {
-                if settings.notify_drops && !loot_event.loot.is_empty() {
+                let (pets, rest) = split_pets(&loot_event.loot);
+                if settings.notify_pets && !pets.is_empty() {
+                    send_pet_embeds(&webhook_url, &member_name, &loot_event.source_name, &pets, &web_origin).await;
+                }
+                if settings.notify_drops && !rest.is_empty() {
                     let ge_prices = unauthed::get_ge_prices_map();
                     let lines = drop_lines(
-                        &loot_event.loot,
+                        &rest,
                         &ge_prices,
                         settings.drops_min_value,
                         settings.drops_unique_only,
@@ -362,17 +519,26 @@ pub fn dispatch_event_webhook(
                     );
                     if !lines.is_empty() {
                         let description = format!(
-                            "{} received {} from {}",
+                            "{} received {} from [{}]({})",
                             member_name,
                             lines.join(", "),
-                            loot_event.source_name
+                            loot_event.source_name,
+                            wiki_url(&loot_event.source_name)
                         );
-                        let thumbnail = loot_event
-                            .loot
+                        let thumbnail = rest
                             .iter()
                             .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
                             .map(|item| item_icon_url(&web_origin, item.item_id));
-                        send_webhook_embed_with_thumbnail(webhook_url, "Drops", description, LOOT_COLOR, thumbnail).await;
+                        send_webhook_embed_rich(
+                            webhook_url,
+                            "Drops",
+                            description,
+                            LOOT_COLOR,
+                            thumbnail,
+                            Vec::new(),
+                            Some(member_name.clone()),
+                        )
+                        .await;
                     }
                 }
             }
@@ -390,7 +556,7 @@ pub fn dispatch_event_webhook(
 /// the group has a webhook configured and `notify_raids` is on. Like `dispatch_drop_webhook`,
 /// takes the pre-built message directly since the merge/finalize step that produces it already
 /// lives outside this per-event match.
-pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String) {
+pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String, raid_type: crate::models::RaidType) {
     tokio::spawn(async move {
         let client = match db_pool.get().await {
             Ok(client) => client,
@@ -414,7 +580,7 @@ pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String) {
             return;
         }
 
-        send_webhook_embed(webhook_url, "Raid", message, RAID_COLOR).await;
+        send_webhook_embed_with_thumbnail(webhook_url, "Raid", message, RAID_COLOR, Some(raid_icon_url(raid_type))).await;
     });
 }
 
@@ -494,12 +660,18 @@ pub fn dispatch_progress_webhook(
             EVENT_TYPE_QUEST if settings.notify_quests => {
                 let quest_id = event.payload["quest_id"].as_i64().unwrap_or_default() as i32;
                 let name = crate::quest_ids::quest_name(quest_id).unwrap_or("a quest");
-                let thumbnail = quest_icon_url(&web_origin, crate::quest_ids::quest_difficulty(quest_id));
+                let difficulty = crate::quest_ids::quest_difficulty(quest_id);
+                let thumbnail = quest_icon_url(&web_origin, difficulty);
+                let mut fields = Vec::new();
+                if let Some(difficulty) = difficulty {
+                    fields.push(("Difficulty".to_string(), difficulty.to_string()));
+                }
                 Some((
                     "Quest",
-                    format!("{} completed {}", member_name, name),
+                    format!("{} completed [{}]({})", member_name, name, wiki_url(name)),
                     QUEST_COLOR,
                     thumbnail,
+                    fields,
                 ))
             }
             EVENT_TYPE_DIARY if settings.notify_diaries => {
@@ -507,9 +679,16 @@ pub fn dispatch_progress_webhook(
                 let tier = event.payload["tier"].as_str().unwrap_or("");
                 Some((
                     "Diary",
-                    format!("{} completed the {} {} diary", member_name, region, tier),
+                    format!(
+                        "{} completed the [{}]({}) {} diary",
+                        member_name,
+                        region,
+                        wiki_url(&format!("{} Diary", region)),
+                        tier
+                    ),
                     DIARY_COLOR,
-                    None,
+                    Some(diary_icon_url()),
+                    Vec::new(),
                 ))
             }
             EVENT_TYPE_COMBAT_TASK if settings.notify_combat_achievements && event.payload["kind"] == "boss" => {
@@ -519,7 +698,8 @@ pub fn dispatch_progress_webhook(
                     "Combat achievements",
                     format!("{} completed every combat achievement for [{}]({})", member_name, boss, url),
                     COMBAT_TASK_COLOR,
-                    None,
+                    Some(combat_achievement_icon_url()),
+                    Vec::new(),
                 ))
             }
             EVENT_TYPE_COMBAT_TASK if settings.notify_combat_achievements && event.payload["kind"].is_null() => {
@@ -530,23 +710,30 @@ pub fn dispatch_progress_webhook(
                     "Combat achievements",
                     format!("{} completed the combat task [{}]({})", member_name, task, url),
                     COMBAT_TASK_COLOR,
-                    None,
+                    Some(combat_achievement_icon_url()),
+                    Vec::new(),
                 ))
             }
             EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "page" => {
                 let page = event.payload["page"].as_str().unwrap_or("a page");
                 Some((
                     "Collection log",
-                    format!("{} completed the {} collection log page", member_name, page),
+                    format!(
+                        "{} completed the [{}]({}) collection log page",
+                        member_name,
+                        page,
+                        wiki_url(page)
+                    ),
                     COLLECTION_LOG_COLOR,
-                    None,
+                    Some(collection_log_icon_url(&web_origin, page)),
+                    Vec::new(),
                 ))
             }
             _ => None,
         };
 
-        if let Some((title, description, color, thumbnail)) = post {
-            send_webhook_embed_with_thumbnail(webhook_url, title, description, color, thumbnail).await;
+        if let Some((title, description, color, thumbnail, fields)) = post {
+            send_webhook_embed_rich(webhook_url, title, description, color, thumbnail, fields, Some(member_name)).await;
         }
     });
 }

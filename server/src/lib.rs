@@ -25,6 +25,7 @@ pub mod loot_sources;
 pub mod models;
 pub mod notable_npcs;
 pub mod permissions;
+pub mod pets;
 pub mod progress_events;
 pub mod push;
 pub mod quest_ids;

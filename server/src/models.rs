@@ -1233,6 +1233,12 @@ pub struct DiscordWebhookSettings {
     pub notify_collection_log: bool,
     pub notify_quests: bool,
     pub notify_diaries: bool,
+    /// Split out of `notify_drops` - a pet item is excluded from the "Drops" line and posted as
+    /// its own "Pet" embed instead when this is on.
+    pub notify_pets: bool,
+    /// Split out of `notify_drops` - a clue casket opening posts as its own "Clue casket" embed
+    /// (with a tier field) instead of riding the generic "Drops" line when this is on.
+    pub notify_clues: bool,
 }
 
 #[derive(Deserialize)]

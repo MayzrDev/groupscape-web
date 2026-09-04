@@ -517,6 +517,8 @@ async fn test_discord_webhook_settings_default_to_disabled_and_all_notify_true()
     assert!(settings.notify_collection_log);
     assert!(settings.notify_quests);
     assert!(settings.notify_diaries);
+    assert!(settings.notify_pets);
+    assert!(settings.notify_clues);
 }
 
 #[tokio::test]
@@ -539,6 +541,8 @@ async fn test_discord_webhook_settings_round_trip() {
         notify_collection_log: true,
         notify_quests: true,
         notify_diaries: true,
+        notify_pets: true,
+        notify_clues: true,
     };
     db::update_discord_webhook_settings(&client, group_id, &updated)
         .await
@@ -577,6 +581,8 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_collection_log: true,
             notify_quests: true,
             notify_diaries: true,
+            notify_pets: true,
+            notify_clues: true,
         },
     )
     .await
@@ -597,6 +603,8 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_collection_log: true,
             notify_quests: true,
             notify_diaries: true,
+            notify_pets: true,
+            notify_clues: true,
         },
     )
     .await
@@ -632,6 +640,8 @@ async fn test_discord_webhook_settings_scoped_per_group() {
             notify_collection_log: true,
             notify_quests: true,
             notify_diaries: true,
+            notify_pets: true,
+            notify_clues: true,
         },
     )
     .await

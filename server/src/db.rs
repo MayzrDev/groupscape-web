@@ -500,7 +500,8 @@ pub async fn get_discord_webhook_settings(
         .prepare_cached(
             "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_drops, \
              discord_drops_min_value, discord_drops_unique_only, discord_notify_raids, discord_notify_combat_achievements, \
-             discord_notify_collection_log, discord_notify_quests, discord_notify_diaries \
+             discord_notify_collection_log, discord_notify_quests, discord_notify_diaries, discord_notify_pets, \
+             discord_notify_clues \
              FROM groupscape.groups WHERE group_id=$1",
         )
         .await?;
@@ -520,6 +521,8 @@ pub async fn get_discord_webhook_settings(
         notify_collection_log: row.try_get("discord_notify_collection_log")?,
         notify_quests: row.try_get("discord_notify_quests")?,
         notify_diaries: row.try_get("discord_notify_diaries")?,
+        notify_pets: row.try_get("discord_notify_pets")?,
+        notify_clues: row.try_get("discord_notify_clues")?,
     })
 }
 
@@ -534,7 +537,7 @@ pub async fn update_discord_webhook_settings(
              discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_drops=$5, \
              discord_drops_min_value=$6, discord_drops_unique_only=$7, discord_notify_raids=$8, \
              discord_notify_combat_achievements=$9, discord_notify_collection_log=$10, discord_notify_quests=$11, \
-             discord_notify_diaries=$12 \
+             discord_notify_diaries=$12, discord_notify_pets=$13, discord_notify_clues=$14 \
              WHERE group_id=$1",
         )
         .await?;
@@ -554,6 +557,8 @@ pub async fn update_discord_webhook_settings(
                 &settings.notify_collection_log,
                 &settings.notify_quests,
                 &settings.notify_diaries,
+                &settings.notify_pets,
+                &settings.notify_clues,
             ],
         )
         .await
@@ -2739,6 +2744,23 @@ ADD COLUMN IF NOT EXISTS discord_notify_diaries BOOLEAN NOT NULL DEFAULT true
             .await?;
 
         commit_migration(&transaction, "add_groups_discord_achievement_notify_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_groups_discord_pets_clues_notify_columns").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_notify_pets BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN IF NOT EXISTS discord_notify_clues BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_pets_clues_notify_columns").await?;
         transaction.commit().await?;
     }
 

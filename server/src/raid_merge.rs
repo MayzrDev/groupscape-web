@@ -131,7 +131,7 @@ pub async fn handle_raid_completion(
             }
         }
 
-        discord::dispatch_raid_webhook(db_pool.get_ref().clone(), group_id, message);
+        discord::dispatch_raid_webhook(db_pool.get_ref().clone(), group_id, message, finalized.raid_type);
     });
 
     Ok(())

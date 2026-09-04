@@ -6,6 +6,8 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Group settings' Discord Drops notification now has a "Unique drops only" option - turn it on and only drops that are actually unique to that boss/source get posted, ignoring the minimum-value threshold entirely.
+- Pets and clue caskets now get their own Discord notifications instead of riding the generic Drops post, each with its own on/off toggle in group settings.
+- Discord notifications for kills, diaries, quests, collection log, and raids now show an icon and link straight to the relevant Old School RuneScape Wiki page; kills and boss kill counts are now shown as proper fields instead of run-on text.
 
 ## [1.0.376] - 2026-09-04
 

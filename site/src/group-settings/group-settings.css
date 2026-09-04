@@ -323,6 +323,14 @@ group-settings {
   background: var(--activity-diary);
 }
 
+.group-settings__discord-notify-dot--pet {
+  background: #ff7ac6;
+}
+
+.group-settings__discord-notify-dot--clue {
+  background: #3ba7d6;
+}
+
 .group-settings__discord-notify-group-label {
   margin: 0.9em 0 0.1em;
   font-size: 0.72em;
