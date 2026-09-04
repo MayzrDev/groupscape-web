@@ -369,6 +369,33 @@ group-settings {
   margin-top: 0.2em;
 }
 
+.group-settings__discord-drops-unique-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.5em;
+  padding-top: 0.4em;
+  border-top: 1px dashed var(--light-border);
+}
+
+.group-settings__discord-drops-unique-toggle label {
+  font-size: 0.78em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.group-settings__discord-drops-unique-star {
+  color: var(--rarity-unique);
+}
+
+.group-settings__discord-drops-unique-note {
+  font-size: 0.7em;
+  font-style: italic;
+  margin-top: 0.2em;
+}
+
 .group-settings__discord-notify-row label {
   margin-top: 3px;
 }

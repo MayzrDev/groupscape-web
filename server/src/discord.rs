@@ -108,20 +108,34 @@ const DIARY_COLOR: u32 = 0x29C2B0;
 /// "3,300 gp", not "100 gp") - a single expensive-enough item shouldn't get hidden just because
 /// its unit price is small. Untradeable items (no GE price at all) can't be judged against
 /// `min_value`, so they always pass the filter and show "untradeable" instead of a gp amount.
-fn drop_lines(items: &[crate::models::LootItem], ge_prices: &GEPrices, min_value: i64, source_name: &str) -> Vec<String> {
+///
+/// When `unique_only` is set, `min_value` is ignored entirely - only items `drop_rates::lookup`
+/// marks `is_unique` for `source_name` pass. An item with no curated entry for that source counts
+/// as not unique (excluded), even if it's untradeable.
+fn drop_lines(
+    items: &[crate::models::LootItem],
+    ge_prices: &GEPrices,
+    min_value: i64,
+    unique_only: bool,
+    source_name: &str,
+) -> Vec<String> {
     items
         .iter()
         .filter_map(|item| {
+            let rate_entry = drop_rates::lookup(source_name, item.item_id);
+            if unique_only && !rate_entry.map(|d| d.is_unique).unwrap_or(false) {
+                return None;
+            }
             let unit_value = ge_prices.get(&item.item_id).copied();
             let value = unit_value.unwrap_or(0) * item.quantity as i64;
-            if unit_value.is_some() && value < min_value {
+            if !unique_only && unit_value.is_some() && value < min_value {
                 return None;
             }
             let value_part = match unit_value {
                 Some(_) => format!("{} gp", format_gp(value)),
                 None => "untradeable".to_string(),
             };
-            let detail = match drop_rates::lookup(source_name, item.item_id).and_then(|d| d.rate.clone()) {
+            let detail = match rate_entry.and_then(|d| d.rate.clone()) {
                 Some(rate) => format!("{}, {}", value_part, rate),
                 None => value_part,
             };
@@ -300,7 +314,13 @@ pub fn dispatch_event_webhook(
                 if settings.notify_drops {
                     if let Some(loot) = &kill.loot {
                         let ge_prices = unauthed::get_ge_prices_map();
-                        let lines = drop_lines(loot, &ge_prices, settings.drops_min_value, &kill.npc_name);
+                        let lines = drop_lines(
+                            loot,
+                            &ge_prices,
+                            settings.drops_min_value,
+                            settings.drops_unique_only,
+                            &kill.npc_name,
+                        );
                         if !lines.is_empty() {
                             let description = format!(
                                 "{} received {} from {}",
@@ -333,7 +353,13 @@ pub fn dispatch_event_webhook(
             GameEvent::Loot(loot_event) => {
                 if settings.notify_drops && !loot_event.loot.is_empty() {
                     let ge_prices = unauthed::get_ge_prices_map();
-                    let lines = drop_lines(&loot_event.loot, &ge_prices, settings.drops_min_value, &loot_event.source_name);
+                    let lines = drop_lines(
+                        &loot_event.loot,
+                        &ge_prices,
+                        settings.drops_min_value,
+                        settings.drops_unique_only,
+                        &loot_event.source_name,
+                    );
                     if !lines.is_empty() {
                         let description = format!(
                             "{} received {} from {}",

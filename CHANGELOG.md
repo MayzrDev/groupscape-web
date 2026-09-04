@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.383] - 2026-09-04
+
+### Added
+- Group settings' Discord Drops notification now has a "Unique drops only" option - turn it on and only drops that are actually unique to that boss/source get posted, ignoring the minimum-value threshold entirely.
+
 ## [1.0.376] - 2026-09-04
 
 ### Fixed
@@ -55,10 +60,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Removed
 - Removed GP Earned, Boss KC, and Raid Completions from the Graphs page - it's XP-only now (kill/loot/raid tracking elsewhere in the app is unaffected).
 
-## [1.0.350] - 2026-09-02
-
-### Changed
-- The Activity Feed's "no events yet" message now mentions quests and diaries too, not just kills and deaths.
+[1.0.350] — Broaden Activity Feed Empty-State Message
 
 ## [1.0.329] - 2026-09-02
 

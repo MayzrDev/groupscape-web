@@ -1224,6 +1224,10 @@ pub struct DiscordWebhookSettings {
     /// plugin-side notable-drop alert.
     pub notify_drops: bool,
     pub drops_min_value: i64,
+    /// When set, `drops_min_value` is ignored entirely - only items `drop_rates::lookup` marks
+    /// `is_unique` for their source NPC are posted. Items with no curated entry are treated as
+    /// not unique (excluded), even if untradeable.
+    pub drops_unique_only: bool,
     pub notify_raids: bool,
     pub notify_combat_achievements: bool,
     pub notify_collection_log: bool,

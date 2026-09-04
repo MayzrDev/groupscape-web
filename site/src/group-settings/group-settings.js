@@ -120,6 +120,12 @@ export class GroupSettings extends BaseElement {
     this.discordDropsParsed = this.querySelector(".group-settings__discord-drops-parsed");
     this.eventListener(this.discordDropsMinValueInput, "input", this.updateDiscordDropsParsedPreview.bind(this));
     this.eventListener(this.discordDropsMinValueInput, "change", this.saveDiscordSettings.bind(this));
+    this.discordDropsUniqueOnlyCheckbox = this.querySelector(".group-settings__discord-drops-unique-checkbox");
+    this.eventListener(
+      this.discordDropsUniqueOnlyCheckbox,
+      "change",
+      this.handleDiscordDropsUniqueOnlyChange.bind(this)
+    );
 
     const [mostRecentMembers] = pubsub.getMostRecent("members-updated") || [];
     if (mostRecentMembers) {
@@ -400,6 +406,21 @@ export class GroupSettings extends BaseElement {
     }
     this.discordDropsMinValueInput.value = formatGpShorthand(settings.drops_min_value ?? 250_000);
     this.updateDiscordDropsParsedPreview();
+    this.discordDropsUniqueOnlyCheckbox.checked = !!settings.drops_unique_only;
+    this.updateDiscordDropsUniqueOnlyLock();
+  }
+
+  // The min-value field is meaningless once unique-only is on (drop_lines ignores it server-side),
+  // so it's disabled here to match rather than left editable but silently unused.
+  updateDiscordDropsUniqueOnlyLock() {
+    const uniqueOnly = this.discordDropsUniqueOnlyCheckbox.checked;
+    this.discordDropsMinValueInput.disabled = uniqueOnly;
+    this.querySelector(".group-settings__discord-drops-unique-note").style.display = uniqueOnly ? "" : "none";
+  }
+
+  handleDiscordDropsUniqueOnlyChange() {
+    this.updateDiscordDropsUniqueOnlyLock();
+    this.saveDiscordSettings();
   }
 
   updateDiscordDropsParsedPreview() {
@@ -422,7 +443,8 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       checkbox.disabled = !connected;
     }
-    this.discordDropsMinValueInput.disabled = !connected;
+    this.discordDropsUniqueOnlyCheckbox.disabled = !connected;
+    this.discordDropsMinValueInput.disabled = !connected || this.discordDropsUniqueOnlyCheckbox.checked;
     this.querySelector(".group-settings__discord-lock-note").style.display = connected ? "none" : "";
   }
 
@@ -443,6 +465,7 @@ export class GroupSettings extends BaseElement {
     }
     const parsedMinValue = parseGpShorthand(this.discordDropsMinValueInput.value);
     settings.drops_min_value = parsedMinValue ?? this.lastSavedDiscordSettings?.drops_min_value ?? 250_000;
+    settings.drops_unique_only = this.discordDropsUniqueOnlyCheckbox.checked;
 
     try {
       loadingScreenManager.showLoadingScreen();

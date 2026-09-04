@@ -512,6 +512,7 @@ async fn test_discord_webhook_settings_default_to_disabled_and_all_notify_true()
     assert!(settings.notify_deaths);
     assert!(settings.notify_drops);
     assert_eq!(settings.drops_min_value, 250000);
+    assert!(!settings.drops_unique_only);
     assert!(settings.notify_combat_achievements);
     assert!(settings.notify_collection_log);
     assert!(settings.notify_quests);
@@ -532,6 +533,7 @@ async fn test_discord_webhook_settings_round_trip() {
         notify_deaths: false,
         notify_drops: true,
         drops_min_value: 500000,
+        drops_unique_only: false,
         notify_raids: true,
         notify_combat_achievements: true,
         notify_collection_log: true,
@@ -569,6 +571,7 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_deaths: true,
             notify_drops: true,
             drops_min_value: 250000,
+            drops_unique_only: false,
             notify_raids: true,
             notify_combat_achievements: true,
             notify_collection_log: true,
@@ -588,6 +591,7 @@ async fn test_discord_webhook_settings_url_can_be_cleared() {
             notify_deaths: true,
             notify_drops: true,
             drops_min_value: 250000,
+            drops_unique_only: false,
             notify_raids: true,
             notify_combat_achievements: true,
             notify_collection_log: true,
@@ -622,6 +626,7 @@ async fn test_discord_webhook_settings_scoped_per_group() {
             notify_deaths: true,
             notify_drops: true,
             drops_min_value: 250000,
+            drops_unique_only: false,
             notify_raids: true,
             notify_combat_achievements: true,
             notify_collection_log: true,

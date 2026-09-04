@@ -499,7 +499,7 @@ pub async fn get_discord_webhook_settings(
     let stmt = client
         .prepare_cached(
             "SELECT discord_webhook_url, discord_notify_kills, discord_notify_deaths, discord_notify_drops, \
-             discord_drops_min_value, discord_notify_raids, discord_notify_combat_achievements, \
+             discord_drops_min_value, discord_drops_unique_only, discord_notify_raids, discord_notify_combat_achievements, \
              discord_notify_collection_log, discord_notify_quests, discord_notify_diaries \
              FROM groupscape.groups WHERE group_id=$1",
         )
@@ -514,6 +514,7 @@ pub async fn get_discord_webhook_settings(
         notify_deaths: row.try_get("discord_notify_deaths")?,
         notify_drops: row.try_get("discord_notify_drops")?,
         drops_min_value: row.try_get("discord_drops_min_value")?,
+        drops_unique_only: row.try_get("discord_drops_unique_only")?,
         notify_raids: row.try_get("discord_notify_raids")?,
         notify_combat_achievements: row.try_get("discord_notify_combat_achievements")?,
         notify_collection_log: row.try_get("discord_notify_collection_log")?,
@@ -531,8 +532,9 @@ pub async fn update_discord_webhook_settings(
         .prepare_cached(
             "UPDATE groupscape.groups SET \
              discord_webhook_url=$2, discord_notify_kills=$3, discord_notify_deaths=$4, discord_notify_drops=$5, \
-             discord_drops_min_value=$6, discord_notify_raids=$7, discord_notify_combat_achievements=$8, \
-             discord_notify_collection_log=$9, discord_notify_quests=$10, discord_notify_diaries=$11 \
+             discord_drops_min_value=$6, discord_drops_unique_only=$7, discord_notify_raids=$8, \
+             discord_notify_combat_achievements=$9, discord_notify_collection_log=$10, discord_notify_quests=$11, \
+             discord_notify_diaries=$12 \
              WHERE group_id=$1",
         )
         .await?;
@@ -546,6 +548,7 @@ pub async fn update_discord_webhook_settings(
                 &settings.notify_deaths,
                 &settings.notify_drops,
                 &settings.drops_min_value,
+                &settings.drops_unique_only,
                 &settings.notify_raids,
                 &settings.notify_combat_achievements,
                 &settings.notify_collection_log,
@@ -2780,6 +2783,22 @@ ADD COLUMN IF NOT EXISTS slayer_task TEXT
         create_timestamp_trigger(&transaction, "slayer_task").await?;
 
         commit_migration(&transaction, "add_slayer_task_column").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_groups_discord_drops_unique_only_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS discord_drops_unique_only BOOLEAN NOT NULL DEFAULT false
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_discord_drops_unique_only_column").await?;
         transaction.commit().await?;
     }
 
