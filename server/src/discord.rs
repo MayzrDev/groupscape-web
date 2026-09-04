@@ -860,11 +860,10 @@ pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item
 /// diary, combat-achievement, collection-log, or skill level-up milestone) as a Discord embed when
 /// the matching notify setting is on.
 ///
-/// Per-item collection-log events are far too frequent to post individually (thousands of log
-/// slots) - only the page-completion variant (`kind: "page"` in the payload) is posted, matching
-/// the milestone framing the settings row describes. Combat-achievement tasks post individually
-/// (each linked to its wiki page), plus a boss-completion post (`kind: "boss"`) linked to the
-/// boss's wiki page.
+/// Collection-log items post individually (`kind: "item"` in the payload), plus a page-completion
+/// post (`kind: "page"`) when the addition just finished a page. Combat-achievement tasks post
+/// individually (each linked to its wiki page), plus a boss-completion post (`kind: "boss"`)
+/// linked to the boss's wiki page.
 pub fn dispatch_progress_webhook(
     db_pool: Pool,
     group_id: i64,
@@ -951,6 +950,24 @@ pub fn dispatch_progress_webhook(
                     format!("{} completed the combat task [{}]({})", member_name, task, url),
                     COMBAT_TASK_COLOR,
                     Some(combat_achievement_icon_url()),
+                    Vec::new(),
+                ))
+            }
+            EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "item" => {
+                let item_id = event.payload["item_id"].as_i64().unwrap_or_default() as i32;
+                let quantity = event.payload["quantity"].as_i64().unwrap_or(1);
+                let name = item_names::display(item_id);
+                Some((
+                    "Collection log",
+                    format!(
+                        "{} added [{}{}]({}) to their collection log",
+                        member_name,
+                        if quantity > 1 { format!("{}x ", quantity) } else { String::new() },
+                        name,
+                        wiki_url(&name)
+                    ),
+                    COLLECTION_LOG_COLOR,
+                    Some(item_icon_url(&web_origin, item_id)),
                     Vec::new(),
                 ))
             }
