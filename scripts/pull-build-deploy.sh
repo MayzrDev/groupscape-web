@@ -64,6 +64,7 @@ log_warn()    { log "[WARN] $*"; }
 log_error()   { log "[ERROR] $*" >&2; }
 log_success() { log "[SUCCESS] $*"; }
 timestamp()   { while IFS= read -r line; do echo "[$(date '+%Y-%m-%d %H:%M:%S')] $line"; done; }
+tag_lines()   { local TAG="$1"; while IFS= read -r line; do echo "[$TAG] $line"; done; }
 
 exec > >(tee -a "$DEPLOY_LOG_FILE") 2>&1
 TEE_PID=$!
@@ -337,10 +338,11 @@ deploy() {
     fi
   done
 
-  # Build backend and frontend in parallel — independent Dockerfiles/contexts,
-  # each build logs to its own file so the interleaved output stays readable.
-  local BACKEND_LOG="$DOCKER_LOG_DIR/backend-build-$VERSION.log"
-  local FRONTEND_LOG="$DOCKER_LOG_DIR/frontend-build-$VERSION.log"
+  # Build backend and frontend in parallel — independent Dockerfiles/contexts.
+  # Each stream is tagged and written straight to $DOCKER_LOG_FILE as it happens
+  # (append writes below PIPE_BUF are atomic, so the two interleave safely) —
+  # buffering a build's output until it finished previously starved Vantage's
+  # log-tailing progress detection for the whole build duration.
   local BACKEND_PID="" FRONTEND_PID=""
 
   if [ "$BUILD_BACKEND" = true ]; then
@@ -351,7 +353,7 @@ deploy() {
         -t groupscape-web-backend:latest \
         -t "groupscape-web-backend:$VERSION" \
         -f server/Dockerfile \
-        server > "$BACKEND_LOG" 2>&1 ) &
+        server 2>&1 | tag_lines backend | timestamp >> "$DOCKER_LOG_FILE" ) &
     BACKEND_PID=$!
   fi
 
@@ -362,7 +364,7 @@ deploy() {
         -t groupscape-web-frontend:latest \
         -t "groupscape-web-frontend:$VERSION" \
         -f site/Dockerfile \
-        site > "$FRONTEND_LOG" 2>&1 ) &
+        site 2>&1 | tag_lines frontend | timestamp >> "$DOCKER_LOG_FILE" ) &
     FRONTEND_PID=$!
   fi
 
@@ -374,7 +376,6 @@ deploy() {
       log_error "Backend docker build failed"
       BUILD_FAILED=true
     fi
-    cat "$BACKEND_LOG" | timestamp >> "$DOCKER_LOG_FILE"
   fi
   if [ -n "$FRONTEND_PID" ]; then
     if wait "$FRONTEND_PID"; then
@@ -383,9 +384,7 @@ deploy() {
       log_error "Frontend docker build failed"
       BUILD_FAILED=true
     fi
-    cat "$FRONTEND_LOG" | timestamp >> "$DOCKER_LOG_FILE"
   fi
-  rm -f "$BACKEND_LOG" "$FRONTEND_LOG"
   if [ "$BUILD_FAILED" = true ]; then
     return 1
   fi
