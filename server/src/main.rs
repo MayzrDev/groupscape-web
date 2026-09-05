@@ -428,7 +428,18 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/get-active-raid-markers").route(web::get().to(authed::get_active_raid_markers)))
             .service(authed::get_group_data)
             .service(authed::get_portrait);
-        let json_config = web::JsonConfig::default().limit(100000);
+        // Without a custom handler, a malformed body (e.g. an unrecognized event shape from an
+        // out-of-date or buggy plugin) 400s silently - the access log shows the status code but
+        // never the reason, so a schema mismatch that drops a whole heartbeat's worth of events
+        // is invisible until someone thinks to reproduce it locally.
+        let json_config = web::JsonConfig::default().limit(100000).error_handler(|err, req| {
+            log::warn!("JSON payload rejected on {}: {}", req.path(), err);
+            actix_web::error::InternalError::from_response(
+                err,
+                actix_web::HttpResponse::BadRequest().finish(),
+            )
+            .into()
+        });
         let cors = Cors::default()
             .allow_any_origin()
             .send_wildcard()

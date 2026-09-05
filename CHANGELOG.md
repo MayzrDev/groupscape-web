@@ -9,6 +9,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Each Discord notification type in group settings now has a "Test" button that sends a realistic example message, so you can check the channel/formatting/icons without waiting for the real thing to happen in-game.
 
 ### Fixed
+- Discord "Unique drops only" no longer always flags brimstone keys, dragon med helms, ancient shards, or dark totem pieces as unique - those also drop from common non-boss sources, so they were spamming notifications outside the curated boss list.
 - Discord "Drops" notifications were posting untradeable junk drops (e.g. ensouled heads) from regular monsters even with a minimum value set - untradeable drops now count as 0gp against that minimum instead of always getting through.
 - Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.
 - Site admin activity feed delete was failing with a server error instead of deleting the selected events.
@@ -20,6 +21,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Admin accounts page was failing to load ("Failed to load accounts") because the new "Last visit" column's database migration was never actually applied.
 
 ### Changed
+- Internal: the server now logs why it rejected a malformed request from the plugin instead of just returning a 400 with no trace of the reason.
 - Internal: sped up production deploys — backend Docker builds now reuse compiled dependencies instead of recompiling all of them on every push, and the backend/frontend images build in parallel with unchanged ones skipped entirely; fixed a follow-up bug where the deploy monitor couldn't tell a parallel build apart from a stalled one.
 - Internal: added scripts to detect new OSRS quests and combat achievement tasks against the wiki, so the data-refresh workflow can catch these the same way it already does for items and bosses.
 - Discord "Drops" notifications no longer spam a new message per drop - a repeat of the same single item from the same source within an hour now edits the previous drop message's quantity/value in place instead, the same way kill/death notifications already do.

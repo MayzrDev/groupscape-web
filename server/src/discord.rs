@@ -189,16 +189,10 @@ fn drop_lines(
 /// them flagged no matter which NPC dropped them.
 static UNIQUE_DROP_EXCEPTIONS: LazyLock<std::collections::HashSet<i32>> = LazyLock::new(|| {
     [
-        23083, // Brimstone key
-        1149,  // Dragon med helm
         2366,  // Shield left half
         2577,  // Ranger boots
         11286, // Draconic visage
         24268, // Basilisk jaw
-        19677, // Ancient shard
-        19679, // Dark totem base
-        19681, // Dark totem middle
-        19683, // Dark totem top
         6798,  // Earth warrior champion scroll
         6799,  // Ghoul champion scroll
         6800,  // Giant champion scroll
