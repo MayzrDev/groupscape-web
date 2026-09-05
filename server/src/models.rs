@@ -1407,7 +1407,7 @@ pub struct AdminAccountSummary {
     pub must_change_password: bool,
     pub locked_out: bool,
     pub created_at: DateTime<Utc>,
-    pub last_login_at: Option<DateTime<Utc>>,
+    pub last_visit_at: Option<DateTime<Utc>>,
     pub is_online: bool,
 }
 
@@ -1451,7 +1451,7 @@ pub struct AdminAccountDetail {
     pub must_change_password: bool,
     pub locked_out: bool,
     pub created_at: DateTime<Utc>,
-    pub last_login_at: Option<DateTime<Utc>>,
+    pub last_visit_at: Option<DateTime<Utc>>,
     pub groups: Vec<AdminAccountGroup>,
     pub characters: Vec<AdminAccountCharacter>,
     pub session_count: i64,

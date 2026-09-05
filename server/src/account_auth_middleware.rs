@@ -181,6 +181,9 @@ async fn authenticate_via_db(
         .map_err(|_| actix_web::error::ErrorInternalServerError(""))?
         .ok_or_else(|| actix_web::error::ErrorUnauthorized(""))?;
 
+    // Best-effort - a failed write here shouldn't fail the request it's just piggybacking on.
+    let _ = db::record_account_visit(&client, account.id).await;
+
     cache.insert(
         token_hash.to_owned(),
         Account {

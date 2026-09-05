@@ -2523,6 +2523,14 @@ ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP
         transaction
             .execute(
                 r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_visit_at TIMESTAMPTZ
+"#,
+                &[],
+            )
+            .await?;
+        transaction
+            .execute(
+                r#"
 ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0
 "#,
                 &[],
@@ -3278,15 +3286,29 @@ RETURNING locked_until
 }
 
 /// Clears the lockout counters and records a successful login timestamp - called on a
-/// successful password check.
+/// successful password check. Also stamps `last_visit_at`, since a login is itself a visit.
 pub async fn reset_login_lockout_and_record_login(
     client: &Client,
     account_id: i64,
 ) -> Result<(), ApiError> {
     let stmt = client
         .prepare_cached(
-            "UPDATE groupscape.accounts SET failed_login_attempts = 0, locked_until = NULL, last_login_at = now() WHERE id = $1",
+            "UPDATE groupscape.accounts SET failed_login_attempts = 0, locked_until = NULL, last_login_at = now(), last_visit_at = now() WHERE id = $1",
         )
+        .await?;
+    client
+        .execute(&stmt, &[&account_id])
+        .await
+        .map_err(ApiError::GetAccountError)?;
+    Ok(())
+}
+
+/// Stamps `last_visit_at` for an authenticated account - called from the account-session auth
+/// middleware on a cache miss, which naturally throttles writes to once per
+/// `ACCOUNT_AUTH_CACHE_TTL` per session token rather than on every request.
+pub async fn record_account_visit(client: &Client, account_id: i64) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached("UPDATE groupscape.accounts SET last_visit_at = now() WHERE id = $1")
         .await?;
     client
         .execute(&stmt, &[&account_id])
@@ -6321,12 +6343,12 @@ fn admin_account_summary_from_row(row: &Row) -> Result<AdminAccountSummary, ApiE
         must_change_password: row.try_get("must_change_password")?,
         locked_out: row.try_get("locked_out")?,
         created_at: row.try_get("created_at")?,
-        last_login_at: row.try_get("last_login_at")?,
+        last_visit_at: row.try_get("last_visit_at")?,
         is_online: row.try_get("is_online")?,
     })
 }
 
-const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.username, a.status, a.must_change_password, a.created_at, a.last_login_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
+const ADMIN_ACCOUNT_SUMMARY_COLUMNS: &str = "a.id, a.username, a.status, a.must_change_password, a.created_at, a.last_visit_at, (a.locked_until IS NOT NULL AND a.locked_until > now()) AS locked_out";
 
 /// Mirrors the 60s "online" threshold used for the live online badge in the group view
 /// (`get_homepage_stats`), scoped to a single account via its characters' `account_hash`.
@@ -6498,7 +6520,7 @@ ORDER BY g.group_name
         must_change_password: summary.must_change_password,
         locked_out: summary.locked_out,
         created_at: summary.created_at,
-        last_login_at: summary.last_login_at,
+        last_visit_at: summary.last_visit_at,
         groups,
         characters,
         session_count,

@@ -134,7 +134,7 @@ export class AdminAccountsPage extends BaseElement {
           <td class="admin-accounts__row-username">${account.username ?? "(no username)"}</td>
           <td>${this.statusBadge(account)}</td>
           <td class="admin-mono">${
-            account.last_login_at ? new Date(account.last_login_at).toLocaleDateString() : "&mdash;"
+            account.last_visit_at ? new Date(account.last_visit_at).toLocaleDateString() : "&mdash;"
           }</td>
         </tr>
       `
@@ -204,12 +204,12 @@ export class AdminAccountsPage extends BaseElement {
 
     this.dialogueTitle.textContent = account.username ?? `Account #${account.id}`;
     const created = new Date(account.created_at).toLocaleDateString();
-    const lastLogin = account.last_login_at ? new Date(account.last_login_at).toLocaleString() : "never";
+    const lastVisit = account.last_visit_at ? new Date(account.last_visit_at).toLocaleString() : "never";
     this.dialogueMeta.innerHTML = `
       ${this.statusBadge(account)}
       <span>#${account.id}</span>
       <span>Joined ${created}</span>
-      <span>Last login: ${lastLogin}</span>
+      <span>Last visit: ${lastVisit}</span>
     `;
 
     this.groupCount.textContent = account.groups.length;
