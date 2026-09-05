@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Site admins viewing a group can now select individual activity feed events and delete them for everyone in the group.
+- Each Discord notification type in group settings now has a "Test" button that sends a realistic example message, so you can check the channel/formatting/icons without waiting for the real thing to happen in-game.
 
 ### Fixed
 - Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.

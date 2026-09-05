@@ -281,6 +281,142 @@ pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
     .unwrap_or_else(|err| Err(ApiError::DiscordWebhookInvalidError(err.to_string())))
 }
 
+/// Fixed example content for the "Send test message" button next to each notification toggle
+/// in group settings - lets an admin see exactly what a real embed for that category looks like
+/// (icons included) without waiting for it to actually happen in-game. Built from real OSRS
+/// names/ids and, for the "Raid" case, the same [`crate::models::RaidCompletionPayload`] the real
+/// relay uses, so the example can't drift out of sync with the real format. `kind` is one of this
+/// struct's own `notify_*` field names - the same string the settings page's checkbox
+/// `data-key` already carries, so the client has nothing new to know about.
+pub async fn send_test_notification(webhook_url: String, web_origin: String, kind: &str) -> Result<(), ApiError> {
+    const MEMBER: &str = "TestPlayer";
+    const TWISTED_BOW: i32 = 20997;
+    const PET_SNAKELING: i32 = 12921;
+    const DRAGON_BOOTS: i32 = 11840;
+    const SERPENTINE_VISAGE: i32 = 12927;
+
+    let (title, description, color, thumbnail, fields): (&'static str, String, u32, Option<String>, Vec<(String, String)>) =
+        match kind {
+            "notify_kills" => (
+                "Kill",
+                format!("{} killed [Zulrah]({})", MEMBER, wiki_url("Zulrah")),
+                KILL_COLOR,
+                Some(boss_icon_url(&web_origin, "Zulrah")),
+                vec![
+                    ("Kill count".to_string(), "42".to_string()),
+                    ("Loot value".to_string(), format!("{} gp", format_gp(1_200_000))),
+                ],
+            ),
+            "notify_deaths" => (
+                "Death",
+                format!("{} died to [Vorkath]({})", MEMBER, wiki_url("Vorkath")),
+                DEATH_COLOR,
+                Some(boss_icon_url(&web_origin, "Vorkath")),
+                vec![("Deaths".to_string(), "5".to_string())],
+            ),
+            "notify_drops" => (
+                "Drops",
+                format!(
+                    "{} received 1x {} from [Zulrah]({})",
+                    MEMBER,
+                    item_names::display(TWISTED_BOW),
+                    wiki_url("Zulrah")
+                ),
+                LOOT_COLOR,
+                item_icon_url(TWISTED_BOW),
+                Vec::new(),
+            ),
+            "notify_pets" => (
+                "Pet",
+                format!("{} received a pet: {}", MEMBER, item_names::display(PET_SNAKELING)),
+                PET_COLOR,
+                item_icon_url(PET_SNAKELING),
+                vec![("Source".to_string(), "Zulrah".to_string())],
+            ),
+            "notify_clues" => (
+                "Clue casket",
+                format!("{} opened a hard casket: 1x {}", MEMBER, item_names::display(DRAGON_BOOTS)),
+                CLUE_COLOR,
+                Some(clue_casket_icon_url("hard")),
+                vec![("Tier".to_string(), "hard".to_string())],
+            ),
+            "notify_raids" => {
+                let payload = crate::models::RaidCompletionPayload {
+                    raid_type: crate::models::RaidType::Tob,
+                    difficulty: crate::models::RaidDifficulty::Mode { mode: Some("Hard Mode".to_string()) },
+                    participants: vec![crate::models::RaidParticipant {
+                        member_name: MEMBER.to_string(),
+                        value: 3_500_000,
+                        loot: Vec::new(),
+                    }],
+                    total_value: 3_500_000,
+                    merge_open: false,
+                };
+                (
+                    "Raid",
+                    payload.to_message(),
+                    RAID_COLOR,
+                    Some(raid_icon_url(crate::models::RaidType::Tob)),
+                    Vec::new(),
+                )
+            }
+            "notify_combat_achievements" => (
+                "Combat achievements",
+                format!(
+                    "{} completed the combat task [{}]({})",
+                    MEMBER,
+                    "Zulrah Adept",
+                    wiki_url("Zulrah Adept")
+                ),
+                COMBAT_TASK_COLOR,
+                Some(combat_achievement_icon_url()),
+                Vec::new(),
+            ),
+            "notify_collection_log" => (
+                "Collection log",
+                format!(
+                    "{} added [{}]({}) to their collection log",
+                    MEMBER,
+                    item_names::name(SERPENTINE_VISAGE).unwrap_or("an item"),
+                    item_names::wiki_link(SERPENTINE_VISAGE)
+                ),
+                COLLECTION_LOG_COLOR,
+                item_icon_url(SERPENTINE_VISAGE),
+                Vec::new(),
+            ),
+            "notify_quests" => (
+                "Quest",
+                format!("{} completed [Dragon Slayer II]({})", MEMBER, wiki_url("Dragon Slayer II")),
+                QUEST_COLOR,
+                quest_icon_url(&web_origin, Some("Grandmaster")),
+                vec![("Difficulty".to_string(), "Grandmaster".to_string())],
+            ),
+            "notify_diaries" => (
+                "Diary",
+                format!("{} completed the [Ardougne]({}) Elite diary", MEMBER, wiki_url("Ardougne Diary")),
+                DIARY_COLOR,
+                Some(diary_icon_url()),
+                Vec::new(),
+            ),
+            "notify_level_ups" => (
+                "Level up",
+                format!("{} reached level 99 [Attack]({})", MEMBER, wiki_url("Attack")),
+                LEVEL_UP_COLOR,
+                Some(skill_icon_url("Attack")),
+                Vec::new(),
+            ),
+            _ => return Err(ApiError::DiscordWebhookInvalidError(format!("unknown notification kind: {kind}"))),
+        };
+
+    task::spawn_blocking(move || {
+        let fields: Vec<(&str, &str)> = fields.iter().map(|(name, value)| (name.as_str(), value.as_str())).collect();
+        send_webhook_embed_sync(&webhook_url, title, &description, color, thumbnail.as_deref(), &fields, Some(MEMBER))
+            .map_err(|err| ApiError::DiscordWebhookInvalidError(err.to_string()))
+    })
+    .await
+    .unwrap_or_else(|err| Err(ApiError::DiscordWebhookInvalidError(err.to_string())))
+}
+
 async fn send_webhook_embed_with_thumbnail(
     url: String,
     title: &'static str,

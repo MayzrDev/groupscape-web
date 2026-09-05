@@ -15,7 +15,8 @@ use crate::models::{
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
     GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem, LootLogEvent,
     LootLogItem, LootLogPage, LootLogSummary, MyPermissions, PermissionFlags, PermissionKey,
-    RenameGroup, UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
+    RenameGroup, TestDiscordNotificationRequest, UpdateGroupPermissionsRequest,
+    UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::notable_npcs;
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
@@ -395,6 +396,35 @@ pub async fn update_discord_settings(
 
     db::update_discord_webhook_settings(&client, auth.group_id, &settings).await?;
     Ok(web::Json(settings))
+}
+
+/// Sends one fabricated example embed for whichever notification category the admin clicked
+/// "Send test message" on (see [`discord::send_test_notification`]) - lets them see the real
+/// format/icon without waiting for it to actually happen in-game. Gated the same as the other
+/// Discord settings endpoints; requires a webhook URL already saved (there's nothing to send a
+/// test to otherwise, and this never persists a URL of its own the way `update-discord-settings`
+/// does).
+#[post("/test-discord-notification")]
+pub async fn test_discord_notification(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<TestDiscordNotificationRequest>,
+    db_pool: web::Data<Pool>,
+    config: web::Data<Config>,
+) -> Result<HttpResponse, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageDiscord).await?;
+
+    let settings = db::get_discord_webhook_settings(&client, auth.group_id).await?;
+    let Some(webhook_url) = settings.webhook_url else {
+        return Err(ApiError::DiscordWebhookInvalidError(
+            "Save a webhook URL first.".to_string(),
+        )
+        .into());
+    };
+
+    discord::send_test_notification(webhook_url, config.web_origin.clone(), &body.kind).await?;
+    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn update_group_member(

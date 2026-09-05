@@ -240,6 +240,7 @@ async fn main() -> std::io::Result<()> {
             .service(authed::update_member_color)
             .service(authed::get_discord_settings)
             .service(authed::update_discord_settings)
+            .service(authed::test_discord_notification)
             .service(authed::rename_group)
             .service(authed::reroll_group_token)
             .service(authed::delete_group)

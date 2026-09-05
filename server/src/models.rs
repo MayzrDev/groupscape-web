@@ -1209,6 +1209,15 @@ pub struct UpdateMemberColorRequest {
     pub color: String,
 }
 
+/// `kind` is one of [`DiscordWebhookSettings`]'s own `notify_*` field names - the settings page's
+/// notification checkboxes already carry that name in their `data-key`, so the "Send test
+/// message" button next to each one just forwards it as-is.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestDiscordNotificationRequest {
+    pub kind: String,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpdateGroupPermissionsRequest {

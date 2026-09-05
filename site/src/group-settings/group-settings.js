@@ -116,6 +116,9 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       this.eventListener(checkbox, "change", this.saveDiscordSettings.bind(this));
     }
+    for (const testButton of this.querySelectorAll(".group-settings__discord-notify-test-button")) {
+      this.eventListener(testButton, "click", this.testDiscordNotification.bind(this));
+    }
     this.discordDropsMinValueInput = this.querySelector(".group-settings__discord-drops-min-value");
     this.discordDropsParsed = this.querySelector(".group-settings__discord-drops-parsed");
     this.eventListener(this.discordDropsMinValueInput, "input", this.updateDiscordDropsParsedPreview.bind(this));
@@ -446,6 +449,9 @@ export class GroupSettings extends BaseElement {
     for (const checkbox of this.querySelectorAll(".group-settings__discord-notify-checkbox")) {
       checkbox.disabled = !connected;
     }
+    for (const testButton of this.querySelectorAll(".group-settings__discord-notify-test-button")) {
+      testButton.disabled = !connected;
+    }
     this.discordDropsUniqueOnlyCheckbox.disabled = !connected;
     this.discordDropsMinValueInput.disabled = !connected || this.discordDropsUniqueOnlyCheckbox.checked;
     this.discordLevelUpIntervalSelect.disabled = !connected;
@@ -503,6 +509,32 @@ export class GroupSettings extends BaseElement {
       this.showDiscordStatus(`Failed to save: ${error}`, "err");
     } finally {
       loadingScreenManager.hideLoadingScreen();
+    }
+  }
+
+  // `kind` is just the row's own `data-key` (e.g. "notify_kills") - the server already knows
+  // that string as a `DiscordWebhookSettings` field name, so there's no separate mapping to keep
+  // in sync here.
+  async testDiscordNotification(event) {
+    const button = event.currentTarget;
+    const kind = button.closest(".group-settings__discord-notify-row").dataset.key;
+    const title = button
+      .closest(".group-settings__discord-notify-row")
+      .querySelector(".group-settings__discord-notify-title").textContent;
+
+    button.disabled = true;
+    try {
+      const response = await api.testDiscordNotification(kind);
+      if (response.ok) {
+        this.showDiscordStatus(`Test "${title}" message sent to Discord.`, "ok");
+      } else {
+        const message = await response.text();
+        this.showDiscordStatus(message, "err");
+      }
+    } catch (error) {
+      this.showDiscordStatus(`Failed to send test message: ${error}`, "err");
+    } finally {
+      button.disabled = !this.lastSavedDiscordSettings?.webhook_url;
     }
   }
 

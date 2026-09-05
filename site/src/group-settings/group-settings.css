@@ -413,6 +413,13 @@ group-settings {
   margin-top: 0.2em;
 }
 
+.group-settings__discord-notify-test-button {
+  flex-shrink: 0;
+  align-self: center;
+  font-size: 0.75em;
+  padding: 2px 8px;
+}
+
 .group-settings__discord-notify-row label {
   margin-top: 3px;
 }

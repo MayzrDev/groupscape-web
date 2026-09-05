@@ -91,6 +91,10 @@ class Api {
     return `${this.groupScopeUrl}/update-discord-settings`;
   }
 
+  get testDiscordNotificationUrl() {
+    return `${this.groupScopeUrl}/test-discord-notification`;
+  }
+
   get renameGroupUrl() {
     return `${this.groupScopeUrl}/rename-group`;
   }
@@ -381,6 +385,20 @@ class Api {
         ...this.accountAuthHeaders,
       },
       method: "PUT",
+    });
+
+    return response;
+  }
+
+  async testDiscordNotification(kind) {
+    const response = await fetch(this.testDiscordNotificationUrl, {
+      body: JSON.stringify({ kind }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+      method: "POST",
     });
 
     return response;
