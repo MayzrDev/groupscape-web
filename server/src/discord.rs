@@ -107,6 +107,24 @@ const PET_COLOR: u32 = 0xFF7AC6;
 const CLUE_COLOR: u32 = 0x3BA7D6;
 const LEVEL_UP_COLOR: u32 = 0x52C41A;
 
+/// `{quantity}x {name} ({value}, {drop rate})` for a single item - factored out of `drop_lines` so
+/// `dispatch_drop_message` can rebuild the same line at a different (cumulative) quantity when
+/// editing a repeat single-item drop in place, without re-deriving the value/rate formatting.
+fn format_drop_line(item_id: i32, quantity: i64, ge_prices: &GEPrices, source_name: &str) -> String {
+    let rate_entry = drop_rates::lookup(source_name, item_id);
+    let unit_value = ge_prices.get(&item_id).copied();
+    let value = unit_value.unwrap_or(0) * quantity;
+    let value_part = match unit_value {
+        Some(_) => format!("{} gp", format_gp(value)),
+        None => "untradeable".to_string(),
+    };
+    let detail = match rate_entry.and_then(|d| d.rate.clone()) {
+        Some(rate) => format!("{}, {}", value_part, rate),
+        None => value_part,
+    };
+    format!("{}x {} ({})", quantity, item_names::display(item_id), detail)
+}
+
 /// `{quantity}x {name} ({value}, {drop rate})` lines for the unified "Drops" notification -
 /// shared by kill loot, chest/clue loot, since both format the same way once resolved to a
 /// display line, a gp value, and (when curated) a drop rate.
@@ -116,51 +134,67 @@ const LEVEL_UP_COLOR: u32 = 0x52C41A;
 /// its unit price is small. Untradeable items (no GE price at all) can't be judged against
 /// `min_value`, so they always pass the filter and show "untradeable" instead of a gp amount.
 ///
-/// When `unique_only` is set, `min_value` is ignored entirely - only items `drop_rates::lookup`
-/// marks `is_unique` for `source_name` pass. An item with no curated entry for that source counts
-/// as not unique (excluded), even if it's untradeable.
-/// (item id, combined stack value, display line) for each item that survives the `min_value`
-/// / `unique_only` filter - the item id and value ride along so callers can pick a thumbnail from
-/// the same set of items the description actually names, instead of re-deriving "the highest
-/// value item" from the full unfiltered loot list (which could surface an item never mentioned in
-/// the text, e.g. a priced common drop like Bones when the notable item shown was untradeable).
+/// When `unique_only` is set, `min_value` is ignored entirely for an item that counts as unique -
+/// either `drop_rates::lookup` marks it `is_unique` for `source_name` *and* `source_name` is a
+/// curated notable NPC (`notable_npcs::is_notable`), or the item id is in `UNIQUE_DROP_EXCEPTIONS`
+/// (see that const's doc comment). Everything else is excluded outright under `unique_only`, even
+/// if it's untradeable. Unique-only is otherwise a notable-boss-only mode - a curated-unique item
+/// dropped by a non-notable NPC (e.g. a rare drop table item, since that table spans NPCs never
+/// added to `notable_npcs`) doesn't count unless it's also in the exception list.
+///
+/// (item id, quantity, combined stack value, display line) for each item that survives the
+/// `min_value` / `unique_only` filter - the item id and value ride along so callers can pick a
+/// thumbnail from the same set of items the description actually names, instead of re-deriving
+/// "the highest value item" from the full unfiltered loot list (which could surface an item never
+/// mentioned in the text, e.g. a priced common drop like Bones when the notable item shown was
+/// untradeable). The quantity rides along too, so a single-item drop can be re-formatted at a
+/// different (cumulative) quantity later - see `dispatch_drop_message`.
 fn drop_lines(
     items: &[crate::models::LootItem],
     ge_prices: &GEPrices,
     min_value: i64,
     unique_only: bool,
     source_name: &str,
-) -> Vec<(i32, i64, String)> {
+) -> Vec<(i32, i64, i64, String)> {
+    let source_is_notable = notable_npcs::is_notable(source_name);
     items
         .iter()
         .filter_map(|item| {
             let rate_entry = drop_rates::lookup(source_name, item.item_id);
-            if unique_only && !rate_entry.map(|d| d.is_unique).unwrap_or(false) {
+            let counts_as_unique = UNIQUE_DROP_EXCEPTIONS.contains(&item.item_id)
+                || (source_is_notable && rate_entry.map(|d| d.is_unique).unwrap_or(false));
+            if unique_only && !counts_as_unique {
                 return None;
             }
             let unit_value = ge_prices.get(&item.item_id).copied();
             let value = unit_value.unwrap_or(0) * item.quantity as i64;
-            if !unique_only && unit_value.is_some() && value < min_value {
+            let bypasses_min_value = unique_only && counts_as_unique;
+            if !bypasses_min_value && unit_value.is_some() && value < min_value {
                 return None;
             }
-            let value_part = match unit_value {
-                Some(_) => format!("{} gp", format_gp(value)),
-                None => "untradeable".to_string(),
-            };
-            let detail = match rate_entry.and_then(|d| d.rate.clone()) {
-                Some(rate) => format!("{}, {}", value_part, rate),
-                None => value_part,
-            };
-            let line = format!("{}x {} ({})", item.quantity, item_names::display(item.item_id), detail);
-            Some((item.item_id, value, line))
+            let line = format_drop_line(item.item_id, item.quantity as i64, ge_prices, source_name);
+            Some((item.item_id, item.quantity as i64, value, line))
         })
         .collect()
 }
 
+/// Items that should still count as "unique" under `unique_only` even when dropped by a non-notable
+/// NPC - the notable-boss restriction in `drop_lines` exists to keep unique-only from surfacing
+/// every curated rare-drop-table entry regardless of which (often minor) NPC rolled it, but some
+/// items are notable enough on their own (e.g. a key toward a boss's loot) that a group still wants
+/// them flagged no matter which NPC dropped them.
+static UNIQUE_DROP_EXCEPTIONS: LazyLock<std::collections::HashSet<i32>> = LazyLock::new(|| {
+    [
+        23083, // Brimstone key
+    ]
+    .into_iter()
+    .collect()
+});
+
 /// Thumbnail for a "Drops" embed - the highest-value item among the ones actually named in
 /// `lines`, so the icon always matches something the description text mentions.
-fn drop_thumbnail(lines: &[(i32, i64, String)]) -> Option<String> {
-    lines.iter().max_by_key(|(_, value, _)| *value).and_then(|(item_id, _, _)| item_icon_url(*item_id))
+fn drop_thumbnail(lines: &[(i32, i64, i64, String)]) -> Option<String> {
+    lines.iter().max_by_key(|(_, _, value, _)| *value).and_then(|(item_id, _, _, _)| item_icon_url(*item_id))
 }
 
 /// Combined GE value of a whole kill's loot, regardless of the per-item `drops_min_value`
@@ -515,36 +549,44 @@ async fn edit_webhook_embed_rich(
     .unwrap_or(false)
 }
 
-/// Time a "Kill"/"Death" embed can still be edited in place for a repeat kill/death on the same
-/// boss+member, past which a new event posts a fresh message instead - keeps a kill or death after
-/// a long gap (next session, days later) from silently editing a message that's since scrolled far
-/// up the channel.
+/// Time a "Kill"/"Death"/"Drops" embed can still be edited in place for a repeat kill, death, or
+/// single-item drop on the same boss+member (or item+source+member), past which a new event posts
+/// a fresh message instead - keeps an event after a long gap (next session, days later) from
+/// silently editing a message that's since scrolled far up the channel.
 const WEBHOOK_MESSAGE_EDIT_TTL: Duration = Duration::from_secs(60 * 60);
 
-/// What a tracked "Kill"/"Death" message was about, so a later event can tell whether it's a
-/// repeat of *this* message specifically rather than just "some message for this member" - a kill
-/// on Zulrah and a death to Zulrah (or a death with no known killer at all) are different things
-/// and must never edit each other's message.
+/// What a tracked "Kill"/"Death"/"Drops" message was about, so a later event can tell whether it's
+/// a repeat of *this* message specifically rather than just "some message for this member" - a
+/// kill on Zulrah and a death to Zulrah (or a death with no known killer at all) are different
+/// things and must never edit each other's message.
 #[derive(Clone, PartialEq, Eq)]
 enum WebhookEventKind {
     Kill(String),
     /// `None` covers a death with no identified killer (`DeathEvent::killer_name` is best-effort)
     /// - those still get grouped/edited together as long as nothing else interrupts them.
     Death(Option<String>),
+    /// A drop event that named exactly one item (item id, source name) - a drop event naming more
+    /// than one item never gets tracked here at all (see `dispatch_drop_message`), so it can never
+    /// match or be matched by this variant.
+    Drop(i32, String),
 }
 
-/// Only one entry is kept per (group, member): the *last* Kill/Death message posted for them,
-/// regardless of what it was about. A new event only edits that message when it matches the same
-/// `WebhookEventKind` and is still within `WEBHOOK_MESSAGE_EDIT_TTL` - any other message posted for
-/// this member in between (a different boss, a death with no killer, etc.) already overwrote this
-/// entry, which is exactly the "no other message has been posted since" check: there's nothing else
-/// to consult.
+/// Only one entry is kept per (group, member): the *last* Kill/Death/Drops message posted for
+/// them, regardless of what it was about. A new event only edits that message when it matches the
+/// same `WebhookEventKind` and is still within `WEBHOOK_MESSAGE_EDIT_TTL` - any other message
+/// posted for this member in between (a different boss, a death with no killer, a different item,
+/// etc.) already overwrote this entry, which is exactly the "no other message has been posted
+/// since" check: there's nothing else to consult.
 type MemberKey = (i64, String);
 
 struct LastMemberMessage {
     message_id: String,
     kind: WebhookEventKind,
     touched: Instant,
+    /// Cumulative quantity named by the tracked message so far - only meaningful when `kind` is
+    /// `Drop`, ignored (and passed as `0`) for `Kill`/`Death`, whose counts come from
+    /// `db::count_kills_for_member_npc`/`count_deaths_for_member_npc` instead.
+    quantity: i64,
 }
 
 /// In-memory only (see `dispatch_event_webhook`'s doc comment on loading settings fresh each
@@ -553,19 +595,19 @@ struct LastMemberMessage {
 static LAST_MEMBER_MESSAGE: LazyLock<Mutex<HashMap<MemberKey, LastMemberMessage>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn cached_message_for(member_key: &MemberKey, kind: &WebhookEventKind) -> Option<String> {
+fn cached_message_for(member_key: &MemberKey, kind: &WebhookEventKind) -> Option<(String, i64)> {
     let cache = LAST_MEMBER_MESSAGE.lock().unwrap();
     cache
         .get(member_key)
         .filter(|entry| entry.kind == *kind && entry.touched.elapsed() < WEBHOOK_MESSAGE_EDIT_TTL)
-        .map(|entry| entry.message_id.clone())
+        .map(|entry| (entry.message_id.clone(), entry.quantity))
 }
 
-fn store_last_message(member_key: MemberKey, kind: WebhookEventKind, message_id: String) {
+fn store_last_message(member_key: MemberKey, kind: WebhookEventKind, message_id: String, quantity: i64) {
     LAST_MEMBER_MESSAGE
         .lock()
         .unwrap()
-        .insert(member_key, LastMemberMessage { message_id, kind, touched: Instant::now() });
+        .insert(member_key, LastMemberMessage { message_id, kind, touched: Instant::now(), quantity });
 }
 
 /// Absolute URL to a boss's self-hosted RuneLite-hiscore-style icon (see `site/src/data/
@@ -679,6 +721,84 @@ fn clue_casket_icon_url(tier: &str) -> String {
     wiki_icon_url(&format!("Reward casket ({}).png", tier.to_lowercase()))
 }
 
+/// Posts (or edits) a "Drops" embed for a resolved, non-empty `lines` list - shared by the Kill
+/// arm's kill-loot and the standalone Loot arm below. Mirrors the Kill/Death "edit in place" flow
+/// (see `WEBHOOK_MESSAGE_EDIT_TTL`'s doc comment) for the one case where a repeat drop has a
+/// well-defined identity to check: `lines` naming exactly one item. A repeat of that same item
+/// from the same source, for the same member, within the window edits the last drop message with
+/// a bumped cumulative quantity (and rebuilt gp value) instead of posting a new one.
+///
+/// A drop event naming more than one item never participates - it always posts a fresh message,
+/// same as before this existed - and, since it never calls `store_last_message`, leaves the cache
+/// untouched. That means a later single-item drop can still land on (and edit) an older cached
+/// message even though a multi-item drop was posted in between; that's an existing gap already
+/// true of Kill/Death around any event that doesn't go through this cache (e.g. a Loot message
+/// today doesn't interrupt a Kill/Death chain either), not a new inconsistency.
+async fn dispatch_drop_message(
+    webhook_url: String,
+    group_id: i64,
+    member_name: String,
+    source_name: String,
+    lines: Vec<(i32, i64, i64, String)>,
+    ge_prices: &GEPrices,
+) {
+    let thumbnail = drop_thumbnail(&lines);
+    let [(item_id, quantity, _, _)] = lines.as_slice() else {
+        let description = format!(
+            "{} received {} from [{}]({})",
+            member_name,
+            lines.iter().map(|(_, _, _, line)| line.as_str()).collect::<Vec<_>>().join(", "),
+            source_name,
+            wiki_url(&source_name)
+        );
+        send_webhook_embed_rich(webhook_url, "Drops", description, LOOT_COLOR, thumbnail, Vec::new(), Some(member_name))
+            .await;
+        return;
+    };
+    let (item_id, quantity) = (*item_id, *quantity);
+    let member_key: MemberKey = (group_id, member_name.clone());
+    let kind = WebhookEventKind::Drop(item_id, source_name.clone());
+    let cached = cached_message_for(&member_key, &kind);
+    let total_quantity = quantity + cached.as_ref().map(|(_, prev)| *prev).unwrap_or(0);
+    let line = format_drop_line(item_id, total_quantity, ge_prices, &source_name);
+    let description = format!("{} received {} from [{}]({})", member_name, line, source_name, wiki_url(&source_name));
+    let edited_id = match cached {
+        Some((message_id, _)) => {
+            let edited = edit_webhook_embed_rich(
+                webhook_url.clone(),
+                message_id.clone(),
+                "Drops",
+                description.clone(),
+                LOOT_COLOR,
+                thumbnail.clone(),
+                Vec::new(),
+                Some(member_name.clone()),
+            )
+            .await;
+            edited.then_some(message_id)
+        }
+        None => None,
+    };
+    let message_id = match edited_id {
+        Some(message_id) => Some(message_id),
+        None => {
+            send_webhook_embed_rich_get_id(
+                webhook_url,
+                "Drops",
+                description,
+                LOOT_COLOR,
+                thumbnail,
+                Vec::new(),
+                Some(member_name),
+            )
+            .await
+        }
+    };
+    if let Some(message_id) = message_id {
+        store_last_message(member_key, kind, message_id, total_quantity);
+    }
+}
+
 /// Fire-and-forget, mirroring `push::dispatch_alert_push` - a dead or misconfigured webhook must
 /// never fail the telemetry upload that triggered it. Loads this group's webhook settings fresh
 /// on every call rather than threading them through from the caller, since `update_group_member`
@@ -739,7 +859,7 @@ pub fn dispatch_event_webhook(
                     let member_key: MemberKey = (group_id, member_name.clone());
                     let kind = WebhookEventKind::Kill(kill.npc_name.clone());
                     let edited_id = match cached_message_for(&member_key, &kind) {
-                        Some(message_id) => {
+                        Some((message_id, _)) => {
                             let edited = edit_webhook_embed_rich(
                                 webhook_url.clone(),
                                 message_id.clone(),
@@ -771,7 +891,7 @@ pub fn dispatch_event_webhook(
                         }
                     };
                     if let Some(message_id) = message_id {
-                        store_last_message(member_key, kind, message_id);
+                        store_last_message(member_key, kind, message_id, 0);
                     }
                 }
                 if let Some(loot) = &kill.loot {
@@ -789,25 +909,13 @@ pub fn dispatch_event_webhook(
                             &kill.npc_name,
                         );
                         if !lines.is_empty() {
-                            let description = format!(
-                                "{} received {} from [{}]({})",
-                                member_name,
-                                lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", "),
-                                kill.npc_name,
-                                wiki_url(&kill.npc_name)
-                            );
-                            // Thumbnail highlights the single most valuable item actually named
-                            // above, mirroring the plugin's own notable-drop "highlight" pick,
-                            // rather than trying to show every item in one embed image.
-                            let thumbnail = drop_thumbnail(&lines);
-                            send_webhook_embed_rich(
+                            dispatch_drop_message(
                                 webhook_url.clone(),
-                                "Drops",
-                                description,
-                                LOOT_COLOR,
-                                thumbnail,
-                                Vec::new(),
-                                Some(member_name.clone()),
+                                group_id,
+                                member_name.clone(),
+                                kill.npc_name.clone(),
+                                lines,
+                                &ge_prices,
                             )
                             .await;
                         }
@@ -839,7 +947,7 @@ pub fn dispatch_event_webhook(
                     let member_key: MemberKey = (group_id, member_name.clone());
                     let kind = WebhookEventKind::Death(killer);
                     let edited_id = match cached_message_for(&member_key, &kind) {
-                        Some(message_id) => {
+                        Some((message_id, _)) => {
                             let edited = edit_webhook_embed_rich(
                                 webhook_url.clone(),
                                 message_id.clone(),
@@ -871,7 +979,7 @@ pub fn dispatch_event_webhook(
                         }
                     };
                     if let Some(message_id) = message_id {
-                        store_last_message(member_key, kind, message_id);
+                        store_last_message(member_key, kind, message_id, 0);
                     }
                 }
             }
@@ -885,7 +993,7 @@ pub fn dispatch_event_webhook(
                             "{} opened a {} casket: {}",
                             member_name,
                             tier,
-                            lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", ")
+                            lines.iter().map(|(_, _, _, line)| line.as_str()).collect::<Vec<_>>().join(", ")
                         );
                         send_webhook_embed_rich(
                             webhook_url,
@@ -915,22 +1023,13 @@ pub fn dispatch_event_webhook(
                         &loot_event.source_name,
                     );
                     if !lines.is_empty() {
-                        let description = format!(
-                            "{} received {} from [{}]({})",
-                            member_name,
-                            lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", "),
-                            loot_event.source_name,
-                            wiki_url(&loot_event.source_name)
-                        );
-                        let thumbnail = drop_thumbnail(&lines);
-                        send_webhook_embed_rich(
+                        dispatch_drop_message(
                             webhook_url,
-                            "Drops",
-                            description,
-                            LOOT_COLOR,
-                            thumbnail,
-                            Vec::new(),
-                            Some(member_name.clone()),
+                            group_id,
+                            member_name.clone(),
+                            loot_event.source_name.clone(),
+                            lines,
+                            &ge_prices,
                         )
                         .await;
                     }
