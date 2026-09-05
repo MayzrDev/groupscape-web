@@ -20,6 +20,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Admin accounts page was failing to load ("Failed to load accounts") because the new "Last visit" column's database migration was never actually applied.
 
 ### Changed
+- Internal: sped up production deploys — backend Docker builds now reuse compiled dependencies instead of recompiling all of them on every push, and the backend/frontend images build in parallel with unchanged ones skipped entirely.
+
+### Changed
 - Internal: added scripts to detect new OSRS quests and combat achievement tasks against the wiki, so the data-refresh workflow can catch these the same way it already does for items and bosses.
 - Discord "Drops" notifications no longer spam a new message per drop - a repeat of the same single item from the same source within an hour now edits the previous drop message's quantity/value in place instead, the same way kill/death notifications already do.
 - Group settings' "Unique drops only" option now also flags a curated list of items (Brimstone key, 3rd Age gear, Draconic visage, champion's scrolls, and more) as unique regardless of which NPC dropped them, since they're notable enough on their own even outside the curated boss list.

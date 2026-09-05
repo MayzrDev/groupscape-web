@@ -290,6 +290,12 @@ deploy() {
     return 1
   fi
 
+  # Diff against what's actually running (not just HEAD) so a build is never
+  # skipped because a *previous* failed/forced deploy already moved HEAD past
+  # the last change without rebuilding it.
+  local PREV_HASH
+  PREV_HASH=$(cat "$STATE_FILE" 2>/dev/null || echo "")
+
   # Mirror the remote rather than merge — the server never carries local commits.
   log_info "Syncing working tree to origin/$BRANCH..."
   if ! git reset --hard "origin/$BRANCH" 2>&1 | timestamp >> "$GIT_LOG_FILE"; then
@@ -306,6 +312,23 @@ deploy() {
 
   log_info "Building GroupScape Web $VERSION"
 
+  # Skip rebuilding an image whose source directory didn't change, and whose
+  # :latest tag already exists — first deploy ever (no PREV_HASH, or no existing
+  # image) always builds both so the "$VERSION" tag actually exists for pruning.
+  local BUILD_BACKEND=true BUILD_FRONTEND=true
+  if [ -n "$PREV_HASH" ] && git cat-file -e "$PREV_HASH" 2>/dev/null; then
+    if git diff --quiet "$PREV_HASH" "$COMMIT_HASH" -- server \
+        && docker image inspect groupscape-web-backend:latest > /dev/null 2>&1; then
+      BUILD_BACKEND=false
+      log_info "server/ unchanged since $PREV_HASH — skipping backend build"
+    fi
+    if git diff --quiet "$PREV_HASH" "$COMMIT_HASH" -- site \
+        && docker image inspect groupscape-web-frontend:latest > /dev/null 2>&1; then
+      BUILD_FRONTEND=false
+      log_info "site/ unchanged since $PREV_HASH — skipping frontend build"
+    fi
+  fi
+
   # Tag current images as "previous" so we can roll back if the new deploy fails health checks
   for IMG in "${APP_IMAGES[@]}"; do
     if docker image inspect "$IMG:latest" > /dev/null 2>&1; then
@@ -314,30 +337,67 @@ deploy() {
     fi
   done
 
-  # Build backend image. Runtime config (PG_*, BACKEND_SECRET) is written to
-  # config.toml by server/docker-entrypoint.sh at container start, not baked in
-  # at build time — so no build args are needed here.
-  if ! docker build \
-    -t groupscape-web-backend:latest \
-    -t "groupscape-web-backend:$VERSION" \
-    -f server/Dockerfile \
-    server 2>&1 | timestamp >> "$DOCKER_LOG_FILE"; then
-    log_error "Backend docker build failed"
-    return 1
-  fi
-  log_success "Backend image built (groupscape-web-backend:latest + $VERSION)"
+  # Build backend and frontend in parallel — independent Dockerfiles/contexts,
+  # each build logs to its own file so the interleaved output stays readable.
+  local BACKEND_LOG="$DOCKER_LOG_DIR/backend-build-$VERSION.log"
+  local FRONTEND_LOG="$DOCKER_LOG_DIR/frontend-build-$VERSION.log"
+  local BACKEND_PID="" FRONTEND_PID=""
 
-  # Build frontend image. HOST_URL is patched into the bundled api.js by
-  # site/scripts/docker-entrypoint.sh at container start, not at build time.
-  if ! docker build \
-    -t groupscape-web-frontend:latest \
-    -t "groupscape-web-frontend:$VERSION" \
-    -f site/Dockerfile \
-    site 2>&1 | timestamp >> "$DOCKER_LOG_FILE"; then
-    log_error "Frontend docker build failed"
+  if [ "$BUILD_BACKEND" = true ]; then
+    # Runtime config (PG_*, BACKEND_SECRET) is written to config.toml by
+    # server/docker-entrypoint.sh at container start, not baked in at build
+    # time — so no build args are needed here.
+    ( docker build \
+        -t groupscape-web-backend:latest \
+        -t "groupscape-web-backend:$VERSION" \
+        -f server/Dockerfile \
+        server > "$BACKEND_LOG" 2>&1 ) &
+    BACKEND_PID=$!
+  fi
+
+  if [ "$BUILD_FRONTEND" = true ]; then
+    # HOST_URL is patched into the bundled api.js by site/scripts/docker-entrypoint.sh
+    # at container start, not at build time.
+    ( docker build \
+        -t groupscape-web-frontend:latest \
+        -t "groupscape-web-frontend:$VERSION" \
+        -f site/Dockerfile \
+        site > "$FRONTEND_LOG" 2>&1 ) &
+    FRONTEND_PID=$!
+  fi
+
+  local BUILD_FAILED=false
+  if [ -n "$BACKEND_PID" ]; then
+    if wait "$BACKEND_PID"; then
+      log_success "Backend image built (groupscape-web-backend:latest + $VERSION)"
+    else
+      log_error "Backend docker build failed"
+      BUILD_FAILED=true
+    fi
+    cat "$BACKEND_LOG" | timestamp >> "$DOCKER_LOG_FILE"
+  fi
+  if [ -n "$FRONTEND_PID" ]; then
+    if wait "$FRONTEND_PID"; then
+      log_success "Frontend image built (groupscape-web-frontend:latest + $VERSION)"
+    else
+      log_error "Frontend docker build failed"
+      BUILD_FAILED=true
+    fi
+    cat "$FRONTEND_LOG" | timestamp >> "$DOCKER_LOG_FILE"
+  fi
+  rm -f "$BACKEND_LOG" "$FRONTEND_LOG"
+  if [ "$BUILD_FAILED" = true ]; then
     return 1
   fi
-  log_success "Frontend image built (groupscape-web-frontend:latest + $VERSION)"
+
+  # If a build was skipped, re-tag $VERSION onto the existing :latest so the
+  # tag still exists for docker-compose to pick up and for the prune step below.
+  if [ "$BUILD_BACKEND" = false ]; then
+    docker tag groupscape-web-backend:latest "groupscape-web-backend:$VERSION"
+  fi
+  if [ "$BUILD_FRONTEND" = false ]; then
+    docker tag groupscape-web-frontend:latest "groupscape-web-frontend:$VERSION"
+  fi
 
   # Clean old versioned images (keep latest 2 per image; never touch "latest" or the "previous" rollback tag)
   for IMG in "${APP_IMAGES[@]}"; do
