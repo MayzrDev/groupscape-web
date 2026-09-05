@@ -1,7 +1,7 @@
 use crate::auth_middleware::Authenticated;
 use crate::db;
 use crate::error::ApiError;
-use crate::models::{GroupMember, SHARED_MEMBER};
+use crate::models::{normalize_interacting, GroupMember, SHARED_MEMBER};
 use actix_web::{rt, web, Error, HttpRequest, HttpResponse};
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
@@ -528,14 +528,15 @@ pub fn to_wire_vitals(member: &GroupMember) -> WireVitals {
         _ => (None, None, None, None, None, None),
     };
 
-    let (target_name, target_health_ratio, target_health_scale) = match &member.interacting {
-        Some(interacting) => (
-            Some(interacting.name.clone()),
-            Some(interacting.ratio),
-            Some(interacting.scale),
-        ),
-        None => (None, None, None),
-    };
+    let (target_name, target_health_ratio, target_health_scale) =
+        match normalize_interacting(member.interacting.clone()) {
+            Some(interacting) => (
+                Some(interacting.name.clone()),
+                Some(interacting.ratio),
+                Some(interacting.scale),
+            ),
+            None => (None, None, None),
+        };
 
     WireVitals {
         hp,

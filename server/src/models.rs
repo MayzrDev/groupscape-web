@@ -95,6 +95,26 @@ fn default_last_updated() -> DateTime<Utc> {
     Utc::now()
 }
 
+impl Interacting {
+    /// The plugin has no other way to say "the player stopped interacting with anything" through
+    /// this `Option<Interacting>` field - an absent field already means "no update this batch",
+    /// so it sends this empty-name placeholder instead to force a real, storable value change
+    /// (needed so `merge_group_member`'s `is_some()` check and the `interacting_last_update`
+    /// change-trigger both fire). Every read site must collapse this back to `None` before
+    /// exposing it to a client - see `normalize_interacting`.
+    pub fn is_cleared(&self) -> bool {
+        self.name.is_empty()
+    }
+}
+
+/// Collapses the plugin's "explicitly not interacting" placeholder (see
+/// [`Interacting::is_cleared`]) into a real `None`. Every place that reads a stored/broadcast
+/// `interacting` value for external consumption (REST responses, the websocket overlay feed)
+/// must pass it through this first.
+pub fn normalize_interacting(interacting: Option<Interacting>) -> Option<Interacting> {
+    interacting.filter(|i| !i.is_cleared())
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct CombatAchievements {
     pub tiers: std::collections::HashMap<String, bool>,

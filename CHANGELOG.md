@@ -13,6 +13,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord "Drops" notifications were posting untradeable junk drops (e.g. ensouled heads) from regular monsters even with a minimum value set - untradeable drops now count as 0gp against that minimum instead of always getting through.
 - Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.
 - Site admin activity feed delete was failing with a server error instead of deleting the selected events.
+- A group member's current target no longer stays stuck showing whoever they were last fighting after they've actually stopped interacting with anything.
 - Discord collection log notifications were posting a garbled double-link instead of a clean item name/link.
 - Site admin activity feed delete now also invalidates the Loot Log cache, so a deleted kill/loot entry no longer keeps showing there after being removed from the activity feed.
 - Discord drop/pet/collection-log notifications could show the wrong item image (e.g. a totem piece showing up as coins) - thumbnails now link straight to the wiki's own image instead of a locally cached one that was wrong for some untradeable items.
