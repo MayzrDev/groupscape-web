@@ -9,6 +9,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Each Discord notification type in group settings now has a "Test" button that sends a realistic example message, so you can check the channel/formatting/icons without waiting for the real thing to happen in-game.
 
 ### Fixed
+- Discord "Drops" notifications were posting untradeable junk drops (e.g. ensouled heads) from regular monsters even with a minimum value set - untradeable drops now count as 0gp against that minimum instead of always getting through.
 - Opening your collection log to browse it in-game could previously overwrite items GroupScape had already tracked for you; browsing now merges into what's already recorded instead of replacing it.
 - Site admin activity feed delete was failing with a server error instead of deleting the selected events.
 - Discord collection log notifications were posting a garbled double-link instead of a clean item name/link.

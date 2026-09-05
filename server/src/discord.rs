@@ -131,8 +131,12 @@ fn format_drop_line(item_id: i32, quantity: i64, ge_prices: &GEPrices, source_na
 ///
 /// The stack's *combined* value gates `min_value` and is what's shown (e.g. 33x a 100gp item is
 /// "3,300 gp", not "100 gp") - a single expensive-enough item shouldn't get hidden just because
-/// its unit price is small. Untradeable items (no GE price at all) can't be judged against
-/// `min_value`, so they always pass the filter and show "untradeable" instead of a gp amount.
+/// its unit price is small. Untradeable items (no GE price at all) count as worth 0gp for this
+/// comparison - they still show "untradeable" instead of a gp amount, but only clear `min_value`
+/// when it's 0 (or when the item bypasses the filter entirely, see below). A non-zero `min_value`
+/// with an untradeable item excludes it, same as any other item that can't clear the bar - this is
+/// what keeps a regular monster's junk untradeable drops (ensouled heads, seeds, etc.) from
+/// spamming the webhook just because they have no GE price to compare.
 ///
 /// When `unique_only` is set, `min_value` is ignored entirely for an item that counts as unique -
 /// either `drop_rates::lookup` marks it `is_unique` for `source_name` *and* `source_name` is a
@@ -169,7 +173,7 @@ fn drop_lines(
             let unit_value = ge_prices.get(&item.item_id).copied();
             let value = unit_value.unwrap_or(0) * item.quantity as i64;
             let bypasses_min_value = unique_only && counts_as_unique;
-            if !bypasses_min_value && unit_value.is_some() && value < min_value {
+            if !bypasses_min_value && value < min_value {
                 return None;
             }
             let line = format_drop_line(item.item_id, item.quantity as i64, ge_prices, source_name);
