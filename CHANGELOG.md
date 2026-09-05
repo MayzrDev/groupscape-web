@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.409] - 2026-09-06
+
+### Changed
+- Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
+
 ## [1.0.392] - 2026-09-05
 
 ### Added

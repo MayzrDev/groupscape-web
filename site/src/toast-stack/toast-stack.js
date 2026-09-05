@@ -62,8 +62,9 @@ export class ToastStack extends BaseElement {
     this.eventListener(this.clearButton, "click", () => this.clearAll());
     this.subscribe("toast", this.handleToast.bind(this));
     this.tickInterval = window.setInterval(this.tickTimestamps.bind(this), RELATIVE_TIME_TICK_MS);
-    // key (member+boss, see `killGroupKey`) -> { toast, el } for the kill toast currently on
-    // screen for that key, so a repeat kill updates it in place instead of stacking a duplicate.
+    // key (kill/death|member|boss, see `groupKey` below) -> { toast, el } for the kill/death
+    // toast currently on screen for that key, so a repeat one updates it in place instead of
+    // stacking a duplicate.
     this.killToastGroups = new Map();
   }
 
@@ -72,11 +73,17 @@ export class ToastStack extends BaseElement {
     window.clearInterval(this.tickInterval);
   }
 
-  // Repeat kills of the same boss by the same member fold into the toast still on screen for
-  // that kill (see `KILL_MERGE_WINDOW_MS`) rather than stacking a duplicate. Returns true when
-  // the toast was merged in place, so the caller skips creating a new element.
-  mergeIntoExistingKillToast(toast) {
-    const key = killGroupKey(toast.event);
+  // Kill and death groups are namespaced separately (rather than sharing `killGroupKey` raw) so a
+  // kill and a death against the same NPC name don't collide in `killToastGroups`.
+  groupKey(type, event) {
+    return `${type}|${killGroupKey(event)}`;
+  }
+
+  // Repeat kills/deaths against the same boss by the same member fold into the toast still on
+  // screen for that one (see `KILL_MERGE_WINDOW_MS`) rather than stacking a duplicate. Returns
+  // true when the toast was merged in place, so the caller skips creating a new element.
+  mergeIntoExistingToast(toast, displayType) {
+    const key = this.groupKey(displayType, toast.event);
     const group = this.killToastGroups.get(key);
     if (!group) return false;
     const eventTime = new Date(toast.event.occurred_at).getTime();
@@ -99,16 +106,17 @@ export class ToastStack extends BaseElement {
   }
 
   handleToast(toast) {
+    const displayType = toast.event && activityDisplayType(toast.event);
     // A death ends whatever kill streak was building for that member - the next kill of the same
     // boss should spawn a fresh toast rather than folding into the one from before the death.
-    if (toast.event && activityDisplayType(toast.event) === "death") {
+    if (displayType === "death") {
       for (const key of this.killToastGroups.keys()) {
-        if (key.startsWith(`${toast.event.member_name}|`)) this.killToastGroups.delete(key);
+        if (key.startsWith(`kill|${toast.event.member_name}|`)) this.killToastGroups.delete(key);
       }
     }
 
-    const isKillToast = toast.event && activityDisplayType(toast.event) === "kill";
-    if (isKillToast && this.mergeIntoExistingKillToast(toast)) return;
+    const isGroupableToast = displayType === "kill" || displayType === "death";
+    if (isGroupableToast && this.mergeIntoExistingToast(toast, displayType)) return;
 
     const el = document.createElement("a");
     el.className = `toast-stack__toast toast-stack__toast--${toast.type}`;
@@ -166,8 +174,8 @@ export class ToastStack extends BaseElement {
     this.list.appendChild(el);
     this.updateClearButton();
 
-    if (isKillToast) {
-      const key = killGroupKey(toast.event);
+    if (isGroupableToast) {
+      const key = this.groupKey(displayType, toast.event);
       el.dataset.killGroupKey = key;
       this.killToastGroups.set(key, { toast, el });
     }

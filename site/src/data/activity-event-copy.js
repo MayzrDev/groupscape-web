@@ -121,14 +121,15 @@ export function npcWikiUrl(npcName) {
   return `https://oldschool.runescape.wiki/w/Special:Lookup?type=npc&name=${encodeURIComponent(npcName)}`;
 }
 
-// Repeat kills of the same boss by the same member within this window collapse into one
-// activity-feed row / toast instead of stacking duplicates - see `mergeOrCreateRow` in
+// Repeat kills/deaths against the same boss by the same member within this window collapse into
+// one activity-feed row / toast instead of stacking duplicates - see `mergeOrCreateRow` in
 // activity-feed-page.js and `handleToast` in toast-stack.js. Each merge resets the window from
-// the latest kill, so a steady drip of kills keeps merging indefinitely.
+// the latest event, so a steady drip keeps merging indefinitely.
 export const KILL_MERGE_WINDOW_MS = 60 * 60 * 1000;
 
 export function killGroupKey(event) {
-  const npc = event.payload?.npcName || event.payload?.npc_name;
+  const npc =
+    event.payload?.npcName || event.payload?.npc_name || event.payload?.killerName || event.payload?.killer_name;
   return `${event.member_name}|${npc}`;
 }
 
@@ -261,8 +262,8 @@ export function activityEventDescription(event, format = {}) {
       const npc = payload.npcName || payload.npc_name;
       const noLoot = !payload.loot || payload.loot.length === 0;
       // `aggregateCount` is a client-side field set by the activity feed/toast stack when folding
-      // repeat kills of the same boss by the same member within an hour into one row (see
-      // `mergeKillEvents` in activity-feed-page.js) - it's never sent by the server.
+      // repeat kills/deaths against the same boss by the same member within an hour into one row
+      // (see `mergeOrCreateRow` in activity-feed-page.js) - it's never sent by the server.
       const count = event.aggregateCount || 1;
       return `${member} killed ${wrapSubject(npc || "an NPC", "monster", npc && npcWikiUrl(npc), bossIconFor(npc))}${
         count > 1 ? ` &times;${count}` : ""
@@ -270,7 +271,11 @@ export function activityEventDescription(event, format = {}) {
     }
     case "death": {
       const killer = payload.killerName || payload.killer_name;
-      return killer ? `${member} died to ${wrapSubject(killer, "death", npcWikiUrl(killer))}` : `${member} died`;
+      const count = event.aggregateCount || 1;
+      const countSuffix = count > 1 ? ` &times;${count}` : "";
+      return killer
+        ? `${member} died to ${wrapSubject(killer, "death", npcWikiUrl(killer))}${countSuffix}`
+        : `${member} died${countSuffix}`;
     }
     case "quest": {
       const questName = questNameFor(payload);

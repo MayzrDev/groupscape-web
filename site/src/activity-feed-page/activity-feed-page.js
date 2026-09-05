@@ -270,42 +270,49 @@ export class ActivityFeedPage extends BaseElement {
     return row;
   }
 
-  // Folds a repeat kill of the same boss by the same member into its existing aggregated row
-  // (see `KILL_MERGE_WINDOW_MS`) instead of creating a new one. Returns the row to insert, or
-  // null when the event was merged into an already-rendered row instead.
+  // Folds a repeat kill/death against the same boss by the same member into its existing
+  // aggregated row (see `KILL_MERGE_WINDOW_MS`) instead of creating a new one. Returns the row to
+  // insert, or null when the event was merged into an already-rendered row instead.
   mergeOrCreateRow(event, { prepend }) {
+    const displayType = activityDisplayType(event);
+    // Kill and death groups are namespaced separately (rather than sharing `killGroupKey` raw) so
+    // a kill and a death against the same NPC name - e.g. killed then later killed-by the same
+    // boss - don't collide in `feedGroups`.
+    const groupKey = (type, e) => `${type}|${killGroupKey(e)}`;
     // A death ends whatever kill streak was building for that member - the next kill of the same
     // boss (whichever direction in time it's encountered from, see `loadMore` vs `poll`) should
     // start a fresh aggregated row rather than folding into the one from before the death.
-    if (activityDisplayType(event) === "death") {
+    if (displayType === "death") {
       for (const key of this.feedGroups.keys()) {
-        if (key.startsWith(`${event.member_name}|`)) this.feedGroups.delete(key);
+        if (key.startsWith(`kill|${event.member_name}|`)) this.feedGroups.delete(key);
       }
     }
 
-    if (activityDisplayType(event) === "kill") {
-      const key = killGroupKey(event);
+    if (displayType === "kill" || displayType === "death") {
+      const key = groupKey(displayType, event);
       const group = this.feedGroups.get(key);
       const eventTime = new Date(event.occurred_at).getTime();
       if (group && Math.abs(eventTime - new Date(group.event.occurred_at).getTime()) <= KILL_MERGE_WINDOW_MS) {
         group.event.aggregateCount = (group.event.aggregateCount || 1) + 1;
-        group.event.payload = {
-          ...group.event.payload,
-          loot: [...(group.event.payload?.loot || []), ...(event.payload?.loot || [])],
-        };
+        if (displayType === "kill") {
+          group.event.payload = {
+            ...group.event.payload,
+            loot: [...(group.event.payload?.loot || []), ...(event.payload?.loot || [])],
+          };
+        }
         if (eventTime > new Date(group.event.occurred_at).getTime()) group.event.occurred_at = event.occurred_at;
         group.row.event = group.event;
         group.row.render();
-        // Only a fresh, more recent kill (poll) should bump the row back to the top - an older
-        // kill filled in from loadMore already sits above the batch being appended below it.
+        // Only a fresh, more recent event (poll) should bump the row back to the top - an older
+        // event filled in from loadMore already sits above the batch being appended below it.
         if (prepend) this.list.insertBefore(group.row, this.list.firstChild);
         return null;
       }
     }
 
     const row = this.createRow(event);
-    if (activityDisplayType(event) === "kill") {
-      this.feedGroups.set(killGroupKey(event), { event, row });
+    if (displayType === "kill" || displayType === "death") {
+      this.feedGroups.set(groupKey(displayType, event), { event, row });
     }
     return row;
   }
