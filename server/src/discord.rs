@@ -169,13 +169,7 @@ fn split_pets(items: &[crate::models::LootItem]) -> (Vec<crate::models::LootItem
 
 /// Posts one "Pet" embed per pet item found in a drop - in practice always at most one, but a
 /// list keeps this correct if RuneLite ever correlates more than one pet drop into a single event.
-async fn send_pet_embeds(
-    webhook_url: &str,
-    member_name: &str,
-    source_name: &str,
-    pets: &[crate::models::LootItem],
-    web_origin: &str,
-) {
+async fn send_pet_embeds(webhook_url: &str, member_name: &str, source_name: &str, pets: &[crate::models::LootItem]) {
     for pet in pets {
         let description = format!("{} received a pet: {}", member_name, item_names::display(pet.item_id));
         send_webhook_embed_rich(
@@ -183,7 +177,7 @@ async fn send_pet_embeds(
             "Pet",
             description,
             PET_COLOR,
-            Some(item_icon_url(web_origin, pet.item_id)),
+            item_icon_url(pet.item_id),
             vec![("Source".to_string(), source_name.to_string())],
             Some(member_name.to_string()),
         )
@@ -437,12 +431,16 @@ fn boss_icon_url(web_origin: &str, npc_name: &str) -> String {
     )
 }
 
-/// Absolute URL to an item's self-hosted icon (see `site/src/data/item.js`'s `Item.imageUrl`),
-/// for the "Drops"/"Drop" embed's thumbnail. Uses the base (non-stacked) icon regardless of
-/// quantity - the stack-count sprite variants `Item.imageUrl` picks between exist for in-app
-/// legibility at a glance, not worth threading through here for a one-off Discord thumbnail.
-fn item_icon_url(web_origin: &str, item_id: i32) -> String {
-    format!("{}/icons/items/{}.webp", web_origin.trim_end_matches('/'), item_id)
+/// Direct link to the item's own wiki-hosted image, for the "Drops"/"Drop"/"Pet"/"Collection log"
+/// embed thumbnails - not the self-hosted `site/public/icons/items/<id>.webp` set the in-app UI
+/// uses, since a chunk of that set (everything not GE-tradeable, inherited from the original
+/// `group-ironmen` cache dump - see `fetch-items.mjs`'s doc comment) was found to hold the wrong
+/// sprite for some items. Going straight to the wiki sidesteps needing to re-download and
+/// re-verify that whole set just to fix Discord thumbnails. Same silent-miss tolerance as
+/// `boss_icon_url`: an item with no known name, or whose name doesn't match the wiki's file
+/// naming, just drops the thumbnail.
+fn item_icon_url(item_id: i32) -> Option<String> {
+    item_names::name(item_id).map(|name| wiki_icon_url(&format!("{}.png", name)))
 }
 
 /// Wiki article URL for a page title - an NPC's death killer, a combat-achievement task, or a
@@ -620,7 +618,7 @@ pub fn dispatch_event_webhook(
                 if let Some(loot) = &kill.loot {
                     let (pets, rest) = split_pets(loot);
                     if settings.notify_pets && !pets.is_empty() {
-                        send_pet_embeds(&webhook_url, &member_name, &kill.npc_name, &pets, &web_origin).await;
+                        send_pet_embeds(&webhook_url, &member_name, &kill.npc_name, &pets).await;
                     }
                     if settings.notify_drops {
                         let ge_prices = unauthed::get_ge_prices_map();
@@ -645,7 +643,7 @@ pub fn dispatch_event_webhook(
                             let thumbnail = rest
                                 .iter()
                                 .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-                                .map(|item| item_icon_url(&web_origin, item.item_id));
+                                .and_then(|item| item_icon_url(item.item_id));
                             send_webhook_embed_rich(
                                 webhook_url.clone(),
                                 "Drops",
@@ -744,7 +742,7 @@ pub fn dispatch_event_webhook(
             GameEvent::Loot(loot_event) => {
                 let (pets, rest) = split_pets(&loot_event.loot);
                 if settings.notify_pets && !pets.is_empty() {
-                    send_pet_embeds(&webhook_url, &member_name, &loot_event.source_name, &pets, &web_origin).await;
+                    send_pet_embeds(&webhook_url, &member_name, &loot_event.source_name, &pets).await;
                 }
                 if settings.notify_drops && !rest.is_empty() {
                     let ge_prices = unauthed::get_ge_prices_map();
@@ -766,7 +764,7 @@ pub fn dispatch_event_webhook(
                         let thumbnail = rest
                             .iter()
                             .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-                            .map(|item| item_icon_url(&web_origin, item.item_id));
+                            .and_then(|item| item_icon_url(item.item_id));
                         send_webhook_embed_rich(
                             webhook_url,
                             "Drops",
@@ -827,7 +825,7 @@ pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String, raid
 /// Discord embed, when the group has a webhook configured and `notify_drops` is on. Notable
 /// drops aren't a `GameEvent` (they're never stored, see `update_group_member`), so this takes
 /// the pre-built message directly rather than matching over the enum like the function above.
-pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item_id: i32, web_origin: String) {
+pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item_id: i32) {
     tokio::spawn(async move {
         let client = match db_pool.get().await {
             Ok(client) => client,
@@ -851,8 +849,8 @@ pub fn dispatch_drop_webhook(db_pool: Pool, group_id: i64, message: String, item
             return;
         }
 
-        let thumbnail = item_icon_url(&web_origin, item_id);
-        send_webhook_embed_with_thumbnail(webhook_url, "Drop", message, DROP_COLOR, Some(thumbnail)).await;
+        let thumbnail = item_icon_url(item_id);
+        send_webhook_embed_with_thumbnail(webhook_url, "Drop", message, DROP_COLOR, thumbnail).await;
     });
 }
 
@@ -967,7 +965,7 @@ pub fn dispatch_progress_webhook(
                         item_names::wiki_link(item_id)
                     ),
                     COLLECTION_LOG_COLOR,
-                    Some(item_icon_url(&web_origin, item_id)),
+                    item_icon_url(item_id),
                     Vec::new(),
                 ))
             }
