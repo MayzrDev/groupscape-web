@@ -119,13 +119,18 @@ const LEVEL_UP_COLOR: u32 = 0x52C41A;
 /// When `unique_only` is set, `min_value` is ignored entirely - only items `drop_rates::lookup`
 /// marks `is_unique` for `source_name` pass. An item with no curated entry for that source counts
 /// as not unique (excluded), even if it's untradeable.
+/// (item id, combined stack value, display line) for each item that survives the `min_value`
+/// / `unique_only` filter - the item id and value ride along so callers can pick a thumbnail from
+/// the same set of items the description actually names, instead of re-deriving "the highest
+/// value item" from the full unfiltered loot list (which could surface an item never mentioned in
+/// the text, e.g. a priced common drop like Bones when the notable item shown was untradeable).
 fn drop_lines(
     items: &[crate::models::LootItem],
     ge_prices: &GEPrices,
     min_value: i64,
     unique_only: bool,
     source_name: &str,
-) -> Vec<String> {
+) -> Vec<(i32, i64, String)> {
     items
         .iter()
         .filter_map(|item| {
@@ -146,9 +151,16 @@ fn drop_lines(
                 Some(rate) => format!("{}, {}", value_part, rate),
                 None => value_part,
             };
-            Some(format!("{}x {} ({})", item.quantity, item_names::display(item.item_id), detail))
+            let line = format!("{}x {} ({})", item.quantity, item_names::display(item.item_id), detail);
+            Some((item.item_id, value, line))
         })
         .collect()
+}
+
+/// Thumbnail for a "Drops" embed - the highest-value item among the ones actually named in
+/// `lines`, so the icon always matches something the description text mentions.
+fn drop_thumbnail(lines: &[(i32, i64, String)]) -> Option<String> {
+    lines.iter().max_by_key(|(_, value, _)| *value).and_then(|(item_id, _, _)| item_icon_url(*item_id))
 }
 
 /// Combined GE value of a whole kill's loot, regardless of the per-item `drops_min_value`
@@ -780,17 +792,14 @@ pub fn dispatch_event_webhook(
                             let description = format!(
                                 "{} received {} from [{}]({})",
                                 member_name,
-                                lines.join(", "),
+                                lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", "),
                                 kill.npc_name,
                                 wiki_url(&kill.npc_name)
                             );
-                            // Thumbnail highlights the single most valuable priced item in the
-                            // drop - mirroring the plugin's own notable-drop "highlight" pick -
+                            // Thumbnail highlights the single most valuable item actually named
+                            // above, mirroring the plugin's own notable-drop "highlight" pick,
                             // rather than trying to show every item in one embed image.
-                            let thumbnail = rest
-                                .iter()
-                                .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-                                .and_then(|item| item_icon_url(item.item_id));
+                            let thumbnail = drop_thumbnail(&lines);
                             send_webhook_embed_rich(
                                 webhook_url.clone(),
                                 "Drops",
@@ -872,7 +881,12 @@ pub fn dispatch_event_webhook(
                     let ge_prices = unauthed::get_ge_prices_map();
                     let lines = drop_lines(&loot_event.loot, &ge_prices, 0, false, &loot_event.source_name);
                     if !lines.is_empty() {
-                        let description = format!("{} opened a {} casket: {}", member_name, tier, lines.join(", "));
+                        let description = format!(
+                            "{} opened a {} casket: {}",
+                            member_name,
+                            tier,
+                            lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", ")
+                        );
                         send_webhook_embed_rich(
                             webhook_url,
                             "Clue casket",
@@ -904,14 +918,11 @@ pub fn dispatch_event_webhook(
                         let description = format!(
                             "{} received {} from [{}]({})",
                             member_name,
-                            lines.join(", "),
+                            lines.iter().map(|(_, _, line)| line.as_str()).collect::<Vec<_>>().join(", "),
                             loot_event.source_name,
                             wiki_url(&loot_event.source_name)
                         );
-                        let thumbnail = rest
-                            .iter()
-                            .max_by_key(|item| ge_prices.get(&item.item_id).copied().unwrap_or(0) * item.quantity as i64)
-                            .and_then(|item| item_icon_url(item.item_id));
+                        let thumbnail = drop_thumbnail(&lines);
                         send_webhook_embed_rich(
                             webhook_url,
                             "Drops",

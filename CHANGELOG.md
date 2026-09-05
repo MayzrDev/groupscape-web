@@ -15,6 +15,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Site admin activity feed delete now also invalidates the Loot Log cache, so a deleted kill/loot entry no longer keeps showing there after being removed from the activity feed.
 - Discord drop/pet/collection-log notifications could show the wrong item image (e.g. a totem piece showing up as coins) - thumbnails now link straight to the wiki's own image instead of a locally cached one that was wrong for some untradeable items.
 - Discord item thumbnails now use a verified wiki image lookup for 13,000+ items instead of guessing the filename, catching cases the guess would've missed (e.g. coins linking to the wrong denomination's icon).
+- Discord "Drops" notifications could show a thumbnail for an item that wasn't even mentioned in the message (e.g. showing Bones when the text only named an untradeable drop) - the icon now always matches an item named in the message.
 
 ### Changed
 - Internal: added scripts to detect new OSRS quests and combat achievement tasks against the wiki, so the data-refresh workflow can catch these the same way it already does for items and bosses.
