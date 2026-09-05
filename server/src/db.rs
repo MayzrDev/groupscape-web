@@ -2523,14 +2523,6 @@ ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP
         transaction
             .execute(
                 r#"
-ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_visit_at TIMESTAMPTZ
-"#,
-                &[],
-            )
-            .await?;
-        transaction
-            .execute(
-                r#"
 ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS failed_login_attempts INT NOT NULL DEFAULT 0
 "#,
                 &[],
@@ -2557,6 +2549,21 @@ UPDATE groupscape.accounts SET status = 'banned' WHERE disabled = true
             .await?;
 
         commit_migration(&transaction, "add_account_status_columns").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "add_accounts_last_visit_at_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.accounts ADD COLUMN IF NOT EXISTS last_visit_at TIMESTAMPTZ
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_accounts_last_visit_at_column").await?;
         transaction.commit().await?;
     }
 
