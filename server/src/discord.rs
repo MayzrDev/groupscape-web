@@ -186,6 +186,50 @@ fn drop_lines(
 static UNIQUE_DROP_EXCEPTIONS: LazyLock<std::collections::HashSet<i32>> = LazyLock::new(|| {
     [
         23083, // Brimstone key
+        1149,  // Dragon med helm
+        2366,  // Shield left half
+        2577,  // Ranger boots
+        11286, // Draconic visage
+        24268, // Basilisk jaw
+        19677, // Ancient shard
+        19679, // Dark totem base
+        19681, // Dark totem middle
+        19683, // Dark totem top
+        6798,  // Earth warrior champion scroll
+        6799,  // Ghoul champion scroll
+        6800,  // Giant champion scroll
+        6801,  // Goblin champion scroll
+        6802,  // Hobgoblin champion scroll
+        6803,  // Imp champion scroll
+        6804,  // Jogre champion scroll
+        6805,  // Lesser demon champion scroll
+        6806,  // Skeleton champion scroll
+        6807,  // Zombie champion scroll
+        6808,  // Leon's champion scroll
+        10330, // 3rd Age range top
+        10332, // 3rd Age range legs
+        10334, // 3rd Age range coif
+        10336, // 3rd Age vambraces
+        10338, // 3rd Age robe top
+        10340, // 3rd Age robe
+        10342, // 3rd Age mage hat
+        10344, // 3rd Age amulet
+        10346, // 3rd Age platelegs
+        10348, // 3rd Age platebody
+        10350, // 3rd Age full helmet
+        10352, // 3rd Age kiteshield
+        12422, // 3rd Age wand
+        12424, // 3rd Age bow
+        12426, // 3rd Age longsword
+        12437, // 3rd Age cloak
+        20011, // 3rd Age axe
+        20014, // 3rd Age pickaxe
+        23242, // 3rd Age plateskirt
+        23336, // 3rd Age druidic robe top
+        23339, // 3rd Age druidic robe bottoms
+        23342, // 3rd Age druidic staff
+        23345, // 3rd Age druidic cloak
+        28226, // 3rd Age felling axe
     ]
     .into_iter()
     .collect()
