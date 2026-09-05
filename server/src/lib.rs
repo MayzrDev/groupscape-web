@@ -19,6 +19,7 @@ pub mod drop_rates;
 pub mod error;
 pub mod item_bonuses;
 pub mod item_names;
+pub mod item_wiki_icons;
 pub mod leaderboard;
 pub mod loot_log_search;
 pub mod loot_sources;

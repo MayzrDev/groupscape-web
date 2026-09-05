@@ -3,6 +3,7 @@ use crate::db;
 use crate::drop_rates;
 use crate::error::ApiError;
 use crate::item_names;
+use crate::item_wiki_icons;
 use crate::models::{format_gp, GameEvent, GEPrices};
 use crate::notable_npcs;
 use crate::unauthed;
@@ -572,10 +573,20 @@ fn boss_icon_url(web_origin: &str, npc_name: &str) -> String {
 /// uses, since a chunk of that set (everything not GE-tradeable, inherited from the original
 /// `group-ironmen` cache dump - see `fetch-items.mjs`'s doc comment) was found to hold the wrong
 /// sprite for some items. Going straight to the wiki sidesteps needing to re-download and
-/// re-verify that whole set just to fix Discord thumbnails. Same silent-miss tolerance as
-/// `boss_icon_url`: an item with no known name, or whose name doesn't match the wiki's file
-/// naming, just drops the thumbnail.
+/// re-verify that whole set just to fix Discord thumbnails.
+///
+/// Prefers `item_wiki_icons`' verified id -> filename map (built by
+/// `fetch-item-wiki-icons.mjs` from the wiki's own `File:` pages, so it's already resolved any
+/// redirect quirks - e.g. "Coins.png" actually being "Coins 100.png") and falls back to guessing
+/// `"<name>.png"` for anything not yet in that map (a brand-new item, or one added by hand to
+/// `item_names.json` - see the `update-osrs-data` skill's notes - since the last time
+/// `fetch-item-wiki-icons.mjs` was regenerated). Same silent-miss tolerance as `boss_icon_url`
+/// either way: an item with no known name, or whose name doesn't match the wiki's file naming,
+/// just drops the thumbnail.
 fn item_icon_url(item_id: i32) -> Option<String> {
+    if let Some(filename) = item_wiki_icons::filename(item_id) {
+        return Some(wiki_icon_url(filename));
+    }
     item_names::name(item_id).map(|name| wiki_icon_url(&format!("{}.png", name)))
 }
 

@@ -31,6 +31,8 @@ nocommit
 
 # OSRS data pipeline scratch output
 scripts/osrs-data/new-bosses-report.json
+scripts/osrs-data/new-quests-report.json
+scripts/osrs-data/new-ca-tasks-report.json
 
 # Playwright
 playwright-report/
