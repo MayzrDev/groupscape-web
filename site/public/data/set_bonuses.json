@@ -194,20 +194,31 @@
   },
   {
     "name": "Angler's Outfit",
-    "pieces": [[13258], [13259], [13260], [13261]],
-    "effect": "+2.5% Fishing experience while the full set is worn.",
+    "pieces": [
+      [13258, 25592],
+      [13259, 25594],
+      [13260, 25596],
+      [13261, 25598]
+    ],
+    "effect": "+2.5% Fishing experience while the full set is worn. Spirit angler's outfit pieces count interchangeably with angler's outfit pieces for this bonus - any mix of the two that covers all four slots still qualifies.",
     "image": "https://oldschool.runescape.wiki/images/Angler's_outfit_equipped.png"
   },
   {
     "name": "Prospector Kit",
     "pieces": [
-      [12013, 29472],
-      [12014, 29474],
-      [12015, 29476],
-      [12016, 29478]
+      [12013, 29472, 25549],
+      [12014, 29474, 25551],
+      [12015, 29476, 25553],
+      [12016, 29478, 25555]
     ],
-    "effect": "+2.5% Mining experience while the full set is worn.",
+    "effect": "+2.5% Mining experience while the full set is worn. The golden prospector kit is a cosmetic recolour with the identical bonus.",
     "image": "https://oldschool.runescape.wiki/images/Prospector_kit_(male)_equipped.png"
+  },
+  {
+    "name": "Forestry Outfit",
+    "pieces": [[28173], [28169], [28171], [28175]],
+    "effect": "+2.5% Woodcutting experience while the full set is worn; stacks with the Kandarin Diary reward and Forester's rations.",
+    "image": "https://oldschool.runescape.wiki/images/Forestry_outfit_equipped_male.png"
   },
   {
     "name": "Zealot's Robes",
@@ -262,6 +273,12 @@
     ],
     "effect": "Reduces damage taken from lizardman shamans' poison attack by 100% while the full tier 5 set is worn (lower tiers grant 20% per tier).",
     "image": "https://oldschool.runescape.wiki/images/Shayzien_armour_(5)_(male)_equipped.png"
+  },
+  {
+    "name": "Guild Hunter Outfit",
+    "pieces": [[29263], [29265], [29267], [29269]],
+    "effect": "Each piece boosts Hunter catch rate (+0.2%/0.8%/0.6%/0.4%) and rare creature part chance (+0.4%/1.6%/1.2%/0.8%); the full set adds a further +0.5% catch rate and +1% rare part chance, for +2.5%/+5% totals. Once all four pieces are owned, wearing just one still grants the full-set rare-part bonus, freeing the other slots for weight-reducing gear.",
+    "image": "https://oldschool.runescape.wiki/images/Guild_hunter_outfit_equipped_male.png"
   },
   {
     "name": "Crystal Armour",

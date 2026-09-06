@@ -13,6 +13,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord raid completion notifications now show each member's share of the loot and whether it's a new group record.
 - Item icons now link straight to the item's wiki page when clicked.
 - Opening a Hunters' loot sack from Hunters' rumours (any tier) now shows up in the group's loot log.
+- Equipment set bonus panel now recognizes the Guild Hunter outfit and the Forestry outfit.
 
 ### Changed
 - Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
@@ -23,6 +24,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Combat achievements "Group average" row was showing the group's summed totals instead of an average per member.
+- Angler's outfit and Prospector kit set bonuses now also recognize their Spirit angler's / Golden prospector variants.
 
 ## [1.0.392] - 2026-09-05
 
