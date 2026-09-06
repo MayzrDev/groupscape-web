@@ -20,6 +20,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot log session cards now show average gp per kill/open/casket underneath the total value.
 - Raid completion notifications and activity feed entries for a shared raid now show up faster - the window for grouping a party's completions together dropped from 5 minutes to 90 seconds.
 
+### Fixed
+- Combat achievements "Group average" row was showing the group's summed totals instead of an average per member.
+
 ## [1.0.392] - 2026-09-05
 
 ### Added

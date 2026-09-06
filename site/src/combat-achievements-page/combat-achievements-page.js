@@ -110,9 +110,14 @@ export class CombatAchievementsPage extends BaseElement {
   }
 
   groupTierData(members, key) {
-    const total = combatAchievement.totalTasksForTier(key) * members.length;
-    const done = members.reduce((sum, member) => sum + combatAchievement.completedTaskCountForTier(member, key), 0);
-    return { key, done, total, percent: total ? Math.round((done / total) * 100) : 0, complete: false };
+    const total = combatAchievement.totalTasksForTier(key);
+    const summedDone = members.reduce(
+      (sum, member) => sum + combatAchievement.completedTaskCountForTier(member, key),
+      0
+    );
+    const done = members.length ? Math.round(summedDone / members.length) : 0;
+    const percent = total && members.length ? Math.round((summedDone / (total * members.length)) * 100) : 0;
+    return { key, done, total, percent, complete: false };
   }
 
   tierBarCell({ key, done, total, percent, complete, group = false }) {
