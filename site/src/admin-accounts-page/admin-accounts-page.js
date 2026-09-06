@@ -133,9 +133,9 @@ export class AdminAccountsPage extends BaseElement {
           }</td>
           <td class="admin-accounts__row-username">${account.username ?? "(no username)"}</td>
           <td>${this.statusBadge(account)}</td>
-          <td class="admin-mono">${
-            account.last_visit_at ? new Date(account.last_visit_at).toLocaleDateString() : "&mdash;"
-          }</td>
+          <td class="admin-mono"${
+            account.last_visit_at ? ` title="${new Date(account.last_visit_at).toLocaleString()}"` : ""
+          }>${account.last_visit_at ? new Date(account.last_visit_at).toLocaleDateString() : "&mdash;"}</td>
         </tr>
       `
         )
