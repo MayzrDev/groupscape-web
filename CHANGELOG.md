@@ -18,6 +18,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord drop notifications now show the actual drop rate (e.g. "1/508") for a lot more boss drops than before - backfilled odds for hundreds of items across most bosses using the wiki's own drop tables.
 - Admin accounts page: hovering the "Last visit" date now shows the full date and time.
 - Loot log session cards now show average gp per kill/open/casket underneath the total value.
+- Raid completion notifications and activity feed entries for a shared raid now show up faster - the window for grouping a party's completions together dropped from 5 minutes to 90 seconds.
 
 ## [1.0.392] - 2026-09-05
 

@@ -17,7 +17,7 @@ use tokio::sync::Mutex;
 /// its one websocket/Discord relay fires with whoever showed up. Chosen as a "generous enough for
 /// the rest of a full party's clients to report, short enough the feed doesn't lag noticeably" -
 /// see the design discussion this shipped from.
-pub const MERGE_WINDOW_SECS: u64 = 300;
+pub const MERGE_WINDOW_SECS: u64 = 90;
 
 /// Identifies "the same raid instance" for merging: same group session, same raid, same
 /// difficulty (level/mode - see `RaidDifficulty::merge_key`). Deliberately session-wide rather
