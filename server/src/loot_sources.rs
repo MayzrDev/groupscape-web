@@ -20,6 +20,10 @@ static CHEST_SOURCES: LazyLock<HashSet<String>> = LazyLock::new(|| {
         "Zalcano",
         "Guardians of the Rift",
         "Fortis Colosseum",
+        "Hunters' loot sack (basic)",
+        "Hunters' loot sack (adept)",
+        "Hunters' loot sack (expert)",
+        "Hunters' loot sack (master)",
     ];
     names.drain(..).map(slugify_npc_name).collect()
 });
@@ -67,6 +71,8 @@ mod tests {
         assert!(is_known("The Corrupted Gauntlet"));
         assert!(is_known("Guardians of the Rift"));
         assert!(is_known("Fortis Colosseum"));
+        assert!(is_known("Hunters' loot sack (basic)"));
+        assert!(is_known("Hunters' loot sack (master)"));
     }
 
     #[test]

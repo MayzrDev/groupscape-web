@@ -12,6 +12,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Discord collection log item notifications now show your progress on that item's page (e.g. "14/34") alongside the drop rate.
 - Discord raid completion notifications now show each member's share of the loot and whether it's a new group record.
 - Item icons now link straight to the item's wiki page when clicked.
+- Opening a Hunters' loot sack from Hunters' rumours (any tier) now shows up in the group's loot log.
 
 ### Changed
 - Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
