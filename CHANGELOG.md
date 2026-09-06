@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.409] - 2026-09-06
 
+### Added
+- Discord combat achievement notifications now show what percentage of players have completed that task, sourced from the wiki.
+
 ### Changed
 - Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
 - Discord drop notifications now show the actual drop rate (e.g. "1/508") for a lot more boss drops than before - backfilled odds for hundreds of items across most bosses using the wiki's own drop tables.

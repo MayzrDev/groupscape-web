@@ -459,7 +459,7 @@ pub async fn send_test_notification(webhook_url: String, web_origin: String, kin
                 ),
                 COMBAT_TASK_COLOR,
                 Some(combat_achievement_icon_url()),
-                Vec::new(),
+                vec![("Completed by".to_string(), "38.9% of players".to_string())],
             ),
             "notify_collection_log" => (
                 "Collection log",
@@ -1242,12 +1242,16 @@ pub fn dispatch_progress_webhook(
                 let task_id = event.payload["task_id"].as_i64().unwrap_or_default();
                 let task = crate::combat_achievement_content::task_name(task_id).unwrap_or("a combat task");
                 let url = wiki_url(task);
+                let mut fields = Vec::new();
+                if let Some(pct) = crate::combat_achievement_content::completion_percent(task_id) {
+                    fields.push(("Completed by".to_string(), format!("{:.1}% of players", pct)));
+                }
                 Some((
                     "Combat achievements",
                     format!("{} completed the combat task [{}]({})", member_name, task, url),
                     COMBAT_TASK_COLOR,
                     Some(combat_achievement_icon_url()),
-                    Vec::new(),
+                    fields,
                 ))
             }
             EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "item" => {

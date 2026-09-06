@@ -68,6 +68,22 @@ pub fn task_name(task_id: i64) -> Option<&'static str> {
     TASK_NAMES.get(&task_id).map(String::as_str)
 }
 
+/// Task id -> wiki-sourced completion percentage (`content/combat_achievement_completion.json`,
+/// scraped from the "Comp%" column of https://oldschool.runescape.wiki/w/Combat_Achievements/All_tasks
+/// - itself described there as "Estimated percentage of players (with at least one CA completion)
+/// who have completed this achievement, based on wiki crowdsourcing", so this is an estimate, not
+/// an official Jagex figure). Keyed by the wiki's `data-ca-task-id`, which matches the game's own
+/// task id used throughout this codebase (verified against a handful of known tasks when this was
+/// built). Not refreshed automatically - re-scrape and replace the JSON file if it goes stale.
+static TASK_COMPLETION: LazyLock<HashMap<i64, f64>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("content/combat_achievement_completion.json"))
+        .expect("content/combat_achievement_completion.json must parse")
+});
+
+pub fn completion_percent(task_id: i64) -> Option<f64> {
+    TASK_COMPLETION.get(&task_id).copied()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,5 +100,18 @@ mod tests {
     fn general_and_other_are_excluded() {
         let groups = boss_groups();
         assert!(groups.iter().all(|(boss, _)| boss != "General" && boss != "Other"));
+    }
+
+    #[test]
+    fn completion_percent_is_loaded_for_known_task() {
+        // Zulrah Adept - checked against https://oldschool.runescape.wiki/w/Combat_Achievements/All_tasks
+        assert_eq!(completion_percent(224), Some(38.9));
+    }
+
+    #[test]
+    fn completion_percent_covers_every_known_task() {
+        for task_id in TASK_NAMES.keys() {
+            assert!(completion_percent(*task_id).is_some(), "missing completion% for task {task_id}");
+        }
     }
 }
