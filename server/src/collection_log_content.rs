@@ -73,6 +73,17 @@ pub fn pages() -> &'static [(String, Vec<i32>)] {
     &PAGES
 }
 
+/// The page a (canonicalised) collection-log item id belongs to, plus that page's full item list -
+/// used to show "X/Y items" progress on the Discord collection-log item embed. `item_id` is
+/// expected to already be canonicalised (see `canonical_item_id`); an item listed on more than one
+/// page (rare) just returns the first match in `PAGES`' order.
+pub fn page_containing(item_id: i32) -> Option<(&'static str, &'static [i32])> {
+    PAGES
+        .iter()
+        .find(|(_, items)| items.contains(&item_id))
+        .map(|(name, items)| (name.as_str(), items.as_slice()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -91,5 +102,17 @@ mod tests {
         assert_eq!(canonical_item_id(4178), 4151);
         // An id with no duplicate entry passes through untouched.
         assert_eq!(canonical_item_id(4151), 4151);
+    }
+
+    #[test]
+    fn page_containing_finds_the_owning_page() {
+        let (page, items) = page_containing(4151).expect("abyssal whip should be on a page");
+        assert_eq!(page, "Abyssal Sire");
+        assert!(items.contains(&4151));
+    }
+
+    #[test]
+    fn page_containing_is_none_for_unknown_item() {
+        assert!(page_containing(-1).is_none());
     }
 }

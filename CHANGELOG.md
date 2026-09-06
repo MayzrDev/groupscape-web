@@ -6,6 +6,12 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Discord combat achievement notifications now show what percentage of players have completed that task, sourced from the wiki.
+- Discord drop and clue casket notifications now call out "💎 Rare drop"/"💎 Rare clue reward" when the item is genuinely rare (1/500 or rarer).
+- Discord pet notifications now show the drop rate and (for boss pets) which kill number you got it on.
+- Discord quest completion notifications now show how many quests you've finished overall (e.g. "148 of 172").
+- Discord collection log item notifications now show your progress on that item's page (e.g. "14/34") alongside the drop rate.
+- Discord raid completion notifications now show each member's share of the loot and whether it's a new group record.
+- Item icons now link straight to the item's wiki page when clicked.
 
 ### Changed
 - Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.

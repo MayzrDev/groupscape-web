@@ -106,6 +106,25 @@ const DIARY_COLOR: u32 = 0x29C2B0;
 const PET_COLOR: u32 = 0xFF7AC6;
 const CLUE_COLOR: u32 = 0x3BA7D6;
 const LEVEL_UP_COLOR: u32 = 0x52C41A;
+const RARE_DROP_COLOR: u32 = 0xFF2EC1;
+
+/// A drop is called out as "Rare drop" when the rarest curated item in it has odds at or below
+/// this (1/500) - matches the rough cutoff OSRS players already use for "that's a rare one"
+/// (most boss uniques clear this; common supply drops don't). Items with no curated `rate` at all
+/// never trigger this - see `drop_rates::DropRateEntry::rate`'s doc comment on why that's treated
+/// as "unknown" rather than "common".
+const RARE_DROP_THRESHOLD: f64 = 1.0 / 500.0;
+
+/// The lowest curated drop-rate probability among `lines`' items from `source_name`, or `None` if
+/// none of them have a curated `rate` at all - used to decide whether a "Drops"/"Clue casket"
+/// embed gets the rare-drop callout treatment (see `RARE_DROP_THRESHOLD`).
+fn rarest_probability(lines: &[(i32, i64, i64, String)], source_name: &str) -> Option<f64> {
+    lines
+        .iter()
+        .filter_map(|(item_id, _, _, _)| drop_rates::lookup(source_name, *item_id)?.rate.as_deref())
+        .filter_map(drop_rates::probability)
+        .fold(None, |min, p| Some(min.map_or(p, |m: f64| m.min(p))))
+}
 
 /// `{quantity}x {name} ({value}, {drop rate})` for a single item - factored out of `drop_lines` so
 /// `dispatch_drop_message` can rebuild the same line at a different (cumulative) quantity when
@@ -258,16 +277,34 @@ fn split_pets(items: &[crate::models::LootItem]) -> (Vec<crate::models::LootItem
 
 /// Posts one "Pet" embed per pet item found in a drop - in practice always at most one, but a
 /// list keeps this correct if RuneLite ever correlates more than one pet drop into a single event.
-async fn send_pet_embeds(webhook_url: &str, member_name: &str, source_name: &str, pets: &[crate::models::LootItem]) {
+///
+/// `account_kc` is the reporting client's own in-game kill count (`KillEvent::account_kc`, parsed
+/// from the "kill count is" chat line), *not* this server's tracked kill log - only meaningful for
+/// a pet obtained from a `GameEvent::Kill`, so a skilling/minigame pet arriving via a plain
+/// `GameEvent::Loot` just passes `None` and the field is omitted.
+async fn send_pet_embeds(
+    webhook_url: &str,
+    member_name: &str,
+    source_name: &str,
+    pets: &[crate::models::LootItem],
+    account_kc: Option<i64>,
+) {
     for pet in pets {
         let description = format!("{} received a pet: {}", member_name, item_names::display(pet.item_id));
+        let mut fields = vec![("Source".to_string(), source_name.to_string())];
+        if let Some(rate) = drop_rates::lookup(source_name, pet.item_id).and_then(|entry| entry.rate.clone()) {
+            fields.push(("Drop rate".to_string(), rate));
+        }
+        if let Some(kc) = account_kc {
+            fields.push(("Obtained on kill".to_string(), format!("#{}", kc)));
+        }
         send_webhook_embed_rich(
             webhook_url.to_string(),
             "Pet",
             description,
             PET_COLOR,
             item_icon_url(pet.item_id),
-            vec![("Source".to_string(), source_name.to_string())],
+            fields,
             Some(member_name.to_string()),
         )
         .await;
@@ -379,7 +416,7 @@ pub async fn test_webhook(url: &str) -> Result<(), ApiError> {
 /// `data-key` already carries, so the client has nothing new to know about.
 pub async fn send_test_notification(webhook_url: String, web_origin: String, kind: &str) -> Result<(), ApiError> {
     const MEMBER: &str = "TestPlayer";
-    const TWISTED_BOW: i32 = 20997;
+    const TANZANITE_FANG: i32 = 12922;
     const PET_SNAKELING: i32 = 12921;
     const DRAGON_BOOTS: i32 = 11840;
     const SERPENTINE_VISAGE: i32 = 12927;
@@ -408,11 +445,11 @@ pub async fn send_test_notification(webhook_url: String, web_origin: String, kin
                 format!(
                     "{} received 1x {} from [Zulrah]({})",
                     MEMBER,
-                    item_names::display(TWISTED_BOW),
+                    item_names::display(TANZANITE_FANG),
                     wiki_url("Zulrah")
                 ),
                 LOOT_COLOR,
-                item_icon_url(TWISTED_BOW),
+                item_icon_url(TANZANITE_FANG),
                 Vec::new(),
             ),
             "notify_pets" => (
@@ -420,7 +457,11 @@ pub async fn send_test_notification(webhook_url: String, web_origin: String, kin
                 format!("{} received a pet: {}", MEMBER, item_names::display(PET_SNAKELING)),
                 PET_COLOR,
                 item_icon_url(PET_SNAKELING),
-                vec![("Source".to_string(), "Zulrah".to_string())],
+                vec![
+                    ("Source".to_string(), "Zulrah".to_string()),
+                    ("Drop rate".to_string(), "1/4000".to_string()),
+                    ("Obtained on kill".to_string(), "#4,812".to_string()),
+                ],
             ),
             "notify_clues" => (
                 "Clue casket",
@@ -471,14 +512,20 @@ pub async fn send_test_notification(webhook_url: String, web_origin: String, kin
                 ),
                 COLLECTION_LOG_COLOR,
                 item_icon_url(SERPENTINE_VISAGE),
-                Vec::new(),
+                vec![
+                    ("Page progress".to_string(), "14/34 (Vorkath)".to_string()),
+                    ("Drop rate".to_string(), "1/512".to_string()),
+                ],
             ),
             "notify_quests" => (
                 "Quest",
                 format!("{} completed [Dragon Slayer II]({})", MEMBER, wiki_url("Dragon Slayer II")),
                 QUEST_COLOR,
                 quest_icon_url(&web_origin, Some("Grandmaster")),
-                vec![("Difficulty".to_string(), "Grandmaster".to_string())],
+                vec![
+                    ("Difficulty".to_string(), "Grandmaster".to_string()),
+                    ("Quests complete".to_string(), "148 of 172".to_string()),
+                ],
             ),
             "notify_diaries" => (
                 "Diary",
@@ -785,6 +832,8 @@ async fn dispatch_drop_message(
     ge_prices: &GEPrices,
 ) {
     let thumbnail = drop_thumbnail(&lines);
+    let is_rare = rarest_probability(&lines, &source_name).is_some_and(|p| p <= RARE_DROP_THRESHOLD);
+    let (title, color) = if is_rare { ("\u{1F48E} Rare drop", RARE_DROP_COLOR) } else { ("Drops", LOOT_COLOR) };
     let [(item_id, quantity, _, _)] = lines.as_slice() else {
         let description = format!(
             "{} received {} from [{}]({})",
@@ -793,7 +842,7 @@ async fn dispatch_drop_message(
             source_name,
             wiki_url(&source_name)
         );
-        send_webhook_embed_rich(webhook_url, "Drops", description, LOOT_COLOR, thumbnail, Vec::new(), Some(member_name))
+        send_webhook_embed_rich(webhook_url, title, description, color, thumbnail, Vec::new(), Some(member_name))
             .await;
         return;
     };
@@ -809,9 +858,9 @@ async fn dispatch_drop_message(
             let edited = edit_webhook_embed_rich(
                 webhook_url.clone(),
                 message_id.clone(),
-                "Drops",
+                title,
                 description.clone(),
-                LOOT_COLOR,
+                color,
                 thumbnail.clone(),
                 Vec::new(),
                 Some(member_name.clone()),
@@ -826,9 +875,9 @@ async fn dispatch_drop_message(
         None => {
             send_webhook_embed_rich_get_id(
                 webhook_url,
-                "Drops",
+                title,
                 description,
-                LOOT_COLOR,
+                color,
                 thumbnail,
                 Vec::new(),
                 Some(member_name),
@@ -939,7 +988,8 @@ pub fn dispatch_event_webhook(
                 if let Some(loot) = &kill.loot {
                     let (pets, rest) = split_pets(loot);
                     if settings.notify_pets && !pets.is_empty() {
-                        send_pet_embeds(&webhook_url, &member_name, &kill.npc_name, &pets).await;
+                        send_pet_embeds(&webhook_url, &member_name, &kill.npc_name, &pets, kill.account_kc.map(i64::from))
+                            .await;
                     }
                     if settings.notify_drops {
                         let ge_prices = unauthed::get_ge_prices_map();
@@ -1037,11 +1087,14 @@ pub fn dispatch_event_webhook(
                             tier,
                             lines.iter().map(|(_, _, _, line)| line.as_str()).collect::<Vec<_>>().join(", ")
                         );
+                        let is_rare = rarest_probability(&lines, &loot_event.source_name).is_some_and(|p| p <= RARE_DROP_THRESHOLD);
+                        let (title, color) =
+                            if is_rare { ("\u{1F48E} Rare clue reward", RARE_DROP_COLOR) } else { ("Clue casket", CLUE_COLOR) };
                         send_webhook_embed_rich(
                             webhook_url,
-                            "Clue casket",
+                            title,
                             description,
-                            CLUE_COLOR,
+                            color,
                             Some(clue_casket_icon_url(tier)),
                             vec![("Tier".to_string(), tier.to_string())],
                             Some(member_name.clone()),
@@ -1053,7 +1106,7 @@ pub fn dispatch_event_webhook(
             GameEvent::Loot(loot_event) => {
                 let (pets, rest) = split_pets(&loot_event.loot);
                 if settings.notify_pets && !pets.is_empty() {
-                    send_pet_embeds(&webhook_url, &member_name, &loot_event.source_name, &pets).await;
+                    send_pet_embeds(&webhook_url, &member_name, &loot_event.source_name, &pets, None).await;
                 }
                 if settings.notify_drops && !rest.is_empty() {
                     let ge_prices = unauthed::get_ge_prices_map();
@@ -1088,10 +1141,21 @@ pub fn dispatch_event_webhook(
 
 /// Fire-and-forget, mirroring `dispatch_event_webhook` above - posts the merged raid-completion
 /// message (`RaidCompletionPayload::to_message`) as a Discord embed, once per completion, when
-/// the group has a webhook configured and `notify_raids` is on. Like `dispatch_drop_webhook`,
-/// takes the pre-built message directly since the merge/finalize step that produces it already
-/// lives outside this per-event match.
-pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String, raid_type: crate::models::RaidType) {
+/// the group has a webhook configured and `notify_raids` is on. Takes the finalized payload
+/// directly (rather than a pre-built message) since the merge/finalize step that produces it
+/// already lives outside this per-event match, and this now also needs `total_value` /
+/// `participants` itself for the per-member split and record fields below.
+///
+/// `previous_best` is this group's best `total_value` for the same raid+difficulty *before* this
+/// completion (see `db::group_raid_best_value`), looked up by the caller since that needs a db
+/// client the finalize step already had open - `None` means this is the first-ever finalized
+/// completion of this raid+difficulty for the group.
+pub fn dispatch_raid_webhook(
+    db_pool: Pool,
+    group_id: i64,
+    payload: crate::models::RaidCompletionPayload,
+    previous_best: Option<i64>,
+) {
     tokio::spawn(async move {
         let client = match db_pool.get().await {
             Ok(client) => client,
@@ -1115,7 +1179,31 @@ pub fn dispatch_raid_webhook(db_pool: Pool, group_id: i64, message: String, raid
             return;
         }
 
-        send_webhook_embed_with_thumbnail(webhook_url, "Raid", message, RAID_COLOR, Some(raid_icon_url(raid_type))).await;
+        let message = payload.to_message();
+        let mut fields = Vec::new();
+        if payload.total_value > 0 && payload.participants.len() > 1 {
+            for participant in &payload.participants {
+                let pct = participant.value as f64 / payload.total_value as f64 * 100.0;
+                fields.push((participant.member_name.clone(), format!("{:.0}% ({} gp)", pct, format_gp(participant.value))));
+            }
+        }
+        let record_field = match previous_best {
+            Some(best) if payload.total_value > best => "\u{1F3C6} New group record!".to_string(),
+            Some(best) => format!("Best: {} gp", format_gp(best)),
+            None => "\u{1F3C6} New group record!".to_string(),
+        };
+        fields.push(("Record".to_string(), record_field));
+
+        send_webhook_embed_rich(
+            webhook_url,
+            "Raid",
+            message,
+            RAID_COLOR,
+            Some(raid_icon_url(payload.raid_type)),
+            fields,
+            None,
+        )
+        .await;
     });
 }
 
@@ -1202,6 +1290,11 @@ pub fn dispatch_progress_webhook(
                 if let Some(difficulty) = difficulty {
                     fields.push(("Difficulty".to_string(), difficulty.to_string()));
                 }
+                if let (Some(completed), Some(total)) =
+                    (event.payload["completed_count"].as_i64(), event.payload["total_count"].as_i64())
+                {
+                    fields.push(("Quests complete".to_string(), format!("{} of {}", completed, total)));
+                }
                 Some((
                     "Quest",
                     format!("{} completed [{}]({})", member_name, name, wiki_url(name)),
@@ -1258,6 +1351,18 @@ pub fn dispatch_progress_webhook(
                 let item_id = event.payload["item_id"].as_i64().unwrap_or_default() as i32;
                 let quantity = event.payload["quantity"].as_i64().unwrap_or(1);
                 let name = item_names::name(item_id).unwrap_or("an item");
+                let mut fields = Vec::new();
+                let page = event.payload["page"].as_str();
+                if let (Some(page), Some(owned), Some(total)) =
+                    (page, event.payload["page_owned"].as_i64(), event.payload["page_total"].as_i64())
+                {
+                    fields.push(("Page progress".to_string(), format!("{}/{} ({})", owned, total, page)));
+                }
+                if let Some(rate) =
+                    page.and_then(|page| drop_rates::lookup(page, item_id)).and_then(|entry| entry.rate.clone())
+                {
+                    fields.push(("Drop rate".to_string(), rate));
+                }
                 Some((
                     "Collection log",
                     format!(
@@ -1269,7 +1374,7 @@ pub fn dispatch_progress_webhook(
                     ),
                     COLLECTION_LOG_COLOR,
                     item_icon_url(item_id),
-                    Vec::new(),
+                    fields,
                 ))
             }
             EVENT_TYPE_COLLECTION_LOG if settings.notify_collection_log && event.payload["kind"] == "page" => {
@@ -1318,4 +1423,35 @@ pub fn dispatch_progress_webhook(
             send_webhook_embed_rich(webhook_url, title, description, color, thumbnail, fields, Some(member_name)).await;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rarest_probability_flags_a_curated_rare_item() {
+        // Draconic visage is 1/5000 off Vorkath - well past RARE_DROP_THRESHOLD (1/500).
+        let lines = vec![(11286, 1, 0, "1x Draconic visage".to_string())];
+        let p = rarest_probability(&lines, "Vorkath").expect("draconic visage has a curated rate");
+        assert!(p <= RARE_DROP_THRESHOLD);
+    }
+
+    #[test]
+    fn rarest_probability_is_none_without_curated_rate_data() {
+        let lines = vec![(995, 1000, 0, "1000x Coins".to_string())];
+        assert!(rarest_probability(&lines, "Some Random Npc").is_none());
+    }
+
+    #[test]
+    fn rarest_probability_takes_the_lowest_across_multiple_items() {
+        // Silver ore (442) has no curated rate; draconic visage (11286) does - the missing one
+        // must not hide the rare one that's actually there.
+        let lines = vec![
+            (442, 1, 0, "1x Silver ore".to_string()),
+            (11286, 1, 0, "1x Draconic visage".to_string()),
+        ];
+        let p = rarest_probability(&lines, "Vorkath").expect("draconic visage has a curated rate");
+        assert!(p <= RARE_DROP_THRESHOLD);
+    }
 }

@@ -122,6 +122,18 @@ pub async fn handle_raid_completion(
                 return;
             }
         };
+        let previous_best = db::group_raid_best_value(
+            &finalize_client,
+            group_id,
+            finalized.raid_type,
+            &finalized.difficulty,
+            event_id,
+        )
+        .await
+        .unwrap_or_else(|err| {
+            log::warn!("raid_merge: failed to load previous best raid value: {}", err);
+            None
+        });
         drop(finalize_client);
         redis.incr(&activity_log_version_key(group_id)).await;
 
@@ -138,7 +150,7 @@ pub async fn handle_raid_completion(
             }
         }
 
-        discord::dispatch_raid_webhook(db_pool.get_ref().clone(), group_id, message, finalized.raid_type);
+        discord::dispatch_raid_webhook(db_pool.get_ref().clone(), group_id, finalized, previous_best);
     });
 
     Ok(())

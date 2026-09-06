@@ -62,6 +62,12 @@ pub fn quest_id_at(index: usize) -> Option<i32> {
     QUEST_IDS.get(index).copied()
 }
 
+/// Total number of quests this server's catalog tracks - the denominator for the Discord "Quest"
+/// embed's "X of Y quests complete" progress field.
+pub fn total_count() -> usize {
+    QUEST_IDS.len()
+}
+
 /// Display name for a quest id - used by the Discord "Quest completions" notification, which
 /// only has the id (see [`quest_id_at`]'s doc comment on why the frontend resolves this itself
 /// for the activity feed instead).

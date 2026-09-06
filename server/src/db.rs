@@ -5937,6 +5937,30 @@ fn raid_completion_matches(
     }
 }
 
+/// Best (highest) `total_value` among this group's other finalized completions of the same
+/// raid+difficulty, excluding `exclude_event_id` (the completion that was just finalized, which is
+/// already in `activity_events` by the time this is called) - powers the Discord raid embed's
+/// "New group record!" / "Best: X gp" field. `None` when this is the group's first finalized
+/// completion of this raid+difficulty (matched via `RaidDifficulty::merge_key`, the same identity
+/// `raid_merge` itself uses, so a level-300 and level-350 ToA run never count as the same record).
+pub async fn group_raid_best_value(
+    client: &Client,
+    group_id: i64,
+    raid_type: RaidType,
+    difficulty: &RaidDifficulty,
+    exclude_event_id: i64,
+) -> Result<Option<i64>, ApiError> {
+    let events = list_raid_events_since(client, group_id, None).await?;
+    let merge_key = difficulty.merge_key();
+    Ok(events
+        .iter()
+        .filter(|event| event.id != exclude_event_id)
+        .filter_map(parse_finalized_raid)
+        .filter(|payload| payload.raid_type == raid_type && payload.difficulty.merge_key() == merge_key)
+        .map(|payload| payload.total_value)
+        .max())
+}
+
 /// Per-member participation counts for raid completions matching `raid_type`/`difficulty` over
 /// the window - "participation" means present in [`RaidCompletionPayload::participants`], not
 /// just the reporting member, since a raid completion is a group event every party member should

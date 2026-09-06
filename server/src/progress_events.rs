@@ -68,6 +68,13 @@ fn diff_quests(previous: &[u8], current: &[u8]) -> Vec<ProgressEvent> {
             payload: json!({ "quest_id": quest_id }),
         });
     }
+    if !events.is_empty() {
+        let completed_count = current.iter().filter(|&&state| state == QUEST_STATE_FINISHED).count();
+        for event in &mut events {
+            event.payload["completed_count"] = json!(completed_count);
+            event.payload["total_count"] = json!(quest_ids::total_count());
+        }
+    }
     events
 }
 
@@ -195,9 +202,15 @@ fn diff_collection_log(previous: &[i32], current: &[i32]) -> Vec<ProgressEvent> 
 
     let mut events: Vec<ProgressEvent> = added
         .into_iter()
-        .map(|(item_id, quantity)| ProgressEvent {
-            event_type: EVENT_TYPE_COLLECTION_LOG,
-            payload: json!({ "kind": "item", "item_id": item_id, "quantity": quantity }),
+        .map(|(item_id, quantity)| {
+            let mut payload = json!({ "kind": "item", "item_id": item_id, "quantity": quantity });
+            if let Some((page, items)) = collection_log_content::page_containing(item_id) {
+                let owned = items.iter().filter(|id| current_quantities.get(id).copied().unwrap_or(0) > 0).count();
+                payload["page"] = json!(page);
+                payload["page_owned"] = json!(owned);
+                payload["page_total"] = json!(items.len());
+            }
+            ProgressEvent { event_type: EVENT_TYPE_COLLECTION_LOG, payload }
         })
         .collect();
 
@@ -528,6 +541,24 @@ mod tests {
         assert_eq!(item_events[0].event_type, EVENT_TYPE_COLLECTION_LOG);
         assert_eq!(item_events[0].payload["item_id"], json!(13262));
         assert_eq!(item_events[0].payload["quantity"], json!(1));
+        assert_eq!(item_events[0].payload["page"], json!("Abyssal Sire"));
+        // Whip (4151, already owned) + orphan (13262, just added) = 2 of the page's 9 items.
+        assert_eq!(item_events[0].payload["page_owned"], json!(2));
+        assert_eq!(item_events[0].payload["page_total"], json!(9));
+    }
+
+    #[test]
+    fn quest_transition_carries_completed_and_total_counts() {
+        let mut previous = vec![0u8; 8];
+        let mut current = vec![0u8; 8];
+        current[0] = QUEST_STATE_FINISHED;
+        current[2] = QUEST_STATE_FINISHED;
+        previous[0] = QUEST_STATE_FINISHED;
+
+        let events = diff_quests(&previous, &current);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].payload["completed_count"], json!(2));
+        assert_eq!(events[0].payload["total_count"], json!(quest_ids::total_count()));
     }
 
     #[test]

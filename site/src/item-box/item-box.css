@@ -15,6 +15,11 @@ item-box {
   max-width: 100%;
 }
 
+.item-box__link {
+  display: flex;
+  height: 100%;
+}
+
 .item-box__image {
   z-index: 0;
   pointer-events: none;

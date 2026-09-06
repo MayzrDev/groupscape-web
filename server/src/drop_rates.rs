@@ -50,6 +50,20 @@ pub fn lookup(npc_name: &str, item_id: i32) -> Option<&'static DropRateEntry> {
     DROP_RATES.get(&slugify_npc_name(npc_name))?.get(&item_id)
 }
 
+/// Parses a curated `"n/d"` rate string (e.g. "1/508") into a plain probability - used to compare
+/// rates across items on a common scale (e.g. flagging a drop as rare regardless of whether the
+/// wiki expressed its odds as "1/500" or "2/1000"). `None` for anything that doesn't parse as
+/// exactly two integers separated by `/`, or with a zero denominator.
+pub fn probability(rate: &str) -> Option<f64> {
+    let (numerator, denominator) = rate.split_once('/')?;
+    let numerator: f64 = numerator.trim().parse().ok()?;
+    let denominator: f64 = denominator.trim().parse().ok()?;
+    if denominator <= 0.0 {
+        return None;
+    }
+    Some(numerator / denominator)
+}
+
 /// Ordinal rank for sorting loot summary rows by rarity, rarest first. Unknown/missing
 /// rarities rank below every known tier rather than erroring.
 pub fn rarity_rank(rarity: &str) -> u8 {
@@ -87,6 +101,19 @@ mod tests {
     fn unknown_npc_or_item_returns_none() {
         assert!(lookup("Some Random Npc", 1).is_none());
         assert!(lookup("Vorkath", 999_999).is_none());
+    }
+
+    #[test]
+    fn probability_parses_valid_rates() {
+        assert_eq!(probability("1/508"), Some(1.0 / 508.0));
+        assert_eq!(probability("3/300"), Some(3.0 / 300.0));
+    }
+
+    #[test]
+    fn probability_rejects_malformed_rates() {
+        assert_eq!(probability("not a rate"), None);
+        assert_eq!(probability("1/0"), None);
+        assert_eq!(probability("1/2/3"), None);
     }
 
     #[test]

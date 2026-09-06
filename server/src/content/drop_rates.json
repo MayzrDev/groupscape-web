@@ -3771,6 +3771,11 @@
       "rarity": "uncommon",
       "isUnique": true
     },
+    "27352": {
+      "name": "Tumeken's guardian",
+      "rarity": "very_rare",
+      "isUnique": true
+    },
     "30893": {
       "name": "Jewel of amascut",
       "rarity": "uncommon",
@@ -4406,6 +4411,12 @@
       "rarity": "uncommon",
       "isUnique": false,
       "rate": "3/139"
+    },
+    "13262": {
+      "name": "Abyssal orphan",
+      "rarity": "very_rare",
+      "isUnique": true,
+      "rate": "1/2560"
     },
     "13273": {
       "name": "Unsired",

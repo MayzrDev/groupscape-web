@@ -1,5 +1,11 @@
 <div class="item-box__container">
+  ${this.item?.isValid() ? `
+  <a href="${this.item.wikiLink}" target="_blank" class="item-box__link">
+    <img class="item-box__image" src="${Item.imageUrl(this.itemId, this.quantity)}" loading="lazy" />
+  </a>
+  ` : `
   <img class="item-box__image" src="${Item.imageUrl(this.itemId, this.quantity)}" loading="lazy" />
+  `}
   ${this.quantity > 1 ? `
   <span class="item-box__quantity">
     ${this.veryShortQuantity ? Item.veryShortQuantity(this.quantity) : Item.shortQuantity(this.quantity)}
