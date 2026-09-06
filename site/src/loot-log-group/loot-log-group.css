@@ -77,13 +77,23 @@ loot-log-group[data-source="clue"] .loot-log-group__source-dot {
   opacity: 0.65;
 }
 
+.loot-log-group__total-wrap {
+  flex-shrink: 0;
+  text-align: right;
+}
+
 .loot-log-group__total {
   font-family: "rsbold", ui-sans-serif, Arial, sans-serif;
   color: var(--yellow);
   font-size: 0.9em;
   font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-  text-align: right;
+}
+
+.loot-log-group__avg {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 0.72em;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
 }
 
 .loot-log-group__grid {

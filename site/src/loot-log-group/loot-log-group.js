@@ -11,6 +11,12 @@ const COUNT_LABELS = {
   clue: "caskets",
 };
 
+const COUNT_LABELS_SINGULAR = {
+  kill: "kill",
+  chest: "open",
+  clue: "casket",
+};
+
 // One farming-session "entry" - consecutive same-member/source/type events <=45min apart (see
 // loot-log-page.js's `appendEvent`/`prependEvent`), not a boss-wide group across the whole scope
 // like this component used to render.
@@ -93,6 +99,10 @@ export class LootLogGroup extends BaseElement {
     return COUNT_LABELS[this.group.sourceType] || "events";
   }
 
+  get countLabelSingular() {
+    return COUNT_LABELS_SINGULAR[this.group.sourceType] || "event";
+  }
+
   // Span of this session entry alone (first event -> last event, merged within the 45-minute
   // window) - a boss farmed for hours shows that whole span, not just an event count.
   get timeRangeLabel() {
@@ -130,6 +140,10 @@ export class LootLogGroup extends BaseElement {
 
   get totalValue() {
     return this.mergedItems().reduce((sum, item) => sum + item.total_value, 0);
+  }
+
+  get averageValue() {
+    return Math.round(this.totalValue / this.group.events.length);
   }
 }
 customElements.define("loot-log-group", LootLogGroup);

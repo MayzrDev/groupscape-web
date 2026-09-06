@@ -15,6 +15,9 @@
       <div class="loot-log-group__meta">${this.group.events.length.toLocaleString()} ${this.countLabel} &middot; ${this.timeRangeLabel}</div>
     </div>
   </div>
-  <div class="loot-log-group__total">${this.totalValue.toLocaleString()} gp</div>
+  <div class="loot-log-group__total-wrap">
+    <div class="loot-log-group__total">${this.totalValue.toLocaleString()} gp</div>
+    <div class="loot-log-group__avg">${this.averageValue.toLocaleString()} gp/${this.countLabelSingular}</div>
+  </div>
 </div>
 <div class="loot-log-group__grid"></div>

@@ -11,6 +11,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
 - Discord drop notifications now show the actual drop rate (e.g. "1/508") for a lot more boss drops than before - backfilled odds for hundreds of items across most bosses using the wiki's own drop tables.
 - Admin accounts page: hovering the "Last visit" date now shows the full date and time.
+- Loot log session cards now show average gp per kill/open/casket underneath the total value.
 
 ## [1.0.392] - 2026-09-05
 
