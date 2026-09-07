@@ -7,9 +7,11 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Added
 - Each group member's panel now has a "Boss KC" tab showing their real, live OSRS hiscores kill counts for every boss, clue scroll tier, and minigame - not GroupScape's own tracked counts, but the account's actual lifetime totals straight from the official hiscores.
 - Opening the Barrows chest or the Moons of Peril reward chest now logs a single activity feed entry naming exactly which brothers/moons you defeated that run, e.g. "Barrows (Dharok, Verac, Torag)" or "Moons of Peril (Eclipse, Blood)" - Moons of Peril kills weren't shown anywhere before this.
+- GroupScape can now be installed as an app on your phone or desktop, with an install prompt for Android/desktop and a manual "Add to Home Screen" tip on iPhone/iPad. Once installed, the app shell keeps working when you lose connection, with a banner letting you know your data may be out of date.
 
 ### Changed
 - Individual Barrows brother and Moon kills no longer show up on their own in the activity feed, toast notifications, or Discord kill webhook - only the combined chest-opening entry does now.
+- The installed app now refreshes itself automatically in the background whenever a new version of GroupScape ships.
 - The Set Bonus dialog's "Other Sets" list is now split into collapsible Combat and Skilling groups, so it's faster to find the set you're looking for.
 - The member panel's tab bar is now split across two rows so there's room for the new Boss KC tab without crowding the rest, grouped so Inventory/Equipment/Skills/Slayer sit up top and Quests/Diaries/Collection Log/Combat Achievements/Boss KC sit below.
 - The Boss KC tab icon is now Vorkath's head instead of Zulrah's fang.

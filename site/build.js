@@ -130,6 +130,19 @@ const htmlBuildPlugin = {
   }
 };
 
+const serviceWorkerBuildPlugin = {
+  name: "serviceWorkerBuild",
+  setup(build) {
+    const { version } = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+
+    build.onEnd(async () => {
+      let swSource = await fs.promises.readFile("src/service-worker.js", "utf8");
+      swSource = swSource.replace(/\{\{version\}\}/g, version);
+      await fs.promises.writeFile("public/service-worker.js", swSource);
+    });
+  }
+};
+
 const minifyJsPlugin = {
   name: "minifyJs",
   setup(build) {
@@ -176,7 +189,7 @@ function build() {
     define: {
       __APP_VERSION__: JSON.stringify(version)
     },
-    plugins: [componentBuildPlugin, minifyJsPlugin, htmlBuildPlugin, buildLoggingPlugin, mapJsonPlugin]
+    plugins: [componentBuildPlugin, minifyJsPlugin, htmlBuildPlugin, serviceWorkerBuildPlugin, buildLoggingPlugin, mapJsonPlugin]
   }).catch((error) => console.error(error));
 }
 

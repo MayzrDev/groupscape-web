@@ -80,6 +80,9 @@ import "./characters-page/characters-page.js";
 import "./account-page/account-page.js";
 import "./onboarding-page/onboarding-page.js";
 import "./toast-stack/toast-stack.js";
+import "./install-banner/install-banner.js";
+import "./offline-banner/offline-banner.js";
+import "./pwa.js";
 import { accountApi } from "./data/account-api";
 
 const discordCallbackResult = accountApi.handleDiscordCallback();
