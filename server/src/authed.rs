@@ -1283,6 +1283,36 @@ fn is_diagnostic_source(source_name: &str) -> bool {
         .any(|name| name.eq_ignore_ascii_case(source_name))
 }
 
+/// Gauntlet/Corrupted Gauntlet trash mobs - real NPCs (unlike [`DIAGNOSTIC_NPC_NAMES`]) whose
+/// kills/loot are still fine to show in the activity feed if they somehow kill a player, but are
+/// too noisy to be worth surfacing in the Loot Log.
+const EXCLUDED_LOOT_LOG_NPC_NAMES: &[&str] = &[
+    "Corrupted wolf",
+    "Crystalline wolf",
+    "Crystalline spider",
+    "Corrupted spider",
+    "Corrupted bat",
+    "Crystalline bat",
+    "Crystalline rat",
+    "Corrupted rat",
+    "Crystalline dragon",
+    "Corrupted dragon",
+    "Crystalline bear",
+    "Corrupted bear",
+    "Crystalline dark beast",
+    "Corrupted dark beast",
+    "Ba-Ba",
+    "Akkha",
+    "Kephri",
+    "Zebak",
+];
+
+fn is_excluded_loot_log_source(source_name: &str) -> bool {
+    EXCLUDED_LOOT_LOG_NPC_NAMES
+        .iter()
+        .any(|name| name.eq_ignore_ascii_case(source_name))
+}
+
 fn as_loot_source_event(event: &GameEvent) -> Option<LootSourceEvent> {
     match event {
         GameEvent::Kill(kill) => Some(LootSourceEvent {
@@ -1602,7 +1632,10 @@ pub async fn get_loot_log(
             let Some(source) = as_loot_source_event(&parsed) else {
                 continue;
             };
-            if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+            if is_diagnostic_source(&source.source_name)
+                || is_excluded_loot_log_source(&source.source_name)
+                || source.loot.is_empty()
+            {
                 continue;
             }
             if !categories.matches(&source) {
@@ -1704,7 +1737,10 @@ pub async fn get_loot_log_summary(
             let Some(source) = as_loot_source_event(&parsed) else {
                 continue;
             };
-            if is_diagnostic_source(&source.source_name) || source.loot.is_empty() {
+            if is_diagnostic_source(&source.source_name)
+                || is_excluded_loot_log_source(&source.source_name)
+                || source.loot.is_empty()
+            {
                 continue;
             }
             if !categories.matches(&source) {
