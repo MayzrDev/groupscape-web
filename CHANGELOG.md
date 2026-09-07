@@ -14,6 +14,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The member panel's tab bar is now split across two rows so there's room for the new Boss KC tab without crowding the rest, grouped so Inventory/Equipment/Skills/Slayer sit up top and Quests/Diaries/Collection Log/Combat Achievements/Boss KC sit below.
 - The Boss KC tab icon is now Vorkath's head instead of Zulrah's fang.
 - Hovering a boss/clue/minigame in the Boss KC tab now shows its name and kill count, and clicking it opens the OSRS Wiki page for it in a new tab.
+- On mobile, the side panel toggle button moved to the bottom-left corner (above the Discord button). The admin dashboard shortcut button moved from the top-right to the bottom-right corner.
 
 ## [1.0.409] - 2026-09-06
 

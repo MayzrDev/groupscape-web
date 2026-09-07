@@ -61,24 +61,19 @@ button.side-panel__mobile-toggle {
     align-items: center;
     justify-content: center;
     position: fixed;
-    right: 12px;
-    bottom: 12px;
+    left: 12px;
+    bottom: 56px;
     width: 48px;
     height: 48px;
     padding: 0;
     border-radius: 50%;
     z-index: 31;
     pointer-events: auto;
-    transition: right 0.2s ease-out;
   }
 
   .side-panel__mobile-toggle img {
     width: 24px;
     height: 24px;
-  }
-
-  side-panel.side-panel--open .side-panel__mobile-toggle {
-    right: calc(min(330px, 85vw) + 12px);
   }
 
   .side-panel--open .side-panel__backdrop {
