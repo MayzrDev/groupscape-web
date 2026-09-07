@@ -2,7 +2,7 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
-## [1.0.420] - 2026-09-07
+## [1.0.421] - 2026-09-07
 
 ### Added
 - Opening the Barrows chest or the Moons of Peril reward chest now logs a single activity feed entry naming exactly which brothers/moons you defeated that run, e.g. "Barrows (Dharok, Verac, Torag)" or "Moons of Peril (Eclipse, Blood)" - Moons of Peril kills weren't shown anywhere before this.
