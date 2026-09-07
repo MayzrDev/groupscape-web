@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.433] - 2026-09-08
+
+### Fixed
+- Moons of Peril kill entries in the activity feed and toast notifications no longer merge two different moon combos into one misleading "x2" - each combo (e.g. "Eclipse, Blue, Blood" vs. just "Blue") now shows as its own entry with its own loot.
+
 ## [1.0.421] - 2026-09-07
 
 ### Added

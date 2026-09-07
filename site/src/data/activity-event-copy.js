@@ -133,6 +133,23 @@ export function killGroupKey(event) {
   return `${event.member_name}|${npc}`;
 }
 
+// Order-independent comparison of two kill payloads' sub_kills (combo bosses only - Barrows/Moons
+// of Peril, see `KillEvent::sub_kills` server-side). A combo kill whose sub_kills differ from the
+// row/toast it would otherwise fold into (e.g. one Moons attempt killing Eclipse+Blue+Blood, the
+// next only Blue) is a distinct kill, not a repeat of the same one - merging it would silently
+// drop its own breakdown (only the first event's sub_kills ever got kept) and misreport it as
+// "x2" of the earlier combo, so callers should skip merging when this returns false. Kill order
+// can legitimately differ between two attempts that still killed the exact same sub-bosses, so
+// this only cares about the set, not the sequence.
+export function subKillsMatch(payloadA, payloadB) {
+  const a = payloadA?.subKills || payloadA?.sub_kills || [];
+  const b = payloadB?.subKills || payloadB?.sub_kills || [];
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((label, i) => label === sortedB[i]);
+}
+
 // Same self-hosted RuneLite-hiscore-style icon the loot log uses per boss (see
 // `loot-log-group.js`'s `iconUrl` getter) - null falls back to no icon for NPCs outside that set.
 export function bossIconFor(npcName) {

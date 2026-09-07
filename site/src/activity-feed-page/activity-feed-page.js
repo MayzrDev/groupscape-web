@@ -5,7 +5,7 @@ import { adminViewSession } from "../data/admin-view-session";
 import { confirmDialogManager } from "../confirm-dialog/confirm-dialog-manager";
 import { pubsub } from "../data/pubsub";
 import { utility } from "../utility";
-import { activityDisplayType, killGroupKey, KILL_MERGE_WINDOW_MS } from "../data/activity-event-copy";
+import { activityDisplayType, killGroupKey, KILL_MERGE_WINDOW_MS, subKillsMatch } from "../data/activity-event-copy";
 
 const EVENT_TYPES = [
   [null, "All"],
@@ -292,7 +292,17 @@ export class ActivityFeedPage extends BaseElement {
       const key = groupKey(displayType, event);
       const group = this.feedGroups.get(key);
       const eventTime = new Date(event.occurred_at).getTime();
-      if (group && Math.abs(eventTime - new Date(group.event.occurred_at).getTime()) <= KILL_MERGE_WINDOW_MS) {
+      // A combo kill (Barrows/Moons of Peril) whose sub_kills differ from the row it would
+      // otherwise fold into (e.g. one Moons attempt killing Eclipse+Blue+Blood, the next only
+      // Blue) is a distinct kill, not a repeat of the same one - merging it would silently drop
+      // its own breakdown (only the first event's sub_kills ever got kept) and misreport it as
+      // "x2" of the earlier combo. Fall through to a fresh row instead.
+      const sameSubKills = displayType !== "kill" || subKillsMatch(group?.event.payload, event.payload);
+      if (
+        group &&
+        sameSubKills &&
+        Math.abs(eventTime - new Date(group.event.occurred_at).getTime()) <= KILL_MERGE_WINDOW_MS
+      ) {
         group.event.aggregateCount = (group.event.aggregateCount || 1) + 1;
         if (displayType === "kill") {
           group.event.payload = {

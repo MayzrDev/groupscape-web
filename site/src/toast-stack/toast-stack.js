@@ -6,6 +6,7 @@ import {
   activityDisplayType,
   killGroupKey,
   KILL_MERGE_WINDOW_MS,
+  subKillsMatch,
 } from "../data/activity-event-copy";
 import { pubsub } from "../data/pubsub";
 
@@ -86,6 +87,9 @@ export class ToastStack extends BaseElement {
     const key = this.groupKey(displayType, toast.event);
     const group = this.killToastGroups.get(key);
     if (!group) return false;
+    // A combo kill (Barrows/Moons of Peril) whose sub_kills differ from the toast it would
+    // otherwise fold into is a distinct kill, not a repeat - see `subKillsMatch`.
+    if (displayType === "kill" && !subKillsMatch(group.toast.event.payload, toast.event.payload)) return false;
     const eventTime = new Date(toast.event.occurred_at).getTime();
     const groupTime = new Date(group.toast.event.occurred_at).getTime();
     if (Math.abs(eventTime - groupTime) > KILL_MERGE_WINDOW_MS) return false;
