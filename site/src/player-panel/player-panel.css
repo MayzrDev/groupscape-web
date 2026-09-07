@@ -79,11 +79,11 @@ player-panel + player-panel {
 }
 
 .player-panel__minibar-row--top {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
 }
 
 .player-panel__minibar-row--bottom {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
 }
 
 player-panel.expanded .player-panel__minibar {
