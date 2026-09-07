@@ -12,6 +12,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Individual Barrows brother and Moon kills no longer show up on their own in the activity feed, toast notifications, or Discord kill webhook - only the combined chest-opening entry does now.
 - The Set Bonus dialog's "Other Sets" list is now split into collapsible Combat and Skilling groups, so it's faster to find the set you're looking for.
 - The member panel's tab bar is now split across two rows so there's room for the new Boss KC tab without crowding the rest, grouped so Inventory/Equipment/Skills/Slayer sit up top and Quests/Diaries/Collection Log/Combat Achievements/Boss KC sit below.
+- The Boss KC tab icon is now Vorkath's head instead of Zulrah's fang.
 
 ## [1.0.409] - 2026-09-06
 
