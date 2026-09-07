@@ -84,3 +84,43 @@ export const BOSS_ICON_SLUGS = new Set([
 
 // Every clue tier has an icon - keyed directly by clue_tier (not slugified npc names).
 export const CLUE_TIER_ICONS = new Set(["beginner", "easy", "medium", "hard", "elite", "master"]);
+
+// Shared placeholder for any hiscores boss/clue/minigame entry with no matching local icon (see
+// HISCORE_BOSS_ICON_GAPS below and activity-icons.js's own gap set) - a neutral "?" tile rather
+// than blocking the boss-kc-panel tab on a missing asset.
+export const HISCORE_ICON_PLACEHOLDER = "/icons/hiscore/activity-icon-placeholder.png";
+
+// The live OSRS hiscores' `activities` boss names (server/src/hiscores.rs's ACTIVITY_DEFS `key`
+// slugs - ground-truthed against a real hiscores response 2026-09-07) don't all slugify to an
+// existing file in BOSS_ICON_SLUGS above - some are punctuation/spacing differences from the
+// same boss, some are a raid's separate difficulty variant sharing its base raid's icon. Maps
+// boss-kc-panel's hiscores `key` -> the existing icon slug to actually use.
+export const HISCORE_BOSS_ICON_OVERRIDES = {
+  barrows_chests: "barrows",
+  chambers_of_xeric_cm: "chambers_of_xeric",
+  mimic: "the_mimic",
+  nex: "the_nex",
+  nightmare: "nightmare_of_ashihama",
+  the_gauntlet: "crystalline_hunllef",
+  the_corrupted_gauntlet: "corrupted_hunllef",
+  theatre_of_blood_hard_mode: "theatre_of_blood",
+  tombs_of_amascut_expert_mode: "tombs_of_amascut",
+  // "Colosseum Glory" (a minigame-category hiscores stat, not a boss) and "Rifts closed" reuse
+  // existing boss-slot icons that already depict their minigame (Fortis Colosseum / Guardians of
+  // the Rift) - see activity-icons.js's ACTIVITY_ICON_OVERRIDES for where these are consumed.
+};
+
+// hiscores `key`s ground-truthed as having no matching icon anywhere in this codebase's existing
+// set (as of the 2026-09-07 ground-truthing pass) - rendered with HISCORE_ICON_PLACEHOLDER
+// instead. "Lunar Chests" has no icon in this project's boss set and no icon in wise-old-man's
+// bundled hiscore icon set either (see activity-icons.js's header comment for why that's this
+// project's source for new hiscore-style icons).
+export const HISCORE_BOSS_ICON_GAPS = new Set(["lunar_chests"]);
+
+// Resolves a boss-kc-panel hiscores `key` (boss category only) to its icon URL, applying the
+// override table above and falling back to the shared placeholder for a documented gap.
+export function hiscoreBossIconUrl(key) {
+  if (HISCORE_BOSS_ICON_GAPS.has(key)) return HISCORE_ICON_PLACEHOLDER;
+  const slug = HISCORE_BOSS_ICON_OVERRIDES[key] ?? key;
+  return BOSS_ICON_SLUGS.has(slug) ? `/icons/hiscore/bosses/${slug}.png` : HISCORE_ICON_PLACEHOLDER;
+}

@@ -245,6 +245,7 @@ async fn main() -> std::io::Result<()> {
             .service(authed::reroll_group_token)
             .service(authed::delete_group)
             .service(authed::get_portrait)
+            .service(authed::get_boss_kc)
             .service(
                 web::resource("/update-portrait/{member_name}")
                     .app_data(web::PayloadConfig::new(5_000_000))

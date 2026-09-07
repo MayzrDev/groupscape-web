@@ -70,8 +70,20 @@ player-panel + player-panel {
 }
 
 .player-panel__minibar {
+  display: flex;
+  flex-direction: column;
+}
+
+.player-panel__minibar-row {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+}
+
+.player-panel__minibar-row--top {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.player-panel__minibar-row--bottom {
+  grid-template-columns: repeat(3, 1fr);
 }
 
 player-panel.expanded .player-panel__minibar {
@@ -108,6 +120,7 @@ player-panel.expanded .player-panel__content {
 
 .player-panel__collection-log img,
 .player-panel__combat-achievements img,
-.player-panel__slayer-task img {
+.player-panel__slayer-task img,
+.player-panel__boss-kc img {
   image-rendering: initial;
 }

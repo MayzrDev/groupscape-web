@@ -7,6 +7,7 @@ use crate::db;
 use crate::discord;
 use crate::drop_rates;
 use crate::error::ApiError;
+use crate::hiscores;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::loot_log_search::{combat_level, numeric_clause_matches, parse_numeric_clause};
@@ -2056,6 +2057,43 @@ pub async fn get_portrait(
             .content_type("application/octet-stream")
             .body(mesh)),
         None => Ok(HttpResponse::NotFound().finish()),
+    }
+}
+
+/// Live OSRS hiscores boss/clue/minigame kill counts for a group member (the `boss-kc-panel`
+/// frontend tab) - fetched fresh from Jagex every call (see `hiscores::get_boss_kc`'s doc
+/// comment for the short in-flight dedupe that protects against a request storm), not
+/// GroupScape's own self-tracked kill-count system. `member_name` doubles as the account's RSN
+/// (see `groupscape.members`' doc comment / `db::is_member_in_group`), so no extra RSN lookup is
+/// needed beyond confirming the name belongs to this group.
+#[get("/boss-kc/{member_name}")]
+pub async fn get_boss_kc(
+    auth: Authenticated,
+    path: web::Path<(String, String)>,
+    db_pool: web::Data<Pool>,
+) -> Result<HttpResponse, Error> {
+    let (_group_name, member_name) = path.into_inner();
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    if !db::is_member_in_group(&client, auth.group_id, &member_name).await? {
+        return Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "kind": "not_found",
+            "message": "That member is not in this group",
+        })));
+    }
+
+    match hiscores::get_boss_kc(&member_name).await {
+        Ok(response) => Ok(HttpResponse::Ok().json(response)),
+        Err(hiscores::HiscoresError::NotFound) => Ok(HttpResponse::NotFound().json(serde_json::json!({
+            "kind": "not_found",
+            "message": "Hiscores profile not found - it may be private, or the account may not exist",
+        }))),
+        Err(hiscores::HiscoresError::Unavailable(reason)) => {
+            log::warn!("hiscores fetch failed for {member_name}: {reason}");
+            Ok(HttpResponse::BadGateway().json(serde_json::json!({
+                "kind": "unavailable",
+                "message": "OSRS hiscores are temporarily unavailable",
+            })))
+        }
     }
 }
 

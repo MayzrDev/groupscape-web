@@ -17,6 +17,7 @@ pub mod diary_tiers;
 pub mod discord;
 pub mod drop_rates;
 pub mod error;
+pub mod hiscores;
 pub mod item_bonuses;
 pub mod item_names;
 pub mod item_wiki_icons;

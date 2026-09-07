@@ -127,6 +127,10 @@ class Api {
     return `${this.groupScopeUrl}/portrait`;
   }
 
+  get bossKcUrl() {
+    return `${this.groupScopeUrl}/boss-kc`;
+  }
+
   get activityEventsUrl() {
     return `${this.groupScopeUrl}/get-activity-events`;
   }
@@ -600,6 +604,32 @@ class Api {
       throw new Error(`get-item-bonuses ${itemId} failed: ${response.status}`);
     }
     return response.json();
+  }
+
+  // Live OSRS hiscores boss/clue/minigame kill counts for `memberName` (boss-kc-panel) - fetched
+  // fresh from Jagex on every call server-side, never cached here. Returns `{ ok: true, data }`
+  // on success or `{ ok: false, kind, message }` on failure (`kind` is `"not_found"` for a
+  // private/nonexistent hiscores profile or `"unavailable"` for a network/5xx failure - see
+  // `hiscores::HiscoresError` server-side) so the panel can show a distinct message per case.
+  async getBossKc(memberName) {
+    let response;
+    try {
+      response = await fetch(`${this.bossKcUrl}/${encodeURIComponent(memberName)}`, {
+        headers: { Authorization: this.authHeader },
+      });
+    } catch {
+      return { ok: false, kind: "unavailable", message: "Could not reach the server" };
+    }
+
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      return {
+        ok: false,
+        kind: body?.kind ?? "unavailable",
+        message: body?.message ?? "Failed to load hiscores",
+      };
+    }
+    return { ok: true, data: body };
   }
 
   async getPortrait(memberName) {

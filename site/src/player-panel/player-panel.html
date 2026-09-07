@@ -5,30 +5,37 @@
   <player-stats player-name="${this.playerName}"></player-stats>
 </div>
 <div class="player-panel__minibar">
-  <button type="button" data-component="player-inventory">
-    <img src="/ui/777-0.png" width="26" height="28" />
-  </button>
-  <button type="button" data-component="player-equipment">
-    <img src="/ui/778-0.png" width="27" height="32" />
-  </button>
-  <button type="button" data-component="player-skills">
-    <img src="/ui/3579-0.png" width="23" height="22" />
-  </button>
-  <button type="button" data-component="player-quests">
-    <img src="/ui/776-0.png" width="22" height="22" />
-  </button>
-  <button type="button" data-component="player-diaries">
-    <img src="/ui/1298-0.png" width="22" height="22" />
-  </button>
-  <button type="button" class="player-panel__collection-log">
-    <img src="/icons/items/22711.webp" width="32" height="28" />
-  </button>
-  <button type="button" class="player-panel__combat-achievements">
-    <img src="/icons/items/25956.webp" width="26" height="26" />
-  </button>
-  <button type="button" class="player-panel__slayer-task" data-component="slayer-panel">
-    <img src="/icons/slayer/slayer-icon.png" width="24" height="24" />
-  </button>
+  <div class="player-panel__minibar-row player-panel__minibar-row--top">
+    <button type="button" data-component="player-inventory">
+      <img src="/ui/777-0.png" width="26" height="28" />
+    </button>
+    <button type="button" data-component="player-equipment">
+      <img src="/ui/778-0.png" width="27" height="32" />
+    </button>
+    <button type="button" data-component="player-skills">
+      <img src="/ui/3579-0.png" width="23" height="22" />
+    </button>
+    <button type="button" data-component="player-quests">
+      <img src="/ui/776-0.png" width="22" height="22" />
+    </button>
+    <button type="button" data-component="player-diaries">
+      <img src="/ui/1298-0.png" width="22" height="22" />
+    </button>
+    <button type="button" class="player-panel__slayer-task" data-component="slayer-panel">
+      <img src="/icons/slayer/slayer-icon.png" width="24" height="24" />
+    </button>
+  </div>
+  <div class="player-panel__minibar-row player-panel__minibar-row--bottom">
+    <button type="button" class="player-panel__collection-log">
+      <img src="/icons/items/22711.webp" width="32" height="28" />
+    </button>
+    <button type="button" class="player-panel__combat-achievements">
+      <img src="/icons/items/25956.webp" width="26" height="26" />
+    </button>
+    <button type="button" class="player-panel__boss-kc" data-component="boss-kc-panel" title="Boss KC">
+      <img src="/icons/hiscore/bosses/zulrah.png" width="24" height="24" />
+    </button>
+  </div>
 </div>
 <div class="player-panel__content"></div>
 ${ this.portraitMode === "full" ? `<player-portrait
