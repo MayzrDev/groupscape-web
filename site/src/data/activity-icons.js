@@ -1,4 +1,5 @@
 import { HISCORE_ICON_PLACEHOLDER } from "./boss-icons";
+import { npcWikiUrl, clueWikiUrl } from "./activity-event-copy";
 
 // Icons for the boss-kc-panel's "Clues & Minigames" section - the live OSRS hiscores' clue
 // scroll / minigame / leagues activities, which (unlike bosses) had no existing local icon
@@ -53,6 +54,34 @@ export const ACTIVITY_ICON_GAPS = new Set([
   "bounty_hunter_legacy_hunter",
   "bounty_hunter_legacy_rogue",
 ]);
+
+// Wiki page titles for minigame/leagues hiscores keys whose page name doesn't match the
+// hiscores' own name (e.g. "LMS - Rank" isn't a wiki title; "Last Man Standing" is). Keys with no
+// sensible target page (retired/UI-only stats with no wiki article) are omitted - those cells
+// render unclickable rather than link somewhere wrong.
+const MINIGAME_WIKI_TITLES = {
+  lms_rank: "Last Man Standing",
+  pvp_arena_rank: "PvP Arena",
+  soul_wars_zeal: "Soul Wars",
+  bounty_hunter_hunter: "Bounty Hunter",
+  bounty_hunter_rogue: "Bounty Hunter",
+  rifts_closed: "Guardians of the Rift",
+  colosseum_glory: "Fortis Colosseum",
+  collections_logged: "Collection log",
+  league_points: "Leagues",
+};
+
+// Resolves a boss-kc-panel hiscores activity to its OSRS Wiki page, or null when there's no
+// sensible page to link to (see MINIGAME_WIKI_TITLES above).
+export function activityWikiUrl(activity) {
+  if (activity.category === "boss") return npcWikiUrl(activity.name);
+  if (activity.category === "clue") {
+    if (activity.key === "clue_all") return "https://oldschool.runescape.wiki/w/Clue_scroll";
+    return clueWikiUrl(activity.key.slice("clue_".length));
+  }
+  const title = MINIGAME_WIKI_TITLES[activity.key];
+  return title ? `https://oldschool.runescape.wiki/w/${title.replace(/ /g, "_")}` : null;
+}
 
 // Resolves a boss-kc-panel hiscores `key` (clue/minigame category only) to its icon URL.
 export function activityIconUrl(key) {

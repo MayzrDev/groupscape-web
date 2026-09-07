@@ -1,7 +1,7 @@
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { hiscoreBossIconUrl } from "../data/boss-icons";
-import { activityIconUrl } from "../data/activity-icons";
+import { activityIconUrl, activityWikiUrl } from "../data/activity-icons";
 
 /**
  * Minibar tab (same swap-into-content pattern as `slayer-panel`/`player-skills`/etc, see
@@ -115,11 +115,17 @@ export class BossKcPanel extends BaseElement {
     const tracked = activity.kc >= 0;
     const iconUrl = activity.category === "boss" ? hiscoreBossIconUrl(activity.key) : activityIconUrl(activity.key);
     const value = tracked ? activity.kc.toLocaleString() : "&mdash;&mdash;";
+    const tooltip = `${activity.name} - ${tracked ? activity.kc.toLocaleString() : "Untracked"}`;
+    const wikiUrl = activityWikiUrl(activity);
+    const tag = wikiUrl ? "a" : "div";
+    const attrs = wikiUrl ? `href="${wikiUrl}" target="_blank" rel="noopener"` : "";
     return `
-      <div class="boss-kc-panel__cell${tracked ? "" : " boss-kc-panel__cell--untracked"}" title="${activity.name}">
+      <${tag} class="boss-kc-panel__cell${
+      tracked ? "" : " boss-kc-panel__cell--untracked"
+    }" title="${tooltip}" ${attrs}>
         <img class="boss-kc-panel__icon" src="${iconUrl}" alt="${activity.name}" />
         <span class="boss-kc-panel__value">${value}</span>
-      </div>
+      </${tag}>
     `;
   }
 

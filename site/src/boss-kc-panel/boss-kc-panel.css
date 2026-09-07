@@ -38,6 +38,14 @@ boss-kc-panel {
   border: 1px solid var(--light-border);
   border-radius: 3px;
   min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+
+a.boss-kc-panel__cell:hover {
+  background: rgba(255, 152, 31, 0.12);
+  border-color: var(--orange);
+  cursor: pointer;
 }
 
 .boss-kc-panel__icon {
