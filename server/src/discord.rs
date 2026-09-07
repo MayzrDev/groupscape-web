@@ -926,20 +926,32 @@ pub fn dispatch_event_webhook(
                 // what a group actually wants pinged in Discord. Uses the same curated boss list
                 // as the activity feed (`notable_npcs`).
                 if settings.notify_kills && notable_npcs::is_notable(&kill.npc_name) {
-                    // Prefer the account's real in-game KC (parsed client-side from the "kill
-                    // count is" chat line); only fall back to counting this server's own kill
-                    // log when that line didn't arrive in time, e.g. right at plugin startup.
-                    let kc = match kill.account_kc {
-                        Some(kc) => kc as i64,
-                        None => db::count_kills_for_member_npc(&client, group_id, &member_name, &kill.npc_name)
-                            .await
-                            .unwrap_or_else(|err| {
-                                log::warn!("discord: failed to load kill count: {}", err);
-                                0
-                            }),
-                    };
-                    let description = format!("{} killed [{}]({})", member_name, kill.npc_name, wiki_url(&kill.npc_name));
-                    let mut fields = vec![("Kill count".to_string(), kc.to_string())];
+                    let description = format!(
+                        "{} killed [{}]({}){}",
+                        member_name,
+                        kill.npc_name,
+                        wiki_url(&kill.npc_name),
+                        kill.sub_kills_suffix()
+                    );
+                    // A combo kill ("Barrows"/"Moons of Peril") has no KC of its own to report -
+                    // only its individual sub-bosses do, and those are tracked silently (excluded
+                    // from `notable_npcs` on purpose - see `KillEvent::sub_kills`).
+                    let mut fields = Vec::new();
+                    if kill.sub_kills.is_none() {
+                        // Prefer the account's real in-game KC (parsed client-side from the "kill
+                        // count is" chat line); only fall back to counting this server's own kill
+                        // log when that line didn't arrive in time, e.g. right at plugin startup.
+                        let kc = match kill.account_kc {
+                            Some(kc) => kc as i64,
+                            None => db::count_kills_for_member_npc(&client, group_id, &member_name, &kill.npc_name)
+                                .await
+                                .unwrap_or_else(|err| {
+                                    log::warn!("discord: failed to load kill count: {}", err);
+                                    0
+                                }),
+                        };
+                        fields.push(("Kill count".to_string(), kc.to_string()));
+                    }
                     if let Some(loot) = &kill.loot {
                         let value = total_loot_value(loot, &unauthed::get_ge_prices_map());
                         if value > 0 {

@@ -265,9 +265,17 @@ export function activityEventDescription(event, format = {}) {
       // repeat kills/deaths against the same boss by the same member within an hour into one row
       // (see `mergeOrCreateRow` in activity-feed-page.js) - it's never sent by the server.
       const count = event.aggregateCount || 1;
-      return `${member} killed ${wrapSubject(npc || "an NPC", "monster", npc && npcWikiUrl(npc), bossIconFor(npc))}${
-        count > 1 ? ` &times;${count}` : ""
-      }${noLoot ? " — no loot" : ""}`;
+      // Combo kills only (e.g. "Barrows"/"Moons of Peril" - see `KillEvent::sub_kills`
+      // server-side): names whichever sub-bosses were actually killed that run, e.g.
+      // "Moons of Peril (Eclipse, Blood)".
+      const subKills = payload.subKills || payload.sub_kills;
+      const subKillsSuffix = subKills?.length ? ` (${subKills.join(", ")})` : "";
+      return `${member} killed ${wrapSubject(
+        npc || "an NPC",
+        "monster",
+        npc && npcWikiUrl(npc),
+        bossIconFor(npc)
+      )}${subKillsSuffix}${count > 1 ? ` &times;${count}` : ""}${noLoot ? " — no loot" : ""}`;
     }
     case "death": {
       const killer = payload.killerName || payload.killer_name;

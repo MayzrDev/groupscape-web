@@ -81,9 +81,11 @@ static NOTABLE_NPCS: LazyLock<HashSet<String>> = LazyLock::new(|| {
         "Crystalline Hunllef",
         "Corrupted Hunllef",
         "Spindel",
-        "Blood Moon",
-        "Blue Moon",
-        "Eclipse Moon",
+        // The three moons themselves are deliberately excluded - individual moon kills still
+        // ship and count towards KC, but only the combined "Moons of Peril" combo kill (synthesized
+        // by the plugin's ComboKillEvents on Lunar Chest loot) should surface in the feed/toasts/
+        // Discord. See ComboKillEvents' class doc.
+        "Moons of Peril",
         "Brutus",
         "Demonic Brutus",
         "Revenant maledictus",

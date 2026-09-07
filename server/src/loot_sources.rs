@@ -6,13 +6,14 @@ use crate::drop_rates::slugify_npc_name;
 /// Curated set of chest/instance reward sources - RuneLite reports these as
 /// `LootRecordType.EVENT` (source name, e.g. "Chambers of Xeric"), never correlated to any NPC
 /// kill, so they need their own allowlist distinct from [`crate::notable_npcs`]'s kill-feed gate.
+/// Doesn't include "Barrows"/"Lunar Chest" - those are combo chests, claimed by the plugin's
+/// `ComboKillEvents` into a `KillEvent` instead of a standalone loot event (see `KillEvent::sub_kills`).
 /// Kept in sync manually with the plugin's `ChestLootSourceNames.NAMES`.
 static CHEST_SOURCES: LazyLock<HashSet<String>> = LazyLock::new(|| {
     let mut names: Vec<&str> = vec![
         "Chambers of Xeric",
         "Theatre of Blood",
         "Tombs of Amascut",
-        "Barrows",
         "The Gauntlet",
         "The Corrupted Gauntlet",
         "Wintertodt",
@@ -66,7 +67,6 @@ mod tests {
         assert!(is_known("Chambers of Xeric"));
         assert!(is_known("Theatre of Blood"));
         assert!(is_known("Tombs of Amascut"));
-        assert!(is_known("Barrows"));
         assert!(is_known("The Gauntlet"));
         assert!(is_known("The Corrupted Gauntlet"));
         assert!(is_known("Guardians of the Rift"));

@@ -313,6 +313,26 @@ pub struct KillEvent {
     /// callers fall back to a server-tracked count in that case.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_kc: Option<i32>,
+    /// Set only for a "combo" kill the plugin's `ComboKillEvents` synthesizes on a shared reward
+    /// chest opening (`npc_name` "Barrows"/"Moons of Peril") - the short display labels of
+    /// whichever sub-bosses were actually killed that run, in kill order (e.g. `["Eclipse",
+    /// "Blood"]`). Absent for every ordinary single-NPC kill. Reused as-is (not a dedicated event
+    /// type) so any future combo-reward boss only needs a plugin-side definition, not a new
+    /// server model/message path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sub_kills: Option<Vec<String>>,
+}
+impl KillEvent {
+    /// `" (Eclipse, Blood, Blue)"`-style suffix for a combo kill's `sub_kills`, empty string for
+    /// an ordinary kill - mirrors `RaidDifficulty`'s suffix role in the raid completion message,
+    /// but built here rather than as a `RaidDifficulty`-style enum since a combo's sub-boss set is
+    /// open-ended (1-6+ entries) rather than one of a few fixed difficulty tiers.
+    pub fn sub_kills_suffix(&self) -> String {
+        match &self.sub_kills {
+            Some(labels) if !labels.is_empty() => format!(" ({})", labels.join(", ")),
+            _ => String::new(),
+        }
+    }
 }
 
 /// Distinguishes a chest/instance reward (e.g. Chambers of Xeric, Barrows) from a clue scroll
