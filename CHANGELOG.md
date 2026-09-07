@@ -9,6 +9,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Changed
 - Individual Barrows brother and Moon kills no longer show up on their own in the activity feed, toast notifications, or Discord kill webhook - only the combined chest-opening entry does now.
+- The Set Bonus dialog's "Other Sets" list is now split into collapsible Combat and Skilling groups, so it's faster to find the set you're looking for.
 
 ## [1.0.409] - 2026-09-06
 

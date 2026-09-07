@@ -43,6 +43,7 @@ export async function detectActiveSets(equippedItemIds) {
     const missingItemIds = missingPieces.map((variantIds) => variantIds[0]);
     return {
       name: set.name,
+      category: set.category,
       effect: set.effect,
       wikiUrl: wikiUrl(set),
       image: set.image,

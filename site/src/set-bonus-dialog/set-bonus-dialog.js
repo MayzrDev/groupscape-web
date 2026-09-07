@@ -1,6 +1,9 @@
 import { BaseElement } from "../base-element/base-element";
 import { detectActiveSets } from "../data/set-bonus";
 
+const OTHERS_CATEGORY_ORDER = ["combat", "skilling"];
+const OTHERS_CATEGORY_LABELS = { combat: "Combat", skilling: "Skilling" };
+
 /** Small popup listing curated item-set effects (Void, Barrows, God Wars, ...) and whether the
  * player currently has each active/partially equipped - created and appended on demand from
  * `player-equipment.js`'s "Set Bonus" button, matching `player-panel.js`'s
@@ -15,6 +18,7 @@ export class SetBonusDialog extends BaseElement {
     // Set by the caller before appending to the DOM (see player-equipment.js).
     this.equippedItemIds = [];
     this.othersOpen = false;
+    this.othersCategoryOpen = {};
   }
 
   html() {
@@ -93,6 +97,23 @@ export class SetBonusDialog extends BaseElement {
     `;
   }
 
+  renderOthersCategory(category, sets) {
+    const isOpen = !!this.othersCategoryOpen[category];
+    return `
+      <div class="set-bonus-dialog__others-category" data-category="${category}" data-open="${isOpen}">
+        <button class="set-bonus-dialog__others-category-toggle" aria-expanded="${isOpen}">
+          <span>${OTHERS_CATEGORY_LABELS[category]} (${sets.length})</span>
+          <span class="set-bonus-dialog__others-category-chevron" aria-hidden="true"></span>
+        </button>
+        <div class="set-bonus-dialog__others-category-panel">
+          <div class="set-bonus-dialog__others-category-panel-inner">
+            <div class="set-bonus-dialog__others-list">${sets.map((set) => this.renderOtherRow(set)).join("")}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   async renderSets() {
     const sets = await detectActiveSets(this.equippedItemIds);
     const active = sets.filter((set) => set.active);
@@ -121,6 +142,11 @@ export class SetBonusDialog extends BaseElement {
       `
       : "";
 
+    const othersByCategory = OTHERS_CATEGORY_ORDER.map((category) => ({
+      category,
+      sets: others.filter((set) => set.category === category),
+    })).filter((group) => group.sets.length);
+
     const othersSection = others.length
       ? `
         <section class="set-bonus-dialog__others" data-open="${this.othersOpen}">
@@ -132,7 +158,9 @@ export class SetBonusDialog extends BaseElement {
           </button>
           <div class="set-bonus-dialog__others-panel" id="set-bonus-others-panel">
             <div class="set-bonus-dialog__others-panel-inner">
-              <div class="set-bonus-dialog__others-list">${others.map((set) => this.renderOtherRow(set)).join("")}</div>
+              <div class="set-bonus-dialog__others-categories">${othersByCategory
+                .map((group) => this.renderOthersCategory(group.category, group.sets))
+                .join("")}</div>
             </div>
           </div>
         </section>
@@ -145,6 +173,10 @@ export class SetBonusDialog extends BaseElement {
     if (toggle) {
       this.eventListener(toggle, "click", this.toggleOthers.bind(this));
     }
+
+    for (const categoryToggle of this.querySelectorAll(".set-bonus-dialog__others-category-toggle")) {
+      this.eventListener(categoryToggle, "click", this.toggleOthersCategory.bind(this));
+    }
   }
 
   toggleOthers() {
@@ -153,6 +185,15 @@ export class SetBonusDialog extends BaseElement {
     const toggle = this.querySelector(".set-bonus-dialog__others-toggle");
     section.setAttribute("data-open", String(this.othersOpen));
     toggle.setAttribute("aria-expanded", String(this.othersOpen));
+  }
+
+  toggleOthersCategory(evt) {
+    const section = evt.currentTarget.closest(".set-bonus-dialog__others-category");
+    const category = section.dataset.category;
+    const isOpen = !this.othersCategoryOpen[category];
+    this.othersCategoryOpen[category] = isOpen;
+    section.setAttribute("data-open", String(isOpen));
+    evt.currentTarget.setAttribute("aria-expanded", String(isOpen));
   }
 }
 customElements.define("set-bonus-dialog", SetBonusDialog);
