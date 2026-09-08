@@ -32,7 +32,16 @@ const SESSION_MERGE_WINDOW_MS = 45 * 60 * 1000;
 // calls) rather than risk the runaway-fetch tab freeze this file has been bitten by before.
 const GROUP_CLOSE_FETCH_CAP = 5;
 const MAX_RESOLVED_ITEM_IDS = 200;
-const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k", "vorkath && >1m"];
+const PLACEHOLDER_EXAMPLES = [
+  "zulrah",
+  ">1m",
+  "whip",
+  "732",
+  "master clue",
+  "<100k",
+  "vorkath && >1m",
+  "vorkath && >10kc",
+];
 const PLACEHOLDER_INTERVAL_MS = 2500;
 const PLACEHOLDER_FADE_MS = 400;
 const FILTER_CATEGORIES = [
@@ -61,6 +70,125 @@ function loadPersistedCategories() {
   return valid.length ? valid : [...ALL_CATEGORY_KEYS];
 }
 
+// Kill count ("kc") is a farming-session concept - the number of events merged into one
+// loot-log-group card (see that component's `countLabel`) - that only exists client-side after
+// session grouping, unlike the value/quantity/level clauses the server filters raw events on
+// (see loot_log_search.rs). So the raw search text is re-parsed here, independently of what the
+// server did with it, purely to decide whether to show/hide each session card by its live event
+// count. Mirrors loot_log_search.rs's `split_search_groups`/`parse_numeric_clause` grammar - keep
+// both in sync if either changes.
+const KILL_COUNT_WORDS = ["kc", "kills", "kill"];
+
+function parseNumericClauseJs(token) {
+  const t = token.trim();
+  if (!t) return null;
+  let op = "eq";
+  let rest = t;
+  if (rest.startsWith(">=")) {
+    op = "gte";
+    rest = rest.slice(2);
+  } else if (rest.startsWith("<=")) {
+    op = "lte";
+    rest = rest.slice(2);
+  } else if (rest.startsWith(">")) {
+    op = "gt";
+    rest = rest.slice(1);
+  } else if (rest.startsWith("<")) {
+    op = "lt";
+    rest = rest.slice(1);
+  } else if (rest.startsWith("=")) {
+    rest = rest.slice(1);
+  }
+  rest = rest.trim();
+  if (!rest) return null;
+
+  const lastChar = rest[rest.length - 1].toLowerCase();
+  let numberPart = rest;
+  let multiplier = 1;
+  if (lastChar === "k") {
+    numberPart = rest.slice(0, -1);
+    multiplier = 1_000;
+  } else if (lastChar === "m") {
+    numberPart = rest.slice(0, -1);
+    multiplier = 1_000_000;
+  } else if (lastChar === "b") {
+    numberPart = rest.slice(0, -1);
+    multiplier = 1_000_000_000;
+  }
+  const cleaned = numberPart.replace(/,/g, "");
+  if (!cleaned) return null;
+  const base = Number(cleaned);
+  if (!Number.isFinite(base)) return null;
+  return { op, value: base * multiplier };
+}
+
+function numericClauseMatchesJs(clause, candidate) {
+  switch (clause.op) {
+    case "gt":
+      return candidate > clause.value;
+    case "gte":
+      return candidate >= clause.value;
+    case "lt":
+      return candidate < clause.value;
+    case "lte":
+      return candidate <= clause.value;
+    default:
+      return Math.abs(candidate - clause.value) < 0.5;
+  }
+}
+
+// "&&" and the standalone word "and" (case-insensitive) split into AND-required groups; plain
+// whitespace does not, since NPC/item names routinely contain spaces.
+function splitSearchGroups(search) {
+  const spaced = search.replace(/&&/g, " && ");
+  const groups = [[]];
+  for (const word of spaced.split(/\s+/).filter(Boolean)) {
+    if (word === "&&" || word.toLowerCase() === "and") {
+      if (groups[groups.length - 1].length) groups.push([]);
+      continue;
+    }
+    groups[groups.length - 1].push(word);
+  }
+  return groups.filter((group) => group.length);
+}
+
+// Finds a kill-count clause within one AND-group of tokens, either attached to the number
+// ("10kc", like the k/m/b multiplier suffixes) or as its own following word ("10 kills"), and
+// returns the clause plus the group's remaining tokens with it removed.
+function extractKillCountClause(tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    const lower = token.toLowerCase();
+    for (const word of KILL_COUNT_WORDS) {
+      if (lower.length > word.length && lower.endsWith(word)) {
+        const clause = parseNumericClauseJs(token.slice(0, token.length - word.length));
+        if (clause) {
+          return { clause, rest: [...tokens.slice(0, i), ...tokens.slice(i + 1)] };
+        }
+      }
+    }
+  }
+  for (let i = 0; i < tokens.length - 1; i++) {
+    const clause = parseNumericClauseJs(tokens[i]);
+    if (clause && KILL_COUNT_WORDS.includes(tokens[i + 1].toLowerCase())) {
+      return { clause, rest: [...tokens.slice(0, i), ...tokens.slice(i + 2)] };
+    }
+  }
+  return { clause: null, rest: tokens };
+}
+
+// A group counts as a kill-count clause only when the whole group was that clause (e.g.
+// "vorkath && >10kc") - a group like "vorkath 10kc" (no separator) still needs "vorkath" checked
+// server-side too, so it's left alone here rather than being misread as an unconditional kc gate.
+function parseKillCountClauses(search) {
+  const clauses = [];
+  for (const group of splitSearchGroups(search || "")) {
+    const { clause, rest } = extractKillCountClause(group);
+    if (clause && rest.length === 0) clauses.push(clause);
+  }
+  return clauses;
+}
+
 export class LootLogPage extends BaseElement {
   constructor() {
     super();
@@ -82,6 +210,7 @@ export class LootLogPage extends BaseElement {
     this.autoLoadStreakEventsAdded = 0;
     this.autoLoadGaveUp = false;
     this.searchText = "";
+    this.killCountClauses = [];
     this.itemIds = [];
     this.categories = loadPersistedCategories();
     this.summary = { total_value: 0, event_count: 0 };
@@ -292,7 +421,14 @@ export class LootLogPage extends BaseElement {
     const raw = this.searchInput.value.trim();
     this.searchText = raw;
     this.itemIds = this.resolveItemIds(raw);
+    this.killCountClauses = parseKillCountClauses(raw);
     this.resetAndLoad();
+  }
+
+  // Whether a session card with this many merged events satisfies every kill-count clause in the
+  // current search (see `parseKillCountClauses`) - AND across clauses, same as every other group.
+  matchesKillCount(count) {
+    return this.killCountClauses.every((clause) => numericClauseMatchesJs(clause, count));
   }
 
   entryKey(event) {
@@ -325,12 +461,14 @@ export class LootLogPage extends BaseElement {
         entry.events.push(event);
         entry.element.group = this.buildGroupData(entry);
         entry.element.update();
+        entry.element.hidden = !this.matchesKillCount(entry.events.length);
         return;
       }
     }
     const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
+    newEntry.element.hidden = !this.matchesKillCount(newEntry.events.length);
     this.list.appendChild(newEntry.element);
     this.entryGroups.set(key, newEntry);
   }
@@ -349,6 +487,7 @@ export class LootLogPage extends BaseElement {
         entry.events.unshift(event);
         entry.element.group = this.buildGroupData(entry);
         entry.element.update();
+        entry.element.hidden = !this.matchesKillCount(entry.events.length);
         this.list.insertBefore(entry.element, this.list.firstChild);
         return;
       }
@@ -356,6 +495,7 @@ export class LootLogPage extends BaseElement {
     const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
+    newEntry.element.hidden = !this.matchesKillCount(newEntry.events.length);
     this.list.insertBefore(newEntry.element, this.list.firstChild);
     this.entryGroups.set(key, newEntry);
   }

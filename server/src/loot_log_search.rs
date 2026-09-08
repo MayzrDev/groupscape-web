@@ -140,6 +140,46 @@ pub fn numeric_clause_matches(clause: &NumericClause, candidate: i64) -> bool {
     }
 }
 
+/// Kill count ("kc") is a farming-session concept - the number of events merged into one
+/// loot-log-group card client-side (see loot-log-group.js's `countLabel`) - that only exists
+/// after the client merges raw events, so it can't be evaluated per-event here the way
+/// value/quantity/level clauses are. [`extract_kill_count_clause`] exists purely so a kc token
+/// doesn't get misread as a literal text/value token by [`crate::authed::build_matching_loot_log_event`]
+/// (which would wrongly exclude every event in the group); the actual kc filtering happens
+/// client-side in loot-log-page.js's `parseKillCountClauses`, which mirrors this grammar and must
+/// be kept in sync with it.
+const KILL_COUNT_WORDS: [&str; 3] = ["kc", "kills", "kill"];
+
+/// Finds a kill-count clause within one AND-group of tokens, either attached to the number
+/// (`10kc`, like the `k`/`m`/`b` multiplier suffixes) or as its own following word (`10 kills`),
+/// and returns the clause plus the group's remaining tokens with it removed. `None` if the group
+/// has no kill-count clause at all.
+pub fn extract_kill_count_clause(tokens: &[String]) -> (Option<NumericClause>, Vec<String>) {
+    for (i, token) in tokens.iter().enumerate() {
+        let lower = token.to_lowercase();
+        for word in KILL_COUNT_WORDS {
+            if lower.len() > word.len() && lower.ends_with(word) {
+                if let Some(clause) = parse_numeric_clause(&token[..token.len() - word.len()]) {
+                    let mut rest = tokens.to_vec();
+                    rest.remove(i);
+                    return (Some(clause), rest);
+                }
+            }
+        }
+    }
+    for i in 0..tokens.len().saturating_sub(1) {
+        if let Some(clause) = parse_numeric_clause(&tokens[i]) {
+            if KILL_COUNT_WORDS.iter().any(|w| tokens[i + 1].eq_ignore_ascii_case(w)) {
+                let mut rest = tokens.to_vec();
+                rest.remove(i + 1);
+                rest.remove(i);
+                return (Some(clause), rest);
+            }
+        }
+    }
+    (None, tokens.to_vec())
+}
+
 /// Splits a raw Loot Log search string into AND-separated condition groups: `&&` and the
 /// standalone word `and` (case-insensitive) both act as separators between groups, and the
 /// caller (`build_matching_loot_log_event`) requires every group to match. Plain whitespace is
@@ -245,5 +285,45 @@ mod tests {
     fn empty_and_separator_only_input_yields_no_groups() {
         assert!(split_search_groups("").is_empty());
         assert!(split_search_groups("&& and &&").is_empty());
+    }
+
+    fn strs(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn extracts_attached_kc_suffix() {
+        let (clause, rest) = extract_kill_count_clause(&strs(&[">10kc"]));
+        assert!(numeric_clause_matches(&clause.unwrap(), 11));
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn extracts_attached_kills_suffix() {
+        let (clause, rest) = extract_kill_count_clause(&strs(&["5kills"]));
+        assert!(numeric_clause_matches(&clause.unwrap(), 5));
+        assert!(rest.is_empty());
+    }
+
+    #[test]
+    fn extracts_two_token_kills_form() {
+        let (clause, rest) = extract_kill_count_clause(&strs(&["vorkath", ">10", "kills"]));
+        assert!(numeric_clause_matches(&clause.unwrap(), 11));
+        assert_eq!(rest, strs(&["vorkath"]));
+    }
+
+    #[test]
+    fn ten_k_alone_is_not_a_kill_count_clause() {
+        // "10k" is the existing thousands multiplier, not a kill-count suffix.
+        let (clause, rest) = extract_kill_count_clause(&strs(&[">10k"]));
+        assert!(clause.is_none());
+        assert_eq!(rest, strs(&[">10k"]));
+    }
+
+    #[test]
+    fn no_kill_count_clause_returns_tokens_unchanged() {
+        let (clause, rest) = extract_kill_count_clause(&strs(&["vorkath", ">1m"]));
+        assert!(clause.is_none());
+        assert_eq!(rest, strs(&["vorkath", ">1m"]));
     }
 }

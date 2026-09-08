@@ -10,7 +10,9 @@ use crate::error::ApiError;
 use crate::hiscores;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
-use crate::loot_log_search::{combat_level, numeric_clause_matches, parse_numeric_clause, split_search_groups};
+use crate::loot_log_search::{
+    combat_level, extract_kill_count_clause, numeric_clause_matches, parse_numeric_clause, split_search_groups,
+};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
@@ -1525,6 +1527,16 @@ fn build_matching_loot_log_event(
 
     let mut item_matched_in_any_group = vec![false; items.len()];
     for group in groups {
+        // A kill-count clause (e.g. `>10kc`) can't be evaluated per-event - it's a farming-session
+        // total the client computes after merging events (see `extract_kill_count_clause`'s doc
+        // comment). Strip it here so it isn't misread as a literal text token that would wrongly
+        // exclude this event; a group that was ONLY a kill-count clause imposes no server-side
+        // constraint at all, since the client applies it independently.
+        let (kill_count_clause, group) = extract_kill_count_clause(group);
+        if kill_count_clause.is_some() && group.is_empty() {
+            continue;
+        }
+
         let numeric_clauses: Vec<_> = group.iter().filter_map(|t| parse_numeric_clause(t)).collect();
         let text_tokens: Vec<String> = group
             .iter()
@@ -1657,6 +1669,21 @@ mod build_matching_loot_log_event_tests {
 
         assert!(call(&source, &ge_prices, "dust and >1m").is_some());
         assert!(call(&source, &ge_prices, "vorkath and >1m").is_none());
+    }
+
+    #[test]
+    fn kill_count_only_group_imposes_no_server_side_constraint() {
+        // "vorkath && >10kc" - the kc half can't be checked per-event, so a lone Dust devil kill
+        // that matches the (unrelated, wrong-boss) name half should still fail on "vorkath" alone,
+        // while a matching-name event should pass through untouched by the kc clause.
+        let source = source(vec![LootItem { item_id: 1, quantity: 1 }]);
+        let ge_prices = crate::models::GEPrices::from([(1, 10)]);
+
+        assert!(call(&source, &ge_prices, "vorkath && >10kc").is_none());
+        assert!(call(&source, &ge_prices, "dust && >10kc").is_some());
+        // A search that's purely a kill-count clause matches every event server-side - the client
+        // applies the actual count filter after session grouping.
+        assert!(call(&source, &ge_prices, ">10kc").is_some());
     }
 
     #[test]
