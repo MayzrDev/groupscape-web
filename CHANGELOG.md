@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.449] - 2026-09-08
+
+### Changed
+- Crystalline/Corrupted Scorpion kills from the Gauntlet no longer clutter the Loot Log, matching the other Gauntlet trash mobs already filtered out.
+
 ## [1.0.444] - 2026-09-08
 
 ### Added
