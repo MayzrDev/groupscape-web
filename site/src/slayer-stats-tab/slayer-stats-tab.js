@@ -125,7 +125,6 @@ export class SlayerStatsTab extends BaseElement {
         ${this.renderLeaderTile(s.most_common_task, "Most common task", " times", false)}
         ${this.renderMasterTile(s.most_common_master)}
         ${this.renderLeaderTile(s.most_cancelled_task, "Most cancelled", "&times; cancelled", true)}
-        ${this.renderLeaderTile(s.most_blocked_task, "Most blocked", "&times; blocked", true)}
       </div>
     `;
   }

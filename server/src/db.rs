@@ -5177,7 +5177,7 @@ LIMIT 1
 
 /// All-time slayer task stats for one member - the Stats tab. Every "most X" tile is its own
 /// small `GROUP BY` query rather than one combined query, since each ranks a different subset
-/// (all tasks / completed only / cancelled only / blocked only) - a single query would need a
+/// (all tasks / completed only / cancelled only) - a single query would need a
 /// `FILTER` per aggregate anyway, and these are cheap enough (indexed on `(group_id,
 /// member_name)`) that clarity wins over shaving a handful of round trips.
 pub async fn get_slayer_task_stats(
@@ -5223,8 +5223,6 @@ WHERE group_id=$1 AND member_name=$2
         top_slayer_task_name(client, group_id, member_name, None, "COUNT(*)").await?;
     let most_cancelled_task =
         top_slayer_task_name(client, group_id, member_name, Some("cancelled"), "COUNT(*)").await?;
-    let most_blocked_task =
-        top_slayer_task_name(client, group_id, member_name, Some("blocked"), "COUNT(*)").await?;
 
     let master_stmt = client
         .prepare_cached(
@@ -5254,7 +5252,6 @@ LIMIT 1
         most_common_task,
         most_common_master,
         most_cancelled_task,
-        most_blocked_task,
     })
 }
 

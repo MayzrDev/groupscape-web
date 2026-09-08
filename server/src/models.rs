@@ -221,8 +221,6 @@ pub struct SlayerTaskStats {
     pub most_common_master: Option<SlayerTaskLeader>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub most_cancelled_task: Option<SlayerTaskLeader>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub most_blocked_task: Option<SlayerTaskLeader>,
 }
 
 #[derive(Deserialize)]
