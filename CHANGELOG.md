@@ -5,7 +5,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ## [1.0.434] - 2026-09-08
 
 ### Added
-- Each member's Slayer panel now has History and Stats sub-tabs alongside the current task: History lists every past task (filterable by status or slayer master, with masters ordered by progression and grouped with their stand-ins - Nieve/Steve, Duradel/Kuradal, etc.) with points earned/spent and kill progress, while Stats shows all-time totals and "most killed", "most common", and "most cancelled" records.
+- Each member's Slayer panel now has History and Stats sub-tabs alongside the current task: History lists every past task (filterable by status or slayer master, with masters ordered by progression and grouped with their stand-ins - Nieve/Steve, Duradel/Kuradal, etc.) with points earned/spent and kill progress, while Stats shows all-time totals and "most killed", "most common", and "most cancelled" records. Task and master icons now render in a ringed medallion frame.
 
 ### Fixed
 - Moons of Peril kill entries in the activity feed and toast notifications no longer merge two different moon combos into one misleading "x2" - each combo (e.g. "Eclipse, Blue, Blood" vs. just "Blue") now shows as its own entry with its own loot.

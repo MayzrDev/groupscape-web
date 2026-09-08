@@ -79,16 +79,17 @@ slayer-stats-tab {
 }
 
 .slayer-stats-tab__tile-icon {
-  width: 26px;
-  height: 26px;
+  width: 30px;
+  height: 30px;
   object-fit: contain;
   flex-shrink: 0;
   image-rendering: initial;
-}
-
-.slayer-stats-tab__tile-icon--master {
+  box-sizing: border-box;
   border-radius: 50%;
-  border: 1px solid hsl(40deg 15.79% 29.8%);
+  padding: 3px;
+  background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4) 72%), #1c1811;
+  border: 2px solid var(--orange);
+  box-shadow: 0 0 0 1px hsl(40deg 15.79% 20%), 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .slayer-stats-tab__tile-name {
