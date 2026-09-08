@@ -12,6 +12,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Changed
 - Internal: commits now require a CHANGELOG.md entry - a pre-commit hook rejects a commit that doesn't stage one.
+- Internal: Loot Log's value-clause matching (`>100k` etc.) now ignores an item's gp value if that item isn't one the client can actually render, so a session card can't clear a value search using gp from an item that doesn't visibly appear on it. Search debounce also increased from 300ms to 1s to reduce firing mid-multi-word-query.
 
 ## [1.0.444] - 2026-09-08
 

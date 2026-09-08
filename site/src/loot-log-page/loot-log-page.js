@@ -9,7 +9,7 @@ import { timeBounds, formatDuration, formatTimeRange } from "../data/time-range"
 // landing mid-session and needing the GROUP_CLOSE_FETCH_CAP chase below.
 const PAGE_LIMIT = 100;
 const REFRESH_INTERVAL_MS = 15000;
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 1000;
 // Same reasoning as activity-feed-page.js's AUTO_LOAD_BURST_LIMIT - a search can scan page after
 // page of raw history without a single match (server-side scan cap notwithstanding), so bound how
 // many pages the sentinel auto-fetches before requiring a manual click, rather than trying to
@@ -460,8 +460,12 @@ export class LootLogPage extends BaseElement {
     return this.killCountClauses.every((clause) => numericClauseMatchesJs(clause, count));
   }
 
+  // Matches loot-log-group.js's `mergedItems`/`totalValue`: an item the client's catalog doesn't
+  // recognize (no name/image/value on file) is dropped from the card entirely, not just dimmed -
+  // so it must also be dropped here, or a session could clear a value clause using gp from an
+  // item the user can't actually see on the card that's supposedly matching.
   eventTotalValue(event) {
-    return event.items.reduce((sum, item) => sum + item.total_value, 0);
+    return event.items.reduce((sum, item) => sum + (Item.exists(item.item_id) ? item.total_value : 0), 0);
   }
 
   // Whether a session card built from these merged events satisfies every bare value clause in
