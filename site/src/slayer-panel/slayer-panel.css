@@ -139,7 +139,8 @@ slayer-panel {
   height: 30px;
   flex-shrink: 0;
   border-radius: 50%;
-  border: 1px solid hsl(40deg 15.79% 29.8%);
+  background: #1c1811;
+  box-shadow: 0 0 0 1px hsl(40deg 15.79% 29.8%), 0 0 0 3px rgba(0, 0, 0, 0.4), inset 0 0 6px rgba(0, 0, 0, 0.6);
   object-fit: contain;
   image-rendering: initial;
 }
@@ -207,6 +208,11 @@ slayer-panel {
 .slayer-panel__task-icon-wrap {
   position: relative;
   flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #1c1811;
+  box-shadow: 0 0 0 1px hsl(40deg 15.79% 29.8%), 0 0 0 3px rgba(0, 0, 0, 0.4), inset 0 0 6px rgba(0, 0, 0, 0.6);
 }
 
 .slayer-panel__task-icon {
