@@ -5086,9 +5086,14 @@ pub async fn list_slayer_task_history_page(
     before: Option<DateTime<Utc>>,
     limit: i64,
     status: Option<&str>,
-    master_name: Option<&str>,
+    // A slice of exact `master_name` values rather than one, since the site's master filter
+    // groups NPCs that are really the same slayer master role (Nieve/Steve, Duradel/Kuradal,
+    // ...) into one dropdown option - see slayer-history-tab.js's MASTER_GROUPS. `None`/empty
+    // means no filter, matching `status` above.
+    master_names: Option<&[String]>,
 ) -> Result<SlayerTaskHistoryPage, ApiError> {
     let page_limit = limit.clamp(1, 100);
+    let master_names = master_names.filter(|names| !names.is_empty());
     let stmt = client
         .prepare_cached(
             r#"
@@ -5097,7 +5102,7 @@ FROM groupscape.slayer_task_history
 WHERE group_id=$1
   AND member_name=$2
   AND ($3::text IS NULL OR status = $3)
-  AND ($4::text IS NULL OR master_name = $4)
+  AND ($4::text[] IS NULL OR master_name = ANY($4))
   AND ($5::timestamptz IS NULL OR assigned_at < $5)
 ORDER BY assigned_at DESC
 LIMIT $6
@@ -5111,7 +5116,7 @@ LIMIT $6
                 &group_id,
                 &member_name,
                 &status,
-                &master_name,
+                &master_names,
                 &before,
                 &(page_limit + 1),
             ],

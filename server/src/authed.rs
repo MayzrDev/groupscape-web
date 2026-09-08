@@ -1803,6 +1803,10 @@ pub struct GetSlayerTaskHistoryQuery {
     pub limit: i64,
     #[serde(default)]
     pub status: Option<String>,
+    /// Comma-separated exact `master_name` values - the site's master filter dropdown groups
+    /// NPCs that are the same slayer master role (Nieve/Steve, Duradel/Kuradal, ...) into one
+    /// option, so a single group can mean several underlying names. See
+    /// `db::list_slayer_task_history_page`.
     #[serde(default)]
     pub master_name: Option<String>,
 }
@@ -1817,6 +1821,13 @@ pub async fn get_slayer_task_history(
     query: web::Query<GetSlayerTaskHistoryQuery>,
 ) -> Result<web::Json<SlayerTaskHistoryPage>, Error> {
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let master_names: Option<Vec<String>> = query.master_name.as_deref().map(|names| {
+        names
+            .split(',')
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty())
+            .collect()
+    });
     let page = db::list_slayer_task_history_page(
         &client,
         auth.group_id,
@@ -1824,7 +1835,7 @@ pub async fn get_slayer_task_history(
         query.before,
         query.limit,
         query.status.as_deref(),
-        query.master_name.as_deref(),
+        master_names.as_deref(),
     )
     .await?;
     Ok(web::Json(page))

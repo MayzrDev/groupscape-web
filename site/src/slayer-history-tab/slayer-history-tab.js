@@ -21,27 +21,32 @@ const STATUS_META = {
   blocked: { label: "Blocked", cls: "bl" },
 };
 
-// Display-cased NPC names as the plugin captures them from dialogue (see
+// Grouped by slayer master *role*, not individual NPC - Aya/Spria are Turael reskins (post-
+// "While Guthix Sleeps" and pre-quest respectively), Achtryn replaces Mazchna the same way, and
+// Steve/Kuradal are temporary/quest-unlocked stand-ins for Nieve/Duradel. All share their base
+// master's task list and block price (see GroupScapeTrackerPlugin's SLAYER_BLOCK_PRICE table),
+// so a group's task history reads as one continuous master rather than splintering across
+// whichever NPC happened to be at the desk that day. Ordered by unlock progression (Slayer
+// Master wiki page's combat/Slayer level requirements), Krystilia/Mortimer last since they sit
+// outside the normal ladder (wilderness-only and Miscellania-diary-gated respectively). Names
+// are display-cased as the plugin captures them from dialogue (see
 // GroupScapeTrackerPlugin#captureSlayerTaskMasterDialogue) - matched server-side by exact string
-// equality (`master_name = $4` in db::list_slayer_task_history_page), not case-insensitively.
+// equality against this list (see db::list_slayer_task_history_page), not case-insensitively.
+const MASTER_GROUPS = [
+  { label: "Turael", names: ["Turael", "Aya", "Spria"] },
+  { label: "Mazchna", names: ["Mazchna", "Achtryn"] },
+  { label: "Vannaka", names: ["Vannaka"] },
+  { label: "Chaeldar", names: ["Chaeldar"] },
+  { label: "Konar quo Maten", names: ["Konar quo Maten"] },
+  { label: "Nieve", names: ["Nieve", "Steve"] },
+  { label: "Duradel", names: ["Duradel", "Kuradal"] },
+  { label: "Krystilia", names: ["Krystilia"] },
+  { label: "Mortimer", names: ["Mortimer"] },
+];
+
 const MASTER_OPTIONS = [
   { value: "", label: "All masters" },
-  ...[
-    "Turael",
-    "Spria",
-    "Mazchna",
-    "Vannaka",
-    "Chaeldar",
-    "Nieve",
-    "Steve",
-    "Duradel",
-    "Konar quo Maten",
-    "Krystilia",
-    "Mortimer",
-    "Aya",
-    "Achtryn",
-    "Kuradal",
-  ].map((name) => ({ value: name, label: name })),
+  ...MASTER_GROUPS.map((group) => ({ value: group.names.join(","), label: group.label })),
 ];
 
 /**
