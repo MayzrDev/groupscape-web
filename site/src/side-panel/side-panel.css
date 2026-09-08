@@ -111,9 +111,13 @@ button.side-panel__mobile-toggle {
 /* The tab-icon row shouldn't stretch along with the widened side panel above - it stays at the
    panel's normal content width while the equipment tab's content grows past it on the right.
    The vitals bars (.player-panel__header) are exempt from this and stretch to the full widened
-   width instead, since player-stats already fills its container with width: 100%. */
-.player-panel--equipment-active .player-panel__minibar {
-  width: 314px;
+   width instead, since player-stats already fills its container with width: 100%. Desktop-only,
+   matching the :has() rule above - on mobile the equipment tab stacks into Gear/Stats tabs
+   instead of widening (see player-equipment.css), so the minibar should stay full width there. */
+@media only screen and (min-width: 1001px) {
+  .player-panel--equipment-active .player-panel__minibar {
+    width: 314px;
+  }
 }
 
 button.side-panel__move {

@@ -2,6 +2,10 @@ player-equipment {
   display: block;
 }
 
+.equipment-tabs {
+  display: none;
+}
+
 .equipment-and-stats {
   display: flex;
   align-items: flex-start;
@@ -9,6 +13,13 @@ player-equipment {
   gap: 12px;
   width: max-content;
   min-width: 100%;
+}
+
+.equipment-gear-pane {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: none;
 }
 
 .equipment {
@@ -148,4 +159,76 @@ player-equipment {
   justify-content: center;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* Below this, the equipment doll and the stats grid no longer fit side by side in the
+   side-panel's mobile width (side-panel.css only widens the panel to fit both at
+   min-width: 1001px) - swap to a Gear/Stats tab strip, styled after slayer-panel's
+   `.slayer-panel__tabs`, and show one pane at a time instead. */
+@media only screen and (max-width: 1000px) {
+  .equipment-tabs {
+    display: flex;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid hsl(40deg 15.79% 29.8%);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+
+  .equipment-tab {
+    flex: 1;
+    padding: 7px 4px;
+    font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+    color: var(--primary-text);
+    opacity: 0.6;
+    cursor: pointer;
+    border: none;
+    background: none;
+    text-shadow: 1px 1px var(--black);
+  }
+
+  .equipment-tab + .equipment-tab {
+    border-left: 1px solid hsl(40deg 15.79% 24%);
+  }
+
+  .equipment-tab--active {
+    opacity: 1;
+    color: var(--orange);
+    background: rgba(255, 152, 31, 0.1);
+    box-shadow: inset 0 -2px 0 var(--orange);
+  }
+
+  .equipment-tab:hover:not(.equipment-tab--active) {
+    opacity: 0.85;
+  }
+
+  .equipment-and-stats {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .equipment-gear-pane,
+  .equipment-stats-pane {
+    display: none;
+    width: 100%;
+  }
+
+  player-equipment[data-active-tab="gear"] .equipment-gear-pane,
+  player-equipment[data-active-tab="stats"] .equipment-stats-pane {
+    display: flex;
+  }
+
+  .equipment-gear-pane {
+    justify-content: center;
+  }
+
+  .equipment-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 14px;
+    width: 100%;
+    min-width: 0;
+  }
 }

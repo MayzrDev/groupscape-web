@@ -6,8 +6,10 @@ player-panel {
   box-sizing: border-box;
 }
 
-.player-panel--equipment-active {
-  width: max-content;
+@media only screen and (min-width: 1001px) {
+  .player-panel--equipment-active {
+    width: max-content;
+  }
 }
 
 player-panel + player-panel {

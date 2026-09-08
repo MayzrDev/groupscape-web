@@ -1,21 +1,29 @@
+<div class="equipment-tabs">
+  <button class="equipment-tab" tab-id="gear">Gear</button>
+  <button class="equipment-tab" tab-id="stats">Stats</button>
+</div>
+
 <div class="equipment-and-stats">
-  <div class="equipment">
-    <div class="equipment-head equipment-slot"></div>
-    <div class="equipment-cape equipment-slot"></div>
-    <div class="equipment-neck equipment-slot"></div>
-    <div class="equipment-ammo equipment-slot"></div>
-    <div class="equipment-weapon equipment-slot"></div>
-    <div class="equipment-torso equipment-slot"></div>
-    <div class="equipment-shield equipment-slot"></div>
-    <div class="equipment-legs equipment-slot"></div>
-    <div class="equipment-gloves equipment-slot"></div>
-    <div class="equipment-boots equipment-slot"></div>
-    <div class="equipment-ring equipment-slot"></div>
+  <div class="equipment-gear-pane">
+    <div class="equipment">
+      <div class="equipment-head equipment-slot"></div>
+      <div class="equipment-cape equipment-slot"></div>
+      <div class="equipment-neck equipment-slot"></div>
+      <div class="equipment-ammo equipment-slot"></div>
+      <div class="equipment-weapon equipment-slot"></div>
+      <div class="equipment-torso equipment-slot"></div>
+      <div class="equipment-shield equipment-slot"></div>
+      <div class="equipment-legs equipment-slot"></div>
+      <div class="equipment-gloves equipment-slot"></div>
+      <div class="equipment-boots equipment-slot"></div>
+      <div class="equipment-ring equipment-slot"></div>
+    </div>
+
+    ${this.showPortrait ? `<player-portrait mode="full" player-name="${this.playerName}" class="equipment-portrait"></player-portrait>` : ""}
   </div>
 
-  ${this.showPortrait ? `<player-portrait mode="full" player-name="${this.playerName}" class="equipment-portrait"></player-portrait>` : ""}
-
-  <div class="equipment-stats rsborder-tiny">
+  <div class="equipment-stats-pane">
+    <div class="equipment-stats rsborder-tiny">
     <div class="equipment-stats__column">
       <h3 class="equipment-stats__heading">Attack bonus</h3>
       <div class="equipment-stats__grid">
@@ -57,6 +65,7 @@
         <span>Actual</span><span class="equipment-stats__value" data-stat="speedActual">-</span>
       </div>
     </div>
+  </div>
   </div>
 </div>
 

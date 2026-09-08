@@ -70,6 +70,9 @@ export class PlayerEquipment extends BaseElement {
     // Bumped on every equipment update so a stats fetch that resolves after a newer update has
     // already started is discarded instead of clobbering fresher numbers on screen.
     this.statsRequestId = 0;
+    // Only rendered/used on mobile widths - see player-equipment.css's `.equipment-tabs` media
+    // query, matching side-panel.css's mobile breakpoint. Desktop always shows both panes.
+    this.activeTab = "gear";
   }
 
   html() {
@@ -102,8 +105,25 @@ export class PlayerEquipment extends BaseElement {
 
     this.eventListener(this.querySelector(".equipment-set-bonus-button"), "click", this.handleSetBonusClick.bind(this));
     this.eventListener(this.querySelector(".equipment-dps-button"), "click", this.handleDpsClick.bind(this));
+    this.eventListener(this.querySelector(".equipment-tabs"), "click", this.handleTabClick.bind(this));
+    this.showTab(this.activeTab);
 
     this.subscribe(`equipment:${this.playerName}`, this.handleUpdatedEquipment.bind(this));
+  }
+
+  handleTabClick(event) {
+    const tabId = event?.target?.getAttribute("tab-id");
+    if (tabId) {
+      this.showTab(tabId);
+    }
+  }
+
+  showTab(tabId) {
+    this.activeTab = tabId;
+    this.setAttribute("data-active-tab", tabId);
+    this.querySelectorAll(".equipment-tab").forEach((button) => {
+      button.classList.toggle("equipment-tab--active", button.getAttribute("tab-id") === tabId);
+    });
   }
 
   disconnectedCallback() {
