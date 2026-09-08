@@ -1541,6 +1541,20 @@ fn build_matching_loot_log_event(
             continue;
         }
 
+        // A group that's nothing but a single value clause (the whole search is just `>100k`, or
+        // one side of `vorkath && >100k`) reads as "worth over X" against the number actually
+        // shown on a farming-session card - loot-log-group.js's merged `totalValue` - not a lone
+        // raw event's own total, so (like a kill-count clause above) it can't safely exclude an
+        // event here: a real 500k session made of many small kills would otherwise vanish because
+        // no single kill in it individually cleared the bar (this was itself a filed bug - see
+        // `matches_on_combined_kill_value_even_when_no_single_item_clears_the_bar`, which only
+        // covers one event's own combined total, not a whole session). So a bare value group
+        // imposes no server-side exclusion either; `loot-log-page.js`'s own copy of this carve-out
+        // (`parseValueClauses`) re-filters session cards afterward against session-total-OR-any-
+        // event-total, once session merging has actually happened client-side. Item-level
+        // matching/dimming below still runs as normal - only the final exclusion check is skipped.
+        let bare_value_group = group.len() == 1 && parse_numeric_clause(&group[0]).is_some();
+
         // Sorts each remaining token in the group into exactly one clause bucket: `unique`/rarity
         // keywords and drop-rate fractions are per-item alternatives alongside id/value matching
         // (see the per-item loop below); anything left over falls through to the existing
@@ -1606,7 +1620,7 @@ fn build_matching_loot_log_event(
             .iter()
             .any(|clause| numeric_clause_matches(clause, kill_total_value));
 
-        if !(context_matched || any_item_level_matched || total_value_matched) {
+        if !bare_value_group && !(context_matched || any_item_level_matched || total_value_matched) {
             return None;
         }
     }
@@ -1682,11 +1696,18 @@ mod build_matching_loot_log_event_tests {
     }
 
     #[test]
-    fn does_not_match_when_neither_any_item_nor_the_total_clears_the_bar() {
+    fn bare_value_group_imposes_no_server_side_constraint() {
+        // ">1m" alone is a "bare" value group (see `bare_value_group` in
+        // build_matching_loot_log_event) - it can't be checked against a lone event's own total
+        // the way a combined clause still is, since the number the user means is a farming-
+        // session's merged total, which only exists client-side after session grouping. So this
+        // event (worth well under 1m) still passes through server-side, undimmed (no item
+        // individually matched anything), and the client re-filters by session/event total.
         let source = source(vec![LootItem { item_id: 1, quantity: 1 }, LootItem { item_id: 2, quantity: 1 }]);
         let ge_prices = crate::models::GEPrices::from([(1, 1_000), (2, 2_000)]);
 
-        assert!(call(&source, &ge_prices, ">1m").is_none());
+        let event = call(&source, &ge_prices, ">1m").expect("bare value clause should not exclude server-side");
+        assert!(event.items.iter().all(|item| item.matched == Some(true)));
     }
 
     #[test]

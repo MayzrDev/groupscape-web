@@ -7,6 +7,9 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Changed
 - Crystalline/Corrupted Scorpion kills from the Gauntlet no longer clutter the Loot Log, matching the other Gauntlet trash mobs already filtered out.
 
+### Fixed
+- Loot Log value searches like `>100k` were only matching a single kill's own loot, so a big farming session made of many smaller kills (e.g. 19 kills worth 141k combined) could vanish from the results even though its total clearly cleared the bar. Now matches if either a single kill or the whole session's combined value clears it.
+
 ## [1.0.444] - 2026-09-08
 
 ### Added

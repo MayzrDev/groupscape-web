@@ -76,11 +76,14 @@ function loadPersistedCategories() {
 
 // Kill count ("kc") is a farming-session concept - the number of events merged into one
 // loot-log-group card (see that component's `countLabel`) - that only exists client-side after
-// session grouping, unlike the value/quantity/level clauses the server filters raw events on
-// (see loot_log_search.rs). So the raw search text is re-parsed here, independently of what the
-// server did with it, purely to decide whether to show/hide each session card by its live event
-// count. Mirrors loot_log_search.rs's `split_search_groups`/`parse_numeric_clause` grammar - keep
-// both in sync if either changes.
+// session grouping, unlike the quantity/level clauses (and combined value clauses like
+// "vorkath && >1m") the server filters raw events on (see loot_log_search.rs). A *bare* value
+// clause (the whole search is just ">100k", or one side of an "&&") is also deferred to the
+// client for the same reason - see `parseValueClauses` below and the server's matching
+// `bare_value_group` carve-out in authed.rs. So the raw search text is re-parsed here,
+// independently of what the server did with it, purely to decide whether to show/hide each
+// session card. Mirrors loot_log_search.rs's `split_search_groups`/`parse_numeric_clause` grammar
+// - keep both in sync if either changes.
 const KILL_COUNT_WORDS = ["kc", "kills", "kill"];
 
 function parseNumericClauseJs(token) {
@@ -193,6 +196,26 @@ function parseKillCountClauses(search) {
   return clauses;
 }
 
+// Mirrors the server's "bare value group" carve-out (see build_matching_loot_log_event's
+// `bare_value_group` in authed.rs) - a group that's nothing but one value clause (the whole
+// search is just ">100k", or one side of "vorkath && >100k") reads as "worth over X" against the
+// number actually shown on a session card (see loot-log-group.js's `totalValue`), not a lone raw
+// event's own total, so the server lets those events through unfiltered and this re-applies the
+// clause here, once session merging has actually happened (see `matchesValue`). Keep in sync with
+// the server's carve-out condition.
+function parseValueClauses(search) {
+  const clauses = [];
+  for (const group of splitSearchGroups(search || "")) {
+    const { clause: killCountClause, rest } = extractKillCountClause(group);
+    if (killCountClause) continue;
+    if (rest.length === 1) {
+      const clause = parseNumericClauseJs(rest[0]);
+      if (clause) clauses.push(clause);
+    }
+  }
+  return clauses;
+}
+
 export class LootLogPage extends BaseElement {
   constructor() {
     super();
@@ -215,6 +238,7 @@ export class LootLogPage extends BaseElement {
     this.autoLoadGaveUp = false;
     this.searchText = "";
     this.killCountClauses = [];
+    this.valueClauses = [];
     this.itemIds = [];
     this.categories = loadPersistedCategories();
     this.summary = { total_value: 0, event_count: 0 };
@@ -426,6 +450,7 @@ export class LootLogPage extends BaseElement {
     this.searchText = raw;
     this.itemIds = this.resolveItemIds(raw);
     this.killCountClauses = parseKillCountClauses(raw);
+    this.valueClauses = parseValueClauses(raw);
     this.resetAndLoad();
   }
 
@@ -433,6 +458,31 @@ export class LootLogPage extends BaseElement {
   // current search (see `parseKillCountClauses`) - AND across clauses, same as every other group.
   matchesKillCount(count) {
     return this.killCountClauses.every((clause) => numericClauseMatchesJs(clause, count));
+  }
+
+  eventTotalValue(event) {
+    return event.items.reduce((sum, item) => sum + item.total_value, 0);
+  }
+
+  // Whether a session card built from these merged events satisfies every bare value clause in
+  // the current search (see `parseValueClauses`) - AND across clauses, same as every other group,
+  // with each clause independently satisfied by either the session's merged total or any single
+  // underlying event's own total (a session made of one huge kill and many tiny ones should still
+  // surface for e.g. ">1m" even though its own total is smaller than the search intends to gate on).
+  matchesValue(events) {
+    if (!this.valueClauses.length) return true;
+    const sessionTotal = events.reduce((sum, event) => sum + this.eventTotalValue(event), 0);
+    return this.valueClauses.every(
+      (clause) =>
+        numericClauseMatchesJs(clause, sessionTotal) ||
+        events.some((event) => numericClauseMatchesJs(clause, this.eventTotalValue(event)))
+    );
+  }
+
+  // Combines both client-side-only filters a session card must satisfy - see `matchesKillCount`
+  // and `matchesValue`.
+  matchesClauses(events) {
+    return this.matchesKillCount(events.length) && this.matchesValue(events);
   }
 
   entryKey(event) {
@@ -465,14 +515,14 @@ export class LootLogPage extends BaseElement {
         entry.events.push(event);
         entry.element.group = this.buildGroupData(entry);
         entry.element.update();
-        entry.element.hidden = !this.matchesKillCount(entry.events.length);
+        entry.element.hidden = !this.matchesClauses(entry.events);
         return;
       }
     }
     const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
-    newEntry.element.hidden = !this.matchesKillCount(newEntry.events.length);
+    newEntry.element.hidden = !this.matchesClauses(newEntry.events);
     this.list.appendChild(newEntry.element);
     this.entryGroups.set(key, newEntry);
   }
@@ -491,7 +541,7 @@ export class LootLogPage extends BaseElement {
         entry.events.unshift(event);
         entry.element.group = this.buildGroupData(entry);
         entry.element.update();
-        entry.element.hidden = !this.matchesKillCount(entry.events.length);
+        entry.element.hidden = !this.matchesClauses(entry.events);
         this.list.insertBefore(entry.element, this.list.firstChild);
         return;
       }
@@ -499,7 +549,7 @@ export class LootLogPage extends BaseElement {
     const newEntry = { key, events: [event], frozen: false };
     newEntry.element = document.createElement("loot-log-group");
     newEntry.element.group = this.buildGroupData(newEntry);
-    newEntry.element.hidden = !this.matchesKillCount(newEntry.events.length);
+    newEntry.element.hidden = !this.matchesClauses(newEntry.events);
     this.list.insertBefore(newEntry.element, this.list.firstChild);
     this.entryGroups.set(key, newEntry);
   }
