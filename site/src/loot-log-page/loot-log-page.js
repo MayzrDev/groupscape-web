@@ -69,6 +69,10 @@ export class LootLogPage extends BaseElement {
     this.nextBefore = undefined;
     this.exhausted = false;
     this.loadingMore = false;
+    // The loadGeneration this.loadingMore's in-flight fetch belongs to, or null when idle -
+    // lets a new generation's loadMore() start immediately even while an old (now-stale)
+    // generation's fetch is still awaiting its response, instead of being blocked by it.
+    this.loadingGeneration = null;
     this.autoLoadStreak = 0;
     this.autoLoadPaused = false;
     // Total events added since the streak last reset (manual click or resetAndLoad) - lets
@@ -81,6 +85,11 @@ export class LootLogPage extends BaseElement {
     this.itemIds = [];
     this.categories = loadPersistedCategories();
     this.summary = { total_value: 0, event_count: 0 };
+    // Bumped by resetAndLoad() so an in-flight loadMore()/loadSummary() from a search/category
+    // that's since changed can detect it's stale and discard its results instead of appending
+    // them into the freshly-cleared list - without this, a slow fetch started under the old
+    // filter can land after the reset and silently reintroduce unfiltered cards.
+    this.loadGeneration = 0;
     // key (member+source+type+clueTier, see `entryKey`) -> { key, events, element } for the
     // farming-session entry currently shown for that key, so an event within the 45-minute
     // window extends it instead of adding a new entry.
@@ -352,6 +361,9 @@ export class LootLogPage extends BaseElement {
   }
 
   async resetAndLoad() {
+    // Invalidates any loadMore()/loadSummary() fetch already in flight under the old search/
+    // category state - see loadGeneration's doc comment.
+    this.loadGeneration++;
     this.loaded = [];
     this.nextBefore = undefined;
     this.exhausted = false;
@@ -368,22 +380,27 @@ export class LootLogPage extends BaseElement {
 
   async loadSummary() {
     if (!api.groupName) return;
+    const generation = this.loadGeneration;
     const summary = await api.getLootLogSummary({
       search: this.searchText,
       itemIds: this.itemIds,
       categories: this.categories,
     });
-    if (this.disposed) return;
+    if (this.disposed || generation !== this.loadGeneration) return;
     this.summary = summary;
     this.renderSummary();
   }
 
   async loadMore({ manual = false } = {}) {
-    if (this.loadingMore || this.exhausted) return;
+    if (this.exhausted) return;
     if (this.autoLoadPaused && !manual) return;
     // No group session to load against - e.g. it was invalidated mid-view (see disconnectedCallback).
     // Bail out before touching any state so a stray call can't leave the sentinel/button stuck.
     if (!api.groupName) return;
+    const generation = this.loadGeneration;
+    // Reentrancy guard, scoped to this generation - a stale generation's own fetch loop is left
+    // to run its course and self-detect staleness below rather than blocking a fresh reload.
+    if (this.loadingGeneration === generation) return;
     if (manual) {
       this.autoLoadPaused = false;
       this.autoLoadStreak = 0;
@@ -393,6 +410,7 @@ export class LootLogPage extends BaseElement {
     } else {
       this.autoLoadStreak++;
     }
+    this.loadingGeneration = generation;
     this.loadingMore = true;
     this.sentinel.classList.add("loot-log-page__sentinel--visible");
     this.sentinel.classList.add("loot-log-page__sentinel--loading");
@@ -416,8 +434,11 @@ export class LootLogPage extends BaseElement {
         itemIds: this.itemIds,
         categories: this.categories,
       });
-      if (this.disposed) {
-        this.loadingMore = false;
+      if (this.disposed || generation !== this.loadGeneration) {
+        if (this.loadingGeneration === generation) {
+          this.loadingMore = false;
+          this.loadingGeneration = null;
+        }
         return;
       }
 
@@ -455,9 +476,12 @@ export class LootLogPage extends BaseElement {
       if (openEntry) openEntry.frozen = true;
     }
 
-    this.loadingMore = false;
+    if (this.loadingGeneration === generation) {
+      this.loadingMore = false;
+      this.loadingGeneration = null;
+    }
     this.sentinel.classList.remove("loot-log-page__sentinel--loading");
-    if (this.disposed) return;
+    if (this.disposed || generation !== this.loadGeneration) return;
 
     this.autoLoadStreakEventsAdded += addedThisCall;
     this.autoLoadPaused = !this.exhausted && this.autoLoadStreak >= AUTO_LOAD_BURST_LIMIT;
@@ -479,6 +503,7 @@ export class LootLogPage extends BaseElement {
   async poll() {
     if (this.loadingMore || !this.loaded.length || !api.groupName) return;
 
+    const generation = this.loadGeneration;
     const newestOccurredAt = new Date(this.loaded[0].occurred_at).getTime();
     const page = await api.getLootLog({
       search: this.searchText,
@@ -486,7 +511,7 @@ export class LootLogPage extends BaseElement {
       categories: this.categories,
       limit: PAGE_LIMIT,
     });
-    if (this.disposed) return;
+    if (this.disposed || generation !== this.loadGeneration) return;
     const incoming = page.events.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
     if (!incoming.length) return;
 

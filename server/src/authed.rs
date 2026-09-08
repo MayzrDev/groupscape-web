@@ -1550,7 +1550,15 @@ fn build_matching_loot_log_event(
         item.matched = Some(item_matched);
     }
 
-    if !(context_matched || any_item_level_matched) {
+    // A numeric clause can also match this kill's combined loot value (e.g. `>1m` should surface
+    // a kill whose drops are collectively worth over a million even if no single item stack
+    // clears that bar on its own) - alongside, not instead of, the per-item matching above.
+    let kill_total_value: i64 = items.iter().map(|item| item.total_value).sum();
+    let total_value_matched = numeric_clauses
+        .iter()
+        .any(|clause| numeric_clause_matches(clause, kill_total_value));
+
+    if !(context_matched || any_item_level_matched || total_value_matched) {
         return None;
     }
     if !any_item_level_matched {
@@ -1567,6 +1575,62 @@ fn build_matching_loot_log_event(
         clue_tier: source.clue_tier.clone(),
         items,
     })
+}
+
+#[cfg(test)]
+mod build_matching_loot_log_event_tests {
+    use super::*;
+    use crate::models::LootItem;
+
+    fn source(loot: Vec<LootItem>) -> LootSourceEvent {
+        LootSourceEvent { source_name: "Dust devil".to_string(), source_type: "kill", clue_tier: None, loot }
+    }
+
+    fn call(source: &LootSourceEvent, ge_prices: &crate::models::GEPrices, search: &str) -> Option<LootLogEvent> {
+        let tokens: Vec<&str> = search.split_whitespace().collect();
+        build_matching_loot_log_event(
+            source,
+            "Some Member",
+            Utc::now(),
+            ge_prices,
+            &tokens,
+            &std::collections::HashSet::new(),
+            true,
+        )
+    }
+
+    #[test]
+    fn matches_on_combined_kill_value_even_when_no_single_item_clears_the_bar() {
+        // Three items each worth well under 1m individually, but summing past it together.
+        let source = source(vec![
+            LootItem { item_id: 1, quantity: 1 },
+            LootItem { item_id: 2, quantity: 1 },
+            LootItem { item_id: 3, quantity: 1 },
+        ]);
+        let ge_prices = crate::models::GEPrices::from([(1, 400_000), (2, 400_000), (3, 400_000)]);
+
+        let event = call(&source, &ge_prices, ">1m").expect("kill's combined loot value should match >1m");
+        // Matched only via the combined total, not any single item - none should be dimmed.
+        assert!(event.items.iter().all(|item| item.matched == Some(true)));
+    }
+
+    #[test]
+    fn still_matches_and_dims_on_a_single_qualifying_item() {
+        let source = source(vec![LootItem { item_id: 1, quantity: 1 }, LootItem { item_id: 2, quantity: 1 }]);
+        let ge_prices = crate::models::GEPrices::from([(1, 2_000_000), (2, 10)]);
+
+        let event = call(&source, &ge_prices, ">1m").expect("item worth over 1m should match");
+        assert_eq!(event.items[0].matched, Some(true));
+        assert_eq!(event.items[1].matched, Some(false));
+    }
+
+    #[test]
+    fn does_not_match_when_neither_any_item_nor_the_total_clears_the_bar() {
+        let source = source(vec![LootItem { item_id: 1, quantity: 1 }, LootItem { item_id: 2, quantity: 1 }]);
+        let ge_prices = crate::models::GEPrices::from([(1, 1_000), (2, 2_000)]);
+
+        assert!(call(&source, &ge_prices, ">1m").is_none());
+    }
 }
 
 fn default_loot_log_limit() -> i64 {
