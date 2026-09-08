@@ -32,7 +32,7 @@ const SESSION_MERGE_WINDOW_MS = 45 * 60 * 1000;
 // calls) rather than risk the runaway-fetch tab freeze this file has been bitten by before.
 const GROUP_CLOSE_FETCH_CAP = 5;
 const MAX_RESOLVED_ITEM_IDS = 200;
-const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k"];
+const PLACEHOLDER_EXAMPLES = ["zulrah", ">1m", "whip", "732", "master clue", "<100k", "vorkath && >1m"];
 const PLACEHOLDER_INTERVAL_MS = 2500;
 const PLACEHOLDER_FADE_MS = 400;
 const FILTER_CATEGORIES = [

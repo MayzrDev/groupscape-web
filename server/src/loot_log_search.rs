@@ -140,6 +140,29 @@ pub fn numeric_clause_matches(clause: &NumericClause, candidate: i64) -> bool {
     }
 }
 
+/// Splits a raw Loot Log search string into AND-separated condition groups: `&&` and the
+/// standalone word `and` (case-insensitive) both act as separators between groups, and the
+/// caller (`build_matching_loot_log_event`) requires every group to match. Plain whitespace is
+/// deliberately NOT a separator - NPC and item names routinely contain spaces (e.g. "General
+/// Graardor", "Zamorak brew"), and splitting a name's words into separate AND'd groups would
+/// break substring matching against them. Each returned group is itself whitespace-tokenized,
+/// preserving the existing OR-across-tokens matching within a group.
+pub fn split_search_groups(search: &str) -> Vec<Vec<String>> {
+    let spaced = search.replace("&&", " && ");
+    let mut groups: Vec<Vec<String>> = vec![Vec::new()];
+    for word in spaced.split_whitespace() {
+        if word == "&&" || word.eq_ignore_ascii_case("and") {
+            if !groups.last().unwrap().is_empty() {
+                groups.push(Vec::new());
+            }
+            continue;
+        }
+        groups.last_mut().unwrap().push(word.to_string());
+    }
+    groups.retain(|g| !g.is_empty());
+    groups
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,5 +213,37 @@ mod tests {
         assert_eq!(combat_level("Vorkath"), Some(732));
         assert_eq!(combat_level("Zulrah"), Some(725));
         assert_eq!(combat_level("Some Random Npc"), None);
+    }
+
+    fn groups(items: &[&[&str]]) -> Vec<Vec<String>> {
+        items.iter().map(|g| g.iter().map(|s| s.to_string()).collect()).collect()
+    }
+
+    #[test]
+    fn plain_whitespace_stays_one_group() {
+        assert_eq!(split_search_groups("general graardor >1m"), groups(&[&["general", "graardor", ">1m"]]));
+    }
+
+    #[test]
+    fn double_ampersand_splits_into_groups() {
+        assert_eq!(split_search_groups("vorkath && >1m"), groups(&[&["vorkath"], &[">1m"]]));
+        assert_eq!(split_search_groups("vorkath&&>1m"), groups(&[&["vorkath"], &[">1m"]]));
+    }
+
+    #[test]
+    fn standalone_and_word_splits_case_insensitively() {
+        assert_eq!(split_search_groups("vorkath AND >1m"), groups(&[&["vorkath"], &[">1m"]]));
+    }
+
+    #[test]
+    fn and_as_a_substring_of_a_word_is_not_a_separator() {
+        // "Sand crab" shouldn't be torn apart just because it contains "and".
+        assert_eq!(split_search_groups("sand crab"), groups(&[&["sand", "crab"]]));
+    }
+
+    #[test]
+    fn empty_and_separator_only_input_yields_no_groups() {
+        assert!(split_search_groups("").is_empty());
+        assert!(split_search_groups("&& and &&").is_empty());
     }
 }

@@ -10,7 +10,7 @@ use crate::error::ApiError;
 use crate::hiscores;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
-use crate::loot_log_search::{combat_level, numeric_clause_matches, parse_numeric_clause};
+use crate::loot_log_search::{combat_level, numeric_clause_matches, parse_numeric_clause, split_search_groups};
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
@@ -1467,17 +1467,20 @@ mod loot_log_categories_tests {
 }
 
 /// Builds one `LootLogEvent` from a normalized loot source, applying the search grammar (see
-/// `loot_log_search`) when `search_active`. Returns `None` when a search is active and this event
-/// matches none of it. Item-level `matched` flags are only set (`Some(_)`) when the match came
-/// from at least one item individually satisfying a value/quantity/id clause - if the event only
-/// matched via member/source-name substring or the monster-level clause, every item is left
-/// un-dimmed (`Some(true)`), since none of them individually "matched" anything.
+/// `loot_log_search`) when `search_active`. `groups` comes from `split_search_groups`: every
+/// group must match (AND across groups, e.g. `vorkath && >1m`), while tokens within a single
+/// group still match on ANY of them (OR), same as before `&&`/`and` support existed. Returns
+/// `None` when a search is active and this event fails at least one group. Item-level `matched`
+/// flags are only set (`Some(_)`) when the match came from at least one item individually
+/// satisfying a value/quantity/id clause in some group - if the event only ever matched via
+/// member/source-name substring or the monster-level clause, every item is left un-dimmed
+/// (`Some(true)`), since none of them individually "matched" anything.
 fn build_matching_loot_log_event(
     source: &LootSourceEvent,
     member_name: &str,
     occurred_at: DateTime<Utc>,
     ge_prices: &crate::models::GEPrices,
-    tokens: &[&str],
+    groups: &[Vec<String>],
     item_ids: &std::collections::HashSet<i32>,
     search_active: bool,
 ) -> Option<LootLogEvent> {
@@ -1512,59 +1515,63 @@ fn build_matching_loot_log_event(
         });
     }
 
-    let numeric_clauses: Vec<_> = tokens.iter().filter_map(|t| parse_numeric_clause(t)).collect();
-    let text_tokens: Vec<String> = tokens
-        .iter()
-        .filter(|t| parse_numeric_clause(t).is_none())
-        .map(|t| t.to_lowercase())
-        .collect();
-
     let member_lower = member_name.to_lowercase();
     let source_lower = source.source_name.to_lowercase();
-    let mut context_matched = text_tokens
-        .iter()
-        .any(|t| member_lower.contains(t.as_str()) || source_lower.contains(t.as_str()));
-    if !context_matched {
-        if let Some(level) = combat_level(&source.source_name) {
-            context_matched = numeric_clauses
-                .iter()
-                .any(|clause| numeric_clause_matches(clause, level as i64));
-        }
-    }
-
-    let mut any_item_level_matched = false;
-    for item in &mut items {
-        let id_match = item_ids.contains(&item.item_id);
-        let value_match = numeric_clauses.iter().any(|clause| {
-            numeric_clause_matches(clause, item.total_value)
-                || item
-                    .unit_value
-                    .map(|v| numeric_clause_matches(clause, v))
-                    .unwrap_or(false)
-                || numeric_clause_matches(clause, item.quantity as i64)
-        });
-        let item_matched = id_match || value_match;
-        if item_matched {
-            any_item_level_matched = true;
-        }
-        item.matched = Some(item_matched);
-    }
-
+    let level = combat_level(&source.source_name);
     // A numeric clause can also match this kill's combined loot value (e.g. `>1m` should surface
     // a kill whose drops are collectively worth over a million even if no single item stack
-    // clears that bar on its own) - alongside, not instead of, the per-item matching above.
+    // clears that bar on its own) - alongside, not instead of, the per-item matching below.
     let kill_total_value: i64 = items.iter().map(|item| item.total_value).sum();
-    let total_value_matched = numeric_clauses
-        .iter()
-        .any(|clause| numeric_clause_matches(clause, kill_total_value));
 
-    if !(context_matched || any_item_level_matched || total_value_matched) {
-        return None;
-    }
-    if !any_item_level_matched {
-        for item in &mut items {
-            item.matched = Some(true);
+    let mut item_matched_in_any_group = vec![false; items.len()];
+    for group in groups {
+        let numeric_clauses: Vec<_> = group.iter().filter_map(|t| parse_numeric_clause(t)).collect();
+        let text_tokens: Vec<String> = group
+            .iter()
+            .filter(|t| parse_numeric_clause(t).is_none())
+            .map(|t| t.to_lowercase())
+            .collect();
+
+        let mut context_matched = text_tokens
+            .iter()
+            .any(|t| member_lower.contains(t.as_str()) || source_lower.contains(t.as_str()));
+        if !context_matched {
+            if let Some(level) = level {
+                context_matched = numeric_clauses
+                    .iter()
+                    .any(|clause| numeric_clause_matches(clause, level as i64));
+            }
         }
+
+        let mut any_item_level_matched = false;
+        for (idx, item) in items.iter().enumerate() {
+            let id_match = item_ids.contains(&item.item_id);
+            let value_match = numeric_clauses.iter().any(|clause| {
+                numeric_clause_matches(clause, item.total_value)
+                    || item
+                        .unit_value
+                        .map(|v| numeric_clause_matches(clause, v))
+                        .unwrap_or(false)
+                    || numeric_clause_matches(clause, item.quantity as i64)
+            });
+            if id_match || value_match {
+                any_item_level_matched = true;
+                item_matched_in_any_group[idx] = true;
+            }
+        }
+
+        let total_value_matched = numeric_clauses
+            .iter()
+            .any(|clause| numeric_clause_matches(clause, kill_total_value));
+
+        if !(context_matched || any_item_level_matched || total_value_matched) {
+            return None;
+        }
+    }
+
+    let any_item_matched = item_matched_in_any_group.iter().any(|m| *m);
+    for (idx, item) in items.iter_mut().enumerate() {
+        item.matched = Some(if any_item_matched { item_matched_in_any_group[idx] } else { true });
     }
 
     Some(LootLogEvent {
@@ -1587,13 +1594,13 @@ mod build_matching_loot_log_event_tests {
     }
 
     fn call(source: &LootSourceEvent, ge_prices: &crate::models::GEPrices, search: &str) -> Option<LootLogEvent> {
-        let tokens: Vec<&str> = search.split_whitespace().collect();
+        let groups = split_search_groups(search);
         build_matching_loot_log_event(
             source,
             "Some Member",
             Utc::now(),
             ge_prices,
-            &tokens,
+            &groups,
             &std::collections::HashSet::new(),
             true,
         )
@@ -1630,6 +1637,41 @@ mod build_matching_loot_log_event_tests {
         let ge_prices = crate::models::GEPrices::from([(1, 1_000), (2, 2_000)]);
 
         assert!(call(&source, &ge_prices, ">1m").is_none());
+    }
+
+    #[test]
+    fn double_ampersand_requires_every_group_to_match() {
+        // Source is "Dust devil" (not vorkath), so "vorkath && >1m" should fail even though the
+        // kill clears the value bar - both AND'd groups must independently match.
+        let source = source(vec![LootItem { item_id: 1, quantity: 1 }]);
+        let ge_prices = crate::models::GEPrices::from([(1, 2_000_000)]);
+
+        assert!(call(&source, &ge_prices, "vorkath && >1m").is_none());
+        assert!(call(&source, &ge_prices, "dust && >1m").is_some());
+    }
+
+    #[test]
+    fn and_word_behaves_like_double_ampersand() {
+        let source = source(vec![LootItem { item_id: 1, quantity: 1 }]);
+        let ge_prices = crate::models::GEPrices::from([(1, 2_000_000)]);
+
+        assert!(call(&source, &ge_prices, "dust and >1m").is_some());
+        assert!(call(&source, &ge_prices, "vorkath and >1m").is_none());
+    }
+
+    #[test]
+    fn plain_spaces_within_a_name_are_not_torn_apart_by_and_grouping() {
+        // Multi-word NPC name search must keep working as an OR-of-words single group, not be
+        // sliced into per-word AND'd groups.
+        let source = LootSourceEvent {
+            source_name: "General Graardor".to_string(),
+            source_type: "kill",
+            clue_tier: None,
+            loot: vec![LootItem { item_id: 1, quantity: 1 }],
+        };
+        let ge_prices = crate::models::GEPrices::from([(1, 10)]);
+
+        assert!(call(&source, &ge_prices, "general graardor").is_some());
     }
 }
 
@@ -1687,7 +1729,7 @@ pub async fn get_loot_log(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
-    let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let groups = split_search_groups(query.search.as_deref().unwrap_or(""));
     let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
@@ -1727,7 +1769,7 @@ pub async fn get_loot_log(
                 &row.member_name,
                 row.occurred_at,
                 &ge_prices,
-                &tokens,
+                &groups,
                 &item_ids,
                 search_active,
             ) {
@@ -1797,7 +1839,7 @@ pub async fn get_loot_log_summary(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
-    let tokens: Vec<&str> = query.search.as_deref().unwrap_or("").split_whitespace().collect();
+    let groups = split_search_groups(query.search.as_deref().unwrap_or(""));
     let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
@@ -1832,7 +1874,7 @@ pub async fn get_loot_log_summary(
                 &row.member_name,
                 row.occurred_at,
                 &ge_prices,
-                &tokens,
+                &groups,
                 &item_ids,
                 search_active,
             ) {

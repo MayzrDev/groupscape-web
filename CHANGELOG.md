@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.444] - 2026-09-08
+
+### Added
+- Loot Log search now understands `&&` (or the word "and") to require multiple conditions at once, e.g. `vorkath && >1m` finds only Vorkath kills worth over a million - previously all search words were just "match any of these", so there was no way to combine a name with a value filter.
+
 ## [1.0.434] - 2026-09-08
 
 ### Added
