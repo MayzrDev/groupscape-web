@@ -13,6 +13,8 @@ import "./map-page/map-page.js";
 import "./side-panel/side-panel.js";
 import "./player-panel/player-panel.js";
 import "./slayer-panel/slayer-panel.js";
+import "./slayer-history-tab/slayer-history-tab.js";
+import "./slayer-stats-tab/slayer-stats-tab.js";
 import "./boss-kc-panel/boss-kc-panel.js";
 import "./player-stats/player-stats.js";
 import "./player-portrait/player-portrait.js";

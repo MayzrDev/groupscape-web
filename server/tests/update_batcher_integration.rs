@@ -124,6 +124,7 @@ fn make_member(group_id: Option<i64>, name: &str) -> GroupMember {
         rich_presence: None,
         combat_achievements: None,
         slayer_task: None,
+        slayer_task_events: None,
         portrait_last_update: None,
         last_updated: None,
         events: None,

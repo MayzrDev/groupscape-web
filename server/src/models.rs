@@ -148,6 +148,83 @@ pub struct SlayerTask {
     pub streak_wildy: Option<i32>,
 }
 
+/// One slayer task's lifecycle, from the plugin's `SlayerTaskCloseEvents` accumulator, under its
+/// own "slayerTaskEvents" upload key (kept separate from `events` - see `GroupMember`). The
+/// plugin sends one of these at assignment (`status` "not_started"/"in_progress") and again
+/// whenever that same task closes out (`status` "completed"/"cancelled"/"blocked"/"unknown") -
+/// both keyed by the same `client_event_id` so the server upserts in place rather than storing
+/// two rows per task. See `db::upsert_slayer_task_history_event`.
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct SlayerTaskHistoryEvent {
+    /// Stable id the plugin generates once per task assignment (not per event) - lets the
+    /// assignment and close events for the same task be recognized as the same history row.
+    pub client_event_id: String,
+    pub task_name: String,
+    pub master_name: String,
+    /// "not_started" | "in_progress" | "completed" | "cancelled" | "blocked" | "unknown"
+    pub status: String,
+    pub amount_done: i32,
+    pub amount_total: i32,
+    /// Signed: positive is the points reward for a completed task, negative is the points spent
+    /// cancelling/blocking, `None` while the task is still open (not_started/in_progress).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub points: Option<i32>,
+    pub assigned_at: DateTime<Utc>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<DateTime<Utc>>,
+}
+
+/// One row of `get-slayer-task-history`, newest-first.
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SlayerTaskHistoryEntry {
+    pub task_name: String,
+    pub master_name: String,
+    pub status: String,
+    pub amount_done: i32,
+    pub amount_total: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub points: Option<i32>,
+    pub assigned_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closed_at: Option<DateTime<Utc>>,
+}
+
+/// One page of `get-slayer-task-history` - same keyset-cursor shape as [`LootLogPage`].
+#[derive(Serialize, Deserialize)]
+pub struct SlayerTaskHistoryPage {
+    pub entries: Vec<SlayerTaskHistoryEntry>,
+    pub next_before: Option<DateTime<Utc>>,
+}
+
+/// A "most X" tile on the Stats tab - `None` when the member has no history to rank yet.
+#[derive(Serialize, Deserialize, Default)]
+pub struct SlayerTaskLeader {
+    pub name: String,
+    pub count: i64,
+}
+
+/// All-time slayer task stats for one member, `get-slayer-task-stats`.
+#[derive(Serialize, Deserialize)]
+pub struct SlayerTaskStats {
+    pub tasks_completed: i64,
+    pub total_kills: i64,
+    pub total_points_earned: i64,
+    /// Percentage (0-100) of closed tasks (completed+cancelled+blocked) that were completed.
+    pub completion_rate: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub most_killed_task: Option<SlayerTaskLeader>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub most_common_task: Option<SlayerTaskLeader>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub most_common_master: Option<SlayerTaskLeader>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub most_cancelled_task: Option<SlayerTaskLeader>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub most_blocked_task: Option<SlayerTaskLeader>,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GroupMemberName {
@@ -235,6 +312,12 @@ pub struct GroupMember {
     pub combat_achievements: Option<CombatAchievements>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slayer_task: Option<SlayerTask>,
+    /// Slayer task assignment/close events from the plugin's `SlayerTaskCloseEvents` accumulator,
+    /// under its own "slayerTaskEvents" upload key. Consumed once per event (upserted into
+    /// `groupscape.slayer_task_history` by `client_event_id`), never stored on `GroupMember`
+    /// itself - same ephemeral handling as `notable_drops`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slayer_task_events: Option<Vec<SlayerTaskHistoryEvent>>,
     /// Timestamp of the character's most recent portrait mesh upload (`character_mesh.mesh_last_update`),
     /// gated by the same "since timestamp" cutoff as the telemetry fields above. Never sent by the
     /// plugin - it's server-computed in `get_group_data` so an already-open side panel knows to

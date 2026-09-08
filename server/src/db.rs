@@ -9,7 +9,8 @@ use crate::models::{
     GroupMember, GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession,
     GroupSkillData, ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint,
     PermissionFlags, PermissionFlagsPatch, PermissionKey, RaidCompletionPayload, RaidDifficulty,
-    RaidType, MEMBER_COLOR_PALETTE, RAID_GROUP_TOTAL_LABEL, SHARED_MEMBER,
+    RaidType, SlayerTaskHistoryEntry, SlayerTaskHistoryEvent, SlayerTaskHistoryPage,
+    SlayerTaskLeader, SlayerTaskStats, MEMBER_COLOR_PALETTE, RAID_GROUP_TOTAL_LABEL, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
 use chrono::{DateTime, Utc};
@@ -902,6 +903,7 @@ WHERE group_id=$2
             notable_drops: None,
             combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
             slayer_task: try_deserialize_json_column(&row, "slayer_task")?,
+            slayer_task_events: None,
             portrait_last_update: row.try_get("portrait_last_update").ok(),
             pending: false,
         };
@@ -967,6 +969,7 @@ async fn get_pending_group_members(client: &Client, group_id: i64) -> Result<Vec
                 notable_drops: None,
                 combat_achievements: None,
                 slayer_task: None,
+                slayer_task_events: None,
                 portrait_last_update: None,
                 pending: true,
             })
@@ -1041,6 +1044,7 @@ WHERE group_id=$1 AND member_name=$2
         notable_drops: None,
         combat_achievements: try_deserialize_json_column(&row, "combat_achievements")?,
         slayer_task: try_deserialize_json_column(&row, "slayer_task")?,
+        slayer_task_events: None,
         portrait_last_update: None,
         pending: false,
     }))
@@ -2915,6 +2919,54 @@ ADD COLUMN IF NOT EXISTS discord_drops_unique_only BOOLEAN NOT NULL DEFAULT fals
             .await?;
 
         commit_migration(&transaction, "add_groups_discord_drops_unique_only_column").await?;
+        transaction.commit().await?;
+    }
+
+    if !has_migration_run(client, "create_slayer_task_history_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.slayer_task_history (
+  history_id BIGSERIAL PRIMARY KEY,
+  group_id BIGINT NOT NULL REFERENCES groupscape.groups(group_id) ON DELETE CASCADE,
+  member_name CITEXT NOT NULL,
+  client_event_id TEXT NOT NULL,
+  task_name TEXT NOT NULL,
+  master_name TEXT NOT NULL,
+  status TEXT NOT NULL,
+  amount_done INT NOT NULL DEFAULT 0,
+  amount_total INT NOT NULL DEFAULT 0,
+  points INT,
+  assigned_at TIMESTAMPTZ NOT NULL,
+  closed_at TIMESTAMPTZ
+);
+"#,
+                &[],
+            )
+            .await?;
+        // Lets the assignment event and that same task's later close event upsert onto one row
+        // (see `upsert_slayer_task_history_event`) instead of the pair landing as two rows.
+        transaction
+            .execute(
+                r#"
+CREATE UNIQUE INDEX IF NOT EXISTS slayer_task_history_group_member_event_idx ON groupscape.slayer_task_history (group_id, member_name, client_event_id)
+"#,
+                &[],
+            )
+            .await?;
+        // The History tab's page query and the Stats tab's aggregate query both filter/order on
+        // this pair.
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS slayer_task_history_group_member_assigned_idx ON groupscape.slayer_task_history (group_id, member_name, assigned_at DESC)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_slayer_task_history_table").await?;
         transaction.commit().await?;
     }
 
@@ -4958,6 +5010,252 @@ LIMIT $3
         .await
         .map_err(ApiError::ListKillEventsError)?;
     rows.iter().map(activity_event_from_row).collect()
+}
+
+/// Writes one slayer-task assignment/close event, upserting onto the same row when a later
+/// close event for the same task (`client_event_id`) arrives - see the unique index in
+/// `create_slayer_task_history_table`. `status`/`amount_done`/`amount_total`/`points`/
+/// `closed_at` all move to whatever the incoming event carries (a close event's values replace
+/// the assignment event's), `task_name`/`master_name`/`assigned_at` stay fixed at whatever the
+/// first (assignment) event wrote - a close event always resends the same values for these, so
+/// `EXCLUDED` would be equivalent, but pinning them to the original row is the more honest
+/// intent (this row's identity is "the task assigned at `assigned_at`", not "whatever the most
+/// recent event happened to say").
+pub async fn upsert_slayer_task_history_event(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    event: &SlayerTaskHistoryEvent,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.slayer_task_history
+  (group_id, member_name, client_event_id, task_name, master_name, status, amount_done, amount_total, points, assigned_at, closed_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+ON CONFLICT (group_id, member_name, client_event_id) DO UPDATE SET
+  status = EXCLUDED.status,
+  amount_done = EXCLUDED.amount_done,
+  amount_total = EXCLUDED.amount_total,
+  points = EXCLUDED.points,
+  closed_at = EXCLUDED.closed_at
+"#,
+        )
+        .await?;
+    client
+        .execute(
+            &stmt,
+            &[
+                &group_id,
+                &member_name,
+                &event.client_event_id,
+                &event.task_name,
+                &event.master_name,
+                &event.status,
+                &event.amount_done,
+                &event.amount_total,
+                &event.points,
+                &event.assigned_at,
+                &event.closed_at,
+            ],
+        )
+        .await?;
+    Ok(())
+}
+
+fn slayer_task_history_entry_from_row(row: &Row) -> Result<SlayerTaskHistoryEntry, ApiError> {
+    Ok(SlayerTaskHistoryEntry {
+        task_name: row.try_get("task_name")?,
+        master_name: row.try_get("master_name")?,
+        status: row.try_get("status")?,
+        amount_done: row.try_get("amount_done")?,
+        amount_total: row.try_get("amount_total")?,
+        points: row.try_get("points")?,
+        assigned_at: row.try_get("assigned_at")?,
+        closed_at: row.try_get("closed_at")?,
+    })
+}
+
+/// One page of a member's slayer task history, newest-first, cursor-paginated on `before` -
+/// same keyset shape as [`list_loot_and_kill_events_page`]. `status`/`master_name` are optional
+/// exact-match filters for the History tab's dropdowns.
+pub async fn list_slayer_task_history_page(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    before: Option<DateTime<Utc>>,
+    limit: i64,
+    status: Option<&str>,
+    master_name: Option<&str>,
+) -> Result<SlayerTaskHistoryPage, ApiError> {
+    let page_limit = limit.clamp(1, 100);
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT task_name, master_name, status, amount_done, amount_total, points, assigned_at, closed_at
+FROM groupscape.slayer_task_history
+WHERE group_id=$1
+  AND member_name=$2
+  AND ($3::text IS NULL OR status = $3)
+  AND ($4::text IS NULL OR master_name = $4)
+  AND ($5::timestamptz IS NULL OR assigned_at < $5)
+ORDER BY assigned_at DESC
+LIMIT $6
+"#,
+        )
+        .await?;
+    let rows = client
+        .query(
+            &stmt,
+            &[
+                &group_id,
+                &member_name,
+                &status,
+                &master_name,
+                &before,
+                &(page_limit + 1),
+            ],
+        )
+        .await?;
+
+    let has_more = rows.len() as i64 > page_limit;
+    let entries = rows
+        .iter()
+        .take(page_limit as usize)
+        .map(slayer_task_history_entry_from_row)
+        .collect::<Result<Vec<_>, _>>()?;
+    let next_before = if has_more {
+        entries.last().map(|e| e.assigned_at)
+    } else {
+        None
+    };
+
+    Ok(SlayerTaskHistoryPage {
+        entries,
+        next_before,
+    })
+}
+
+fn slayer_task_leader_from_row(row: &Row) -> Result<SlayerTaskLeader, ApiError> {
+    Ok(SlayerTaskLeader {
+        name: row.try_get(0)?,
+        count: row.try_get(1)?,
+    })
+}
+
+async fn top_slayer_task_name(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    status_filter: Option<&str>,
+    order_by: &str,
+) -> Result<Option<SlayerTaskLeader>, ApiError> {
+    let sql = format!(
+        r#"
+SELECT task_name, {order_by} AS n
+FROM groupscape.slayer_task_history
+WHERE group_id=$1 AND member_name=$2 {status_clause}
+GROUP BY task_name
+ORDER BY n DESC
+LIMIT 1
+"#,
+        order_by = order_by,
+        status_clause = if status_filter.is_some() {
+            "AND status = $3"
+        } else {
+            ""
+        },
+    );
+    let stmt = client.prepare_cached(&sql).await?;
+    let rows = if let Some(status) = status_filter {
+        client.query(&stmt, &[&group_id, &member_name, &status]).await?
+    } else {
+        client.query(&stmt, &[&group_id, &member_name]).await?
+    };
+    rows.first().map(slayer_task_leader_from_row).transpose()
+}
+
+/// All-time slayer task stats for one member - the Stats tab. Every "most X" tile is its own
+/// small `GROUP BY` query rather than one combined query, since each ranks a different subset
+/// (all tasks / completed only / cancelled only / blocked only) - a single query would need a
+/// `FILTER` per aggregate anyway, and these are cheap enough (indexed on `(group_id,
+/// member_name)`) that clarity wins over shaving a handful of round trips.
+pub async fn get_slayer_task_stats(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<SlayerTaskStats, ApiError> {
+    let totals_stmt = client
+        .prepare_cached(
+            r#"
+SELECT
+  COUNT(*) FILTER (WHERE status = 'completed') AS tasks_completed,
+  COALESCE(SUM(amount_done) FILTER (WHERE status = 'completed'), 0) AS total_kills,
+  COALESCE(SUM(points) FILTER (WHERE status = 'completed'), 0) AS total_points_earned,
+  COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled', 'blocked')) AS closed_count
+FROM groupscape.slayer_task_history
+WHERE group_id=$1 AND member_name=$2
+"#,
+        )
+        .await?;
+    let totals_row = client
+        .query_one(&totals_stmt, &[&group_id, &member_name])
+        .await?;
+    let tasks_completed: i64 = totals_row.try_get("tasks_completed")?;
+    let total_kills: i64 = totals_row.try_get("total_kills")?;
+    let total_points_earned: i64 = totals_row.try_get("total_points_earned")?;
+    let closed_count: i64 = totals_row.try_get("closed_count")?;
+    let completion_rate = if closed_count > 0 {
+        ((tasks_completed as f64 / closed_count as f64) * 100.0).round() as i32
+    } else {
+        0
+    };
+
+    let most_killed_task = top_slayer_task_name(
+        client,
+        group_id,
+        member_name,
+        Some("completed"),
+        "COALESCE(SUM(amount_done), 0)",
+    )
+    .await?;
+    let most_common_task =
+        top_slayer_task_name(client, group_id, member_name, None, "COUNT(*)").await?;
+    let most_cancelled_task =
+        top_slayer_task_name(client, group_id, member_name, Some("cancelled"), "COUNT(*)").await?;
+    let most_blocked_task =
+        top_slayer_task_name(client, group_id, member_name, Some("blocked"), "COUNT(*)").await?;
+
+    let master_stmt = client
+        .prepare_cached(
+            r#"
+SELECT master_name, COUNT(*) AS n
+FROM groupscape.slayer_task_history
+WHERE group_id=$1 AND member_name=$2
+GROUP BY master_name
+ORDER BY n DESC
+LIMIT 1
+"#,
+        )
+        .await?;
+    let most_common_master = client
+        .query(&master_stmt, &[&group_id, &member_name])
+        .await?
+        .first()
+        .map(slayer_task_leader_from_row)
+        .transpose()?;
+
+    Ok(SlayerTaskStats {
+        tasks_completed,
+        total_kills,
+        total_points_earned,
+        completion_rate,
+        most_killed_task,
+        most_common_task,
+        most_common_master,
+        most_cancelled_task,
+        most_blocked_task,
+    })
 }
 
 fn group_session_from_row(row: &Row) -> Result<GroupSession, ApiError> {

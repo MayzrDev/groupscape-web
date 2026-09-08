@@ -16,8 +16,8 @@ use crate::models::{
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
     GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem, LootLogEvent,
     LootLogItem, LootLogPage, LootLogSummary, MyPermissions, PermissionFlags, PermissionKey,
-    RenameGroup, TestDiscordNotificationRequest, UpdateGroupPermissionsRequest,
-    UpdateMemberColorRequest, SHARED_MEMBER,
+    RenameGroup, SlayerTaskHistoryPage, SlayerTaskStats, TestDiscordNotificationRequest,
+    UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
 };
 use crate::notable_npcs;
 use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
@@ -875,6 +875,23 @@ pub async fn update_group_member(
                 message,
                 drop.item_id,
             );
+        }
+    }
+
+    // Slayer task assignment/close events from `SlayerTaskCloseEvents` - upserted by
+    // `client_event_id` into `groupscape.slayer_task_history` (assignment writes a
+    // not_started/in_progress row, the later close event for the same task updates that same
+    // row in place rather than adding a second one). Never stored on `GroupMember` itself,
+    // matching `notable_drops`' ephemeral handling above.
+    if let Some(slayer_task_events) = group_member_inner.slayer_task_events.take() {
+        for event in slayer_task_events {
+            db::upsert_slayer_task_history_event(
+                &client,
+                auth.group_id,
+                &group_member_inner.name,
+                &event,
+            )
+            .await?;
         }
     }
 
@@ -1771,6 +1788,63 @@ pub async fn get_loot_log_summary(
     };
     redis.set_json(&cache_key, &summary, CACHE_TTL_SECS).await;
     Ok(web::Json(summary))
+}
+
+fn default_slayer_task_history_limit() -> i64 {
+    25
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetSlayerTaskHistoryQuery {
+    pub player_name: String,
+    #[serde(default)]
+    pub before: Option<DateTime<Utc>>,
+    #[serde(default = "default_slayer_task_history_limit")]
+    pub limit: i64,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub master_name: Option<String>,
+}
+
+/// Paginated, newest-first slayer task history for one group member - the slayer panel's
+/// History tab. No caching (unlike `get_loot_log`): task closes are rare enough per member that
+/// a plain indexed query is cheap, and it avoids having to wire up a version-counter bump
+/// alongside `upsert_slayer_task_history_event` just to keep a cache from going stale.
+pub async fn get_slayer_task_history(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetSlayerTaskHistoryQuery>,
+) -> Result<web::Json<SlayerTaskHistoryPage>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let page = db::list_slayer_task_history_page(
+        &client,
+        auth.group_id,
+        &query.player_name,
+        query.before,
+        query.limit,
+        query.status.as_deref(),
+        query.master_name.as_deref(),
+    )
+    .await?;
+    Ok(web::Json(page))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetSlayerTaskStatsQuery {
+    pub player_name: String,
+}
+
+/// All-time slayer task stats for one group member - the slayer panel's Stats tab.
+pub async fn get_slayer_task_stats(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+    query: web::Query<GetSlayerTaskStatsQuery>,
+) -> Result<web::Json<SlayerTaskStats>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let stats = db::get_slayer_task_stats(&client, auth.group_id, &query.player_name).await?;
+    Ok(web::Json(stats))
 }
 
 #[derive(Deserialize, Debug)]

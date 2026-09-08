@@ -1,0 +1,143 @@
+slayer-stats-tab {
+  display: block;
+  color: var(--primary-text);
+  box-sizing: border-box;
+}
+
+.slayer-stats-tab__loading {
+  text-align: center;
+  padding: 18px 0 8px;
+  opacity: 0.55;
+  font-size: 13px;
+}
+
+.slayer-stats-tab__totals {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.slayer-stats-tab__total {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  border-radius: 3px;
+  padding: 7px 4px;
+}
+
+.slayer-stats-tab__total-n {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 16px;
+  color: var(--orange);
+  font-variant-numeric: tabular-nums;
+}
+
+.slayer-stats-tab__total-l {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.65;
+  text-align: center;
+}
+
+.slayer-stats-tab__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.slayer-stats-tab__tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid hsl(40deg 15.79% 22%);
+  border-radius: 3px;
+  padding: 8px;
+}
+
+.slayer-stats-tab__tile-label {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  opacity: 0.6;
+}
+
+.slayer-stats-tab__tile-empty {
+  opacity: 0.4;
+  font-size: 13px;
+}
+
+.slayer-stats-tab__tile-body {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slayer-stats-tab__tile-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  flex-shrink: 0;
+  image-rendering: initial;
+}
+
+.slayer-stats-tab__tile-icon--master {
+  border-radius: 50%;
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+}
+
+.slayer-stats-tab__tile-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slayer-stats-tab__tile-count {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 12px;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.slayer-stats-tab__tile--negative .slayer-stats-tab__tile-count {
+  color: #ff8a7a;
+  opacity: 1;
+}
+
+.slayer-stats-tab__tile--wide {
+  grid-column: 1 / -1;
+}
+
+.slayer-stats-tab__rate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slayer-stats-tab__rate-n {
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 22px;
+  color: #6be86b;
+}
+
+.slayer-stats-tab__rate-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 4px;
+  background: #1c1811;
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  overflow: hidden;
+}
+
+.slayer-stats-tab__rate-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #57e057, var(--green));
+}

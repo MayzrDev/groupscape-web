@@ -1,13 +1,7 @@
-<div class="slayer-panel__stats-row">
-  <div class="slayer-panel__streak-ledger">
-    ${this.renderStreakCell("normal", "Normal", this.streakNormal())}
-    ${this.renderStreakCell("mortimer", "Mortimer", this.streakMortimer())}
-    ${this.renderStreakCell("wildy", "Wildy", this.streakWildy())}
-  </div>
-  <div class="slayer-panel__points-box">
-    <span class="slayer-panel__stat-label">Points</span>
-    <span class="slayer-panel__stat-value">${this.points()}</span>
-  </div>
+<div class="slayer-panel__tabs">
+  <button class="slayer-panel__tab" tab-id="current">Current</button>
+  <button class="slayer-panel__tab" tab-id="history">History</button>
+  <button class="slayer-panel__tab" tab-id="stats">Stats</button>
 </div>
 
-${this.hasTask() ? this.renderTask() : this.renderNoTask()}
+<div class="slayer-panel__tab-content"></div>

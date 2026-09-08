@@ -143,6 +143,14 @@ class Api {
     return `${this.groupScopeUrl}/get-loot-log-summary`;
   }
 
+  get slayerHistoryUrl() {
+    return `${this.groupScopeUrl}/get-slayer-task-history`;
+  }
+
+  get slayerStatsUrl() {
+    return `${this.groupScopeUrl}/get-slayer-task-stats`;
+  }
+
   get itemBonusesUrl() {
     return `${this.groupScopeUrl}/get-item-bonuses`;
   }
@@ -590,6 +598,45 @@ class Api {
     });
     if (!response.ok) {
       return { total_value: 0, event_count: 0 };
+    }
+    return response.json();
+  }
+
+  async getSlayerHistory({ playerName, before, limit, status, masterName } = {}) {
+    const query = new URLSearchParams();
+    query.set("player_name", playerName);
+    if (before) query.set("before", before);
+    if (limit) query.set("limit", limit);
+    if (status) query.set("status", status);
+    if (masterName) query.set("master_name", masterName);
+
+    const response = await fetch(`${this.slayerHistoryUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.authHeader,
+      },
+    });
+    if (!response.ok) {
+      return { entries: [], next_before: null };
+    }
+    return response.json();
+  }
+
+  async getSlayerStats({ playerName } = {}) {
+    const query = new URLSearchParams();
+    query.set("player_name", playerName);
+
+    const response = await fetch(`${this.slayerStatsUrl}?${query.toString()}`, {
+      headers: {
+        Authorization: this.authHeader,
+      },
+    });
+    if (!response.ok) {
+      return {
+        tasks_completed: 0,
+        total_kills: 0,
+        total_points_earned: 0,
+        completion_rate: 0,
+      };
     }
     return response.json();
   }

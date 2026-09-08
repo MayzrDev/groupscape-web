@@ -715,6 +715,7 @@ mod tests {
             rich_presence: None,
             combat_achievements: Some(combat_achievements(&["1"])),
             slayer_task: None,
+            slayer_task_events: None,
             portrait_last_update: None,
             last_updated: None,
             events: None,

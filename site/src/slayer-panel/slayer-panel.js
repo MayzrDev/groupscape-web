@@ -3,12 +3,17 @@ import { slayerData } from "../data/slayer";
 
 /**
  * Minibar tab (same swap-into-content pattern as `player-inventory`/`player-stats`/etc, see
- * `player-panel`'s `handleMiniBarClick`) showing a group member's current slayer task, streak
- * and points.
+ * `player-panel`'s `handleMiniBarClick`) showing a group member's slayer info across three
+ * sub-tabs: Current task (this component's own markup, unchanged since before the sub-tabs
+ * existed), History (`slayer-history-tab`) and Stats (`slayer-stats-tab`) - both separate
+ * custom elements, matching `collection-log`/`collection-log-tab`'s parent/child split so
+ * switching sub-tabs only swaps `.slayer-panel__tab-content`'s contents rather than wiping this
+ * whole element's DOM (and therefore its own tab-strip state) on every re-render.
  */
 export class SlayerPanel extends BaseElement {
   constructor() {
     super();
+    this.activeTab = "current";
   }
 
   html() {
@@ -19,7 +24,11 @@ export class SlayerPanel extends BaseElement {
     super.connectedCallback();
     this.playerName = this.getAttribute("player-name");
     this.subscribeOnce("get-group-data", this.init.bind(this));
-    this.subscribe(`slayerTask:${this.playerName}`, this.render.bind(this));
+    // Only ever repaints the Current tab's own content - see renderCurrentTabIfActive. Kept as a
+    // long-lived subscription (rather than one set up/torn down per tab switch) since it also
+    // needs to fire while History/Stats are showing, so a task closing while the user is looking
+    // at History/Stats is reflected the moment they switch back to Current.
+    this.subscribe(`slayerTask:${this.playerName}`, this.renderCurrentTabIfActive.bind(this));
   }
 
   disconnectedCallback() {
@@ -29,6 +38,57 @@ export class SlayerPanel extends BaseElement {
   init(groupData) {
     this.member = groupData.members.get(this.playerName);
     this.render();
+
+    this.tabButtons = this.querySelector(".slayer-panel__tabs");
+    this.tabContent = this.querySelector(".slayer-panel__tab-content");
+    this.eventListener(this.tabButtons, "click", this.handleTabClick.bind(this));
+    this.showTab(this.activeTab);
+  }
+
+  handleTabClick(event) {
+    const tabId = event?.target?.getAttribute("tab-id");
+    if (tabId) {
+      this.showTab(tabId);
+    }
+  }
+
+  showTab(tabId) {
+    this.activeTab = tabId;
+    this.tabButtons.querySelectorAll("button[tab-id]").forEach((button) => {
+      button.classList.toggle("slayer-panel__tab--active", button.getAttribute("tab-id") === tabId);
+    });
+
+    if (tabId === "current") {
+      this.renderCurrentTab();
+    } else if (tabId === "history") {
+      this.tabContent.innerHTML = `<slayer-history-tab player-name="${this.playerName}"></slayer-history-tab>`;
+    } else if (tabId === "stats") {
+      this.tabContent.innerHTML = `<slayer-stats-tab player-name="${this.playerName}"></slayer-stats-tab>`;
+    }
+  }
+
+  renderCurrentTabIfActive() {
+    if (this.activeTab === "current" && this.tabContent) {
+      this.renderCurrentTab();
+    }
+  }
+
+  renderCurrentTab() {
+    this.tabContent.innerHTML = `
+      <div class="slayer-panel__stats-row">
+        <div class="slayer-panel__streak-ledger">
+          ${this.renderStreakCell("normal", "Normal", this.streakNormal())}
+          ${this.renderStreakCell("mortimer", "Mortimer", this.streakMortimer())}
+          ${this.renderStreakCell("wildy", "Wildy", this.streakWildy())}
+        </div>
+        <div class="slayer-panel__points-box">
+          <span class="slayer-panel__stat-label">Points</span>
+          <span class="slayer-panel__stat-value">${this.points()}</span>
+        </div>
+      </div>
+
+      ${this.hasTask() ? this.renderTask() : this.renderNoTask()}
+    `;
   }
 
   hasTask() {

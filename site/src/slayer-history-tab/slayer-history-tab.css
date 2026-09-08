@@ -1,0 +1,232 @@
+slayer-history-tab {
+  display: block;
+  color: var(--primary-text);
+  box-sizing: border-box;
+}
+
+.slayer-history-tab__filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.slayer-history-tab__select-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.slayer-history-tab__select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  padding: 7px 24px 7px 10px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  color: var(--primary-text);
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 11.5px;
+  text-shadow: none;
+  cursor: pointer;
+}
+
+.slayer-history-tab__select:hover {
+  border-color: hsl(40deg 15.79% 40%);
+}
+
+.slayer-history-tab__select:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.slayer-history-tab__select-arrow {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  opacity: 0.6;
+  color: var(--primary-text);
+}
+
+.slayer-history-tab__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.slayer-history-tab__row {
+  display: flex;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid hsl(40deg 15.79% 22%);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.slayer-history-tab__icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  object-fit: contain;
+  margin-top: 1px;
+  image-rendering: initial;
+}
+
+.slayer-history-tab__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.slayer-history-tab__top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.slayer-history-tab__name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slayer-history-tab__points {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex-shrink: 0;
+  text-shadow: none;
+}
+
+.slayer-history-tab__points--pos {
+  color: #6be86b;
+}
+
+.slayer-history-tab__points--neg {
+  color: #ff8a7a;
+}
+
+.slayer-history-tab__points--muted {
+  color: var(--primary-text);
+  opacity: 0.35;
+}
+
+.slayer-history-tab__bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.slayer-history-tab__master {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  opacity: 0.75;
+}
+
+.slayer-history-tab__master-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+  image-rendering: initial;
+}
+
+.slayer-history-tab__master-name {
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slayer-history-tab__kills {
+  font-size: 11px;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.slayer-history-tab__badge {
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid;
+  flex-shrink: 0;
+  text-shadow: none;
+  font-weight: 600;
+}
+
+.slayer-history-tab__badge--ns {
+  color: #b7b7b7;
+  border-color: rgba(183, 183, 183, 0.4);
+  background: rgba(183, 183, 183, 0.08);
+}
+
+.slayer-history-tab__badge--ip {
+  color: #ffb84d;
+  border-color: rgba(255, 152, 31, 0.45);
+  background: rgba(255, 152, 31, 0.1);
+}
+
+.slayer-history-tab__badge--cp {
+  color: #6be86b;
+  border-color: rgba(13, 193, 13, 0.4);
+  background: rgba(13, 193, 13, 0.1);
+}
+
+.slayer-history-tab__badge--cx {
+  color: #ff8a7a;
+  border-color: rgba(255, 0, 0, 0.35);
+  background: rgba(255, 0, 0, 0.08);
+}
+
+.slayer-history-tab__badge--bl {
+  color: #92a6c9;
+  border-color: rgba(146, 166, 201, 0.4);
+  background: rgba(146, 166, 201, 0.1);
+}
+
+.slayer-history-tab__empty {
+  text-align: center;
+  padding: 18px 0 8px;
+  opacity: 0.55;
+  font-size: 13px;
+}
+
+.slayer-history-tab__load-more {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 12px;
+  color: var(--orange);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 6px 0;
+  cursor: pointer;
+  text-shadow: none;
+}
+
+.slayer-history-tab__load-more:hover {
+  border-color: var(--orange);
+}
+
+.slayer-history-tab__load-more[hidden] {
+  display: none;
+}

@@ -5,6 +5,48 @@ slayer-panel {
   box-sizing: border-box;
 }
 
+.slayer-panel__tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.slayer-panel__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 4px;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  color: var(--primary-text);
+  opacity: 0.6;
+  cursor: pointer;
+  border: none;
+  background: none;
+  text-shadow: 1px 1px var(--black);
+}
+
+.slayer-panel__tab + .slayer-panel__tab {
+  border-left: 1px solid hsl(40deg 15.79% 24%);
+}
+
+.slayer-panel__tab--active {
+  opacity: 1;
+  color: var(--orange);
+  background: rgba(255, 152, 31, 0.1);
+  box-shadow: inset 0 -2px 0 var(--orange);
+}
+
+.slayer-panel__tab:hover:not(.slayer-panel__tab--active) {
+  opacity: 0.85;
+}
+
 .slayer-panel__stats-row {
   display: flex;
   gap: 8px;

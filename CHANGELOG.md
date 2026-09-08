@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.434] - 2026-09-08
 
+### Added
+- Each member's Slayer panel now has History and Stats sub-tabs alongside the current task: History lists every past task (filterable by status or slayer master) with points earned/spent and kill progress, while Stats shows all-time totals and "most killed", "most common", "most cancelled", and "most blocked" records.
+
 ### Fixed
 - Moons of Peril kill entries in the activity feed and toast notifications no longer merge two different moon combos into one misleading "x2" - each combo (e.g. "Eclipse, Blue, Blood" vs. just "Blue") now shows as its own entry with its own loot.
 - Skill level-ups (activity feed entry, toast, and Discord notification) were silently missing for every skill's higher levels - the server was using the wrong XP thresholds and thought you were still one level behind where you actually were. Fixed so level-up milestones (10, 20, ..., 99) now fire at the correct level for everyone.

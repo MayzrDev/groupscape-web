@@ -1,0 +1,194 @@
+import { BaseElement } from "../base-element/base-element";
+import { api } from "../data/api";
+import { slayerData } from "../data/slayer";
+
+const PAGE_LIMIT = 25;
+
+const STATUS_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "not_started", label: "Not started" },
+  { value: "in_progress", label: "In progress" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "blocked", label: "Blocked" },
+];
+
+const STATUS_META = {
+  not_started: { label: "Not started", cls: "ns" },
+  in_progress: { label: "In progress", cls: "ip" },
+  completed: { label: "Completed", cls: "cp" },
+  cancelled: { label: "Cancelled", cls: "cx" },
+  blocked: { label: "Blocked", cls: "bl" },
+};
+
+// Display-cased NPC names as the plugin captures them from dialogue (see
+// GroupScapeTrackerPlugin#captureSlayerTaskMasterDialogue) - matched server-side by exact string
+// equality (`master_name = $4` in db::list_slayer_task_history_page), not case-insensitively.
+const MASTER_OPTIONS = [
+  { value: "", label: "All masters" },
+  ...[
+    "Turael",
+    "Spria",
+    "Mazchna",
+    "Vannaka",
+    "Chaeldar",
+    "Nieve",
+    "Steve",
+    "Duradel",
+    "Konar quo Maten",
+    "Krystilia",
+    "Mortimer",
+    "Aya",
+    "Achtryn",
+    "Kuradal",
+  ].map((name) => ({ value: name, label: name })),
+];
+
+/**
+ * Slayer panel's History sub-tab - a paginated, newest-first list of a member's slayer task
+ * history (`GET .../get-slayer-task-history`), filterable by status/master via two dropdowns
+ * (pill-style filter chips were tried first and rejected during design review). Mounted fresh by
+ * `slayer-panel`'s `showTab` on every switch to History, so no state needs to survive a tab
+ * switch away and back.
+ */
+export class SlayerHistoryTab extends BaseElement {
+  constructor() {
+    super();
+    this.entries = [];
+    this.nextBefore = null;
+    this.loading = false;
+    this.status = "";
+    this.masterName = "";
+  }
+
+  html() {
+    return `{{slayer-history-tab.html}}`;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.playerName = this.getAttribute("player-name");
+    this.render();
+
+    this.statusSelect = this.querySelector(".slayer-history-tab__status-select");
+    this.masterSelect = this.querySelector(".slayer-history-tab__master-select");
+    this.listEl = this.querySelector(".slayer-history-tab__list");
+    this.loadMoreBtn = this.querySelector(".slayer-history-tab__load-more");
+
+    this.statusSelect.innerHTML = STATUS_OPTIONS.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
+    this.masterSelect.innerHTML = MASTER_OPTIONS.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
+
+    this.eventListener(this.statusSelect, "change", () => this.setFilters({ status: this.statusSelect.value }));
+    this.eventListener(this.masterSelect, "change", () => this.setFilters({ masterName: this.masterSelect.value }));
+    this.eventListener(this.loadMoreBtn, "click", () => this.loadPage());
+
+    // A task closing (or a fresh one starting) while History is the active tab should show up
+    // without the member switching tabs and back - refetch the first page under the current
+    // filters, capped at however much was already loaded so the list doesn't visibly shrink.
+    this.subscribe(`slayerTask:${this.playerName}`, () => this.refreshFromTop());
+
+    this.loadPage(true);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+  }
+
+  setFilters({ status, masterName }) {
+    if (status !== undefined) this.status = status;
+    if (masterName !== undefined) this.masterName = masterName;
+    this.loadPage(true);
+  }
+
+  async refreshFromTop() {
+    if (this.loading) return;
+    const limit = Math.max(PAGE_LIMIT, this.entries.length);
+    this.loading = true;
+    const page = await api.getSlayerHistory({
+      playerName: this.playerName,
+      limit,
+      status: this.status || undefined,
+      masterName: this.masterName || undefined,
+    });
+    this.loading = false;
+    this.entries = page.entries ?? [];
+    this.nextBefore = page.next_before ?? null;
+    this.renderList();
+  }
+
+  async loadPage(reset = false) {
+    if (this.loading) return;
+    this.loading = true;
+    this.setLoadMoreLabel();
+
+    const page = await api.getSlayerHistory({
+      playerName: this.playerName,
+      before: reset ? undefined : this.nextBefore,
+      limit: PAGE_LIMIT,
+      status: this.status || undefined,
+      masterName: this.masterName || undefined,
+    });
+
+    this.entries = reset ? page.entries ?? [] : [...this.entries, ...(page.entries ?? [])];
+    this.nextBefore = page.next_before ?? null;
+    this.loading = false;
+    this.renderList();
+  }
+
+  setLoadMoreLabel() {
+    if (this.loadMoreBtn) this.loadMoreBtn.textContent = this.loading ? "Loading..." : "Load more";
+  }
+
+  renderList() {
+    if (!this.listEl) return;
+
+    if (this.entries.length === 0) {
+      this.listEl.innerHTML = `<div class="slayer-history-tab__empty">No tasks match these filters</div>`;
+    } else {
+      this.listEl.innerHTML = this.entries.map((entry) => this.renderRow(entry)).join("");
+    }
+
+    this.loadMoreBtn.hidden = !this.nextBefore;
+    this.setLoadMoreLabel();
+  }
+
+  renderRow(entry) {
+    const meta = STATUS_META[entry.status] ?? { label: entry.status, cls: "ns" };
+    const taskIcon = slayerData.taskIconUrl(entry.task_name);
+    const masterIcon = slayerData.masterIconUrl(entry.master_name);
+
+    let pointsLabel = "&mdash;";
+    let pointsCls = "slayer-history-tab__points slayer-history-tab__points--muted";
+    if (entry.points != null) {
+      pointsLabel = (entry.points > 0 ? "+" : "") + entry.points;
+      pointsCls =
+        "slayer-history-tab__points " +
+        (entry.points > 0 ? "slayer-history-tab__points--pos" : "slayer-history-tab__points--neg");
+    }
+
+    return `
+      <div class="slayer-history-tab__row">
+        <img class="slayer-history-tab__icon" src="${taskIcon}" alt="${entry.task_name}" />
+        <div class="slayer-history-tab__body">
+          <div class="slayer-history-tab__top">
+            <span class="slayer-history-tab__name">${entry.task_name}</span>
+            <span class="${pointsCls}">${pointsLabel}</span>
+          </div>
+          <div class="slayer-history-tab__bottom">
+            <span class="slayer-history-tab__master">
+              ${
+                masterIcon
+                  ? `<img class="slayer-history-tab__master-icon" src="${masterIcon}" alt="${entry.master_name}" />`
+                  : ""
+              }
+              <span class="slayer-history-tab__master-name">${entry.master_name}</span>
+            </span>
+            <span class="slayer-history-tab__kills">${entry.amount_done}/${entry.amount_total}</span>
+            <span class="slayer-history-tab__badge slayer-history-tab__badge--${meta.cls}">${meta.label}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+}
+customElements.define("slayer-history-tab", SlayerHistoryTab);
