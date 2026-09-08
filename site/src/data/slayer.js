@@ -143,6 +143,7 @@ const SLAYER_MONSTER_ICONS = {
   wyrms: "wyrms",
   zombies: "zombies",
   zygomites: "zygomites",
+  "mutated zygomites": "mutated-zygomites",
 
   // Every boss assignable via the generic "Boss" slayer task (the task unlocked by the 200-point
   // "Like a boss" reward, given by Duradel/Kuradal, Konar, Nieve/Steve, and Krystilia) - see
