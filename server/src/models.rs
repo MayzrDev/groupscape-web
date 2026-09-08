@@ -149,7 +149,7 @@ pub struct SlayerTask {
 }
 
 /// One slayer task's lifecycle, from the plugin's `SlayerTaskCloseEvents` accumulator, under its
-/// own "slayerTaskEvents" upload key (kept separate from `events` - see `GroupMember`). The
+/// own "slayer_task_events" upload key (kept separate from `events` - see `GroupMember`). The
 /// plugin sends one of these at assignment (`status` "not_started"/"in_progress") and again
 /// whenever that same task closes out (`status` "completed"/"cancelled"/"blocked"/"unknown") -
 /// both keyed by the same `client_event_id` so the server upserts in place rather than storing
@@ -311,7 +311,7 @@ pub struct GroupMember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub slayer_task: Option<SlayerTask>,
     /// Slayer task assignment/close events from the plugin's `SlayerTaskCloseEvents` accumulator,
-    /// under its own "slayerTaskEvents" upload key. Consumed once per event (upserted into
+    /// under its own "slayer_task_events" upload key. Consumed once per event (upserted into
     /// `groupscape.slayer_task_history` by `client_event_id`), never stored on `GroupMember`
     /// itself - same ephemeral handling as `notable_drops`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

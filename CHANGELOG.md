@@ -9,6 +9,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Loot Log search can now filter by kill count too, e.g. `vorkath && >10kc` (or `>10 kills`) only shows farming sessions where you've killed Vorkath more than 10 times in a row.
 - Loot Log search now also understands `unique` (only unique drops), `rare` (rare or rarer), a drop-rate check like `<1/5000` (rarer than 1 in 5000), and `kill`/`chest`/`clue` to filter by drop type generically, e.g. `chest && >1m`.
 
+### Changed
+- Internal: corrected stale doc comments referencing the plugin's slayer task event upload key.
+
 ### Fixed
 - A Mutated Zygomites slayer task now shows its proper monster icon instead of a blank/unknown icon.
 
