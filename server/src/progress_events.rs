@@ -262,11 +262,15 @@ const SKILL_NAMES: [&str; 24] = [
 /// level up to 99. Common early levels aren't worth a post; the max-level grind is.
 const LEVEL_MILESTONES: [u32; 15] = [10, 20, 30, 40, 50, 60, 70, 80, 85, 90, 95, 96, 97, 98, 99];
 
-/// XP required to *start* the given level, ported 1:1 from `site/src/data/skill.js`'s
-/// `xpForLevel` so the server's milestone detection agrees with what the client displays.
+/// XP required to *start* the given level, ported from `site/src/data/skill.js`'s `xpForLevel`
+/// so the server's milestone detection agrees with what the client displays. The client's
+/// `xpForLevel(i)` sums terms `1..=i` and stores the result under key `i + 1` in its lookup
+/// table - i.e. the XP to *start* level `L` is the sum over `1..L` (`L` itself excluded), not
+/// `1..=L`. This mirrors that shift directly instead of replicating the client's off-by-one
+/// indirection.
 fn xp_for_level(level: u32) -> u64 {
     let mut xp: f64 = 0.0;
-    for i in 1..=level {
+    for i in 1..level {
         xp += (i as f64 + 300.0 * 2f64.powf(i as f64 / 7.0)).floor();
     }
     (0.25 * xp).floor() as u64
