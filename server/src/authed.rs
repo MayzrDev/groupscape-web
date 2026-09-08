@@ -11,7 +11,9 @@ use crate::hiscores;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::loot_log_search::{
-    combat_level, extract_kill_count_clause, numeric_clause_matches, parse_numeric_clause, split_search_groups,
+    combat_level, extract_kill_count_clause, matches_category_keyword, matches_rarity_keyword,
+    numeric_clause_matches, numeric_clause_matches_f64, parse_drop_rate_clause, parse_numeric_clause,
+    rarity_keyword, split_search_groups,
 };
 use crate::models::{
     ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
@@ -1537,16 +1539,34 @@ fn build_matching_loot_log_event(
             continue;
         }
 
-        let numeric_clauses: Vec<_> = group.iter().filter_map(|t| parse_numeric_clause(t)).collect();
-        let text_tokens: Vec<String> = group
-            .iter()
-            .filter(|t| parse_numeric_clause(t).is_none())
-            .map(|t| t.to_lowercase())
-            .collect();
+        // Sorts each remaining token in the group into exactly one clause bucket: `unique`/rarity
+        // keywords and drop-rate fractions are per-item alternatives alongside id/value matching
+        // (see the per-item loop below); anything left over falls through to the existing
+        // name-substring/combat-level text path.
+        let mut numeric_clauses: Vec<_> = Vec::new();
+        let mut drop_rate_clauses: Vec<_> = Vec::new();
+        let mut unique_required = false;
+        let mut rarity_required: Option<&'static str> = None;
+        let mut text_tokens: Vec<String> = Vec::new();
+        for token in &group {
+            if token.eq_ignore_ascii_case("unique") {
+                unique_required = true;
+            } else if let Some(keyword) = rarity_keyword(token) {
+                rarity_required = Some(keyword);
+            } else if let Some(clause) = parse_drop_rate_clause(token) {
+                drop_rate_clauses.push(clause);
+            } else if let Some(clause) = parse_numeric_clause(token) {
+                numeric_clauses.push(clause);
+            } else {
+                text_tokens.push(token.to_lowercase());
+            }
+        }
 
-        let mut context_matched = text_tokens
-            .iter()
-            .any(|t| member_lower.contains(t.as_str()) || source_lower.contains(t.as_str()));
+        let mut context_matched = text_tokens.iter().any(|t| {
+            member_lower.contains(t.as_str())
+                || source_lower.contains(t.as_str())
+                || matches_category_keyword(t, source.source_type)
+        });
         if !context_matched {
             if let Some(level) = level {
                 context_matched = numeric_clauses
@@ -1566,7 +1586,15 @@ fn build_matching_loot_log_event(
                         .unwrap_or(false)
                     || numeric_clause_matches(clause, item.quantity as i64)
             });
-            if id_match || value_match {
+            let unique_match = unique_required && item.is_unique;
+            let rarity_match = rarity_required.is_some_and(|kw| matches_rarity_keyword(kw, item.rarity.as_deref()));
+            let drop_rate_match = !drop_rate_clauses.is_empty()
+                && item
+                    .drop_rate
+                    .as_deref()
+                    .and_then(drop_rates::probability)
+                    .is_some_and(|p| drop_rate_clauses.iter().any(|clause| numeric_clause_matches_f64(clause, p)));
+            if id_match || value_match || unique_match || rarity_match || drop_rate_match {
                 any_item_level_matched = true;
                 item_matched_in_any_group[idx] = true;
             }
@@ -1603,6 +1631,14 @@ mod build_matching_loot_log_event_tests {
 
     fn source(loot: Vec<LootItem>) -> LootSourceEvent {
         LootSourceEvent { source_name: "Dust devil".to_string(), source_type: "kill", clue_tier: None, loot }
+    }
+
+    // Real curated drop_rates.json entries under "vorkath" - needed to exercise unique/rarity/
+    // drop-rate keywords, since those are looked up from the curated table, not synthesized.
+    // Item 11286 (Draconic visage): very_rare, unique, 1/5000. Item 383 (Raw shark): uncommon,
+    // not unique, 3/300.
+    fn vorkath_source(loot: Vec<LootItem>) -> LootSourceEvent {
+        LootSourceEvent { source_name: "Vorkath".to_string(), source_type: "kill", clue_tier: None, loot }
     }
 
     fn call(source: &LootSourceEvent, ge_prices: &crate::models::GEPrices, search: &str) -> Option<LootLogEvent> {
@@ -1684,6 +1720,62 @@ mod build_matching_loot_log_event_tests {
         // A search that's purely a kill-count clause matches every event server-side - the client
         // applies the actual count filter after session grouping.
         assert!(call(&source, &ge_prices, ">10kc").is_some());
+    }
+
+    #[test]
+    fn unique_keyword_matches_only_events_with_a_unique_drop() {
+        let ge_prices = crate::models::GEPrices::from([(11286, 5_000_000), (383, 100)]);
+
+        let with_unique = vorkath_source(vec![LootItem { item_id: 11286, quantity: 1 }]);
+        assert!(call(&with_unique, &ge_prices, "unique").is_some());
+
+        let without_unique = vorkath_source(vec![LootItem { item_id: 383, quantity: 1 }]);
+        assert!(call(&without_unique, &ge_prices, "unique").is_none());
+    }
+
+    #[test]
+    fn rare_keyword_matches_very_rare_tier_too() {
+        let ge_prices = crate::models::GEPrices::from([(11286, 5_000_000), (383, 100)]);
+
+        let very_rare_item = vorkath_source(vec![LootItem { item_id: 11286, quantity: 1 }]);
+        assert!(call(&very_rare_item, &ge_prices, "rare").is_some());
+
+        let uncommon_item = vorkath_source(vec![LootItem { item_id: 383, quantity: 1 }]);
+        assert!(call(&uncommon_item, &ge_prices, "rare").is_none());
+    }
+
+    #[test]
+    fn drop_rate_clause_matches_by_probability() {
+        let ge_prices = crate::models::GEPrices::from([(11286, 5_000_000), (383, 100)]);
+
+        // Draconic visage is 1/5000 - rarer than 1/1000.
+        let rare_drop = vorkath_source(vec![LootItem { item_id: 11286, quantity: 1 }]);
+        assert!(call(&rare_drop, &ge_prices, "<1/1000").is_some());
+
+        // Raw shark is 3/300 (1%) - not rarer than 1/1000.
+        let common_drop = vorkath_source(vec![LootItem { item_id: 383, quantity: 1 }]);
+        assert!(call(&common_drop, &ge_prices, "<1/1000").is_none());
+    }
+
+    #[test]
+    fn category_keyword_matches_source_type_generically() {
+        let ge_prices = crate::models::GEPrices::from([(1, 100)]);
+        let kill = source(vec![LootItem { item_id: 1, quantity: 1 }]);
+
+        assert!(call(&kill, &ge_prices, "kill").is_some());
+        assert!(call(&kill, &ge_prices, "chest").is_none());
+    }
+
+    #[test]
+    fn keywords_combine_with_and_grouping() {
+        let ge_prices = crate::models::GEPrices::from([(11286, 5_000_000), (383, 100)]);
+        let event = vorkath_source(vec![
+            LootItem { item_id: 11286, quantity: 1 },
+            LootItem { item_id: 383, quantity: 1 },
+        ]);
+
+        assert!(call(&event, &ge_prices, "vorkath && unique").is_some());
+        assert!(call(&event, &ge_prices, "zulrah && unique").is_none());
     }
 
     #[test]

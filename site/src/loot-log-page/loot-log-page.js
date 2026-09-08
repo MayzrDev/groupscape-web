@@ -41,6 +41,10 @@ const PLACEHOLDER_EXAMPLES = [
   "<100k",
   "vorkath && >1m",
   "vorkath && >10kc",
+  "unique",
+  "rare",
+  "<1/5000",
+  "chest && >1m",
 ];
 const PLACEHOLDER_INTERVAL_MS = 2500;
 const PLACEHOLDER_FADE_MS = 400;

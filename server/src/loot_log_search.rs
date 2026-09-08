@@ -140,6 +140,78 @@ pub fn numeric_clause_matches(clause: &NumericClause, candidate: i64) -> bool {
     }
 }
 
+/// Same comparison as `numeric_clause_matches`, for probability-valued candidates (drop rates,
+/// always well under 1.0) where the value clause's sub-1 epsilon would be meaningless.
+pub fn numeric_clause_matches_f64(clause: &NumericClause, candidate: f64) -> bool {
+    match clause.op {
+        NumericOp::Eq => (candidate - clause.value).abs() < 1e-9,
+        NumericOp::Gt => candidate > clause.value,
+        NumericOp::Gte => candidate >= clause.value,
+        NumericOp::Lt => candidate < clause.value,
+        NumericOp::Lte => candidate <= clause.value,
+    }
+}
+
+/// Parses a drop-rate search clause like `<1/5000` or `1/508`: the same optional comparison
+/// prefix as `parse_numeric_clause`, followed by a curated `"n/d"` rate (see
+/// `crate::drop_rates::probability`), compared as a plain probability - so `<1/5000` reads
+/// naturally as "rarer than 1 in 5000" (a smaller probability IS rarer, no inversion needed).
+pub fn parse_drop_rate_clause(token: &str) -> Option<NumericClause> {
+    let token = token.trim();
+    let (op, rest) = if let Some(r) = token.strip_prefix(">=") {
+        (NumericOp::Gte, r)
+    } else if let Some(r) = token.strip_prefix("<=") {
+        (NumericOp::Lte, r)
+    } else if let Some(r) = token.strip_prefix('>') {
+        (NumericOp::Gt, r)
+    } else if let Some(r) = token.strip_prefix('<') {
+        (NumericOp::Lt, r)
+    } else if let Some(r) = token.strip_prefix('=') {
+        (NumericOp::Eq, r)
+    } else {
+        (NumericOp::Eq, token)
+    };
+    let value = crate::drop_rates::probability(rest.trim())?;
+    Some(NumericClause { op, value })
+}
+
+/// Rarity tiers as stored in `content/drop_rates.json` (see `crate::drop_rates::rarity_rank`).
+/// `"rare"` deliberately also matches the `very_rare` tier (rare-or-rarer) since that reads more
+/// naturally as "show me the rare stuff" than requiring an exact tier match.
+pub fn matches_rarity_keyword(keyword: &str, rarity: Option<&str>) -> bool {
+    let Some(rarity) = rarity else { return false };
+    match keyword {
+        "rare" => rarity == "rare" || rarity == "very_rare",
+        "very_rare" => rarity == "very_rare",
+        "uncommon" => rarity == "uncommon",
+        "common" => rarity == "common",
+        _ => false,
+    }
+}
+
+/// Recognizes a search token as a rarity keyword (case-insensitive; `veryrare`/`very_rare` both
+/// accepted since `&&`/`and` grouping already covers the "two separate words" case some other
+/// way). Returns the canonical tier name `matches_rarity_keyword` expects, or `None`.
+pub fn rarity_keyword(token: &str) -> Option<&'static str> {
+    match token.to_lowercase().as_str() {
+        "rare" => Some("rare"),
+        "veryrare" | "very_rare" => Some("very_rare"),
+        "uncommon" => Some("uncommon"),
+        "common" => Some("common"),
+        _ => None,
+    }
+}
+
+/// Whether a plain-text search token names a Loot Log category by its `source_type` ("kill",
+/// "chest", "clue") rather than a literal name - lets e.g. `chest && >5m` work generically instead
+/// of only matching kills/chests whose actual name happens to contain the word.
+pub fn matches_category_keyword(token: &str, source_type: &str) -> bool {
+    matches!(
+        (token, source_type),
+        ("kill" | "kills", "kill") | ("chest" | "chests", "chest") | ("clue" | "clues", "clue")
+    )
+}
+
 /// Kill count ("kc") is a farming-session concept - the number of events merged into one
 /// loot-log-group card client-side (see loot-log-group.js's `countLabel`) - that only exists
 /// after the client merges raw events, so it can't be evaluated per-event here the way
@@ -325,5 +397,49 @@ mod tests {
         let (clause, rest) = extract_kill_count_clause(&strs(&["vorkath", ">1m"]));
         assert!(clause.is_none());
         assert_eq!(rest, strs(&["vorkath", ">1m"]));
+    }
+
+    #[test]
+    fn rarity_keyword_recognizes_known_tiers_case_insensitively() {
+        assert_eq!(rarity_keyword("RARE"), Some("rare"));
+        assert_eq!(rarity_keyword("veryrare"), Some("very_rare"));
+        assert_eq!(rarity_keyword("very_rare"), Some("very_rare"));
+        assert_eq!(rarity_keyword("uncommon"), Some("uncommon"));
+        assert_eq!(rarity_keyword("common"), Some("common"));
+        assert_eq!(rarity_keyword("vorkath"), None);
+    }
+
+    #[test]
+    fn rare_keyword_also_matches_very_rare_tier() {
+        assert!(matches_rarity_keyword("rare", Some("rare")));
+        assert!(matches_rarity_keyword("rare", Some("very_rare")));
+        assert!(!matches_rarity_keyword("rare", Some("uncommon")));
+        assert!(!matches_rarity_keyword("very_rare", Some("rare")));
+        assert!(!matches_rarity_keyword("rare", None));
+    }
+
+    #[test]
+    fn parses_drop_rate_clause_as_a_probability_comparison() {
+        let clause = parse_drop_rate_clause("<1/5000").unwrap();
+        assert!(numeric_clause_matches_f64(&clause, 1.0 / 10_000.0));
+        assert!(!numeric_clause_matches_f64(&clause, 1.0 / 100.0));
+
+        let clause = parse_drop_rate_clause("1/508").unwrap();
+        assert!(numeric_clause_matches_f64(&clause, 1.0 / 508.0));
+    }
+
+    #[test]
+    fn drop_rate_clause_rejects_non_fraction_tokens() {
+        assert!(parse_drop_rate_clause("vorkath").is_none());
+        assert!(parse_drop_rate_clause(">1m").is_none());
+    }
+
+    #[test]
+    fn category_keyword_matches_source_type_not_literal_text() {
+        assert!(matches_category_keyword("chest", "chest"));
+        assert!(matches_category_keyword("chests", "chest"));
+        assert!(matches_category_keyword("kills", "kill"));
+        assert!(!matches_category_keyword("chest", "kill"));
+        assert!(!matches_category_keyword("vorkath", "kill"));
     }
 }

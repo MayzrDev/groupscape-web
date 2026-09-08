@@ -7,6 +7,7 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Added
 - Loot Log search now understands `&&` (or the word "and") to require multiple conditions at once, e.g. `vorkath && >1m` finds only Vorkath kills worth over a million - previously all search words were just "match any of these", so there was no way to combine a name with a value filter.
 - Loot Log search can now filter by kill count too, e.g. `vorkath && >10kc` (or `>10 kills`) only shows farming sessions where you've killed Vorkath more than 10 times in a row.
+- Loot Log search now also understands `unique` (only unique drops), `rare` (rare or rarer), a drop-rate check like `<1/5000` (rarer than 1 in 5000), and `kill`/`chest`/`clue` to filter by drop type generically, e.g. `chest && >1m`.
 
 ## [1.0.434] - 2026-09-08
 
@@ -39,29 +40,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - On mobile, the side panel toggle button moved to the bottom-left corner (above the Discord button). The admin dashboard shortcut button moved from the top-right to the bottom-right corner.
 - Corrupted Gauntlet trash mobs (corrupted/crystalline wolves, spiders, bats, rats, dragons, bears, dark beasts) and Tombs of Amascut's Ba-Ba, Akkha, Kephri, and Zebak no longer clutter the Loot Log.
 
-## [1.0.409] - 2026-09-06
-
-### Added
-- Discord combat achievement notifications now show what percentage of players have completed that task, sourced from the wiki.
-- Discord drop and clue casket notifications now call out "💎 Rare drop"/"💎 Rare clue reward" when the item is genuinely rare (1/500 or rarer).
-- Discord pet notifications now show the drop rate and (for boss pets) which kill number you got it on.
-- Discord quest completion notifications now show how many quests you've finished overall (e.g. "148 of 172").
-- Discord collection log item notifications now show your progress on that item's page (e.g. "14/34") alongside the drop rate.
-- Discord raid completion notifications now show each member's share of the loot and whether it's a new group record.
-- Item icons now link straight to the item's wiki page when clicked.
-- Opening a Hunters' loot sack from Hunters' rumours (any tier) now shows up in the group's loot log.
-- Equipment set bonus panel now recognizes the Guild Hunter outfit and the Forestry outfit.
-
-### Changed
-- Repeated deaths to the same boss now group into one activity feed entry/notification (e.g. "died to The Whisperer x3") instead of a separate line for every death.
-- Discord drop notifications now show the actual drop rate (e.g. "1/508") for a lot more boss drops than before - backfilled odds for hundreds of items across most bosses using the wiki's own drop tables.
-- Admin accounts page: hovering the "Last visit" date now shows the full date and time.
-- Loot log session cards now show average gp per kill/open/casket underneath the total value.
-- Raid completion notifications and activity feed entries for a shared raid now show up faster - the window for grouping a party's completions together dropped from 5 minutes to 90 seconds.
-
-### Fixed
-- Combat achievements "Group average" row was showing the group's summed totals instead of an average per member.
-- Angler's outfit and Prospector kit set bonuses now also recognize their Spirit angler's / Golden prospector variants.
+[1.0.409] — Richer Discord Notifications, Rare Drop Callouts, Wiki Links
 
 ## [1.0.392] - 2026-09-05
 
