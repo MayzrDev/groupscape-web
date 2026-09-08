@@ -1,5 +1,16 @@
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
 
+# Every commit must go through the `commit` skill, which always updates CHANGELOG.md
+# (see CLAUDE.md / .claude/skills/commit) - Discord #patch-notes posts straight from it, and
+# this repo has repeatedly had commits land without an entry when that step got skipped. Skip
+# the check for merge commits, which don't carry their own changelog entry.
+if [ ! -f .git/MERGE_HEAD ] && ! git diff --cached --name-only | grep -qx 'CHANGELOG.md'; then
+  echo "ERROR: CHANGELOG.md is not staged." >&2
+  echo "Every commit in this repo must update CHANGELOG.md - use the commit skill (groupscape-web:commit) instead of a bare git commit." >&2
+  echo "If this really is exempt, stage a no-op touch or ask a human to override with git commit --no-verify." >&2
+  exit 1
+fi
+
 cd site
 npm run precommit
