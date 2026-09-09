@@ -178,16 +178,21 @@ export class ActivityFeedEvent extends BaseElement {
     this.closeRadial();
   }
 
+  // Each option shows its label as visible text rather than relying on a native `title` tooltip -
+  // while the Like button holds pointer capture (see handleLikePointerDown) the browser doesn't
+  // fire real hover/mouseover on whatever's underneath, so a tooltip would never actually appear
+  // during the press-and-hold that opens this popup.
   openRadial() {
     if (!this.radial) return;
     this.radialOpen = true;
     this.radial.innerHTML = "";
-    RADIAL_REACTION_ORDER.forEach((reaction, index) => {
+    RADIAL_REACTION_ORDER.forEach((reaction) => {
       const option = document.createElement("div");
-      option.className = `activity-feed-event__radial-option activity-feed-event__radial-option--${index}`;
+      option.className = "activity-feed-event__radial-option";
       option.dataset.reaction = reaction;
-      option.title = REACTION_LABELS[reaction];
-      option.innerHTML = this.reactionIcon(reaction);
+      option.innerHTML = `${this.reactionIcon(reaction)}<span class="activity-feed-event__radial-label">${
+        REACTION_LABELS[reaction]
+      }</span>`;
       this.radial.appendChild(option);
     });
     this.radial.hidden = false;

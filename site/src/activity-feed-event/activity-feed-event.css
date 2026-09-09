@@ -35,10 +35,8 @@ activity-feed-event {
   font-family: inherit;
 }
 
-.activity-feed-event__like-btn svg,
 .activity-feed-event__comment-icon,
-.activity-feed-event__pill svg,
-.activity-feed-event__radial-option svg {
+.activity-feed-event__pill svg {
   width: 16px;
   height: 16px;
   display: block;
@@ -55,6 +53,7 @@ activity-feed-event {
   gap: 5px;
   flex-wrap: wrap;
   align-items: center;
+  margin-left: auto;
 }
 
 .activity-feed-event__pill {
@@ -75,17 +74,14 @@ activity-feed-event {
   background: color-mix(in srgb, var(--orange) 22%, #4d4336);
 }
 
-.activity-feed-event__comment-btn {
-  margin-left: auto;
-}
-
 .activity-feed-event__comment-count {
   font-size: 0.85em;
 }
 
-/* Radial popup - a fanned row above the Like button rather than a literal circle, so it never
-   overflows the feed's narrow column width; still reads as "options radiating from the trigger"
-   thanks to the per-option vertical offset below and the caret anchoring it to the button. */
+/* Reaction popup - a flat row of labeled chips above the Like button, anchored with a caret.
+   Labels are drawn as real text (not a `title` tooltip) since the Like button holds pointer
+   capture while this is open, which stops the browser from firing hover on whatever's under the
+   pointer - a tooltip would never show during the press-and-hold that opens this popup. */
 .activity-feed-event__radial[hidden] {
   display: none;
 }
@@ -96,12 +92,12 @@ activity-feed-event {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
   gap: 4px;
-  padding: 7px 9px;
+  padding: 6px;
   background: #2b2419;
   border: 2px solid #4d4336;
-  border-radius: 22px;
+  border-radius: 10px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   z-index: 5;
 }
@@ -117,39 +113,40 @@ activity-feed-event {
 }
 
 .activity-feed-event__radial-option {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
+  width: 42px;
+  padding: 6px 2px 5px;
+  border-radius: 6px;
   background: #4d4336;
   border: 1px solid #6b5f49;
   transition: transform 0.1s ease, background 0.1s ease;
 }
 
 .activity-feed-event__radial-option svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
-.activity-feed-event__radial-option--0 {
-  transform: translateY(3px);
-}
-.activity-feed-event__radial-option--1 {
-  transform: translateY(-3px);
-}
-.activity-feed-event__radial-option--2 {
-  transform: translateY(-3px);
-}
-.activity-feed-event__radial-option--3 {
-  transform: translateY(3px);
+.activity-feed-event__radial-label {
+  font-size: 9px;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--font-color, #c8c0af);
 }
 
 .activity-feed-event__radial-option--hovered {
   background: var(--orange);
   border-color: var(--orange);
-  transform: scale(1.3);
+  transform: translateY(-3px);
+}
+
+.activity-feed-event__radial-option--hovered .activity-feed-event__radial-label {
+  color: #2b2419;
 }
 
 .activity-feed-event__comments-panel {

@@ -7,11 +7,10 @@
 // reaction-summary pills and stacked together in the radial picker - a uniform single-tone set
 // read as an indistinguishable row of dark blobs there.
 const REACTION_ICONS = {
-  // Coins + a check mark - "liked/approved", coin stack being the game's universal positive icon.
+  // Thumbs up - "liked/approved", the plain universal positive gesture.
   like: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-    <ellipse cx="6" cy="10.5" rx="5" ry="2.5" fill="#c9a227" opacity="0.5"/>
-    <ellipse cx="6" cy="9" rx="5" ry="2.5" fill="#e6c34a"/>
-    <path d="M10.5 5.5 12 7l3-3.5" fill="none" stroke="#3a7d2c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M2.5 7h2.2v7H2.5a.7.7 0 0 1-.7-.7V7.7a.7.7 0 0 1 .7-.7Z" fill="#8a7a5c"/>
+    <path d="M5.7 7.2 8.6 2c.4-.1.9 0 1.2.3.3.3.4.7.3 1.1L9.4 6h3.9c.5 0 .9.2 1.2.6.3.4.4.9.2 1.3l-1.7 5.1c-.2.6-.8 1-1.4 1H5.7V7.2Z" fill="#e6c34a"/>
   </svg>`,
   // Laurel wreath around a star - "well played", borrowing the achievement-diary laurel motif.
   gg: `<svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">

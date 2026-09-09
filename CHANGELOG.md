@@ -2,6 +2,13 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.460] - 2026-09-10
+
+### Changed
+- The Like button on activity feed items is now a plain text button that sits right next to the comment button, instead of an icon button off on its own.
+- The Like reaction now shows a thumbs up instead of a coin icon.
+- The other reactions (GG, LOL, Rare!, and F) now show their name as text in the picker, so you don't have to guess what each icon means.
+
 ## [1.0.457] - 2026-09-09
 
 ### Added
