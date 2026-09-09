@@ -50,10 +50,6 @@ activity-feed-event {
   background: color-mix(in srgb, var(--orange) 35%, #4d4336);
 }
 
-.activity-feed-event__like-btn:disabled .activity-feed-event__like-label {
-  color: var(--font-color, #c8c0af);
-}
-
 .activity-feed-event__pills {
   display: flex;
   gap: 5px;
@@ -89,49 +85,71 @@ activity-feed-event {
 
 /* Radial popup - a fanned row above the Like button rather than a literal circle, so it never
    overflows the feed's narrow column width; still reads as "options radiating from the trigger"
-   thanks to the per-option vertical/horizontal offset below. */
+   thanks to the per-option vertical offset below and the caret anchoring it to the button. */
+.activity-feed-event__radial[hidden] {
+  display: none;
+}
+
 .activity-feed-event__radial {
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 12px);
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  background: var(--rsbackground, #3e3529);
-  border: 1px solid var(--light-border);
-  border-radius: 20px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  align-items: flex-end;
+  gap: 4px;
+  padding: 7px 9px;
+  background: #2b2419;
+  border: 2px solid #4d4336;
+  border-radius: 22px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
   z-index: 5;
 }
 
+.activity-feed-event__radial::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: #2b2419;
+}
+
 .activity-feed-event__radial-option {
-  width: 26px;
-  height: 26px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  transition: transform 0.08s ease, background 0.08s ease;
+  background: #4d4336;
+  border: 1px solid #6b5f49;
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.activity-feed-event__radial-option svg {
+  width: 20px;
+  height: 20px;
 }
 
 .activity-feed-event__radial-option--0 {
-  transform: translateY(2px);
+  transform: translateY(3px);
 }
 .activity-feed-event__radial-option--1 {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
 }
 .activity-feed-event__radial-option--2 {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
 }
 .activity-feed-event__radial-option--3 {
-  transform: translateY(2px);
+  transform: translateY(3px);
 }
 
 .activity-feed-event__radial-option--hovered {
   background: var(--orange);
-  transform: scale(1.25);
+  border-color: var(--orange);
+  transform: scale(1.3);
 }
 
 .activity-feed-event__comments-panel {

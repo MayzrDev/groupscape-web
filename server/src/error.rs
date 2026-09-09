@@ -160,7 +160,6 @@ pub enum ApiError {
     ActivityEventNotFoundError,
     ActivityReactionsDisabledError,
     InvalidReactionTypeError,
-    CannotReactToOwnActivityError,
     #[from(ignore)]
     ToggleActivityReactionError(tokio_postgres::error::Error),
     #[from(ignore)]
@@ -410,9 +409,6 @@ impl ResponseError for ApiError {
                 .body("Likes and comments are turned off for this group"),
             ApiError::InvalidReactionTypeError => {
                 HttpResponse::BadRequest().body("Not a valid reaction type")
-            }
-            ApiError::CannotReactToOwnActivityError => {
-                HttpResponse::Forbidden().body("You can't react to your own activity")
             }
             ApiError::ToggleActivityReactionError(ref err) => {
                 handle_pg_error(err, "ToggleActivityReactionError")

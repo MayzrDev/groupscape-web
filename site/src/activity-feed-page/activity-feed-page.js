@@ -57,11 +57,9 @@ export class ActivityFeedPage extends BaseElement {
     this.isAdmin = false;
     this.selecting = false;
     this.selectedIds = new Set();
-    // Group-wide likes/comments toggle (see server's `activity_reactions_enabled`) and this
-    // account's own member name in this group (for the "no Like button on your own item" rule) -
-    // both loaded once per resetAndLoad, since neither varies per-event.
+    // Group-wide likes/comments toggle (see server's `activity_reactions_enabled`) - loaded once
+    // per resetAndLoad, since it doesn't vary per-event.
     this.reactionsEnabled = false;
-    this.myMemberName = null;
   }
 
   html() {
@@ -272,18 +270,15 @@ export class ActivityFeedPage extends BaseElement {
   createRow(event) {
     const row = document.createElement("activity-feed-event");
     row.reactionsEnabled = this.reactionsEnabled;
-    row.isOwn = Boolean(this.myMemberName) && event.member_name === this.myMemberName;
     row.event = event;
     return row;
   }
 
-  // Loaded once per resetAndLoad (group settings/permissions don't change mid-session on this
-  // page) rather than per-poll - `loadCanKickMembers` in group-settings.js does the same "no
-  // account = no permissions response" fallback via `myPermissionsResponse.ok`.
+  // Loaded once per resetAndLoad (group settings don't change mid-session on this page) rather
+  // than per-poll.
   async loadReactionSettings() {
-    const [settings, myPermissionsResponse] = await Promise.all([api.getActivitySettings(), api.getMyPermissions()]);
+    const settings = await api.getActivitySettings();
     this.reactionsEnabled = Boolean(settings.reactions_enabled);
-    this.myMemberName = myPermissionsResponse.ok ? (await myPermissionsResponse.json()).member_name : null;
   }
 
   // Refreshes reaction/comment-count data for whatever's currently rendered - a reaction or
@@ -373,7 +368,7 @@ export class ActivityFeedPage extends BaseElement {
     // DOM references - drop out of selecting mode rather than carry them over.
     if (this.isAdmin) this.setSelecting(false);
     // Must resolve before loadMore's createRow calls so the first page's rows are built with the
-    // right reactionsEnabled/isOwn flags instead of defaulting to false and needing a retrofit.
+    // right reactionsEnabled flag instead of defaulting to false and needing a retrofit.
     await this.loadReactionSettings();
     await Promise.all([this.loadMore(), this.loadCounts()]);
     await this.refreshReactions();

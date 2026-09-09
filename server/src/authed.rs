@@ -1318,10 +1318,8 @@ pub struct ActivityEventPath {
 /// Toggles the caller's reaction on an activity event (§ product spec: tap = `like`, long-press
 /// radial = the other 4 types). Same type twice removes it; a different type replaces it -
 /// [`db::toggle_activity_reaction`] does both in one round trip. Requires a logged-in account
-/// (`X-Account-Authorization`) - there is no notion of an anonymous reaction. Rejects reacting to
-/// the caller's own activity (resolved via [`db::resolve_member_name_for_account`], the same
-/// account-hash join `update_member_color` uses) with 403, enforced here rather than trusted from
-/// the client.
+/// (`X-Account-Authorization`) - there is no notion of an anonymous reaction. Reacting to your own
+/// activity is allowed (§ product spec, revised) - the event only has to belong to this group.
 #[put("/activity-events/{event_id}/react")]
 pub async fn react_to_activity_event(
     req: HttpRequest,
@@ -1342,16 +1340,7 @@ pub async fn react_to_activity_event(
         return Err(ApiError::InvalidReactionTypeError.into());
     }
 
-    let event_member_name =
-        require_activity_event_in_group(&client, auth.group_id, path.event_id).await?;
-    let acting_member_name =
-        db::resolve_member_name_for_account(&client, auth.group_id, account_id).await?;
-    if acting_member_name
-        .as_deref()
-        .is_some_and(|name| name.eq_ignore_ascii_case(&event_member_name))
-    {
-        return Err(ApiError::CannotReactToOwnActivityError.into());
-    }
+    require_activity_event_in_group(&client, auth.group_id, path.event_id).await?;
 
     let summary =
         db::toggle_activity_reaction(&mut client, path.event_id, account_id, &body.reaction).await?;

@@ -33,12 +33,10 @@ export class ActivityFeedEvent extends BaseElement {
   constructor() {
     super();
     // Set by activity-feed-page.js before/after this row is created - whether the group has
-    // likes/comments turned on at all, and whether this item is the viewer's own activity (which
-    // can't be reacted to, per the product spec). `reactionData`/`commentCount` start empty and
-    // are filled in by the page's periodic `refreshReactions` poll (see activity-feed-page.js) -
-    // reactions never come back from get-activity-events itself.
+    // likes/comments turned on at all. `reactionData`/`commentCount` start empty and are filled in
+    // by the page's periodic `refreshReactions` poll (see activity-feed-page.js) - reactions never
+    // come back from get-activity-events itself.
     this.reactionsEnabled = false;
-    this.isOwn = false;
     this.reactionData = { reactions: [], my_reaction: null };
     this.commentCount = 0;
     this.commentsOpen = false;
@@ -95,7 +93,7 @@ export class ActivityFeedEvent extends BaseElement {
     this.commentsError = this.querySelector(".activity-feed-event__comments-error");
     this.commentsIndicator = this.querySelector(".activity-feed-event__comments-indicator");
 
-    if (this.likeButton && !this.isOwn) {
+    if (this.likeButton) {
       this.eventListener(this.likeButton, "pointerdown", this.handleLikePointerDown.bind(this), { passive: false });
       this.eventListener(this.likeButton, "pointermove", this.handleLikePointerMove.bind(this));
       this.eventListener(this.likeButton, "pointerup", this.handleLikePointerUp.bind(this));
@@ -220,7 +218,6 @@ export class ActivityFeedEvent extends BaseElement {
   }
 
   async sendReaction(reaction) {
-    if (this.isOwn) return;
     const response = await api.reactToActivityEvent(this.event.id, reaction);
     if (!response.ok) return;
     const summary = await response.json();
