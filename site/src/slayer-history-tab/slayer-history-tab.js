@@ -159,8 +159,8 @@ export class SlayerHistoryTab extends BaseElement {
 
   renderRow(entry) {
     const meta = STATUS_META[entry.status] ?? { label: entry.status, cls: "ns" };
-    const taskIcon = slayerData.taskIconUrl(entry.task_name);
-    const masterIcon = slayerData.masterIconUrl(entry.master_name);
+    const taskIcon = slayerData.taskIconUrl(entry.taskName);
+    const masterIcon = slayerData.masterIconUrl(entry.masterName);
 
     let pointsLabel = "&mdash;";
     let pointsCls = "slayer-history-tab__points slayer-history-tab__points--muted";
@@ -173,22 +173,22 @@ export class SlayerHistoryTab extends BaseElement {
 
     return `
       <div class="slayer-history-tab__row">
-        <img class="slayer-history-tab__icon" src="${taskIcon}" alt="${entry.task_name}" />
+        <img class="slayer-history-tab__icon" src="${taskIcon}" alt="${entry.taskName}" />
         <div class="slayer-history-tab__body">
           <div class="slayer-history-tab__top">
-            <span class="slayer-history-tab__name">${entry.task_name}</span>
+            <span class="slayer-history-tab__name">${entry.taskName}</span>
             <span class="${pointsCls}">${pointsLabel}</span>
           </div>
           <div class="slayer-history-tab__bottom">
             <span class="slayer-history-tab__master">
               ${
                 masterIcon
-                  ? `<img class="slayer-history-tab__master-icon" src="${masterIcon}" alt="${entry.master_name}" />`
+                  ? `<img class="slayer-history-tab__master-icon" src="${masterIcon}" alt="${entry.masterName}" />`
                   : ""
               }
-              <span class="slayer-history-tab__master-name">${entry.master_name}</span>
+              <span class="slayer-history-tab__master-name">${entry.masterName}</span>
             </span>
-            <span class="slayer-history-tab__kills">${entry.amount_done}/${entry.amount_total}</span>
+            <span class="slayer-history-tab__kills">${entry.amountDone}/${entry.amountTotal}</span>
             <span class="slayer-history-tab__badge slayer-history-tab__badge--${meta.cls}">${meta.label}</span>
           </div>
         </div>

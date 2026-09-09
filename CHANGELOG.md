@@ -9,6 +9,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Like reaction now shows a thumbs up instead of a coin icon.
 - The other reactions (GG, LOL, Rare!, and F) now show their name as text in the picker, so you don't have to guess what each icon means.
 
+### Fixed
+- Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.
+
 ## [1.0.457] - 2026-09-09
 
 ### Added
