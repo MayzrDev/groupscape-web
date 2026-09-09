@@ -8,6 +8,9 @@ All notable changes to GroupScape web are logged here, newest first.
 - Activity feed items can now be liked and commented on. Press and hold the Like button to pick from 5 reactions - Like, GG, LOL, Rare!, and F. Comments are capped at 10 per item. You can't react to your own activity, but others can still comment on it.
 - Group admins can turn likes/comments on or off for the whole group from Group Settings (on by default).
 
+### Fixed
+- The Like and comment buttons on activity feed items were showing as blank shapes with no visible icon. They now use the game's proper button style and show clear icons.
+
 ## [1.0.449] - 2026-09-08
 
 ### Changed

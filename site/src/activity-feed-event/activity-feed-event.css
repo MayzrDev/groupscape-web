@@ -22,15 +22,7 @@ activity-feed-event {
 
 .activity-feed-event__like-btn,
 .activity-feed-event__comment-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--light-border);
-  border-radius: 3px;
-  color: var(--font-color, #c8c0af);
-  padding: 3px 7px;
-  cursor: pointer;
+  gap: 5px;
   touch-action: none;
   user-select: none;
 }
@@ -39,51 +31,52 @@ activity-feed-event {
   touch-action: auto;
 }
 
+.activity-feed-event__like-label {
+  font-family: inherit;
+}
+
 .activity-feed-event__like-btn svg,
 .activity-feed-event__comment-icon,
 .activity-feed-event__pill svg,
 .activity-feed-event__radial-option svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   display: block;
-}
-
-.activity-feed-event__like-btn:hover:not(:disabled),
-.activity-feed-event__comment-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  flex: none;
 }
 
 .activity-feed-event__like-btn--active {
-  color: var(--orange);
-  border-color: var(--orange);
-  background: color-mix(in srgb, var(--orange) 16%, transparent);
+  color: var(--white, #fff);
+  background: color-mix(in srgb, var(--orange) 35%, #4d4336);
 }
 
-.activity-feed-event__like-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+.activity-feed-event__like-btn:disabled .activity-feed-event__like-label {
+  color: var(--font-color, #c8c0af);
 }
 
 .activity-feed-event__pills {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .activity-feed-event__pill {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 2px 6px;
+  gap: 4px;
+  padding: 2px 7px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  background: #4d4336;
   border: 1px solid var(--light-border);
+  color: var(--font-color, #c8c0af);
   font-size: 0.78em;
 }
 
 .activity-feed-event__pill--mine {
   border-color: var(--orange);
   color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 22%, #4d4336);
 }
 
 .activity-feed-event__comment-btn {

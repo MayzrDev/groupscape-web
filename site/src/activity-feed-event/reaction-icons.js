@@ -7,7 +7,7 @@ const REACTION_ICONS = {
   like: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
     <ellipse cx="6" cy="10.5" rx="5" ry="2.5" fill="currentColor" opacity="0.35"/>
     <ellipse cx="6" cy="9" rx="5" ry="2.5" fill="currentColor"/>
-    <path d="M10.5 5.5 12 7l3-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M10.5 5.5 12 7l3-3.5" stroke="var(--rsbackground, #3e3529)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>`,
   // Laurel wreath around a star - "well played", borrowing the achievement-diary laurel motif.
   gg: `<svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
