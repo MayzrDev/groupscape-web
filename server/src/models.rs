@@ -890,6 +890,85 @@ pub struct ActivityEvent {
     pub event_type: String,
     pub occurred_at: DateTime<Utc>,
     pub payload: serde_json::Value,
+    /// Reaction/comment data - only ever populated by `get_activity_events` (never by
+    /// `list_kill_events`/`list_loot_and_kill_events_page`, the loot log's readers of this same
+    /// struct), and only when the group has `activity_reactions_enabled` on. `skip_serializing_if`
+    /// keeps these keys fully absent from the JSON (not just `null`) when the feature is off, per
+    /// the "must render exactly as before" requirement.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reactions: Option<Vec<ActivityReactionCount>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub my_reaction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment_count: Option<i64>,
+}
+
+/// The 5 reaction types likes/comments supports - kept as a plain string on the wire (validated
+/// against this list server-side) rather than a serde enum, so a 6th type is just a data change.
+pub const ACTIVITY_REACTION_KINDS: [&str; 5] = ["like", "gg", "lol", "rare", "f"];
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityReactionCount {
+    pub reaction: String,
+    pub count: i64,
+}
+
+/// Response body for react/unreact and the batch `get-activity-reactions` lookup.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityReactionsSummary {
+    pub reactions: Vec<ActivityReactionCount>,
+    /// `None` when the acting account has no reaction on this event (either it never reacted, or
+    /// this just toggled its own reaction off).
+    pub my_reaction: Option<String>,
+    /// Only meaningful on the batch `get-activity-reactions` lookup (the feed's comment-count
+    /// badge needs this alongside reactions in the same poll); `react_to_activity_event`'s single-
+    /// event response always sends `0` here since reacting never changes the comment count.
+    #[serde(default)]
+    pub comment_count: i64,
+}
+
+/// Group-wide activity feed setting - one combined toggle for both likes and comments (§ product
+/// spec: "one combined boolean toggle per group"). `GET` is reachable by any group member (the
+/// feed needs it to decide whether to render reaction UI at all); only `PUT` is gated to
+/// `ManageSettings`.
+#[derive(Serialize, Deserialize, Clone, Copy)]
+#[serde(deny_unknown_fields)]
+pub struct ActivitySettings {
+    pub reactions_enabled: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReactToActivityEventRequest {
+    pub reaction: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityComment {
+    pub comment_id: i64,
+    pub member_name: String,
+    pub comment_text: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Response body for both `list_activity_comments` and a successful `add_activity_comment` - the
+/// `n / 10 comments` indicator needs the count alongside the list/new comment on every response
+/// rather than as a separate round trip.
+#[derive(Serialize, Clone)]
+pub struct ActivityCommentsPage {
+    pub comments: Vec<ActivityComment>,
+    pub comment_count: i64,
+}
+
+pub const ACTIVITY_COMMENT_CAP: i64 = 10;
+/// Matches the site's `men-input`/discord-url-style free-text fields elsewhere - generous enough
+/// for a real reaction, short enough that the feed row doesn't need to clamp/scroll it.
+pub const ACTIVITY_COMMENT_MAX_LEN: usize = 300;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AddActivityCommentRequest {
+    pub comment_text: String,
 }
 
 /// One item entry within a [`LootLogEvent`] - the loot log's per-event, per-item view (unlike

@@ -39,6 +39,23 @@ pub async fn require_group_permission(
     }
 }
 
+/// Resolves the acting account from `X-Account-Authorization` with no permission check - for
+/// group-token-scoped endpoints that only need to know *who* is acting (e.g. reacting/commenting
+/// on an activity feed item), not whether they hold a specific admin permission.
+pub async fn require_account(req: &HttpRequest, client: &Client) -> Result<i64, ApiError> {
+    let token = req
+        .headers()
+        .get(ACCOUNT_AUTH_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .ok_or(ApiError::AccountAuthRequiredError)?;
+
+    let token_hash = session_token_hash(token);
+    let account = db::get_account_by_session_token_hash(client, &token_hash)
+        .await?
+        .ok_or(ApiError::AccountAuthRequiredError)?;
+    Ok(account.id)
+}
+
 /// Same as [`require_group_permission`], but succeeds if the acting account holds *any* of
 /// `keys` - for surfaces shared by more than one permission (e.g. the member-roster section,
 /// which shows permission toggles to `ManagePermissions` holders and the colour picker to

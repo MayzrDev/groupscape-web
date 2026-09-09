@@ -16,15 +16,19 @@ use crate::loot_log_search::{
     rarity_keyword, split_search_groups,
 };
 use crate::models::{
-    ActivityEvent, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
+    ActivityCommentsPage, ActivityEvent, ActivityReactionsSummary, ActivitySettings,
+    AddActivityCommentRequest, AmIInGroupRequest, BlockedMember, DiscordWebhookSettings, GameEvent,
     GroupCredentials, GroupMember, GroupMemberName, GroupMemberPermissions, GroupMetricData,
     GroupSession, GroupSkillData, IdentifyCharacter, ItemBonusesResponse, LootItem, LootLogEvent,
     LootLogItem, LootLogPage, LootLogSummary, MyPermissions, PermissionFlags, PermissionKey,
-    RenameGroup, SlayerTaskHistoryPage, SlayerTaskStats, TestDiscordNotificationRequest,
-    UpdateGroupPermissionsRequest, UpdateMemberColorRequest, SHARED_MEMBER,
+    ReactToActivityEventRequest, RenameGroup, SlayerTaskHistoryPage, SlayerTaskStats,
+    TestDiscordNotificationRequest, UpdateGroupPermissionsRequest, UpdateMemberColorRequest,
+    ACTIVITY_COMMENT_MAX_LEN, ACTIVITY_REACTION_KINDS, SHARED_MEMBER,
 };
 use crate::notable_npcs;
-use crate::permissions::{require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER};
+use crate::permissions::{
+    require_account, require_any_group_permission, require_group_permission, ACCOUNT_AUTH_HEADER,
+};
 use crate::progress_events;
 use crate::push;
 use crate::raid_merge;
@@ -1257,6 +1261,231 @@ pub async fn get_activity_events(
     .await?;
     redis.set_json(&cache_key, &events, ACTIVITY_LOG_CACHE_TTL_SECS).await;
     Ok(web::Json(events))
+}
+
+/// Group-wide likes/comments toggle - reachable by any group member (no permission gate), since
+/// the activity feed itself needs to know whether to render reaction UI at all, not just the
+/// admin settings page. See `update_activity_settings` for the gated write side.
+#[get("/get-activity-settings")]
+pub async fn get_activity_settings(
+    auth: Authenticated,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<ActivitySettings>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let settings = db::get_activity_settings(&client, auth.group_id).await?;
+    Ok(web::Json(settings))
+}
+
+/// Gated on `ManageSettings`, same permission `group-settings.js`'s colour picker and other
+/// group-wide toggles use - matches the product spec's "changeable by group owner/admin only"
+/// (the group admin holds every permission implicitly, see `has_group_permission`).
+#[put("/update-activity-settings")]
+pub async fn update_activity_settings(
+    req: HttpRequest,
+    auth: Authenticated,
+    body: web::Json<ActivitySettings>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<ActivitySettings>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    require_group_permission(&req, &client, auth.group_id, PermissionKey::ManageSettings).await?;
+    let settings = body.into_inner();
+    db::update_activity_settings(&client, auth.group_id, settings).await?;
+    Ok(web::Json(settings))
+}
+
+/// Confirms `event_id` belongs to `group_id` before any react/comment handler touches it - every
+/// one of those routes takes a bare `{event_id}` with no group in the path, so without this check
+/// an account in group A could react to/comment on group B's activity purely by guessing ids.
+async fn require_activity_event_in_group(
+    client: &Client,
+    group_id: i64,
+    event_id: i64,
+) -> Result<String, ApiError> {
+    let (event_group_id, member_name) = db::get_activity_event_group_and_member(client, event_id)
+        .await?
+        .ok_or(ApiError::ActivityEventNotFoundError)?;
+    if event_group_id != group_id {
+        return Err(ApiError::ActivityEventNotFoundError);
+    }
+    Ok(member_name)
+}
+
+#[derive(Deserialize)]
+pub struct ActivityEventPath {
+    pub event_id: i64,
+}
+
+/// Toggles the caller's reaction on an activity event (§ product spec: tap = `like`, long-press
+/// radial = the other 4 types). Same type twice removes it; a different type replaces it -
+/// [`db::toggle_activity_reaction`] does both in one round trip. Requires a logged-in account
+/// (`X-Account-Authorization`) - there is no notion of an anonymous reaction. Rejects reacting to
+/// the caller's own activity (resolved via [`db::resolve_member_name_for_account`], the same
+/// account-hash join `update_member_color` uses) with 403, enforced here rather than trusted from
+/// the client.
+#[put("/activity-events/{event_id}/react")]
+pub async fn react_to_activity_event(
+    req: HttpRequest,
+    auth: Authenticated,
+    path: web::Path<ActivityEventPath>,
+    body: web::Json<ReactToActivityEventRequest>,
+    db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
+) -> Result<web::Json<ActivityReactionsSummary>, Error> {
+    let mut client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account_id = require_account(&req, &client).await?;
+
+    let settings = db::get_activity_settings(&client, auth.group_id).await?;
+    if !settings.reactions_enabled {
+        return Err(ApiError::ActivityReactionsDisabledError.into());
+    }
+    if !ACTIVITY_REACTION_KINDS.contains(&body.reaction.as_str()) {
+        return Err(ApiError::InvalidReactionTypeError.into());
+    }
+
+    let event_member_name =
+        require_activity_event_in_group(&client, auth.group_id, path.event_id).await?;
+    let acting_member_name =
+        db::resolve_member_name_for_account(&client, auth.group_id, account_id).await?;
+    if acting_member_name
+        .as_deref()
+        .is_some_and(|name| name.eq_ignore_ascii_case(&event_member_name))
+    {
+        return Err(ApiError::CannotReactToOwnActivityError.into());
+    }
+
+    let summary =
+        db::toggle_activity_reaction(&mut client, path.event_id, account_id, &body.reaction).await?;
+    redis.incr(&activity_log_version_key(auth.group_id)).await;
+    Ok(web::Json(summary))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GetActivityReactionsQuery {
+    /// Comma-separated event ids - the activity feed page polls this for whatever page of events
+    /// it currently has rendered (see `activity-feed-page.js`'s `refreshReactions`), separately
+    /// from `get-activity-events`' own cursor pagination, since a reaction/comment on an
+    /// already-loaded event never changes that event's `occurred_at` and so would never surface
+    /// through the feed's "only prepend strictly newer events" poll otherwise. Same
+    /// comma-joined-query-param shape as `get-loot-log`'s `item_ids`/`categories`.
+    #[serde(default)]
+    pub event_ids: Option<String>,
+}
+fn parse_activity_event_ids(raw: Option<&str>) -> Vec<i64> {
+    raw.unwrap_or("")
+        .split(',')
+        .map(str::trim)
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| part.parse::<i64>().ok())
+        .collect()
+}
+
+const MAX_ACTIVITY_REACTIONS_BATCH: usize = 200;
+
+/// Batch reaction+comment-count lookup for a set of already-loaded activity events - see
+/// [`GetActivityReactionsQuery`] for why this is separate from `get-activity-events`. Returns an
+/// empty map when the group has reactions turned off, so the frontend's "is this feature even on"
+/// check can be this response being empty-vs-populated rather than a second settings fetch.
+#[get("/get-activity-reactions")]
+pub async fn get_activity_reactions(
+    req: HttpRequest,
+    auth: Authenticated,
+    query: web::Query<GetActivityReactionsQuery>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<HashMap<i64, ActivityReactionsSummary>>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let event_ids = parse_activity_event_ids(query.event_ids.as_deref());
+    let settings = db::get_activity_settings(&client, auth.group_id).await?;
+    if !settings.reactions_enabled || event_ids.is_empty() {
+        return Ok(web::Json(HashMap::new()));
+    }
+
+    let event_ids: Vec<i64> = event_ids.into_iter().take(MAX_ACTIVITY_REACTIONS_BATCH).collect();
+    // Best-effort account resolution: this endpoint is reachable without being logged in (reading
+    // the feed never requires an account), so a missing/invalid header just means every event's
+    // `my_reaction` comes back `None` rather than a 401.
+    let account_id = req
+        .headers()
+        .get(ACCOUNT_AUTH_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(crate::crypto::session_token_hash);
+    let account_id = match account_id {
+        Some(hash) => db::get_account_by_session_token_hash(&client, &hash)
+            .await?
+            .map(|account| account.id),
+        None => None,
+    };
+
+    let summaries = db::get_reactions_summary_for_events(&client, &event_ids, account_id).await?;
+    Ok(web::Json(summaries))
+}
+
+/// Lists an event's comments oldest-first, plus the current count for the "n / 10 comments"
+/// indicator. Reachable without an account (same reasoning as `get_activity_reactions`) - only
+/// posting a comment requires being logged in.
+#[get("/activity-events/{event_id}/comments")]
+pub async fn list_activity_comments(
+    auth: Authenticated,
+    path: web::Path<ActivityEventPath>,
+    db_pool: web::Data<Pool>,
+) -> Result<web::Json<ActivityCommentsPage>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let settings = db::get_activity_settings(&client, auth.group_id).await?;
+    if !settings.reactions_enabled {
+        return Err(ApiError::ActivityReactionsDisabledError.into());
+    }
+    require_activity_event_in_group(&client, auth.group_id, path.event_id).await?;
+
+    let comments = db::list_activity_comments(&client, path.event_id).await?;
+    let comment_count = comments.len() as i64;
+    Ok(web::Json(ActivityCommentsPage { comments, comment_count }))
+}
+
+/// Adds a comment as the caller's linked character in this group. Unlike reactions, commenting on
+/// your own activity is allowed (§ product spec) - only the 10-per-event cap
+/// ([`db::add_activity_comment`]'s atomic `WHERE COUNT(*) < 10`) can reject this.
+#[post("/activity-events/{event_id}/comments")]
+pub async fn add_activity_comment(
+    req: HttpRequest,
+    auth: Authenticated,
+    path: web::Path<ActivityEventPath>,
+    body: web::Json<AddActivityCommentRequest>,
+    db_pool: web::Data<Pool>,
+    redis: web::Data<RedisCache>,
+) -> Result<web::Json<ActivityCommentsPage>, Error> {
+    let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
+    let account_id = require_account(&req, &client).await?;
+
+    let settings = db::get_activity_settings(&client, auth.group_id).await?;
+    if !settings.reactions_enabled {
+        return Err(ApiError::ActivityReactionsDisabledError.into());
+    }
+    require_activity_event_in_group(&client, auth.group_id, path.event_id).await?;
+
+    let comment_text = body.comment_text.trim().to_string();
+    if comment_text.is_empty() || comment_text.chars().count() > ACTIVITY_COMMENT_MAX_LEN {
+        return Err(ApiError::ActivityCommentValidationError(format!(
+            "Comment must be between 1 and {} characters",
+            ACTIVITY_COMMENT_MAX_LEN
+        ))
+        .into());
+    }
+
+    let member_name = db::resolve_member_name_for_account(&client, auth.group_id, account_id)
+        .await?
+        .ok_or(ApiError::CommentRequiresLinkedCharacterError)?;
+
+    let inserted =
+        db::add_activity_comment(&client, path.event_id, account_id, &member_name, &comment_text)
+            .await?;
+    if inserted.is_none() {
+        return Err(ApiError::ActivityCommentLimitReachedError.into());
+    }
+    redis.incr(&activity_log_version_key(auth.group_id)).await;
+
+    let comments = db::list_activity_comments(&client, path.event_id).await?;
+    let comment_count = comments.len() as i64;
+    Ok(web::Json(ActivityCommentsPage { comments, comment_count }))
 }
 
 fn default_sessions_limit() -> i64 {

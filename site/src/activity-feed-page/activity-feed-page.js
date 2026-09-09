@@ -57,6 +57,11 @@ export class ActivityFeedPage extends BaseElement {
     this.isAdmin = false;
     this.selecting = false;
     this.selectedIds = new Set();
+    // Group-wide likes/comments toggle (see server's `activity_reactions_enabled`) and this
+    // account's own member name in this group (for the "no Like button on your own item" rule) -
+    // both loaded once per resetAndLoad, since neither varies per-event.
+    this.reactionsEnabled = false;
+    this.myMemberName = null;
   }
 
   html() {
@@ -266,8 +271,36 @@ export class ActivityFeedPage extends BaseElement {
 
   createRow(event) {
     const row = document.createElement("activity-feed-event");
+    row.reactionsEnabled = this.reactionsEnabled;
+    row.isOwn = Boolean(this.myMemberName) && event.member_name === this.myMemberName;
     row.event = event;
     return row;
+  }
+
+  // Loaded once per resetAndLoad (group settings/permissions don't change mid-session on this
+  // page) rather than per-poll - `loadCanKickMembers` in group-settings.js does the same "no
+  // account = no permissions response" fallback via `myPermissionsResponse.ok`.
+  async loadReactionSettings() {
+    const [settings, myPermissionsResponse] = await Promise.all([api.getActivitySettings(), api.getMyPermissions()]);
+    this.reactionsEnabled = Boolean(settings.reactions_enabled);
+    this.myMemberName = myPermissionsResponse.ok ? (await myPermissionsResponse.json()).member_name : null;
+  }
+
+  // Refreshes reaction/comment-count data for whatever's currently rendered - a reaction or
+  // comment never changes an event's `occurred_at`, so it would never surface through `poll()`'s
+  // "only prepend strictly newer events" diff otherwise. Capped to the most recent rendered rows
+  // (matching `get-activity-reactions`' own server-side batch cap) rather than every row ever
+  // loaded, since only what's on screen (or just above it) is worth refreshing every 15s.
+  async refreshReactions() {
+    if (!this.reactionsEnabled) return;
+    const rows = [...this.list.children].filter((row) => row.event).slice(0, 100);
+    if (!rows.length) return;
+    const ids = rows.map((row) => row.event.id);
+    const summaries = await api.getActivityReactions(ids);
+    for (const row of rows) {
+      const summary = summaries[row.event.id];
+      if (summary) row.applyReactionSummary(summary);
+    }
   }
 
   // Folds a repeat kill/death against the same boss by the same member into its existing
@@ -339,7 +372,11 @@ export class ActivityFeedPage extends BaseElement {
     // The list is about to be wiped and rebuilt, so any selected rows are about to become stale
     // DOM references - drop out of selecting mode rather than carry them over.
     if (this.isAdmin) this.setSelecting(false);
+    // Must resolve before loadMore's createRow calls so the first page's rows are built with the
+    // right reactionsEnabled/isOwn flags instead of defaulting to false and needing a retrofit.
+    await this.loadReactionSettings();
     await Promise.all([this.loadMore(), this.loadCounts()]);
+    await this.refreshReactions();
   }
 
   setSelecting(selecting) {
@@ -470,6 +507,7 @@ export class ActivityFeedPage extends BaseElement {
     this.empty.classList.toggle("activity-feed-page__empty--visible", this.loaded.length === 0);
     this.renderRail();
     this.renderMemberFilters();
+    await this.refreshReactions();
   }
 
   // Fetches the newest page and prepends whatever is newer than what's already loaded, leaving
@@ -486,6 +524,10 @@ export class ActivityFeedPage extends BaseElement {
       limit: PAGE_LIMIT,
     });
     if (this.disposed) return;
+    // Runs every tick regardless of whether any event is actually newer - a reaction/comment on
+    // an already-loaded row never changes its `occurred_at`, so it would never be caught by the
+    // "newer than last seen" diff below otherwise (see `refreshReactions`'s own doc comment).
+    await this.refreshReactions();
     const incoming = page.filter((event) => new Date(event.occurred_at).getTime() > newestOccurredAt);
     if (!incoming.length) return;
 

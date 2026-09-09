@@ -5,6 +5,207 @@ activity-feed-event {
   align-items: start;
   padding: 10px 4px;
   border-bottom: 1px solid var(--light-border);
+  position: relative;
+}
+
+.activity-feed-event__reactions-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.activity-feed-event__like-wrap {
+  position: relative;
+}
+
+.activity-feed-event__like-btn,
+.activity-feed-event__comment-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--light-border);
+  border-radius: 3px;
+  color: var(--font-color, #c8c0af);
+  padding: 3px 7px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.activity-feed-event__comment-btn {
+  touch-action: auto;
+}
+
+.activity-feed-event__like-btn svg,
+.activity-feed-event__comment-icon,
+.activity-feed-event__pill svg,
+.activity-feed-event__radial-option svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.activity-feed-event__like-btn:hover:not(:disabled),
+.activity-feed-event__comment-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.activity-feed-event__like-btn--active {
+  color: var(--orange);
+  border-color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+}
+
+.activity-feed-event__like-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.activity-feed-event__pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.activity-feed-event__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--light-border);
+  font-size: 0.78em;
+}
+
+.activity-feed-event__pill--mine {
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+.activity-feed-event__comment-btn {
+  margin-left: auto;
+}
+
+.activity-feed-event__comment-count {
+  font-size: 0.85em;
+}
+
+/* Radial popup - a fanned row above the Like button rather than a literal circle, so it never
+   overflows the feed's narrow column width; still reads as "options radiating from the trigger"
+   thanks to the per-option vertical/horizontal offset below. */
+.activity-feed-event__radial {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--rsbackground, #3e3529);
+  border: 1px solid var(--light-border);
+  border-radius: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+  z-index: 5;
+}
+
+.activity-feed-event__radial-option {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  transition: transform 0.08s ease, background 0.08s ease;
+}
+
+.activity-feed-event__radial-option--0 {
+  transform: translateY(2px);
+}
+.activity-feed-event__radial-option--1 {
+  transform: translateY(-4px);
+}
+.activity-feed-event__radial-option--2 {
+  transform: translateY(-4px);
+}
+.activity-feed-event__radial-option--3 {
+  transform: translateY(2px);
+}
+
+.activity-feed-event__radial-option--hovered {
+  background: var(--orange);
+  transform: scale(1.25);
+}
+
+.activity-feed-event__comments-panel {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--light-border);
+  border-radius: 3px;
+}
+
+.activity-feed-event__comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.activity-feed-event__comment {
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.activity-feed-event__comment-author {
+  color: var(--orange);
+  font-weight: 600;
+  margin-right: 5px;
+}
+
+.activity-feed-event__comment-author player-icon {
+  vertical-align: -3px;
+  margin-right: 3px;
+}
+
+.activity-feed-event__comments-compose {
+  display: flex;
+  gap: 6px;
+}
+
+.activity-feed-event__comment-input {
+  flex: 1;
+  min-width: 0;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--light-border);
+  border-radius: 3px;
+  color: inherit;
+  padding: 4px 6px;
+  font-size: 0.85em;
+}
+
+.activity-feed-event__comment-input:disabled {
+  opacity: 0.5;
+}
+
+.activity-feed-event__comments-error {
+  color: var(--red);
+  font-size: 0.78em;
+  margin-top: 4px;
+}
+
+.activity-feed-event__comments-indicator {
+  font-size: 0.72em;
+  opacity: 0.65;
+  margin-top: 4px;
+  text-align: right;
 }
 
 activity-feed-event:last-child {

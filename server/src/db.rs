@@ -2970,6 +2970,99 @@ CREATE INDEX IF NOT EXISTS slayer_task_history_group_member_assigned_idx ON grou
         transaction.commit().await?;
     }
 
+    // Group-wide toggle for the activity feed's like/comment reactions feature (§ likes/comments
+    // ticket) - default true, following the same "on unless an admin turns it off" convention as
+    // the `discord_notify_*` columns above rather than a separate group_settings table, since this
+    // is the only non-Discord group-wide boolean the app has needed so far.
+    if !has_migration_run(client, "add_groups_activity_reactions_enabled_column").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS activity_reactions_enabled BOOLEAN NOT NULL DEFAULT true
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "add_groups_activity_reactions_enabled_column").await?;
+        transaction.commit().await?;
+    }
+
+    // One reaction per (event, account) - reacting again with the same type deletes the row
+    // (toggle off), a different type replaces it via the ON CONFLICT upsert in
+    // `toggle_activity_reaction`. `reaction` is deliberately TEXT + CHECK rather than a Postgres
+    // enum so adding a 6th reaction type later is just another migration, not an enum-alter dance.
+    if !has_migration_run(client, "create_activity_event_reactions_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.activity_event_reactions (
+  event_id BIGINT NOT NULL REFERENCES groupscape.activity_events(event_id) ON DELETE CASCADE,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  reaction TEXT NOT NULL CHECK (reaction IN ('like', 'gg', 'lol', 'rare', 'f')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (event_id, account_id)
+);
+"#,
+                &[],
+            )
+            .await?;
+        // Covers both `get_reactions_summary_for_events`' `event_id = ANY($1)` batch lookup and
+        // the per-event summary query's `GROUP BY reaction` - the PK above already covers
+        // (event_id, account_id) point lookups.
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS activity_event_reactions_event_idx ON groupscape.activity_event_reactions (event_id)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_activity_event_reactions_table").await?;
+        transaction.commit().await?;
+    }
+
+    // `member_name` is denormalized at comment time (the commenting account's resolved member
+    // name in this group, via `resolve_member_name_for_account`) rather than joined live - a
+    // later in-game rename shouldn't rewrite history under an old comment, matching how
+    // `activity_events.member_name` itself is a point-in-time snapshot, not a live FK.
+    if !has_migration_run(client, "create_activity_event_comments_table").await? {
+        let transaction = client.transaction().await?;
+        transaction
+            .execute(
+                r#"
+CREATE TABLE IF NOT EXISTS groupscape.activity_event_comments (
+  comment_id BIGSERIAL PRIMARY KEY,
+  event_id BIGINT NOT NULL REFERENCES groupscape.activity_events(event_id) ON DELETE CASCADE,
+  account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+  member_name CITEXT NOT NULL,
+  comment_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#,
+                &[],
+            )
+            .await?;
+        // Oldest-first listing plus the cap check (`COUNT(*) ... WHERE event_id=$1`) both key off
+        // `event_id` alone; `created_at` in the index lets the listing query satisfy its ORDER BY
+        // from the index instead of an extra sort.
+        transaction
+            .execute(
+                r#"
+CREATE INDEX IF NOT EXISTS activity_event_comments_event_idx ON groupscape.activity_event_comments (event_id, created_at ASC)
+"#,
+                &[],
+            )
+            .await?;
+
+        commit_migration(&transaction, "create_activity_event_comments_table").await?;
+        transaction.commit().await?;
+    }
+
     Ok(())
 }
 
@@ -4881,6 +4974,9 @@ fn activity_event_from_row(row: &Row) -> Result<ActivityEvent, ApiError> {
         event_type: row.try_get("event_type")?,
         occurred_at: row.try_get("occurred_at")?,
         payload: row.try_get("payload")?,
+        reactions: None,
+        my_reaction: None,
+        comment_count: None,
     })
 }
 
@@ -4944,6 +5040,330 @@ LIMIT $5
         .await
         .map_err(ApiError::ListActivityEventsError)?;
     rows.iter().map(activity_event_from_row).collect()
+}
+
+/// `groups.activity_reactions_enabled` - defaults to `true` for any group predating the column
+/// (`ALTER ... DEFAULT true` backfills existing rows at migration time, so this only matters for
+/// the theoretical case of the column being missing entirely).
+pub async fn get_activity_settings(
+    client: &Client,
+    group_id: i64,
+) -> Result<crate::models::ActivitySettings, ApiError> {
+    let stmt = client
+        .prepare_cached("SELECT activity_reactions_enabled FROM groupscape.groups WHERE group_id=$1")
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&group_id])
+        .await
+        .map_err(ApiError::GetActivitySettingsError)?;
+    Ok(crate::models::ActivitySettings {
+        reactions_enabled: row.and_then(|r| r.try_get(0).ok()).unwrap_or(true),
+    })
+}
+
+pub async fn update_activity_settings(
+    client: &Client,
+    group_id: i64,
+    settings: crate::models::ActivitySettings,
+) -> Result<(), ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "UPDATE groupscape.groups SET activity_reactions_enabled=$1 WHERE group_id=$2",
+        )
+        .await?;
+    client
+        .execute(&stmt, &[&settings.reactions_enabled, &group_id])
+        .await
+        .map_err(ApiError::UpdateActivitySettingsError)?;
+    Ok(())
+}
+
+/// `(group_id, member_name)` for `event_id`, used by the react/comment handlers to (a) confirm
+/// the event actually belongs to the caller's group before touching it and (b) know whose item
+/// this is for the "can't react to your own activity" check.
+pub async fn get_activity_event_group_and_member(
+    client: &Client,
+    event_id: i64,
+) -> Result<Option<(i64, String)>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT group_id, member_name FROM groupscape.activity_events WHERE event_id=$1",
+        )
+        .await?;
+    let row = client
+        .query_opt(&stmt, &[&event_id])
+        .await
+        .map_err(ApiError::GetActivityReactionsError)?;
+    match row {
+        Some(row) => Ok(Some((row.try_get(0)?, row.try_get(1)?))),
+        None => Ok(None),
+    }
+}
+
+fn activity_reaction_counts_from_rows(
+    rows: &[Row],
+) -> Result<Vec<crate::models::ActivityReactionCount>, ApiError> {
+    rows.iter()
+        .map(|row| {
+            Ok(crate::models::ActivityReactionCount {
+                reaction: row.try_get("reaction")?,
+                count: row.try_get("count")?,
+            })
+        })
+        .collect()
+}
+
+/// Toggles `account_id`'s reaction on `event_id`: reacting with the same type it already has
+/// removes it, any other type (including having none yet) replaces it. Runs inside its own
+/// transaction so the read-then-write can't race itself, then returns the fresh summary for the
+/// caller to hand straight back to the client without a second round trip.
+pub async fn toggle_activity_reaction(
+    client: &mut Client,
+    event_id: i64,
+    account_id: i64,
+    reaction: &str,
+) -> Result<crate::models::ActivityReactionsSummary, ApiError> {
+    let transaction = client.transaction().await?;
+
+    let existing: Option<String> = {
+        let stmt = transaction
+            .prepare_cached(
+                "SELECT reaction FROM groupscape.activity_event_reactions \
+                 WHERE event_id=$1 AND account_id=$2 FOR UPDATE",
+            )
+            .await?;
+        transaction
+            .query_opt(&stmt, &[&event_id, &account_id])
+            .await
+            .map_err(ApiError::ToggleActivityReactionError)?
+            .map(|row| row.try_get(0))
+            .transpose()?
+    };
+
+    if existing.as_deref() == Some(reaction) {
+        let stmt = transaction
+            .prepare_cached(
+                "DELETE FROM groupscape.activity_event_reactions WHERE event_id=$1 AND account_id=$2",
+            )
+            .await?;
+        transaction
+            .execute(&stmt, &[&event_id, &account_id])
+            .await
+            .map_err(ApiError::ToggleActivityReactionError)?;
+    } else {
+        let stmt = transaction
+            .prepare_cached(
+                "INSERT INTO groupscape.activity_event_reactions (event_id, account_id, reaction) \
+                 VALUES ($1, $2, $3) \
+                 ON CONFLICT (event_id, account_id) DO UPDATE SET reaction=$3, created_at=now()",
+            )
+            .await?;
+        transaction
+            .execute(&stmt, &[&event_id, &account_id, &reaction])
+            .await
+            .map_err(ApiError::ToggleActivityReactionError)?;
+    }
+
+    let counts_stmt = transaction
+        .prepare_cached(
+            "SELECT reaction, COUNT(*) AS count FROM groupscape.activity_event_reactions \
+             WHERE event_id=$1 GROUP BY reaction",
+        )
+        .await?;
+    let count_rows = transaction
+        .query(&counts_stmt, &[&event_id])
+        .await
+        .map_err(ApiError::ToggleActivityReactionError)?;
+    let reactions = activity_reaction_counts_from_rows(&count_rows)?;
+    let my_reaction = if existing.as_deref() == Some(reaction) {
+        None
+    } else {
+        Some(reaction.to_string())
+    };
+
+    transaction.commit().await?;
+    Ok(crate::models::ActivityReactionsSummary {
+        reactions,
+        my_reaction,
+        comment_count: 0,
+    })
+}
+
+/// Batch reaction summary + comment count for a page of activity events (`get-activity-reactions`
+/// and, indirectly, whatever embeds these into `get_activity_events`). `account_id` is `None` for
+/// a request with no logged-in account behind it - `my_reaction` is then always `None` for every
+/// event rather than erroring, since reading the feed never requires being logged in.
+pub async fn get_reactions_summary_for_events(
+    client: &Client,
+    event_ids: &[i64],
+    account_id: Option<i64>,
+) -> Result<
+    std::collections::HashMap<i64, crate::models::ActivityReactionsSummary>,
+    ApiError,
+> {
+    let mut result: std::collections::HashMap<i64, crate::models::ActivityReactionsSummary> =
+        event_ids
+            .iter()
+            .map(|id| {
+                (
+                    *id,
+                    crate::models::ActivityReactionsSummary {
+                        reactions: Vec::new(),
+                        my_reaction: None,
+                        comment_count: 0,
+                    },
+                )
+            })
+            .collect();
+    if event_ids.is_empty() {
+        return Ok(result);
+    }
+
+    let stmt = client
+        .prepare_cached(
+            "SELECT event_id, reaction, COUNT(*) AS count FROM groupscape.activity_event_reactions \
+             WHERE event_id = ANY($1) GROUP BY event_id, reaction",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&event_ids])
+        .await
+        .map_err(ApiError::GetActivityReactionsError)?;
+    for row in &rows {
+        let event_id: i64 = row.try_get("event_id")?;
+        let reaction: String = row.try_get("reaction")?;
+        let count: i64 = row.try_get("count")?;
+        if let Some(summary) = result.get_mut(&event_id) {
+            summary.reactions.push(crate::models::ActivityReactionCount { reaction, count });
+        }
+    }
+
+    if let Some(account_id) = account_id {
+        let mine_stmt = client
+            .prepare_cached(
+                "SELECT event_id, reaction FROM groupscape.activity_event_reactions \
+                 WHERE event_id = ANY($1) AND account_id=$2",
+            )
+            .await?;
+        let mine_rows = client
+            .query(&mine_stmt, &[&event_ids, &account_id])
+            .await
+            .map_err(ApiError::GetActivityReactionsError)?;
+        for row in &mine_rows {
+            let event_id: i64 = row.try_get("event_id")?;
+            let reaction: String = row.try_get(1)?;
+            if let Some(summary) = result.get_mut(&event_id) {
+                summary.my_reaction = Some(reaction);
+            }
+        }
+    }
+
+    let comment_counts = get_comment_counts_for_events(client, event_ids).await?;
+    for (event_id, count) in comment_counts {
+        if let Some(summary) = result.get_mut(&event_id) {
+            summary.comment_count = count;
+        }
+    }
+
+    Ok(result)
+}
+
+pub async fn get_comment_counts_for_events(
+    client: &Client,
+    event_ids: &[i64],
+) -> Result<std::collections::HashMap<i64, i64>, ApiError> {
+    let mut result: std::collections::HashMap<i64, i64> =
+        event_ids.iter().map(|id| (*id, 0)).collect();
+    if event_ids.is_empty() {
+        return Ok(result);
+    }
+    let stmt = client
+        .prepare_cached(
+            "SELECT event_id, COUNT(*) AS count FROM groupscape.activity_event_comments \
+             WHERE event_id = ANY($1) GROUP BY event_id",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&event_ids])
+        .await
+        .map_err(ApiError::ListActivityCommentsError)?;
+    for row in &rows {
+        let event_id: i64 = row.try_get(0)?;
+        let count: i64 = row.try_get(1)?;
+        result.insert(event_id, count);
+    }
+    Ok(result)
+}
+
+pub async fn list_activity_comments(
+    client: &Client,
+    event_id: i64,
+) -> Result<Vec<crate::models::ActivityComment>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT comment_id, member_name, comment_text, created_at \
+             FROM groupscape.activity_event_comments WHERE event_id=$1 ORDER BY created_at ASC",
+        )
+        .await?;
+    let rows = client
+        .query(&stmt, &[&event_id])
+        .await
+        .map_err(ApiError::ListActivityCommentsError)?;
+    rows.iter()
+        .map(|row| {
+            Ok(crate::models::ActivityComment {
+                comment_id: row.try_get("comment_id")?,
+                member_name: row.try_get("member_name")?,
+                comment_text: row.try_get("comment_text")?,
+                created_at: row.try_get("created_at")?,
+            })
+        })
+        .collect()
+}
+
+/// Inserts a comment, enforcing the 10-per-event cap atomically via a `WHERE COUNT(*) < 10`
+/// sub-select rather than a separate check-then-insert - closes the race where two comments
+/// submitted at once could both pass a prior "count < 10" check and land as the 11th/12th.
+/// Returns `None` when the cap was already reached (no row inserted).
+pub async fn add_activity_comment(
+    client: &Client,
+    event_id: i64,
+    account_id: i64,
+    member_name: &str,
+    comment_text: &str,
+) -> Result<Option<crate::models::ActivityComment>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+INSERT INTO groupscape.activity_event_comments (event_id, account_id, member_name, comment_text)
+SELECT $1, $2, $3, $4
+WHERE (SELECT COUNT(*) FROM groupscape.activity_event_comments WHERE event_id=$1) < $5
+RETURNING comment_id, member_name, comment_text, created_at
+"#,
+        )
+        .await?;
+    let row = client
+        .query_opt(
+            &stmt,
+            &[
+                &event_id,
+                &account_id,
+                &member_name,
+                &comment_text,
+                &crate::models::ACTIVITY_COMMENT_CAP,
+            ],
+        )
+        .await
+        .map_err(ApiError::AddActivityCommentError)?;
+    match row {
+        Some(row) => Ok(Some(crate::models::ActivityComment {
+            comment_id: row.try_get("comment_id")?,
+            member_name: row.try_get("member_name")?,
+            comment_text: row.try_get("comment_text")?,
+            created_at: row.try_get("created_at")?,
+        })),
+        None => Ok(None),
+    }
 }
 
 /// All `kill` events for a group in an optional `[since, until]` range, uncapped by cursor

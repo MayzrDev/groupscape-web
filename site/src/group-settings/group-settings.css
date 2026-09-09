@@ -386,6 +386,17 @@ group-settings {
   margin-top: 0.2em;
 }
 
+.group-settings__activity-feed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.5em;
+}
+
+.group-settings__activity-feed-toggle label {
+  cursor: pointer;
+}
+
 .group-settings__discord-drops-unique-toggle {
   display: flex;
   align-items: center;

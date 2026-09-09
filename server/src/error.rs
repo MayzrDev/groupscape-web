@@ -153,6 +153,26 @@ pub enum ApiError {
     UpsertItemBonusesError(tokio_postgres::error::Error),
     #[from(ignore)]
     ItemBonusesScrapeError(String),
+    #[from(ignore)]
+    GetActivitySettingsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    UpdateActivitySettingsError(tokio_postgres::error::Error),
+    ActivityEventNotFoundError,
+    ActivityReactionsDisabledError,
+    InvalidReactionTypeError,
+    CannotReactToOwnActivityError,
+    #[from(ignore)]
+    ToggleActivityReactionError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    GetActivityReactionsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ListActivityCommentsError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    AddActivityCommentError(tokio_postgres::error::Error),
+    #[from(ignore)]
+    ActivityCommentValidationError(String),
+    ActivityCommentLimitReachedError,
+    CommentRequiresLinkedCharacterError,
 }
 impl std::error::Error for ApiError {}
 fn handle_pg_error(err: &tokio_postgres::error::Error, name: &str) -> HttpResponse {
@@ -377,6 +397,42 @@ impl ResponseError for ApiError {
                 log::warn!("ItemBonusesScrapeError: {}", reason);
                 HttpResponse::BadGateway().body("Failed to fetch item bonuses from the OSRS Wiki")
             }
+            ApiError::GetActivitySettingsError(ref err) => {
+                handle_pg_error(err, "GetActivitySettingsError")
+            }
+            ApiError::UpdateActivitySettingsError(ref err) => {
+                handle_pg_error(err, "UpdateActivitySettingsError")
+            }
+            ApiError::ActivityEventNotFoundError => {
+                HttpResponse::NotFound().body("Activity event not found")
+            }
+            ApiError::ActivityReactionsDisabledError => HttpResponse::BadRequest()
+                .body("Likes and comments are turned off for this group"),
+            ApiError::InvalidReactionTypeError => {
+                HttpResponse::BadRequest().body("Not a valid reaction type")
+            }
+            ApiError::CannotReactToOwnActivityError => {
+                HttpResponse::Forbidden().body("You can't react to your own activity")
+            }
+            ApiError::ToggleActivityReactionError(ref err) => {
+                handle_pg_error(err, "ToggleActivityReactionError")
+            }
+            ApiError::GetActivityReactionsError(ref err) => {
+                handle_pg_error(err, "GetActivityReactionsError")
+            }
+            ApiError::ListActivityCommentsError(ref err) => {
+                handle_pg_error(err, "ListActivityCommentsError")
+            }
+            ApiError::AddActivityCommentError(ref err) => {
+                handle_pg_error(err, "AddActivityCommentError")
+            }
+            ApiError::ActivityCommentValidationError(ref reason) => {
+                HttpResponse::BadRequest().body(reason.clone())
+            }
+            ApiError::ActivityCommentLimitReachedError => HttpResponse::BadRequest()
+                .body("This item already has the maximum of 10 comments"),
+            ApiError::CommentRequiresLinkedCharacterError => HttpResponse::BadRequest()
+                .body("Link a character to this group before commenting"),
         }
     }
 }

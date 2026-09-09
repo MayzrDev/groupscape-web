@@ -137,10 +137,14 @@ export class GroupSettings extends BaseElement {
       this.handleUpdatedMembers(mostRecentMembers);
     }
 
+    this.activityFeedCheckbox = this.querySelector(".group-settings__activity-feed-checkbox");
+    this.eventListener(this.activityFeedCheckbox, "change", this.saveActivityFeedSettings.bind(this));
+
     this.loadBlockedMembers();
     this.loadPermissions();
     this.loadCanKickMembers();
     this.loadDiscordSettings();
+    this.loadActivityFeedSettings();
   }
 
   // Cached rather than checked per-member: it's one account's permission for this group, not
@@ -535,6 +539,33 @@ export class GroupSettings extends BaseElement {
       this.showDiscordStatus(`Failed to send test message: ${error}`, "err");
     } finally {
       button.disabled = !this.lastSavedDiscordSettings?.webhook_url;
+    }
+  }
+
+  // Unlike loadDiscordSettings/loadPermissions, the GET here is reachable by any group member (the
+  // activity feed itself needs to know the flag), so it's never used as the section's admin gate -
+  // instead the checkbox is just disabled for anyone without `manage_settings`, same permission
+  // the colour picker checks in loadPermissions.
+  async loadActivityFeedSettings() {
+    const [settings, myPermissionsResponse] = await Promise.all([api.getActivitySettings(), api.getMyPermissions()]);
+    const canManage = myPermissionsResponse.ok ? !!(await myPermissionsResponse.json()).manage_settings : false;
+    this.activityFeedCheckbox.checked = !!settings.reactions_enabled;
+    this.activityFeedCheckbox.disabled = !canManage;
+    this.querySelector(".group-settings__activity-feed-lock-note").style.display = canManage ? "none" : "";
+  }
+
+  async saveActivityFeedSettings() {
+    const reactionsEnabled = this.activityFeedCheckbox.checked;
+    try {
+      loadingScreenManager.showLoadingScreen();
+      const response = await api.updateActivitySettings({ reactions_enabled: reactionsEnabled });
+      if (!response.ok) {
+        // Revert the checkbox - the request was rejected (e.g. permission lost mid-edit), so the
+        // UI shouldn't show a state that was never actually saved.
+        this.activityFeedCheckbox.checked = !reactionsEnabled;
+      }
+    } finally {
+      loadingScreenManager.hideLoadingScreen();
     }
   }
 

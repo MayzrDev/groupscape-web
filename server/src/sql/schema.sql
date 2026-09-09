@@ -29,3 +29,29 @@ CREATE TABLE IF NOT EXISTS groupscape.item_bonuses (
        attack_speed INT,
        fetched_at TIMESTAMPTZ NOT NULL
 );
+
+-- Also migration-created (see "add_groups_activity_reactions_enabled_column" in db.rs) - the
+-- group-wide likes/comments toggle for the activity feed, default on.
+ALTER TABLE groupscape.groups
+ADD COLUMN IF NOT EXISTS activity_reactions_enabled BOOLEAN NOT NULL DEFAULT true;
+
+-- Also migration-created (see "create_activity_event_reactions_table" in db.rs). One reaction per
+-- (event, account); `groupscape.activity_events` is created by "create_sessions_and_activity_events_tables".
+CREATE TABLE IF NOT EXISTS groupscape.activity_event_reactions (
+       event_id BIGINT NOT NULL REFERENCES groupscape.activity_events(event_id) ON DELETE CASCADE,
+       account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+       reaction TEXT NOT NULL CHECK (reaction IN ('like', 'gg', 'lol', 'rare', 'f')),
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+       PRIMARY KEY (event_id, account_id)
+);
+
+-- Also migration-created (see "create_activity_event_comments_table" in db.rs). `member_name` is
+-- a point-in-time snapshot of the commenting account's resolved member name, not a live FK.
+CREATE TABLE IF NOT EXISTS groupscape.activity_event_comments (
+       comment_id BIGSERIAL PRIMARY KEY,
+       event_id BIGINT NOT NULL REFERENCES groupscape.activity_events(event_id) ON DELETE CASCADE,
+       account_id BIGINT NOT NULL REFERENCES groupscape.accounts(id) ON DELETE CASCADE,
+       member_name CITEXT NOT NULL,
+       comment_text TEXT NOT NULL,
+       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

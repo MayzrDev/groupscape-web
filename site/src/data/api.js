@@ -135,6 +135,26 @@ class Api {
     return `${this.groupScopeUrl}/get-activity-events`;
   }
 
+  get activitySettingsUrl() {
+    return `${this.groupScopeUrl}/get-activity-settings`;
+  }
+
+  get updateActivitySettingsUrl() {
+    return `${this.groupScopeUrl}/update-activity-settings`;
+  }
+
+  get activityReactionsUrl() {
+    return `${this.groupScopeUrl}/get-activity-reactions`;
+  }
+
+  activityEventReactUrl(eventId) {
+    return `${this.groupScopeUrl}/activity-events/${eventId}/react`;
+  }
+
+  activityEventCommentsUrl(eventId) {
+    return `${this.groupScopeUrl}/activity-events/${eventId}/comments`;
+  }
+
   get lootLogUrl() {
     return `${this.groupScopeUrl}/get-loot-log`;
   }
@@ -564,6 +584,89 @@ class Api {
       return [];
     }
     return response.json();
+  }
+
+  // Reachable by any group member - the feed needs to know whether to render reaction UI at all,
+  // not just the admin settings page (see server's `get_activity_settings` doc comment).
+  async getActivitySettings() {
+    const response = await fetch(this.activitySettingsUrl, {
+      headers: { Authorization: this.authHeader },
+    });
+    if (!response.ok) {
+      return { reactions_enabled: false };
+    }
+    return response.json();
+  }
+
+  async updateActivitySettings(settings) {
+    const response = await fetch(this.updateActivitySettingsUrl, {
+      body: JSON.stringify(settings),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
+    });
+
+    return response;
+  }
+
+  // Batch reaction/comment-count lookup for whatever page of events the feed currently has
+  // rendered - separate from the get-activity-events cursor poll (see server's
+  // `GetActivityReactionsQuery` doc comment for why). Returns `{}` when reactions are off for the
+  // group, or on any failure - callers treat an empty object as "nothing to show" either way.
+  async getActivityReactions(eventIds) {
+    if (!eventIds || !eventIds.length) return {};
+    const response = await fetch(`${this.activityReactionsUrl}?event_ids=${eventIds.join(",")}`, {
+      headers: {
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+    });
+    if (!response.ok) return {};
+    return response.json();
+  }
+
+  async reactToActivityEvent(eventId, reaction) {
+    const response = await fetch(this.activityEventReactUrl(eventId), {
+      body: JSON.stringify({ reaction }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+      method: "PUT",
+    });
+
+    return response;
+  }
+
+  async getActivityComments(eventId) {
+    const response = await fetch(this.activityEventCommentsUrl(eventId), {
+      headers: {
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+    });
+    if (!response.ok) {
+      return { comments: [], comment_count: 0 };
+    }
+    return response.json();
+  }
+
+  async addActivityComment(eventId, commentText) {
+    const response = await fetch(this.activityEventCommentsUrl(eventId), {
+      body: JSON.stringify({ comment_text: commentText }),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: this.authHeader,
+        ...this.accountAuthHeaders,
+      },
+      method: "POST",
+    });
+
+    return response;
   }
 
   async getLootLog({ before, limit, search, itemIds, categories } = {}) {
