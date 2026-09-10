@@ -5607,6 +5607,14 @@ LIMIT $5 OFFSET $6
                 if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
                     entry.amount_done = live_amount_done;
                 }
+                // Fully killed but not yet turned in to the master - the Current tab already
+                // shows this as "Task complete" (see slayer-panel.js's isTaskComplete), so
+                // reflect that here too rather than leaving the row stuck on "In progress"
+                // until the close event lands. `points` stays unset since the real completion
+                // reward isn't known until that close event actually arrives.
+                if live_task.amount_remaining.is_some_and(|remaining| remaining <= 0) {
+                    entry.status = "completed".to_string();
+                }
             }
         }
     }
