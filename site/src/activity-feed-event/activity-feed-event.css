@@ -106,7 +106,9 @@ activity-feed-event {
   position: absolute;
   bottom: calc(100% + 12px);
   left: 50%;
-  transform: translateX(-50%);
+  /* --radial-shift is set from JS (see openRadial in activity-feed-event.js) to pull the popup
+     back onscreen when centering it on the Like button would overflow the viewport. */
+  transform: translateX(calc(-50% + var(--radial-shift, 0px)));
   display: flex;
   align-items: stretch;
   gap: 4px;
@@ -123,7 +125,9 @@ activity-feed-event {
   position: absolute;
   top: 100%;
   left: 50%;
-  transform: translateX(-50%);
+  /* Counter-shifted so the caret keeps pointing at the Like button even while the popup body
+     above it has been nudged back onscreen. */
+  transform: translateX(calc(-50% - var(--radial-shift, 0px)));
   border: 6px solid transparent;
   border-top-color: #2b2419;
 }

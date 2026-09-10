@@ -167,6 +167,7 @@ export class ActivityFeedEvent extends BaseElement {
   openRadial() {
     if (!this.radial) return;
     this.radialOpen = true;
+    this.radial.style.setProperty("--radial-shift", "0px");
     this.radial.innerHTML = "";
     RADIAL_REACTION_ORDER.forEach((reaction) => {
       const option = document.createElement("div");
@@ -178,6 +179,23 @@ export class ActivityFeedEvent extends BaseElement {
       this.radial.appendChild(option);
     });
     this.radial.hidden = false;
+    this.clampRadialToViewport();
+  }
+
+  // The popup is centered on the Like button by default (see the CSS), which overflows the
+  // viewport when that button sits near the screen edge - most often the right edge, since
+  // .activity-feed-event__meta right-aligns Like/Comment. Nudge it back onscreen via
+  // --radial-shift and counter-shift the caret (in CSS) so it still points at the button.
+  clampRadialToViewport() {
+    const margin = 8;
+    const rect = this.radial.getBoundingClientRect();
+    let shift = 0;
+    if (rect.right > window.innerWidth - margin) {
+      shift = window.innerWidth - margin - rect.right;
+    } else if (rect.left < margin) {
+      shift = margin - rect.left;
+    }
+    this.radial.style.setProperty("--radial-shift", `${shift}px`);
   }
 
   // Touch/mouse drag off the Like button keeps delivering pointermove/pointerup to it (pointer
