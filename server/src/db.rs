@@ -5695,6 +5695,27 @@ LIMIT 1
     rows.first().map(slayer_task_leader_from_row).transpose()
 }
 
+/// Completed-history kill total for one specific task name, used to fold the live in-progress
+/// task's kills into whichever task_name it belongs to when computing `most_killed_task`.
+async fn completed_kills_for_task_name(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    task_name: &str,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT COALESCE(SUM(amount_done), 0) AS n
+FROM groupscape.slayer_task_history
+WHERE group_id=$1 AND member_name=$2 AND status='completed' AND task_name=$3
+"#,
+        )
+        .await?;
+    let row = client.query_one(&stmt, &[&group_id, &member_name, &task_name]).await?;
+    Ok(row.try_get("n")?)
+}
+
 /// All-time slayer task stats for one member - the Stats tab. Every "most X" tile is its own
 /// small `GROUP BY` query rather than one combined query, since each ranks a different subset
 /// (all tasks / completed only / cancelled only) - a single query would need a
@@ -5722,15 +5743,17 @@ WHERE group_id=$1 AND member_name=$2
         .query_one(&totals_stmt, &[&group_id, &member_name])
         .await?;
     let tasks_completed: i64 = totals_row.try_get("tasks_completed")?;
-    // All-time completed-task kills, plus whatever's been killed on the current in-progress
-    // task so far (live off `groupscape.members.slayer_task`, the same source the Current tab
-    // reads) - so this tile visibly ticks up while a task is being worked rather than jumping
-    // only when it closes. See `get_live_slayer_task`.
+    // Fetched once and reused below by both `total_kills` and `most_killed_task`, since both
+    // need to overlay the current in-progress task's live kill count (off
+    // `groupscape.members.slayer_task`, the same source the Current tab reads) on top of
+    // completed-task history - so those tiles visibly tick up while a task is being worked
+    // rather than jumping only when it closes. See `get_live_slayer_task`.
+    let live_task = get_live_slayer_task(client, group_id, member_name).await?;
+    let live_amount_done = live_task.as_ref().and_then(live_slayer_task_amount_done);
+
     let mut total_kills: i64 = totals_row.try_get("total_kills")?;
-    if let Some(live_task) = get_live_slayer_task(client, group_id, member_name).await? {
-        if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
-            total_kills += live_amount_done as i64;
-        }
+    if let Some(live_amount_done) = live_amount_done {
+        total_kills += live_amount_done as i64;
     }
     let total_points_earned: i64 = totals_row.try_get("total_points_earned")?;
     let closed_count: i64 = totals_row.try_get("closed_count")?;
@@ -5748,6 +5771,29 @@ WHERE group_id=$1 AND member_name=$2
         "COALESCE(SUM(amount_done), 0)",
     )
     .await?;
+    // Overlay the live task's kills onto whichever task_name they belong to, so a task in
+    // progress on the current leader (or one about to overtake it) is reflected immediately
+    // instead of only once it closes and lands in `slayer_task_history`.
+    let most_killed_task = match (live_task.as_ref().and_then(|t| t.task_name.as_deref()), live_amount_done) {
+        (Some(live_task_name), Some(live_amount_done)) => {
+            let completed_for_live_task = completed_kills_for_task_name(
+                client,
+                group_id,
+                member_name,
+                live_task_name,
+            )
+            .await?;
+            let live_total = completed_for_live_task + live_amount_done as i64;
+            match &most_killed_task {
+                Some(leader) if leader.count >= live_total => most_killed_task,
+                _ => Some(SlayerTaskLeader {
+                    name: live_task_name.to_string(),
+                    count: live_total,
+                }),
+            }
+        }
+        _ => most_killed_task,
+    };
     let most_common_task =
         top_slayer_task_name(client, group_id, member_name, None, "COUNT(*)").await?;
     let most_cancelled_task =

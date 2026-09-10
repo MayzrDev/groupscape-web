@@ -15,6 +15,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Like and Comment buttons on activity feed items now sit inline next to the timestamp instead of on their own row, so each event takes up less vertical space.
 - Slightly thinner orange border on Slayer History and Stats icons.
 - Internal: the server now guarantees a member only ever has one open Slayer task in their history, instead of trusting the plugin to always close the previous one first. A stray leftover shows up as a new "Superseded" status if it ever happens.
+- The Slayer Stats "Most killed overall" tile now updates live while a task is in progress, instead of only once the task is turned in — so it ticks up in real time, and swaps to a new monster right away if it overtakes the current leader.
 
 ### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.
