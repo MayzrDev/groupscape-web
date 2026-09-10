@@ -9,7 +9,7 @@ use crate::models::{
     GroupMember, GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession,
     GroupSkillData, ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint,
     PermissionFlags, PermissionFlagsPatch, PermissionKey, RaidCompletionPayload, RaidDifficulty,
-    RaidType, SlayerTaskHistoryEntry, SlayerTaskHistoryEvent, SlayerTaskHistoryPage,
+    RaidType, SlayerTask, SlayerTaskHistoryEntry, SlayerTaskHistoryEvent, SlayerTaskHistoryPage,
     SlayerTaskLeader, SlayerTaskStats, MEMBER_COLOR_PALETTE, RAID_GROUP_TOTAL_LABEL, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
@@ -5483,6 +5483,39 @@ ON CONFLICT (group_id, member_name, client_event_id) DO UPDATE SET
     Ok(())
 }
 
+/// The member's live in-progress task, straight off `groupscape.members.slayer_task` (the same
+/// source the Current tab reads) - `None` if the member has no task assigned or the plugin
+/// hasn't sent amount data yet. Used to overlay a fresh kill count onto the one
+/// `slayer_task_history` row that's still open, since that table only gets written at task
+/// assignment (always 0 done) and at close - see `upsert_slayer_task_history_event`'s doc
+/// comment. Never persisted back to `slayer_task_history`; this stays a read-time overlay so no
+/// extra writes are needed per kill.
+async fn get_live_slayer_task(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<Option<SlayerTask>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT slayer_task FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    let row = client.query_opt(&stmt, &[&group_id, &member_name]).await?;
+    let Some(row) = row else { return Ok(None) };
+    Ok(try_deserialize_json_column(&row, "slayer_task")?)
+}
+
+/// `initial_amount - amount_remaining` off a live [`SlayerTask`], if the plugin has reported
+/// both - `None` while a task is assigned but neither has been observed yet.
+fn live_slayer_task_amount_done(task: &SlayerTask) -> Option<i32> {
+    if !task.has_task {
+        return None;
+    }
+    let initial = task.initial_amount?;
+    let remaining = task.amount_remaining?;
+    Some((initial - remaining).max(0))
+}
+
 fn slayer_task_history_entry_from_row(row: &Row) -> Result<SlayerTaskHistoryEntry, ApiError> {
     Ok(SlayerTaskHistoryEntry {
         task_name: row.try_get("task_name")?,
@@ -5558,10 +5591,25 @@ LIMIT $5 OFFSET $6
         )
         .await?;
 
-    let entries = rows
+    let mut entries = rows
         .iter()
         .map(slayer_task_history_entry_from_row)
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Overlay live progress onto whichever row is still in_progress (at most one, and always
+    // the newest since a new assignment can't happen until the last task closes) - see
+    // `get_live_slayer_task`.
+    if let Some(entry) = entries.iter_mut().find(|entry| entry.status == "in_progress") {
+        if let Some(live_task) = get_live_slayer_task(client, group_id, member_name).await? {
+            if live_task.task_name.as_deref() == Some(entry.task_name.as_str())
+                && live_task.master_name.as_deref() == Some(entry.master_name.as_str())
+            {
+                if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
+                    entry.amount_done = live_amount_done;
+                }
+            }
+        }
+    }
 
     Ok(SlayerTaskHistoryPage {
         entries,
@@ -5638,7 +5686,16 @@ WHERE group_id=$1 AND member_name=$2
         .query_one(&totals_stmt, &[&group_id, &member_name])
         .await?;
     let tasks_completed: i64 = totals_row.try_get("tasks_completed")?;
-    let total_kills: i64 = totals_row.try_get("total_kills")?;
+    // All-time completed-task kills, plus whatever's been killed on the current in-progress
+    // task so far (live off `groupscape.members.slayer_task`, the same source the Current tab
+    // reads) - so this tile visibly ticks up while a task is being worked rather than jumping
+    // only when it closes. See `get_live_slayer_task`.
+    let mut total_kills: i64 = totals_row.try_get("total_kills")?;
+    if let Some(live_task) = get_live_slayer_task(client, group_id, member_name).await? {
+        if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
+            total_kills += live_amount_done as i64;
+        }
+    }
     let total_points_earned: i64 = totals_row.try_get("total_points_earned")?;
     let closed_count: i64 = totals_row.try_get("closed_count")?;
     let completion_rate = if closed_count > 0 {
