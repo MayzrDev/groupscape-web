@@ -1,6 +1,9 @@
 import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { slayerData } from "../data/slayer";
+import { formatRelativeTimeLong } from "../data/relative-time";
+
+const OPEN_STATUSES = new Set(["not_started", "in_progress"]);
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -175,6 +178,13 @@ export class SlayerHistoryTab extends BaseElement {
         (entry.points > 0 ? "slayer-history-tab__points--pos" : "slayer-history-tab__points--neg");
     }
 
+    // Open tasks (not_started/in_progress) have no closedAt yet, so show when they were assigned;
+    // everything else shows when it closed out.
+    const isOpen = OPEN_STATUSES.has(entry.status);
+    const timestamp = isOpen ? entry.assignedAt : entry.closedAt ?? entry.assignedAt;
+    const timestampDate = new Date(timestamp);
+    const timestampLabel = (isOpen ? "assigned " : "") + formatRelativeTimeLong(timestampDate);
+
     return `
       <div class="slayer-history-tab__row">
         <a class="slayer-history-tab__icon-link" href="${taskWikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
@@ -203,6 +213,7 @@ export class SlayerHistoryTab extends BaseElement {
             <span class="slayer-history-tab__kills">${entry.amountDone}/${entry.amountTotal}</span>
             <span class="slayer-history-tab__badge slayer-history-tab__badge--${meta.cls}">${meta.label}</span>
           </div>
+          <div class="slayer-history-tab__timestamp" title="${timestampDate.toLocaleString()}">${timestampLabel}</div>
         </div>
       </div>
     `;

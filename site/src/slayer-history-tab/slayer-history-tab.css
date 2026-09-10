@@ -252,6 +252,12 @@ slayer-history-tab {
   background: rgba(138, 138, 138, 0.08);
 }
 
+.slayer-history-tab__timestamp {
+  font-size: 10.5px;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+}
+
 .slayer-history-tab__empty {
   text-align: center;
   padding: 18px 0 8px;
