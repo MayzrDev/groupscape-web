@@ -9,7 +9,7 @@ use crate::models::{
     GroupMember, GroupMemberPermissions, GroupMetricData, GroupPermissions, GroupSession,
     GroupSkillData, ItemBonusesResponse, MemberMetricData, MemberSkillData, MetricDataPoint,
     PermissionFlags, PermissionFlagsPatch, PermissionKey, RaidCompletionPayload, RaidDifficulty,
-    RaidType, SlayerTaskHistoryEntry, SlayerTaskHistoryEvent, SlayerTaskHistoryPage,
+    RaidType, SlayerTask, SlayerTaskHistoryEntry, SlayerTaskHistoryEvent, SlayerTaskHistoryPage,
     SlayerTaskLeader, SlayerTaskStats, MEMBER_COLOR_PALETTE, RAID_GROUP_TOTAL_LABEL, SHARED_MEMBER,
 };
 use crate::validators::valid_name;
@@ -5441,12 +5441,40 @@ LIMIT $3
 /// `EXCLUDED` would be equivalent, but pinning them to the original row is the more honest
 /// intent (this row's identity is "the task assigned at `assigned_at`", not "whatever the most
 /// recent event happened to say").
+///
+/// An assignment event (`status` "not_started"/"in_progress") first force-closes any *other* row
+/// for this member still sitting open, as "superseded" - the plugin's own transition detection
+/// (see `GroupScapeTrackerPlugin#handleSlayerTaskTransition`) already guarantees a close event
+/// precedes the next assignment, but `list_slayer_task_history_page`'s live-progress overlay and
+/// `get_slayer_task_stats`' completion rate both lean on "at most one open row per member" - this
+/// makes that a real server-side invariant instead of one only the client is trusted to uphold
+/// (a lost close event, an out-of-order upload, or a future plugin bug would otherwise leave a
+/// stale open row parked in the table forever).
 pub async fn upsert_slayer_task_history_event(
     client: &Client,
     group_id: i64,
     member_name: &str,
     event: &SlayerTaskHistoryEvent,
 ) -> Result<(), ApiError> {
+    if event.status == "in_progress" || event.status == "not_started" {
+        let supersede_stmt = client
+            .prepare_cached(
+                r#"
+UPDATE groupscape.slayer_task_history
+SET status = 'superseded', closed_at = COALESCE(closed_at, now())
+WHERE group_id=$1 AND member_name=$2 AND client_event_id <> $3
+  AND status IN ('in_progress', 'not_started')
+"#,
+            )
+            .await?;
+        client
+            .execute(
+                &supersede_stmt,
+                &[&group_id, &member_name, &event.client_event_id],
+            )
+            .await?;
+    }
+
     let stmt = client
         .prepare_cached(
             r#"
@@ -5483,6 +5511,39 @@ ON CONFLICT (group_id, member_name, client_event_id) DO UPDATE SET
     Ok(())
 }
 
+/// The member's live in-progress task, straight off `groupscape.members.slayer_task` (the same
+/// source the Current tab reads) - `None` if the member has no task assigned or the plugin
+/// hasn't sent amount data yet. Used to overlay a fresh kill count onto the one
+/// `slayer_task_history` row that's still open, since that table only gets written at task
+/// assignment (always 0 done) and at close - see `upsert_slayer_task_history_event`'s doc
+/// comment. Never persisted back to `slayer_task_history`; this stays a read-time overlay so no
+/// extra writes are needed per kill.
+async fn get_live_slayer_task(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+) -> Result<Option<SlayerTask>, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            "SELECT slayer_task FROM groupscape.members WHERE group_id=$1 AND member_name=$2",
+        )
+        .await?;
+    let row = client.query_opt(&stmt, &[&group_id, &member_name]).await?;
+    let Some(row) = row else { return Ok(None) };
+    Ok(try_deserialize_json_column(&row, "slayer_task")?)
+}
+
+/// `initial_amount - amount_remaining` off a live [`SlayerTask`], if the plugin has reported
+/// both - `None` while a task is assigned but neither has been observed yet.
+fn live_slayer_task_amount_done(task: &SlayerTask) -> Option<i32> {
+    if !task.has_task {
+        return None;
+    }
+    let initial = task.initial_amount?;
+    let remaining = task.amount_remaining?;
+    Some((initial - remaining).max(0))
+}
+
 fn slayer_task_history_entry_from_row(row: &Row) -> Result<SlayerTaskHistoryEntry, ApiError> {
     Ok(SlayerTaskHistoryEntry {
         task_name: row.try_get("task_name")?,
@@ -5496,15 +5557,17 @@ fn slayer_task_history_entry_from_row(row: &Row) -> Result<SlayerTaskHistoryEntr
     })
 }
 
-/// One page of a member's slayer task history, newest-first, cursor-paginated on `before` -
-/// same keyset shape as [`list_loot_and_kill_events_page`]. `status`/`master_name` are optional
-/// exact-match filters for the History tab's dropdowns.
+/// One page of a member's slayer task history, newest-first, offset-paginated (page/page_size)
+/// so the History tab can offer first/prev/next/last controls over a known total - same
+/// list-then-count shape as [`admin_list_groups`]. `status`/`master_name` are optional
+/// exact-match filters for the History tab's dropdowns and apply to both queries so the total
+/// reflects the filtered set, not the member's whole history.
 pub async fn list_slayer_task_history_page(
     client: &Client,
     group_id: i64,
     member_name: &str,
-    before: Option<DateTime<Utc>>,
-    limit: i64,
+    page: i64,
+    page_size: i64,
     status: Option<&str>,
     // A slice of exact `master_name` values rather than one, since the site's master filter
     // groups NPCs that are really the same slayer master role (Nieve/Steve, Duradel/Kuradal,
@@ -5512,9 +5575,30 @@ pub async fn list_slayer_task_history_page(
     // means no filter, matching `status` above.
     master_names: Option<&[String]>,
 ) -> Result<SlayerTaskHistoryPage, ApiError> {
-    let page_limit = limit.clamp(1, 100);
+    let page_size = page_size.clamp(1, 100);
     let master_names = master_names.filter(|names| !names.is_empty());
-    let stmt = client
+
+    let count_stmt = client
+        .prepare_cached(
+            r#"
+SELECT COUNT(*) FROM groupscape.slayer_task_history
+WHERE group_id=$1
+  AND member_name=$2
+  AND ($3::text IS NULL OR status = $3)
+  AND ($4::text[] IS NULL OR master_name = ANY($4))
+"#,
+        )
+        .await?;
+    let total_entries: i64 = client
+        .query_one(&count_stmt, &[&group_id, &member_name, &status, &master_names])
+        .await?
+        .try_get(0)?;
+
+    let total_pages = ((total_entries - 1) / page_size + 1).max(1);
+    let page = page.clamp(1, total_pages);
+    let offset = (page - 1) * page_size;
+
+    let list_stmt = client
         .prepare_cached(
             r#"
 SELECT task_name, master_name, status, amount_done, amount_total, points, assigned_at, closed_at
@@ -5523,41 +5607,52 @@ WHERE group_id=$1
   AND member_name=$2
   AND ($3::text IS NULL OR status = $3)
   AND ($4::text[] IS NULL OR master_name = ANY($4))
-  AND ($5::timestamptz IS NULL OR assigned_at < $5)
 ORDER BY assigned_at DESC
-LIMIT $6
+LIMIT $5 OFFSET $6
 "#,
         )
         .await?;
     let rows = client
         .query(
-            &stmt,
-            &[
-                &group_id,
-                &member_name,
-                &status,
-                &master_names,
-                &before,
-                &(page_limit + 1),
-            ],
+            &list_stmt,
+            &[&group_id, &member_name, &status, &master_names, &page_size, &offset],
         )
         .await?;
 
-    let has_more = rows.len() as i64 > page_limit;
-    let entries = rows
+    let mut entries = rows
         .iter()
-        .take(page_limit as usize)
         .map(slayer_task_history_entry_from_row)
         .collect::<Result<Vec<_>, _>>()?;
-    let next_before = if has_more {
-        entries.last().map(|e| e.assigned_at)
-    } else {
-        None
-    };
+
+    // Overlay live progress onto whichever row is still in_progress (at most one, and always
+    // the newest since a new assignment can't happen until the last task closes) - see
+    // `get_live_slayer_task`.
+    if let Some(entry) = entries.iter_mut().find(|entry| entry.status == "in_progress") {
+        if let Some(live_task) = get_live_slayer_task(client, group_id, member_name).await? {
+            if live_task.task_name.as_deref() == Some(entry.task_name.as_str())
+                && live_task.master_name.as_deref() == Some(entry.master_name.as_str())
+            {
+                if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
+                    entry.amount_done = live_amount_done;
+                }
+                // Fully killed but not yet turned in to the master - the Current tab already
+                // shows this as "Task complete" (see slayer-panel.js's isTaskComplete), so
+                // reflect that here too rather than leaving the row stuck on "In progress"
+                // until the close event lands. `points` stays unset since the real completion
+                // reward isn't known until that close event actually arrives.
+                if live_task.amount_remaining.is_some_and(|remaining| remaining <= 0) {
+                    entry.status = "completed".to_string();
+                }
+            }
+        }
+    }
 
     Ok(SlayerTaskHistoryPage {
         entries,
-        next_before,
+        page,
+        page_size,
+        total_entries,
+        total_pages,
     })
 }
 
@@ -5600,6 +5695,27 @@ LIMIT 1
     rows.first().map(slayer_task_leader_from_row).transpose()
 }
 
+/// Completed-history kill total for one specific task name, used to fold the live in-progress
+/// task's kills into whichever task_name it belongs to when computing `most_killed_task`.
+async fn completed_kills_for_task_name(
+    client: &Client,
+    group_id: i64,
+    member_name: &str,
+    task_name: &str,
+) -> Result<i64, ApiError> {
+    let stmt = client
+        .prepare_cached(
+            r#"
+SELECT COALESCE(SUM(amount_done), 0) AS n
+FROM groupscape.slayer_task_history
+WHERE group_id=$1 AND member_name=$2 AND status='completed' AND task_name=$3
+"#,
+        )
+        .await?;
+    let row = client.query_one(&stmt, &[&group_id, &member_name, &task_name]).await?;
+    Ok(row.try_get("n")?)
+}
+
 /// All-time slayer task stats for one member - the Stats tab. Every "most X" tile is its own
 /// small `GROUP BY` query rather than one combined query, since each ranks a different subset
 /// (all tasks / completed only / cancelled only) - a single query would need a
@@ -5617,7 +5733,7 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'completed') AS tasks_completed,
   COALESCE(SUM(amount_done) FILTER (WHERE status = 'completed'), 0) AS total_kills,
   COALESCE(SUM(points) FILTER (WHERE status = 'completed'), 0) AS total_points_earned,
-  COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled', 'blocked')) AS closed_count
+  COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled', 'blocked', 'reset')) AS closed_count
 FROM groupscape.slayer_task_history
 WHERE group_id=$1 AND member_name=$2
 "#,
@@ -5627,7 +5743,18 @@ WHERE group_id=$1 AND member_name=$2
         .query_one(&totals_stmt, &[&group_id, &member_name])
         .await?;
     let tasks_completed: i64 = totals_row.try_get("tasks_completed")?;
-    let total_kills: i64 = totals_row.try_get("total_kills")?;
+    // Fetched once and reused below by both `total_kills` and `most_killed_task`, since both
+    // need to overlay the current in-progress task's live kill count (off
+    // `groupscape.members.slayer_task`, the same source the Current tab reads) on top of
+    // completed-task history - so those tiles visibly tick up while a task is being worked
+    // rather than jumping only when it closes. See `get_live_slayer_task`.
+    let live_task = get_live_slayer_task(client, group_id, member_name).await?;
+    let live_amount_done = live_task.as_ref().and_then(live_slayer_task_amount_done);
+
+    let mut total_kills: i64 = totals_row.try_get("total_kills")?;
+    if let Some(live_amount_done) = live_amount_done {
+        total_kills += live_amount_done as i64;
+    }
     let total_points_earned: i64 = totals_row.try_get("total_points_earned")?;
     let closed_count: i64 = totals_row.try_get("closed_count")?;
     let completion_rate = if closed_count > 0 {
@@ -5644,6 +5771,29 @@ WHERE group_id=$1 AND member_name=$2
         "COALESCE(SUM(amount_done), 0)",
     )
     .await?;
+    // Overlay the live task's kills onto whichever task_name they belong to, so a task in
+    // progress on the current leader (or one about to overtake it) is reflected immediately
+    // instead of only once it closes and lands in `slayer_task_history`.
+    let most_killed_task = match (live_task.as_ref().and_then(|t| t.task_name.as_deref()), live_amount_done) {
+        (Some(live_task_name), Some(live_amount_done)) => {
+            let completed_for_live_task = completed_kills_for_task_name(
+                client,
+                group_id,
+                member_name,
+                live_task_name,
+            )
+            .await?;
+            let live_total = completed_for_live_task + live_amount_done as i64;
+            match &most_killed_task {
+                Some(leader) if leader.count >= live_total => most_killed_task,
+                _ => Some(SlayerTaskLeader {
+                    name: live_task_name.to_string(),
+                    count: live_total,
+                }),
+            }
+        }
+        _ => most_killed_task,
+    };
     let most_common_task =
         top_slayer_task_name(client, group_id, member_name, None, "COUNT(*)").await?;
     let most_cancelled_task =

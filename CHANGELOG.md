@@ -6,6 +6,8 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Slayer task and master names/icons in the History tab now link to their OSRS Wiki page.
+- Slayer task and master names/icons in the Stats tab now link to their OSRS Wiki page.
+- Each row in the Slayer History tab now shows a relative timestamp ("4 minutes ago", "5 days ago") for when the task was assigned (if still open) or closed out (if completed/cancelled/blocked). Hover it for the exact date and time.
 - The activity feed and loot log now recognize kills of Glough, Dad, Agrith-Na-Na, and The Royal Titans as notable boss kills, instead of ignoring them as regular NPCs.
 
 ### Changed
@@ -13,12 +15,22 @@ All notable changes to GroupScape web are logged here, newest first.
 - The Like reaction now shows a thumbs up instead of a coin icon.
 - The other reactions (GG, LOL, Rare!, and F) now show their name as text in the picker, so you don't have to guess what each icon means.
 - Like and Comment buttons on activity feed items now sit inline next to the timestamp instead of on their own row, so each event takes up less vertical space.
+- Slightly thinner orange border on Slayer History and Stats icons.
+- Internal: the server now guarantees a member only ever has one open Slayer task in their history, instead of trusting the plugin to always close the previous one first. A stray leftover shows up as a new "Superseded" status if it ever happens.
+- The Slayer Stats "Most killed overall" tile now updates live while a task is in progress, instead of only once the task is turned in — so it ticks up in real time, and swaps to a new monster right away if it overtakes the current leader.
+- A free task skip from Turael, Aya, or Spria now shows as "Reset" in Slayer History instead of "Unknown".
 
 ### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.
+- The History tab's in-progress task now shows your live kill count instead of being stuck at 0.
+- The Stats tab's Kills total now includes kills from your current in-progress task instead of only updating when a task is finished.
+- A task you've fully killed but haven't turned in yet now shows as "Completed" in your History tab instead of staying stuck on "In progress".
 
 ### Removed
 - Removed the "Not started" option from the Slayer History status filter, since tasks in that state never showed up in the history anyway.
+
+### Changed
+- Slayer History now shows 5 tasks per page with First/Previous/Next/Last buttons instead of a growing "Load more" list, and paging respects your status/master filters.
 
 ## [1.0.457] - 2026-09-09
 

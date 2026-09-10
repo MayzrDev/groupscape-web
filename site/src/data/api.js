@@ -705,11 +705,10 @@ class Api {
     return response.json();
   }
 
-  async getSlayerHistory({ playerName, before, limit, status, masterName } = {}) {
+  async getSlayerHistory({ playerName, page, status, masterName } = {}) {
     const query = new URLSearchParams();
     query.set("player_name", playerName);
-    if (before) query.set("before", before);
-    if (limit) query.set("limit", limit);
+    if (page) query.set("page", page);
     if (status) query.set("status", status);
     if (masterName) query.set("master_name", masterName);
 
@@ -719,7 +718,7 @@ class Api {
       },
     });
     if (!response.ok) {
-      return { entries: [], next_before: null };
+      return { entries: [], page: 1, page_size: 5, total_entries: 0, total_pages: 1 };
     }
     return response.json();
   }

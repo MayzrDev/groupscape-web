@@ -47,13 +47,20 @@ export class SlayerStatsTab extends BaseElement {
     }
 
     const icon = slayerData.taskIconUrl(leader.name);
+    const wikiUrl = slayerData.taskWikiUrl(leader.name);
     return `
       <div class="slayer-stats-tab__tile${negative ? " slayer-stats-tab__tile--negative" : ""}">
         <span class="slayer-stats-tab__tile-label">${label}</span>
         <div class="slayer-stats-tab__tile-body">
-          <img class="slayer-stats-tab__tile-icon" src="${icon}" alt="${leader.name}" />
+          <a class="slayer-stats-tab__tile-icon-link" href="${wikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      leader.name
+    } on the wiki">
+            <img class="slayer-stats-tab__tile-icon" src="${icon}" alt="${leader.name}" />
+          </a>
           <span>
-            <span class="slayer-stats-tab__tile-name">${leader.name}</span><br />
+            <a class="slayer-stats-tab__tile-name" href="${wikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      leader.name
+    } on the wiki">${leader.name}</a><br />
             <span class="slayer-stats-tab__tile-count">${leader.count.toLocaleString()}${countSuffix}</span>
           </span>
         </div>
@@ -72,17 +79,20 @@ export class SlayerStatsTab extends BaseElement {
     }
 
     const icon = slayerData.masterIconUrl(leader.name);
+    const wikiUrl = slayerData.masterWikiUrl(leader.name);
     return `
       <div class="slayer-stats-tab__tile">
         <span class="slayer-stats-tab__tile-label">Most common master</span>
         <div class="slayer-stats-tab__tile-body">
           ${
             icon
-              ? `<img class="slayer-stats-tab__tile-icon slayer-stats-tab__tile-icon--master" src="${icon}" alt="${leader.name}" />`
+              ? `<a class="slayer-stats-tab__tile-icon-link" href="${wikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${leader.name} on the wiki"><img class="slayer-stats-tab__tile-icon slayer-stats-tab__tile-icon--master" src="${icon}" alt="${leader.name}" /></a>`
               : ""
           }
           <span>
-            <span class="slayer-stats-tab__tile-name">${leader.name}</span><br />
+            <a class="slayer-stats-tab__tile-name" href="${wikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      leader.name
+    } on the wiki">${leader.name}</a><br />
             <span class="slayer-stats-tab__tile-count">${leader.count.toLocaleString()} tasks</span>
           </span>
         </div>

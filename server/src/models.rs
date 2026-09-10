@@ -162,7 +162,7 @@ pub struct SlayerTaskHistoryEvent {
     pub client_event_id: String,
     pub task_name: String,
     pub master_name: String,
-    /// "not_started" | "in_progress" | "completed" | "cancelled" | "blocked" | "unknown"
+    /// "not_started" | "in_progress" | "completed" | "cancelled" | "blocked" | "reset" | "unknown"
     pub status: String,
     pub amount_done: i32,
     pub amount_total: i32,
@@ -191,11 +191,16 @@ pub struct SlayerTaskHistoryEntry {
     pub closed_at: Option<DateTime<Utc>>,
 }
 
-/// One page of `get-slayer-task-history` - same keyset-cursor shape as [`LootLogPage`].
+/// One page of `get-slayer-task-history` - offset pagination (page/page_size) rather than a
+/// keyset cursor, since the History tab needs first/prev/next/last controls over a known total
+/// rather than an infinite-scroll "load more".
 #[derive(Serialize, Deserialize)]
 pub struct SlayerTaskHistoryPage {
     pub entries: Vec<SlayerTaskHistoryEntry>,
-    pub next_before: Option<DateTime<Utc>>,
+    pub page: i64,
+    pub page_size: i64,
+    pub total_entries: i64,
+    pub total_pages: i64,
 }
 
 /// A "most X" tile on the Stats tab - `None` when the member has no history to rank yet.

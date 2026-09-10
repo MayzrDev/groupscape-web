@@ -4,30 +4,12 @@ import { Item } from "../data/item";
 import { groupData } from "../data/group-data";
 import { api } from "../data/api";
 import { REACTION_ICONS, REACTION_LABELS, RADIAL_REACTION_ORDER } from "./reaction-icons";
+import { formatRelativeTime } from "../data/relative-time";
 
 // Press-and-hold this long on the Like button opens the radial popup of the other 4 reaction
 // types (§ product spec) - short enough to feel responsive, long enough that a quick tap never
 // accidentally opens it.
 const LONG_PRESS_MS = 350;
-
-const RELATIVE_UNITS = [
-  ["y", 31536000],
-  ["mo", 2592000],
-  ["d", 86400],
-  ["h", 3600],
-  ["m", 60],
-];
-
-function formatRelativeTime(date) {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (seconds < 60) return "just now";
-
-  for (const [suffix, unitSeconds] of RELATIVE_UNITS) {
-    const value = Math.floor(seconds / unitSeconds);
-    if (value >= 1) return `${value}${suffix} ago`;
-  }
-  return "just now";
-}
 
 export class ActivityFeedEvent extends BaseElement {
   constructor() {

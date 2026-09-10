@@ -2256,17 +2256,20 @@ pub async fn get_loot_log_summary(
     Ok(web::Json(summary))
 }
 
-fn default_slayer_task_history_limit() -> i64 {
-    25
+fn default_slayer_task_history_page() -> i64 {
+    1
+}
+fn default_slayer_task_history_page_size() -> i64 {
+    5
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GetSlayerTaskHistoryQuery {
     pub player_name: String,
-    #[serde(default)]
-    pub before: Option<DateTime<Utc>>,
-    #[serde(default = "default_slayer_task_history_limit")]
-    pub limit: i64,
+    #[serde(default = "default_slayer_task_history_page")]
+    pub page: i64,
+    #[serde(default = "default_slayer_task_history_page_size")]
+    pub page_size: i64,
     #[serde(default)]
     pub status: Option<String>,
     /// Comma-separated exact `master_name` values - the site's master filter dropdown groups
@@ -2298,8 +2301,8 @@ pub async fn get_slayer_task_history(
         &client,
         auth.group_id,
         &query.player_name,
-        query.before,
-        query.limit,
+        query.page,
+        query.page_size,
         query.status.as_deref(),
         master_names.as_deref(),
     )

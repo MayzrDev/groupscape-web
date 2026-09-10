@@ -84,7 +84,7 @@ slayer-history-tab {
   border-radius: 50%;
   padding: 3px;
   background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4) 72%), #1c1811;
-  border: 2px solid var(--orange);
+  border: 1px solid var(--orange);
   box-shadow: 0 0 0 1px hsl(40deg 15.79% 20%), 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: filter 0.1s ease;
 }
@@ -174,7 +174,7 @@ slayer-history-tab {
   image-rendering: initial;
   padding: 1px;
   background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.4) 72%), #1c1811;
-  border: 2px solid var(--orange);
+  border: 1px solid var(--orange);
   box-shadow: 0 0 0 1px hsl(40deg 15.79% 20%), 0 1px 2px rgba(0, 0, 0, 0.5);
   transition: filter 0.1s ease;
 }
@@ -246,6 +246,24 @@ slayer-history-tab {
   background: rgba(146, 166, 201, 0.1);
 }
 
+.slayer-history-tab__badge--rs {
+  color: #c9a8ff;
+  border-color: rgba(168, 105, 255, 0.4);
+  background: rgba(168, 105, 255, 0.1);
+}
+
+.slayer-history-tab__badge--sp {
+  color: #8a8a8a;
+  border-color: rgba(138, 138, 138, 0.4);
+  background: rgba(138, 138, 138, 0.08);
+}
+
+.slayer-history-tab__timestamp {
+  font-size: 10.5px;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+}
+
 .slayer-history-tab__empty {
   text-align: center;
   padding: 18px 0 8px;
@@ -253,25 +271,58 @@ slayer-history-tab {
   font-size: 13px;
 }
 
-.slayer-history-tab__load-more {
-  display: block;
-  width: 100%;
-  margin-top: 8px;
-  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
-  font-size: 12px;
+.slayer-history-tab__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid hsl(40deg 15.79% 22%);
+}
+
+.slayer-history-tab__pager-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid hsl(40deg 15.79% 29.8%);
+  border-radius: 4px;
   color: var(--orange);
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-  padding: 6px 0;
   cursor: pointer;
+}
+
+.slayer-history-tab__pager-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.slayer-history-tab__pager-btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  background: rgba(255, 152, 31, 0.08);
+}
+
+.slayer-history-tab__pager-btn:disabled {
+  color: var(--primary-text);
+  opacity: 0.35;
+  cursor: default;
+}
+
+.slayer-history-tab__pager-status {
+  min-width: 60px;
+  text-align: center;
+  font-family: "rssmall", ui-sans-serif, Arial, sans-serif;
+  font-size: 11.5px;
+  color: var(--primary-text);
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
   text-shadow: none;
 }
 
-.slayer-history-tab__load-more:hover {
-  border-color: var(--orange);
-}
-
-.slayer-history-tab__load-more[hidden] {
-  display: none;
+.slayer-history-tab__pager-status strong {
+  color: var(--orange);
+  font-weight: 600;
 }
