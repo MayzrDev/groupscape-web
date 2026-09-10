@@ -6,7 +6,6 @@ const PAGE_LIMIT = 25;
 
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
-  { value: "not_started", label: "Not started" },
   { value: "in_progress", label: "In progress" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },

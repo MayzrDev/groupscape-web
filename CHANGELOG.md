@@ -13,6 +13,9 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.
 
+### Removed
+- Removed the "Not started" option from the Slayer History status filter, since tasks in that state never showed up in the history anyway.
+
 ## [1.0.457] - 2026-09-09
 
 ### Added
