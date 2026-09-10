@@ -19,6 +19,9 @@ All notable changes to GroupScape web are logged here, newest first.
 ### Removed
 - Removed the "Not started" option from the Slayer History status filter, since tasks in that state never showed up in the history anyway.
 
+### Changed
+- Slayer History now shows 5 tasks per page with First/Previous/Next/Last buttons instead of a growing "Load more" list, and paging respects your status/master filters.
+
 ## [1.0.457] - 2026-09-09
 
 ### Added

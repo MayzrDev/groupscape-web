@@ -5496,15 +5496,17 @@ fn slayer_task_history_entry_from_row(row: &Row) -> Result<SlayerTaskHistoryEntr
     })
 }
 
-/// One page of a member's slayer task history, newest-first, cursor-paginated on `before` -
-/// same keyset shape as [`list_loot_and_kill_events_page`]. `status`/`master_name` are optional
-/// exact-match filters for the History tab's dropdowns.
+/// One page of a member's slayer task history, newest-first, offset-paginated (page/page_size)
+/// so the History tab can offer first/prev/next/last controls over a known total - same
+/// list-then-count shape as [`admin_list_groups`]. `status`/`master_name` are optional
+/// exact-match filters for the History tab's dropdowns and apply to both queries so the total
+/// reflects the filtered set, not the member's whole history.
 pub async fn list_slayer_task_history_page(
     client: &Client,
     group_id: i64,
     member_name: &str,
-    before: Option<DateTime<Utc>>,
-    limit: i64,
+    page: i64,
+    page_size: i64,
     status: Option<&str>,
     // A slice of exact `master_name` values rather than one, since the site's master filter
     // groups NPCs that are really the same slayer master role (Nieve/Steve, Duradel/Kuradal,
@@ -5512,9 +5514,30 @@ pub async fn list_slayer_task_history_page(
     // means no filter, matching `status` above.
     master_names: Option<&[String]>,
 ) -> Result<SlayerTaskHistoryPage, ApiError> {
-    let page_limit = limit.clamp(1, 100);
+    let page_size = page_size.clamp(1, 100);
     let master_names = master_names.filter(|names| !names.is_empty());
-    let stmt = client
+
+    let count_stmt = client
+        .prepare_cached(
+            r#"
+SELECT COUNT(*) FROM groupscape.slayer_task_history
+WHERE group_id=$1
+  AND member_name=$2
+  AND ($3::text IS NULL OR status = $3)
+  AND ($4::text[] IS NULL OR master_name = ANY($4))
+"#,
+        )
+        .await?;
+    let total_entries: i64 = client
+        .query_one(&count_stmt, &[&group_id, &member_name, &status, &master_names])
+        .await?
+        .try_get(0)?;
+
+    let total_pages = ((total_entries - 1) / page_size + 1).max(1);
+    let page = page.clamp(1, total_pages);
+    let offset = (page - 1) * page_size;
+
+    let list_stmt = client
         .prepare_cached(
             r#"
 SELECT task_name, master_name, status, amount_done, amount_total, points, assigned_at, closed_at
@@ -5523,41 +5546,29 @@ WHERE group_id=$1
   AND member_name=$2
   AND ($3::text IS NULL OR status = $3)
   AND ($4::text[] IS NULL OR master_name = ANY($4))
-  AND ($5::timestamptz IS NULL OR assigned_at < $5)
 ORDER BY assigned_at DESC
-LIMIT $6
+LIMIT $5 OFFSET $6
 "#,
         )
         .await?;
     let rows = client
         .query(
-            &stmt,
-            &[
-                &group_id,
-                &member_name,
-                &status,
-                &master_names,
-                &before,
-                &(page_limit + 1),
-            ],
+            &list_stmt,
+            &[&group_id, &member_name, &status, &master_names, &page_size, &offset],
         )
         .await?;
 
-    let has_more = rows.len() as i64 > page_limit;
     let entries = rows
         .iter()
-        .take(page_limit as usize)
         .map(slayer_task_history_entry_from_row)
         .collect::<Result<Vec<_>, _>>()?;
-    let next_before = if has_more {
-        entries.last().map(|e| e.assigned_at)
-    } else {
-        None
-    };
 
     Ok(SlayerTaskHistoryPage {
         entries,
-        next_before,
+        page,
+        page_size,
+        total_entries,
+        total_pages,
     })
 }
 

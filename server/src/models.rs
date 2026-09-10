@@ -191,11 +191,16 @@ pub struct SlayerTaskHistoryEntry {
     pub closed_at: Option<DateTime<Utc>>,
 }
 
-/// One page of `get-slayer-task-history` - same keyset-cursor shape as [`LootLogPage`].
+/// One page of `get-slayer-task-history` - offset pagination (page/page_size) rather than a
+/// keyset cursor, since the History tab needs first/prev/next/last controls over a known total
+/// rather than an infinite-scroll "load more".
 #[derive(Serialize, Deserialize)]
 pub struct SlayerTaskHistoryPage {
     pub entries: Vec<SlayerTaskHistoryEntry>,
-    pub next_before: Option<DateTime<Utc>>,
+    pub page: i64,
+    pub page_size: i64,
+    pub total_entries: i64,
+    pub total_pages: i64,
 }
 
 /// A "most X" tile on the Stats tab - `None` when the member has no history to rank yet.

@@ -2,8 +2,6 @@ import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { slayerData } from "../data/slayer";
 
-const PAGE_LIMIT = 25;
-
 const STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
   { value: "in_progress", label: "In progress" },
@@ -59,7 +57,8 @@ export class SlayerHistoryTab extends BaseElement {
   constructor() {
     super();
     this.entries = [];
-    this.nextBefore = null;
+    this.page = 1;
+    this.totalPages = 1;
     this.loading = false;
     this.status = "";
     this.masterName = "";
@@ -77,21 +76,28 @@ export class SlayerHistoryTab extends BaseElement {
     this.statusSelect = this.querySelector(".slayer-history-tab__status-select");
     this.masterSelect = this.querySelector(".slayer-history-tab__master-select");
     this.listEl = this.querySelector(".slayer-history-tab__list");
-    this.loadMoreBtn = this.querySelector(".slayer-history-tab__load-more");
+    this.pagerStatus = this.querySelector(".slayer-history-tab__pager-status");
+    this.firstBtn = this.querySelector(".slayer-history-tab__pager-first");
+    this.prevBtn = this.querySelector(".slayer-history-tab__pager-prev");
+    this.nextBtn = this.querySelector(".slayer-history-tab__pager-next");
+    this.lastBtn = this.querySelector(".slayer-history-tab__pager-last");
 
     this.statusSelect.innerHTML = STATUS_OPTIONS.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
     this.masterSelect.innerHTML = MASTER_OPTIONS.map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
 
     this.eventListener(this.statusSelect, "change", () => this.setFilters({ status: this.statusSelect.value }));
     this.eventListener(this.masterSelect, "change", () => this.setFilters({ masterName: this.masterSelect.value }));
-    this.eventListener(this.loadMoreBtn, "click", () => this.loadPage());
+    this.eventListener(this.firstBtn, "click", () => this.goToPage(1));
+    this.eventListener(this.prevBtn, "click", () => this.goToPage(this.page - 1));
+    this.eventListener(this.nextBtn, "click", () => this.goToPage(this.page + 1));
+    this.eventListener(this.lastBtn, "click", () => this.goToPage(this.totalPages));
 
     // A task closing (or a fresh one starting) while History is the active tab should show up
-    // without the member switching tabs and back - refetch the first page under the current
-    // filters, capped at however much was already loaded so the list doesn't visibly shrink.
-    this.subscribe(`slayerTask:${this.playerName}`, () => this.refreshFromTop());
+    // without the member switching tabs and back - refetch the current page under the current
+    // filters, since a close/start can shift how many pages exist.
+    this.subscribe(`slayerTask:${this.playerName}`, () => this.goToPage(this.page));
 
-    this.loadPage(true);
+    this.goToPage(1);
   }
 
   disconnectedCallback() {
@@ -101,46 +107,26 @@ export class SlayerHistoryTab extends BaseElement {
   setFilters({ status, masterName }) {
     if (status !== undefined) this.status = status;
     if (masterName !== undefined) this.masterName = masterName;
-    this.loadPage(true);
+    this.goToPage(1);
   }
 
-  async refreshFromTop() {
-    if (this.loading) return;
-    const limit = Math.max(PAGE_LIMIT, this.entries.length);
-    this.loading = true;
-    const page = await api.getSlayerHistory({
-      playerName: this.playerName,
-      limit,
-      status: this.status || undefined,
-      masterName: this.masterName || undefined,
-    });
-    this.loading = false;
-    this.entries = page.entries ?? [];
-    this.nextBefore = page.next_before ?? null;
-    this.renderList();
-  }
-
-  async loadPage(reset = false) {
+  async goToPage(page) {
     if (this.loading) return;
     this.loading = true;
-    this.setLoadMoreLabel();
+    this.renderPager();
 
-    const page = await api.getSlayerHistory({
+    const result = await api.getSlayerHistory({
       playerName: this.playerName,
-      before: reset ? undefined : this.nextBefore,
-      limit: PAGE_LIMIT,
+      page,
       status: this.status || undefined,
       masterName: this.masterName || undefined,
     });
 
-    this.entries = reset ? page.entries ?? [] : [...this.entries, ...(page.entries ?? [])];
-    this.nextBefore = page.next_before ?? null;
+    this.entries = result.entries ?? [];
+    this.page = result.page ?? 1;
+    this.totalPages = result.total_pages ?? 1;
     this.loading = false;
     this.renderList();
-  }
-
-  setLoadMoreLabel() {
-    if (this.loadMoreBtn) this.loadMoreBtn.textContent = this.loading ? "Loading..." : "Load more";
   }
 
   renderList() {
@@ -152,8 +138,20 @@ export class SlayerHistoryTab extends BaseElement {
       this.listEl.innerHTML = this.entries.map((entry) => this.renderRow(entry)).join("");
     }
 
-    this.loadMoreBtn.hidden = !this.nextBefore;
-    this.setLoadMoreLabel();
+    this.renderPager();
+  }
+
+  renderPager() {
+    if (!this.pagerStatus) return;
+
+    const atFirst = this.page <= 1;
+    const atLast = this.page >= this.totalPages;
+
+    this.firstBtn.disabled = this.loading || atFirst;
+    this.prevBtn.disabled = this.loading || atFirst;
+    this.nextBtn.disabled = this.loading || atLast;
+    this.lastBtn.disabled = this.loading || atLast;
+    this.pagerStatus.innerHTML = `<strong>${this.page}</strong> / ${this.totalPages}`;
   }
 
   renderRow(entry) {
