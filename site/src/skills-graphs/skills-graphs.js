@@ -3,19 +3,7 @@ import { BaseElement } from "../base-element/base-element";
 import { api } from "../data/api";
 import { SkillName } from "../data/skill";
 import { GroupData, groupData } from "../data/group-data";
-
-// Day/Week/Month/Year is the single period toggle that drives both the chart and the
-// leaderboard. The leaderboard only understands 3 windows on the wire, so this collapses
-// Month and Year down onto the same "all_time" window (no new window value is introduced).
-export const windowForPeriod = {
-  Hour1: "daily",
-  Hour6: "daily",
-  Hour12: "daily",
-  Day: "daily",
-  Week: "weekly",
-  Month: "all_time",
-  Year: "all_time",
-};
+import { computeXpGains, rankEntries } from "../data/xp-gain";
 
 export function formatLeaderboardValue(value) {
   return Math.round(value).toLocaleString();
@@ -88,34 +76,25 @@ export class SkillsGraphs extends BaseElement {
   }
 
   // Single pipeline entry point: bumps one generation counter shared by the chart fetch and
-  // the leaderboard fetch so stale in-flight responses from a previous state are discarded
-  // the same way the old two independent generation counters did.
+  // the leaderboard render so stale in-flight responses from a previous state are discarded.
   triggerRefresh() {
     const generation = ++this.fetchGeneration;
     this.subscribeOnce("get-group-data", () => {
-      this.fetchLeaderboard(generation);
       this.createChart(generation);
     });
   }
 
-  async fetchLeaderboard(generation) {
-    try {
-      const skillParam = this.state.skill && this.state.skill !== "Overall" ? this.state.skill : undefined;
-
-      const result = await api.getLeaderboard("xp", windowForPeriod[this.state.period] || "daily", skillParam);
-      if (generation !== this.fetchGeneration) return;
-      this.renderLeaderboard(result.entries || []);
-    } catch (err) {
-      if (generation !== this.fetchGeneration) return;
-      console.error(err);
-      this.leaderboardList.innerHTML = "";
-      this.leaderboardEmpty.textContent = `Failed to load ${err}`;
-      this.leaderboardEmpty.classList.add("skills-graphs__leaderboard-empty--visible");
-    }
+  // Ranks the same skillDataForGroup/period the chart just rendered, instead of a separate
+  // leaderboard API call - the leaderboard's server-side windows (daily/weekly/all_time) are
+  // coarser than the chart's 7 periods, which made the sidepanel ignore 1H/6H/12H/24H and
+  // 30D/1Y distinctions. Reading off the chart's own numbers keeps the two in lockstep.
+  renderLeaderboardFromRawData(rawData) {
+    const gains = computeXpGains(rawData, groupData, this.state.skill, this.state.period);
+    const entries = rankEntries(gains.filter((entry) => entry.member_name !== "@SHARED"));
+    this.renderLeaderboard(entries);
   }
 
   renderLeaderboard(entries) {
-    entries = entries.filter((entry) => entry.member_name !== "@SHARED");
     this.leaderboardList.innerHTML = "";
     this.leaderboardEmpty.textContent = "No data for this window yet.";
     this.leaderboardEmpty.classList.toggle("skills-graphs__leaderboard-empty--visible", entries.length === 0);
@@ -190,10 +169,14 @@ export class SkillsGraphs extends BaseElement {
       Chart.defaults.scale.grid.color = style.getPropertyValue("--graph-grid-border");
 
       this.chartContainer.appendChild(skillGraph);
+      this.renderLeaderboardFromRawData(rawData);
     } catch (err) {
       overlay.remove();
       console.error(err);
       this.chartContainer.innerHTML = `Failed to load ${err}`;
+      this.leaderboardList.innerHTML = "";
+      this.leaderboardEmpty.textContent = `Failed to load ${err}`;
+      this.leaderboardEmpty.classList.add("skills-graphs__leaderboard-empty--visible");
     }
   }
 

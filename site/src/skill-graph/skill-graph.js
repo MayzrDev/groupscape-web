@@ -1,6 +1,7 @@
 /* global Chart */
 import { BaseElement } from "../base-element/base-element";
 import { Skill, SkillName } from "../data/skill";
+import * as xpGain from "../data/xp-gain";
 
 function hslToHsla(color, alpha) {
   if (color.startsWith("hsl(")) {
@@ -32,7 +33,7 @@ const periodLabels = {
 // Hour1/Hour6/Hour12/Day all read the same server-side hourly buckets (see
 // windowForPeriod/SkillDataPeriod on the server - there's no finer-grained snapshot data than
 // hourly, kept for 1 day) and only differ in how many trailing hourly buckets are shown.
-const hourlyPeriods = new Set(["Hour1", "Hour6", "Hour12", "Day"]);
+const hourlyPeriods = xpGain.hourlyPeriods;
 
 export class SkillGraph extends BaseElement {
   constructor() {
@@ -428,36 +429,7 @@ export class SkillGraph extends BaseElement {
   // skill's xp from a raw snapshot; `currentValue` overrides the final bucket so the series
   // always ends on the live current XP rather than a stale snapshot.
   generateCompleteTimeSeries(series, currentValue, valueFn) {
-    const bucketedData = new Map();
-    const earliestDateInPeriod = SkillGraph.truncatedDateForPeriod(this.dates[0], this.period);
-    const datesOutsideOfPeriod = [];
-    for (const item of series) {
-      const date = SkillGraph.truncatedDateForPeriod(item.time, this.period);
-      if (!bucketedData.has(date.getTime())) {
-        bucketedData.set(date.getTime(), valueFn(item));
-      }
-
-      if (date < earliestDateInPeriod) {
-        datesOutsideOfPeriod.push(item);
-      }
-    }
-
-    let lastData = datesOutsideOfPeriod.length ? valueFn(datesOutsideOfPeriod[0]) : undefined;
-    const result = [];
-
-    for (const date of this.dates) {
-      const time = date.getTime();
-      if (bucketedData.has(time)) {
-        const data = bucketedData.get(time);
-        result.push(data);
-        lastData = data;
-      } else {
-        result.push(lastData);
-      }
-    }
-
-    result[result.length - 1] = currentValue;
-    return result;
+    return xpGain.generateCompleteTimeSeries(series, currentValue, valueFn, this.dates, this.period);
   }
 
   labelsForPeriod(period, dates) {
@@ -474,60 +446,15 @@ export class SkillGraph extends BaseElement {
   }
 
   static datesForPeriod(period) {
-    const normalizedPeriod = SkillGraph.normalizedPeriod(period);
-    const stepCountsForPeriods = {
-      Hour1: 1,
-      Hour6: 6,
-      Hour12: 12,
-      Day: 24,
-      Week: 7,
-      Month: 30,
-      Year: 12,
-    };
-    const count = stepCountsForPeriods[normalizedPeriod];
-    const now = SkillGraph.truncatedDateForPeriod(new Date(), normalizedPeriod);
-    const result = [];
-
-    for (let i = count - 1; i >= 0; --i) {
-      const t = new Date(now);
-
-      if (hourlyPeriods.has(normalizedPeriod)) {
-        t.setTime(now.getTime() - i * 3600000);
-        result.push(t);
-        continue;
-      }
-
-      if (normalizedPeriod === "Week" || normalizedPeriod === "Month") {
-        t.setDate(now.getDate() - i);
-      } else if (normalizedPeriod === "Year") {
-        t.setMonth(now.getMonth() - i, 1);
-      }
-
-      result.push(SkillGraph.truncatedDateForPeriod(t, normalizedPeriod));
-    }
-
-    return result;
+    return xpGain.datesForPeriod(period);
   }
 
   static truncatedDateForPeriod(date, period) {
-    const normalizedPeriod = SkillGraph.normalizedPeriod(period);
-    const t = new Date(date);
-    t.setMinutes(0, 0, 0);
-
-    if (!hourlyPeriods.has(normalizedPeriod)) {
-      t.setHours(0);
-    }
-
-    if (normalizedPeriod === "Year") {
-      t.setMonth(t.getMonth(), 1);
-    }
-
-    return t;
+    return xpGain.truncatedDateForPeriod(date, period);
   }
 
   static normalizedPeriod(period) {
-    const periods = new Set(["Hour1", "Hour6", "Hour12", "Day", "Week", "Month", "Year"]);
-    return periods.has(period) ? period : "Day";
+    return xpGain.normalizedPeriod(period);
   }
 }
 
