@@ -14,6 +14,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The other reactions (GG, LOL, Rare!, and F) now show their name as text in the picker, so you don't have to guess what each icon means.
 - Like and Comment buttons on activity feed items now sit inline next to the timestamp instead of on their own row, so each event takes up less vertical space.
 - Slightly thinner orange border on Slayer History and Stats icons.
+- Internal: the server now guarantees a member only ever has one open Slayer task in their history, instead of trusting the plugin to always close the previous one first. A stray leftover shows up as a new "Superseded" status if it ever happens.
 
 ### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.

@@ -5441,12 +5441,40 @@ LIMIT $3
 /// `EXCLUDED` would be equivalent, but pinning them to the original row is the more honest
 /// intent (this row's identity is "the task assigned at `assigned_at`", not "whatever the most
 /// recent event happened to say").
+///
+/// An assignment event (`status` "not_started"/"in_progress") first force-closes any *other* row
+/// for this member still sitting open, as "superseded" - the plugin's own transition detection
+/// (see `GroupScapeTrackerPlugin#handleSlayerTaskTransition`) already guarantees a close event
+/// precedes the next assignment, but `list_slayer_task_history_page`'s live-progress overlay and
+/// `get_slayer_task_stats`' completion rate both lean on "at most one open row per member" - this
+/// makes that a real server-side invariant instead of one only the client is trusted to uphold
+/// (a lost close event, an out-of-order upload, or a future plugin bug would otherwise leave a
+/// stale open row parked in the table forever).
 pub async fn upsert_slayer_task_history_event(
     client: &Client,
     group_id: i64,
     member_name: &str,
     event: &SlayerTaskHistoryEvent,
 ) -> Result<(), ApiError> {
+    if event.status == "in_progress" || event.status == "not_started" {
+        let supersede_stmt = client
+            .prepare_cached(
+                r#"
+UPDATE groupscape.slayer_task_history
+SET status = 'superseded', closed_at = COALESCE(closed_at, now())
+WHERE group_id=$1 AND member_name=$2 AND client_event_id <> $3
+  AND status IN ('in_progress', 'not_started')
+"#,
+            )
+            .await?;
+        client
+            .execute(
+                &supersede_stmt,
+                &[&group_id, &member_name, &event.client_event_id],
+            )
+            .await?;
+    }
+
     let stmt = client
         .prepare_cached(
             r#"
