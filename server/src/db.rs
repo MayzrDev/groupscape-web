@@ -5457,22 +5457,77 @@ pub async fn upsert_slayer_task_history_event(
     event: &SlayerTaskHistoryEvent,
 ) -> Result<(), ApiError> {
     if event.status == "in_progress" || event.status == "not_started" {
-        let supersede_stmt = client
+        let dangling_stmt = client
             .prepare_cached(
                 r#"
-UPDATE groupscape.slayer_task_history
-SET status = 'superseded', closed_at = COALESCE(closed_at, now())
+SELECT client_event_id, task_name, master_name
+FROM groupscape.slayer_task_history
 WHERE group_id=$1 AND member_name=$2 AND client_event_id <> $3
   AND status IN ('in_progress', 'not_started')
 "#,
             )
             .await?;
-        client
-            .execute(
-                &supersede_stmt,
+        let dangling_rows = client
+            .query(
+                &dangling_stmt,
                 &[&group_id, &member_name, &event.client_event_id],
             )
             .await?;
+
+        if !dangling_rows.is_empty() {
+            // The plugin's transition detection is supposed to guarantee a close event always
+            // precedes the next assignment (see this fn's doc comment), but a lost close event
+            // does happen in practice - if the dangling row's own task/master still matches the
+            // live snapshot this member last reported and that snapshot shows the task fully
+            // killed, treat it as the completion it actually was (mirroring
+            // `list_slayer_task_history_page`'s read-time overlay) instead of silently zeroing
+            // its progress out under a generic "superseded" label.
+            let live_task = get_live_slayer_task(client, group_id, member_name).await?;
+
+            let completed_stmt = client
+                .prepare_cached(
+                    r#"
+UPDATE groupscape.slayer_task_history
+SET status = 'completed', amount_done = $4, closed_at = COALESCE(closed_at, now())
+WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
+"#,
+                )
+                .await?;
+            let superseded_stmt = client
+                .prepare_cached(
+                    r#"
+UPDATE groupscape.slayer_task_history
+SET status = 'superseded', closed_at = COALESCE(closed_at, now())
+WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
+"#,
+                )
+                .await?;
+
+            for row in &dangling_rows {
+                let dangling_event_id: String = row.try_get("client_event_id")?;
+                let dangling_task_name: String = row.try_get("task_name")?;
+                let dangling_master_name: String = row.try_get("master_name")?;
+
+                let recovered_amount_done = live_task.as_ref().filter(|live| {
+                    live.task_name.as_deref() == Some(dangling_task_name.as_str())
+                        && live.master_name.as_deref() == Some(dangling_master_name.as_str())
+                        && live.amount_remaining.is_some_and(|remaining| remaining <= 0)
+                }).and_then(live_slayer_task_amount_done);
+
+                if let Some(amount_done) = recovered_amount_done {
+                    client
+                        .execute(
+                            &completed_stmt,
+                            &[&group_id, &member_name, &dangling_event_id, &amount_done],
+                        )
+                        .await?;
+                } else {
+                    client
+                        .execute(&superseded_stmt, &[&group_id, &member_name, &dangling_event_id])
+                        .await?;
+                }
+            }
+        }
     }
 
     let stmt = client

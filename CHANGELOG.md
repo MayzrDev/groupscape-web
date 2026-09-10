@@ -28,6 +28,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The History tab's in-progress task now shows your live kill count instead of being stuck at 0.
 - The Stats tab's Kills total now includes kills from your current in-progress task instead of only updating when a task is finished.
 - A task you've fully killed but haven't turned in yet now shows as "Completed" in your History tab instead of staying stuck on "In progress".
+- A finished task could get permanently stuck at "0/x, In progress" in your History tab even after being turned in, if the plugin missed the moment it closed out. The server now recovers the real kill count in that case instead of just labeling the row "Superseded".
 
 ### Removed
 - Removed the "Not started" option from the Slayer History status filter, since tasks in that state never showed up in the history anyway.
