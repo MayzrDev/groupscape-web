@@ -6,6 +6,7 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Added
 - Slayer task and master names/icons in the History tab now link to their OSRS Wiki page.
+- The activity feed and loot log now recognize kills of Glough, Dad, Agrith-Na-Na, and The Royal Titans as notable boss kills, instead of ignoring them as regular NPCs.
 
 ### Changed
 - The Like button on activity feed items is now a plain text button that sits right next to the comment button, instead of an icon button off on its own.
