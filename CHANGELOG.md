@@ -21,6 +21,10 @@ All notable changes to GroupScape web are logged here, newest first.
 - A free task skip from Turael, Aya, or Spria now shows as "Reset" in Slayer History instead of "Unknown".
 
 ### Fixed
+- Graphs tab: the leaderboard sidepanel now matches whichever time period you've selected (1H/6H/12H/24H/7D/30D/1Y) instead of only showing 3 coarser windows that made several of the buttons look identical.
+- The activity feed reaction popup no longer gets cut off past the right edge of the screen on events near the edge.
+
+### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.
 - The History tab's in-progress task now shows your live kill count instead of being stuck at 0.
 - The Stats tab's Kills total now includes kills from your current in-progress task instead of only updating when a task is finished.
