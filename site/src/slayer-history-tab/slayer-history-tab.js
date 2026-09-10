@@ -11,6 +11,7 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
   { value: "blocked", label: "Blocked" },
+  { value: "reset", label: "Reset" },
   { value: "superseded", label: "Superseded" },
 ];
 
@@ -20,6 +21,9 @@ const STATUS_META = {
   completed: { label: "Completed", cls: "cp" },
   cancelled: { label: "Cancelled", cls: "cx" },
   blocked: { label: "Blocked", cls: "bl" },
+  // A free Turael/Aya/Spria skip - no points spent, but it still resets the normal-bucket streak.
+  // See GroupScapeTrackerPlugin#closeSlayerTask's SLAYER_RESET_MASTERS check.
+  reset: { label: "Reset", cls: "rs" },
   // Server-side cleanup, not a real close reason - see db::upsert_slayer_task_history_event's
   // doc comment. Should be rare in practice (the plugin always closes before reassigning) so
   // this only shows up when that guarantee was ever violated (lost event, out-of-order upload).

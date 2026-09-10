@@ -246,6 +246,12 @@ slayer-history-tab {
   background: rgba(146, 166, 201, 0.1);
 }
 
+.slayer-history-tab__badge--rs {
+  color: #c9a8ff;
+  border-color: rgba(168, 105, 255, 0.4);
+  background: rgba(168, 105, 255, 0.1);
+}
+
 .slayer-history-tab__badge--sp {
   color: #8a8a8a;
   border-color: rgba(138, 138, 138, 0.4);

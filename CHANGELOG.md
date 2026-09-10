@@ -17,6 +17,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Slightly thinner orange border on Slayer History and Stats icons.
 - Internal: the server now guarantees a member only ever has one open Slayer task in their history, instead of trusting the plugin to always close the previous one first. A stray leftover shows up as a new "Superseded" status if it ever happens.
 - The Slayer Stats "Most killed overall" tile now updates live while a task is in progress, instead of only once the task is turned in — so it ticks up in real time, and swaps to a new monster right away if it overtakes the current leader.
+- A free task skip from Turael, Aya, or Spria now shows as "Reset" in Slayer History instead of "Unknown".
 
 ### Fixed
 - Slayer task history rows were showing blank task names, blank masters, and "undefined/undefined" kill counts. History now displays correctly.

@@ -5733,7 +5733,7 @@ SELECT
   COUNT(*) FILTER (WHERE status = 'completed') AS tasks_completed,
   COALESCE(SUM(amount_done) FILTER (WHERE status = 'completed'), 0) AS total_kills,
   COALESCE(SUM(points) FILTER (WHERE status = 'completed'), 0) AS total_points_earned,
-  COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled', 'blocked')) AS closed_count
+  COUNT(*) FILTER (WHERE status IN ('completed', 'cancelled', 'blocked', 'reset')) AS closed_count
 FROM groupscape.slayer_task_history
 WHERE group_id=$1 AND member_name=$2
 "#,

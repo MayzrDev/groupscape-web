@@ -162,7 +162,7 @@ pub struct SlayerTaskHistoryEvent {
     pub client_event_id: String,
     pub task_name: String,
     pub master_name: String,
-    /// "not_started" | "in_progress" | "completed" | "cancelled" | "blocked" | "unknown"
+    /// "not_started" | "in_progress" | "completed" | "cancelled" | "blocked" | "reset" | "unknown"
     pub status: String,
     pub amount_done: i32,
     pub amount_total: i32,
