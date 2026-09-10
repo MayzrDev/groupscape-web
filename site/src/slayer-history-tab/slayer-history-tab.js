@@ -160,6 +160,8 @@ export class SlayerHistoryTab extends BaseElement {
     const meta = STATUS_META[entry.status] ?? { label: entry.status, cls: "ns" };
     const taskIcon = slayerData.taskIconUrl(entry.taskName);
     const masterIcon = slayerData.masterIconUrl(entry.masterName);
+    const taskWikiUrl = slayerData.taskWikiUrl(entry.taskName);
+    const masterWikiUrl = slayerData.masterWikiUrl(entry.masterName);
 
     let pointsLabel = "&mdash;";
     let pointsCls = "slayer-history-tab__points slayer-history-tab__points--muted";
@@ -172,20 +174,28 @@ export class SlayerHistoryTab extends BaseElement {
 
     return `
       <div class="slayer-history-tab__row">
-        <img class="slayer-history-tab__icon" src="${taskIcon}" alt="${entry.taskName}" />
+        <a class="slayer-history-tab__icon-link" href="${taskWikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      entry.taskName
+    } on the wiki">
+          <img class="slayer-history-tab__icon" src="${taskIcon}" alt="${entry.taskName}" />
+        </a>
         <div class="slayer-history-tab__body">
           <div class="slayer-history-tab__top">
-            <span class="slayer-history-tab__name">${entry.taskName}</span>
+            <a class="slayer-history-tab__name" href="${taskWikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      entry.taskName
+    } on the wiki">${entry.taskName}</a>
             <span class="${pointsCls}">${pointsLabel}</span>
           </div>
           <div class="slayer-history-tab__bottom">
             <span class="slayer-history-tab__master">
               ${
                 masterIcon
-                  ? `<img class="slayer-history-tab__master-icon" src="${masterIcon}" alt="${entry.masterName}" />`
+                  ? `<a class="slayer-history-tab__master-icon-link" href="${masterWikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${entry.masterName} on the wiki"><img class="slayer-history-tab__master-icon" src="${masterIcon}" alt="${entry.masterName}" /></a>`
                   : ""
               }
-              <span class="slayer-history-tab__master-name">${entry.masterName}</span>
+              <a class="slayer-history-tab__master-name" href="${masterWikiUrl}" target="_blank" rel="noopener noreferrer" title="View ${
+      entry.masterName
+    } on the wiki">${entry.masterName}</a>
             </span>
             <span class="slayer-history-tab__kills">${entry.amountDone}/${entry.amountTotal}</span>
             <span class="slayer-history-tab__badge slayer-history-tab__badge--${meta.cls}">${meta.label}</span>

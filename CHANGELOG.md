@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.460] - 2026-09-10
 
+### Added
+- Slayer task and master names/icons in the History tab now link to their OSRS Wiki page.
+
 ### Changed
 - The Like button on activity feed items is now a plain text button that sits right next to the comment button, instead of an icon button off on its own.
 - The Like reaction now shows a thumbs up instead of a coin icon.
