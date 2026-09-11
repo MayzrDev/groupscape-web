@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
   { value: "blocked", label: "Blocked" },
   { value: "reset", label: "Reset" },
+  { value: "unknown", label: "Unknown" },
   { value: "superseded", label: "Superseded" },
 ];
 
@@ -22,11 +23,18 @@ const STATUS_META = {
   cancelled: { label: "Cancelled", cls: "cx" },
   blocked: { label: "Blocked", cls: "bl" },
   // A free Turael/Aya/Spria skip - no points spent, but it still resets the normal-bucket streak.
-  // See GroupScapeTrackerPlugin#closeSlayerTask's SLAYER_RESET_MASTERS check.
+  // See GroupScapeTrackerPlugin#closeSlayerTask's SLAYER_RESET_MASTERS check (checks whichever
+  // master granted the *new* task, not the closing one, so skipping any master's task via
+  // Turael/Aya/Spria lands here rather than under "unknown").
   reset: { label: "Reset", cls: "rs" },
+  // A points delta the plugin didn't recognize as any of the above (e.g. a game update changing
+  // cancel/block prices, or a Mortimer task closing with neither a completed nor -30 delta) - see
+  // GroupScapeTrackerPlugin#closeSlayerTask's javadoc.
+  unknown: { label: "Unknown", cls: "sp" },
   // Server-side cleanup, not a real close reason - see db::upsert_slayer_task_history_event's
-  // doc comment. Should be rare in practice (the plugin always closes before reassigning) so
-  // this only shows up when that guarantee was ever violated (lost event, out-of-order upload).
+  // doc comment. Should now only show up for a genuinely unrecoverable dangling row (e.g. a
+  // plugin/client restart mid-task with no surviving snapshot) - a lost close event for a skip
+  // via Turael/Aya/Spria is recognized as "reset" and a fully-killed task as "completed" instead.
   superseded: { label: "Superseded", cls: "sp" },
 };
 

@@ -2,6 +2,15 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.476] - 2026-09-11
+
+### Fixed
+- Collection log Discord/activity feed notifications now show the correct page progress (e.g. "3/5") instead of always undercounting to just the newly obtained item.
+- Legacy Bounty Hunter (Hunter/Rogue) hiscores stats now show an icon instead of a placeholder.
+- Lunar Chests now shows its proper icon instead of a placeholder.
+- Skipping a task from a higher-level master via Turael/Aya/Spria no longer shows up as "Superseded" in the Slayer History tab - it's now correctly labeled "Reset".
+- Restarting your client/plugin mid-task no longer freezes that task's progress at 0 in the Slayer History and Stats tabs until you re-talk to your slayer master - progress now updates live like the Current tab always did.
+
 ## [1.0.460] - 2026-09-10
 
 ### Added
@@ -29,6 +38,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - The History tab's in-progress task now shows your live kill count instead of being stuck at 0.
 - The Stats tab's Kills total now includes kills from your current in-progress task instead of only updating when a task is finished.
 - A task you've fully killed but haven't turned in yet now shows as "Completed" in your History tab instead of staying stuck on "In progress".
+- A finished task could get permanently stuck at "0/x, In progress" in your History tab even after being turned in, if the plugin missed the moment it closed out. The server now recovers the real kill count in that case instead of just labeling the row "Superseded".
 
 ### Removed
 - Removed the "Not started" option from the Slayer History status filter, since tasks in that state never showed up in the history anyway.

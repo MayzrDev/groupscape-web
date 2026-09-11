@@ -35,6 +35,11 @@ export const ACTIVITY_ICON_OVERRIDES = {
   clue_all: "clue_scrolls_all",
   lms_rank: "last_man_standing",
   pvp_arena_rank: "pvp_arena",
+  // The retired pre-rework Bounty Hunter (Legacy) Hunter/Rogue hiscores stats reuse the same
+  // current-Bounty-Hunter icons - wise-old-man doesn't track the legacy split separately, and the
+  // rank names/artwork are the same between the two systems.
+  bounty_hunter_legacy_hunter: "bounty_hunter_hunter",
+  bounty_hunter_legacy_rogue: "bounty_hunter_rogue",
 };
 
 // hiscores `key`s reusing an existing boss-slot icon instead of one under
@@ -44,16 +49,10 @@ export const ACTIVITY_ICON_BOSS_SLOT_REUSE = {
   rifts_closed: "guardians_of_the_rift",
 };
 
-// hiscores `key`s ground-truthed as having no matching icon anywhere (legacy/retired hiscores
-// categories - Deadman mode and the old pre-rework Bounty Hunter (Legacy) split, plus "Grid
-// Points", a leagues stat with no icon of its own in wise-old-man's set either) - rendered with
-// the shared placeholder.
-export const ACTIVITY_ICON_GAPS = new Set([
-  "grid_points",
-  "deadman_points",
-  "bounty_hunter_legacy_hunter",
-  "bounty_hunter_legacy_rogue",
-]);
+// hiscores `key`s ground-truthed as having no matching icon anywhere (Deadman Points and "Grid
+// Points", both UI-only leagues/game-mode stats with no icon of their own in wise-old-man's set
+// and no wiki `File:` page to hotlink from) - rendered with the shared placeholder.
+export const ACTIVITY_ICON_GAPS = new Set(["grid_points", "deadman_points"]);
 
 // Wiki page titles for minigame/leagues hiscores keys whose page name doesn't match the
 // hiscores' own name (e.g. "LMS - Rank" isn't a wiki title; "Last Man Standing" is). Keys with no
