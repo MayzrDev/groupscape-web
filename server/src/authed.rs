@@ -11,9 +11,9 @@ use crate::hiscores;
 use crate::item_bonuses;
 use crate::leaderboard::{LeaderboardMetric, LeaderboardResult, LeaderboardWindow};
 use crate::loot_log_search::{
-    combat_level, extract_kill_count_clause, matches_category_keyword, matches_rarity_keyword,
-    numeric_clause_matches, numeric_clause_matches_f64, parse_drop_rate_clause, parse_numeric_clause,
-    rarity_keyword, split_search_groups,
+    combat_level, extract_date_clauses, extract_kill_count_clause, matches_category_keyword,
+    matches_rarity_keyword, numeric_clause_matches, numeric_clause_matches_f64, parse_drop_rate_clause,
+    parse_numeric_clause, rarity_keyword, split_search_groups, DateBounds,
 };
 use crate::models::{
     ActivityCommentsPage, ActivityEvent, ActivityReactionsSummary, ActivitySettings,
@@ -2055,12 +2055,52 @@ pub struct GetLootLogQuery {
     /// Comma-separated subset of "boss","other","chest","clue" - see [`LootLogCategories`].
     #[serde(default)]
     pub categories: Option<String>,
+    /// The viewer's `Date.prototype.getTimezoneOffset()` (minutes local time is behind UTC,
+    /// positive west of UTC) - plumbing only, never shown in any UI. Needed to resolve calendar-
+    /// relative search tokens like "today"/"this week" (see `loot_log_search::extract_date_clauses`)
+    /// against the viewer's own calendar day rather than the server's, since the search string
+    /// itself carries no timezone info. Defaults to 0 (UTC) when the client omits it.
+    #[serde(default)]
+    pub tz_offset_minutes: i32,
 }
 
 // Prevents a search that matches almost nothing in a huge history from doing unbounded work in
 // one request - the client just resumes from `next_before` on its next page request instead.
 const LOOT_LOG_SCAN_CAP: i64 = 5000;
 const LOOT_LOG_BATCH_SIZE: i64 = 200;
+
+/// `Utc::now()` rounded down to the minute - used as the "now" reference for resolving relative
+/// date search clauses ("today", "this hour", "last 3 hours", ...) so that requests landing in
+/// the same minute resolve to the same window and can share `get_loot_log`/`get_loot_log_summary`'s
+/// Redis cache entry. Caps how stale a rolling window ("this hour", "last N hours") can appear
+/// (up to ~60s) against real-time - well under the loot-log page's own 15s poll interval, so it's
+/// not user-visible in practice.
+fn now_rounded_to_minute() -> DateTime<Utc> {
+    let now = Utc::now();
+    now - chrono::Duration::seconds(now.timestamp() % 60)
+}
+
+/// Extracts and AND-intersects every date clause across all of a search's AND-groups (see
+/// `extract_date_clauses`), returning the combined bounds plus the groups with date tokens
+/// stripped out - a group left empty by extraction is dropped entirely, imposing no further
+/// per-event text constraint (mirrors `extract_kill_count_clause`'s bare-clause carve-out, since
+/// the date bound itself already fully governs which events are in scope via the scan cursor).
+fn extract_search_date_bounds(
+    groups: Vec<Vec<String>>,
+    now_utc: DateTime<Utc>,
+    tz_offset_minutes: i32,
+) -> (DateBounds, Vec<Vec<String>>) {
+    let mut combined = DateBounds::default();
+    let mut remaining_groups = Vec::with_capacity(groups.len());
+    for group in groups {
+        let (bounds, rest) = extract_date_clauses(&group, now_utc, tz_offset_minutes);
+        combined = combined.intersect(bounds);
+        if !rest.is_empty() {
+            remaining_groups.push(rest);
+        }
+    }
+    (combined, remaining_groups)
+}
 
 /// Paginated, newest-first, one-row-per-raw-event loot log. Unlike the deleted `get_loot_summary`
 /// (which pre-aggregated into one row per (member, source, item) across the whole unbounded
@@ -2074,9 +2114,10 @@ pub async fn get_loot_log(
     query: web::Query<GetLootLogQuery>,
 ) -> Result<web::Json<LootLogPage>, Error> {
     let limit = query.limit.clamp(1, 100);
+    let now_utc = now_rounded_to_minute();
     let version = redis.get_i64(&loot_log_version_key(auth.group_id)).await;
     let cache_key = format!(
-        "v1:loot-log:{}:{}:{}:{}:{}:{}:{}",
+        "v1:loot-log:{}:{}:{}:{}:{}:{}:{}:{}:{}",
         auth.group_id,
         version,
         query.before.map(|d| d.to_rfc3339()).unwrap_or_default(),
@@ -2084,6 +2125,8 @@ pub async fn get_loot_log(
         query.search.as_deref().unwrap_or(""),
         query.item_ids.as_deref().unwrap_or(""),
         query.categories.as_deref().unwrap_or(""),
+        query.tz_offset_minutes,
+        now_utc.to_rfc3339(),
     );
     if let Some(cached) = redis.get_json::<LootLogPage>(&cache_key).await {
         return Ok(web::Json(cached));
@@ -2092,17 +2135,21 @@ pub async fn get_loot_log(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
-    let groups = split_search_groups(query.search.as_deref().unwrap_or(""));
+    let (date_bounds, groups) =
+        extract_search_date_bounds(split_search_groups(query.search.as_deref().unwrap_or("")), now_utc, query.tz_offset_minutes);
     let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
     let mut events: Vec<LootLogEvent> = Vec::new();
-    let mut cursor = query.before;
+    let mut cursor = match (query.before, date_bounds.before) {
+        (Some(a), Some(b)) => Some(a.min(b)),
+        (a, b) => a.or(b),
+    };
     let mut scanned: i64 = 0;
     let mut scan_exhausted = false;
     let mut next_before = cursor;
 
-    loop {
+    'scan: loop {
         let batch = db::list_loot_and_kill_events_page(&client, auth.group_id, cursor, LOOT_LOG_BATCH_SIZE).await?;
         if batch.is_empty() {
             scan_exhausted = true;
@@ -2110,6 +2157,13 @@ pub async fn get_loot_log(
         }
         let batch_len = batch.len() as i64;
         for row in &batch {
+            // Rows arrive newest-first, so the moment one falls below the search's date-clause
+            // lower bound, every row from here on (this batch and any further page) is too -
+            // the same "provably no more" reasoning as an empty batch, just mid-batch.
+            if date_bounds.after.is_some_and(|after| row.occurred_at < after) {
+                scan_exhausted = true;
+                break 'scan;
+            }
             scanned += 1;
             next_before = Some(row.occurred_at);
             let Ok(parsed) = serde_json::from_value::<GameEvent>(row.payload.clone()) else {
@@ -2138,15 +2192,12 @@ pub async fn get_loot_log(
             ) {
                 events.push(log_event);
                 if events.len() as i64 >= limit {
-                    break;
+                    break 'scan;
                 }
             }
             if scanned >= LOOT_LOG_SCAN_CAP {
-                break;
+                break 'scan;
             }
-        }
-        if events.len() as i64 >= limit || scanned >= LOOT_LOG_SCAN_CAP {
-            break;
         }
         if batch_len < LOOT_LOG_BATCH_SIZE {
             scan_exhausted = true;
@@ -2174,6 +2225,9 @@ pub struct GetLootLogSummaryQuery {
     /// Comma-separated subset of "boss","other","chest","clue" - see [`LootLogCategories`].
     #[serde(default)]
     pub categories: Option<String>,
+    /// See `GetLootLogQuery::tz_offset_minutes` - same plumbing, same reason.
+    #[serde(default)]
+    pub tz_offset_minutes: i32,
 }
 
 const LOOT_LOG_SUMMARY_BATCH_SIZE: i64 = 500;
@@ -2189,12 +2243,15 @@ pub async fn get_loot_log_summary(
     redis: web::Data<RedisCache>,
     query: web::Query<GetLootLogSummaryQuery>,
 ) -> Result<web::Json<LootLogSummary>, Error> {
+    let now_utc = now_rounded_to_minute();
     let cache_key = format!(
-        "v1:loot-log-summary:{}:{}:{}:{}",
+        "v1:loot-log-summary:{}:{}:{}:{}:{}:{}",
         auth.group_id,
         query.search.as_deref().unwrap_or(""),
         query.item_ids.as_deref().unwrap_or(""),
-        query.categories.as_deref().unwrap_or("")
+        query.categories.as_deref().unwrap_or(""),
+        query.tz_offset_minutes,
+        now_utc.to_rfc3339(),
     );
     if let Some(cached) = redis.get_json::<LootLogSummary>(&cache_key).await {
         return Ok(web::Json(cached));
@@ -2202,14 +2259,15 @@ pub async fn get_loot_log_summary(
     let client: Client = db_pool.get().await.map_err(ApiError::PoolError)?;
     let item_ids = parse_item_ids(query.item_ids.as_deref());
     let search_active = query.search.as_deref().is_some_and(|s| !s.trim().is_empty()) || !item_ids.is_empty();
-    let groups = split_search_groups(query.search.as_deref().unwrap_or(""));
+    let (date_bounds, groups) =
+        extract_search_date_bounds(split_search_groups(query.search.as_deref().unwrap_or("")), now_utc, query.tz_offset_minutes);
     let categories = LootLogCategories::parse(query.categories.as_deref());
     let ge_prices = get_ge_prices_map();
 
     let mut total_value: i64 = 0;
     let mut event_count: i64 = 0;
-    let mut cursor: Option<DateTime<Utc>> = None;
-    loop {
+    let mut cursor: Option<DateTime<Utc>> = date_bounds.before;
+    'scan: loop {
         let batch =
             db::list_loot_and_kill_events_page(&client, auth.group_id, cursor, LOOT_LOG_SUMMARY_BATCH_SIZE).await?;
         if batch.is_empty() {
@@ -2217,6 +2275,11 @@ pub async fn get_loot_log_summary(
         }
         let batch_len = batch.len();
         for row in &batch {
+            // See get_loot_log's matching cutoff - rows arrive newest-first, so crossing below
+            // the date clause's lower bound means every remaining row is out of range too.
+            if date_bounds.after.is_some_and(|after| row.occurred_at < after) {
+                break 'scan;
+            }
             let Ok(parsed) = serde_json::from_value::<GameEvent>(row.payload.clone()) else {
                 continue;
             };

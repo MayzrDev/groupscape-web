@@ -4,6 +4,9 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ## [1.0.476] - 2026-09-11
 
+### Added
+- Loot Log search now understands dates: type "today", "yesterday", "this week", "this month", "last 3 days", a specific date like "2026-05-05", or a range like "2026-05-01..2026-05-05" - combine with other search terms too, e.g. "tormented demons and today".
+
 ### Fixed
 - Collection log Discord/activity feed notifications now show the correct page progress (e.g. "3/5") instead of always undercounting to just the newly obtained item.
 - Legacy Bounty Hunter (Hunter/Rogue) hiscores stats now show an icon instead of a placeholder.
