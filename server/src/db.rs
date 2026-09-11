@@ -5539,7 +5539,6 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
             for row in &dangling_rows {
                 let dangling_event_id: String = row.try_get("client_event_id")?;
                 let dangling_task_name: String = row.try_get("task_name")?;
-                let dangling_master_name: String = row.try_get("master_name")?;
 
                 if incoming_master_is_reset_grantor {
                     client
@@ -5548,9 +5547,10 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
                     continue;
                 }
 
+                // master_name intentionally not checked here either - same restart gap as
+                // `list_slayer_task_history_page`'s overlay above.
                 let recovered_amount_done = live_task.as_ref().filter(|live| {
                     live.task_name.as_deref() == Some(dangling_task_name.as_str())
-                        && live.master_name.as_deref() == Some(dangling_master_name.as_str())
                         && live.amount_remaining.is_some_and(|remaining| remaining <= 0)
                 }).and_then(live_slayer_task_amount_done);
 
@@ -5724,9 +5724,13 @@ LIMIT $5 OFFSET $6
     // `get_live_slayer_task`.
     if let Some(entry) = entries.iter_mut().find(|entry| entry.status == "in_progress") {
         if let Some(live_task) = get_live_slayer_task(client, group_id, member_name).await? {
-            if live_task.task_name.as_deref() == Some(entry.task_name.as_str())
-                && live_task.master_name.as_deref() == Some(entry.master_name.as_str())
-            {
+            // master_name is deliberately not part of this match: after a plugin/client restart
+            // mid-task, SlayerTaskState's masterName stays null until the player next talks to a
+            // recognized slayer master (see SlayerTaskState.java), so requiring it to match would
+            // skip the overlay and leave the row stuck on its stale assignment-time amount_done.
+            // task_name plus "the one in_progress row" (at most one, per this fn's doc comment)
+            // is already enough to identify it.
+            if live_task.task_name.as_deref() == Some(entry.task_name.as_str()) {
                 if let Some(live_amount_done) = live_slayer_task_amount_done(&live_task) {
                     entry.amount_done = live_amount_done;
                 }

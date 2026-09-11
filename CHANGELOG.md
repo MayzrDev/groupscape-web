@@ -9,6 +9,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Legacy Bounty Hunter (Hunter/Rogue) hiscores stats now show an icon instead of a placeholder.
 - Lunar Chests now shows its proper icon instead of a placeholder.
 - Skipping a task from a higher-level master via Turael/Aya/Spria no longer shows up as "Superseded" in the Slayer History tab - it's now correctly labeled "Reset".
+- Restarting your client/plugin mid-task no longer freezes that task's progress at 0 in the Slayer History and Stats tabs until you re-talk to your slayer master - progress now updates live like the Current tab always did.
 
 ## [1.0.460] - 2026-09-10
 
