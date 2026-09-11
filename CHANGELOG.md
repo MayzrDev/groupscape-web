@@ -8,6 +8,7 @@ All notable changes to GroupScape web are logged here, newest first.
 - Collection log Discord/activity feed notifications now show the correct page progress (e.g. "3/5") instead of always undercounting to just the newly obtained item.
 - Legacy Bounty Hunter (Hunter/Rogue) hiscores stats now show an icon instead of a placeholder.
 - Lunar Chests now shows its proper icon instead of a placeholder.
+- Skipping a task from a higher-level master via Turael/Aya/Spria no longer shows up as "Superseded" in the Slayer History tab - it's now correctly labeled "Reset".
 
 ## [1.0.460] - 2026-09-10
 

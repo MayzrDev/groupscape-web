@@ -5450,6 +5450,12 @@ LIMIT $3
 /// makes that a real server-side invariant instead of one only the client is trusted to uphold
 /// (a lost close event, an out-of-order upload, or a future plugin bug would otherwise leave a
 /// stale open row parked in the table forever).
+/// Masters who'll swap the current task for a new one at no points cost (the "Turael skip") -
+/// mirrors `GroupScapeTrackerPlugin#SLAYER_RESET_MASTERS` (Aya/Spria are Turael's While Guthix
+/// Sleeps/pre-quest reskins). Used here to recognize a dangling-row cleanup as a reset rather
+/// than guessing from live state - see this fn's doc comment.
+const SLAYER_RESET_MASTERS: [&str; 3] = ["turael", "aya", "spria"];
+
 pub async fn upsert_slayer_task_history_event(
     client: &Client,
     group_id: i64,
@@ -5477,13 +5483,40 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id <> $3
         if !dangling_rows.is_empty() {
             // The plugin's transition detection is supposed to guarantee a close event always
             // precedes the next assignment (see this fn's doc comment), but a lost close event
-            // does happen in practice - if the dangling row's own task/master still matches the
-            // live snapshot this member last reported and that snapshot shows the task fully
-            // killed, treat it as the completion it actually was (mirroring
-            // `list_slayer_task_history_page`'s read-time overlay) instead of silently zeroing
-            // its progress out under a generic "superseded" label.
-            let live_task = get_live_slayer_task(client, group_id, member_name).await?;
+            // does happen in practice - most often a Turael/Aya/Spria skip of a task assigned by
+            // some other master, where the plugin-side close raced the reassignment. Two signals
+            // recover the real outcome instead of a blind "superseded" guess:
+            //   1. If *this* assignment's master is one of the free-skip-granting three, the only
+            //      way OSRS lets that happen while another task is still open is that skip - so
+            //      every dangling row for this member is a "reset", full stop (mirrors
+            //      GroupScapeTrackerPlugin#closeSlayerTask's own reset check, which looks at
+            //      whichever master is granting the *new* task, not the old one).
+            //   2. Otherwise, if the dangling row's own task/master still matches the live
+            //      snapshot this member last reported and that snapshot shows the task fully
+            //      killed, treat it as the completion it actually was (mirroring
+            //      `list_slayer_task_history_page`'s read-time overlay).
+            // A row that matches neither is genuinely ambiguous (most likely a plugin/client
+            // restart mid-task with no surviving snapshot) - default that to "completed" rather
+            // than "superseded" since finishing normally is by far the more common way to lose a
+            // close event than a paid cancel/block, which the plugin closes synchronously anyway.
+            let incoming_master_is_reset_grantor = SLAYER_RESET_MASTERS
+                .contains(&event.master_name.trim().to_lowercase().as_str());
 
+            let live_task = if incoming_master_is_reset_grantor {
+                None
+            } else {
+                get_live_slayer_task(client, group_id, member_name).await?
+            };
+
+            let reset_stmt = client
+                .prepare_cached(
+                    r#"
+UPDATE groupscape.slayer_task_history
+SET status = 'reset', closed_at = COALESCE(closed_at, now())
+WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
+"#,
+                )
+                .await?;
             let completed_stmt = client
                 .prepare_cached(
                     r#"
@@ -5493,11 +5526,11 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
 "#,
                 )
                 .await?;
-            let superseded_stmt = client
+            let unresolved_stmt = client
                 .prepare_cached(
                     r#"
 UPDATE groupscape.slayer_task_history
-SET status = 'superseded', closed_at = COALESCE(closed_at, now())
+SET status = 'completed', closed_at = COALESCE(closed_at, now())
 WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
 "#,
                 )
@@ -5507,6 +5540,13 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
                 let dangling_event_id: String = row.try_get("client_event_id")?;
                 let dangling_task_name: String = row.try_get("task_name")?;
                 let dangling_master_name: String = row.try_get("master_name")?;
+
+                if incoming_master_is_reset_grantor {
+                    client
+                        .execute(&reset_stmt, &[&group_id, &member_name, &dangling_event_id])
+                        .await?;
+                    continue;
+                }
 
                 let recovered_amount_done = live_task.as_ref().filter(|live| {
                     live.task_name.as_deref() == Some(dangling_task_name.as_str())
@@ -5523,7 +5563,7 @@ WHERE group_id=$1 AND member_name=$2 AND client_event_id = $3
                         .await?;
                 } else {
                     client
-                        .execute(&superseded_stmt, &[&group_id, &member_name, &dangling_event_id])
+                        .execute(&unresolved_stmt, &[&group_id, &member_name, &dangling_event_id])
                         .await?;
                 }
             }
