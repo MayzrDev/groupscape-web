@@ -2,6 +2,11 @@
 
 All notable changes to GroupScape web are logged here, newest first.
 
+## [1.0.476] - 2026-09-11
+
+### Fixed
+- Collection log Discord/activity feed notifications now show the correct page progress (e.g. "3/5") instead of always undercounting to just the newly obtained item.
+
 ## [1.0.460] - 2026-09-10
 
 ### Added
