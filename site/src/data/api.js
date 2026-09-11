@@ -676,6 +676,10 @@ class Api {
     if (search) query.set("search", search);
     if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
     if (categories && categories.length) query.set("categories", categories.join(","));
+    // Plumbing only, never shown in any UI - lets the server resolve calendar-relative search
+    // tokens ("today", "this week", ...) against the viewer's own calendar day. See
+    // GetLootLogQuery::tz_offset_minutes on the server.
+    if (search) query.set("tz_offset_minutes", new Date().getTimezoneOffset());
 
     const response = await fetch(`${this.lootLogUrl}?${query.toString()}`, {
       headers: {
@@ -693,6 +697,7 @@ class Api {
     if (search) query.set("search", search);
     if (itemIds && itemIds.length) query.set("item_ids", itemIds.join(","));
     if (categories && categories.length) query.set("categories", categories.join(","));
+    if (search) query.set("tz_offset_minutes", new Date().getTimezoneOffset());
 
     const response = await fetch(`${this.lootLogSummaryUrl}?${query.toString()}`, {
       headers: {

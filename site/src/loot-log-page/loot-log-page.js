@@ -45,6 +45,8 @@ const PLACEHOLDER_EXAMPLES = [
   "rare",
   "<1/5000",
   "chest && >1m",
+  "today",
+  "tormented demons and today",
 ];
 const PLACEHOLDER_INTERVAL_MS = 2500;
 const PLACEHOLDER_FADE_MS = 400;

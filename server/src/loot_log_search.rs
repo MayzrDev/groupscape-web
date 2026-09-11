@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
+use chrono::{DateTime, Datelike, Duration, NaiveDate, Timelike, Utc};
+
 use crate::drop_rates::slugify_npc_name;
 
 /// Mirrors `site/src/data/boss-levels.js`'s `BOSS_COMBAT_LEVELS` - kept in sync manually. Only
@@ -275,6 +277,233 @@ pub fn split_search_groups(search: &str) -> Vec<Vec<String>> {
     groups
 }
 
+/// A half-open time window (`after` inclusive, `before` exclusive - matching `get_loot_log`'s
+/// existing `occurred_at < before` cursor convention) resolved from date tokens in a Loot Log
+/// search string. `None` on either side means "no bound from that side" - a search with no date
+/// tokens at all resolves to `DateBounds::default()` (unbounded).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DateBounds {
+    pub after: Option<DateTime<Utc>>,
+    pub before: Option<DateTime<Utc>>,
+}
+
+impl DateBounds {
+    /// AND-combines two bounds into their intersection (the narrower window) - `after` clauses
+    /// take the latest (max) start, `before` clauses take the earliest (min) end. A search with
+    /// contradictory date clauses (e.g. "today and yesterday") intersects down to an empty/
+    /// inverted window, which the caller's scan loop then naturally yields zero events for.
+    pub fn intersect(self, other: DateBounds) -> DateBounds {
+        DateBounds {
+            after: match (self.after, other.after) {
+                (Some(a), Some(b)) => Some(a.max(b)),
+                (a, b) => a.or(b),
+            },
+            before: match (self.before, other.before) {
+                (Some(a), Some(b)) => Some(a.min(b)),
+                (a, b) => a.or(b),
+            },
+        }
+    }
+}
+
+/// Converts a viewer-local naive calendar instant (a wall-clock date/time in the viewer's own
+/// timezone, with no timezone info of its own) to the UTC instant it actually represents, given
+/// the viewer's UTC offset in minutes (`Date.prototype.getTimezoneOffset()` - positive when local
+/// time is behind UTC). `utc = local + offset`.
+fn local_midnight_to_utc(date: NaiveDate, tz_offset_minutes: i32) -> DateTime<Utc> {
+    let naive = date.and_hms_opt(0, 0, 0).expect("midnight is always a valid time");
+    DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc) + Duration::minutes(tz_offset_minutes as i64)
+}
+
+/// The viewer-local calendar date `now_utc` falls on, given the viewer's UTC offset in minutes -
+/// the inverse of `local_midnight_to_utc`: `local = utc - offset`.
+fn local_date(now_utc: DateTime<Utc>, tz_offset_minutes: i32) -> NaiveDate {
+    (now_utc - Duration::minutes(tz_offset_minutes as i64)).date_naive()
+}
+
+/// One local calendar day as a half-open `[start, start-of-next-day)` window.
+fn day_bounds(date: NaiveDate, tz_offset_minutes: i32) -> DateBounds {
+    DateBounds {
+        after: Some(local_midnight_to_utc(date, tz_offset_minutes)),
+        before: Some(local_midnight_to_utc(date + Duration::days(1), tz_offset_minutes)),
+    }
+}
+
+/// Parses a strict `YYYY-MM-DD` token (the only specific-date format accepted - unambiguous
+/// across locales, unlike `MM/DD/YYYY` vs `DD/MM/YYYY`).
+fn parse_iso_date(token: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(token.trim(), "%Y-%m-%d").ok()
+}
+
+/// Parses one comparison-prefixed or bare date token (`2026-05-05`, `>2026-05-05`,
+/// `>=2026-05-05`, `<2026-05-05`, `<=2026-05-05`) into a bound. A bare date or `>`/`>=` all mean
+/// "from this day onward, inclusive" (the day's start); `<`/`<=` both mean "through the end of
+/// this day, inclusive" (the *next* day's start, as the exclusive upper bound) - `>`/`>=` and
+/// `<`/`<=` are deliberately equivalent for dates, since a day is a bucket, not a point.
+fn parse_date_bound_token(token: &str, tz_offset_minutes: i32) -> Option<DateBounds> {
+    let token = token.trim();
+    // `None` = bare date, no comparison prefix at all - that's `day_bounds`'s single-day window,
+    // not an open-ended one; `Some(is_upper)` says which side the prefix bounds.
+    let (op, rest) = if let Some(r) = token.strip_prefix(">=") {
+        (Some(false), r)
+    } else if let Some(r) = token.strip_prefix("<=") {
+        (Some(true), r)
+    } else if let Some(r) = token.strip_prefix('>') {
+        (Some(false), r)
+    } else if let Some(r) = token.strip_prefix('<') {
+        (Some(true), r)
+    } else {
+        (None, token)
+    };
+    let date = parse_iso_date(rest)?;
+    match op {
+        None => Some(day_bounds(date, tz_offset_minutes)),
+        Some(true) => Some(DateBounds {
+            after: None,
+            before: Some(local_midnight_to_utc(date + Duration::days(1), tz_offset_minutes)),
+        }),
+        Some(false) => Some(DateBounds {
+            after: Some(local_midnight_to_utc(date, tz_offset_minutes)),
+            before: None,
+        }),
+    }
+}
+
+/// Parses a `YYYY-MM-DD..YYYY-MM-DD` range token - both ends inclusive calendar days.
+fn parse_dot_range_token(token: &str, tz_offset_minutes: i32) -> Option<DateBounds> {
+    let (start, end) = token.trim().split_once("..")?;
+    let start = parse_iso_date(start)?;
+    let end = parse_iso_date(end)?;
+    Some(DateBounds {
+        after: Some(local_midnight_to_utc(start, tz_offset_minutes)),
+        before: Some(local_midnight_to_utc(end + Duration::days(1), tz_offset_minutes)),
+    })
+}
+
+/// `this week`/`this hour`/`this month` (case-insensitive, exactly these two tokens). Week starts
+/// Monday. The window runs from the unit's start through `now` (open-ended upper bound, since
+/// "this week" includes events still happening).
+fn parse_this_unit(tokens: &[&str], now_utc: DateTime<Utc>, tz_offset_minutes: i32) -> Option<DateBounds> {
+    if tokens.len() != 2 || !tokens[0].eq_ignore_ascii_case("this") {
+        return None;
+    }
+    let today = local_date(now_utc, tz_offset_minutes);
+    let after = match tokens[1].to_lowercase().as_str() {
+        "hour" => {
+            let local_now = now_utc - Duration::minutes(tz_offset_minutes as i64);
+            let naive = local_now
+                .date_naive()
+                .and_hms_opt(local_now.hour(), 0, 0)
+                .expect("top of the hour is always valid");
+            DateTime::<Utc>::from_naive_utc_and_offset(naive, Utc) + Duration::minutes(tz_offset_minutes as i64)
+        }
+        "week" => {
+            let days_since_monday = today.weekday().num_days_from_monday();
+            local_midnight_to_utc(today - Duration::days(days_since_monday as i64), tz_offset_minutes)
+        }
+        "month" => {
+            let start_of_month = NaiveDate::from_ymd_opt(today.year(), today.month(), 1)?;
+            local_midnight_to_utc(start_of_month, tz_offset_minutes)
+        }
+        _ => return None,
+    };
+    Some(DateBounds {
+        after: Some(after),
+        before: None,
+    })
+}
+
+/// `last N <unit>` (case-insensitive, exactly three tokens) - a rolling window from `N` units
+/// before `now` through `now`. `unit` accepts singular/plural: hour(s), day(s), week(s), month(s).
+fn parse_last_n_unit(tokens: &[&str], now_utc: DateTime<Utc>) -> Option<DateBounds> {
+    if tokens.len() != 3 || !tokens[0].eq_ignore_ascii_case("last") {
+        return None;
+    }
+    let n: i64 = tokens[1].parse().ok()?;
+    if n <= 0 {
+        return None;
+    }
+    let duration = match tokens[2].to_lowercase().as_str() {
+        "hour" | "hours" => Duration::hours(n),
+        "day" | "days" => Duration::days(n),
+        "week" | "weeks" => Duration::weeks(n),
+        "month" | "months" => Duration::days(n * 30),
+        _ => return None,
+    };
+    Some(DateBounds {
+        after: Some(now_utc - duration),
+        before: None,
+    })
+}
+
+/// Tries to match a date clause starting at `tokens[start]`, longest pattern first (`last N
+/// <unit>` is 3 tokens, `this <unit>` is 2, everything else is 1) so e.g. "this" isn't matched as
+/// a stray single token before the 2-token form gets a chance. Returns the resolved bound and how
+/// many tokens it consumed, or `None` if nothing at `start` looks like a date clause.
+fn try_match_date_clause(
+    tokens: &[String],
+    start: usize,
+    now_utc: DateTime<Utc>,
+    tz_offset_minutes: i32,
+) -> Option<(DateBounds, usize)> {
+    if start + 3 <= tokens.len() {
+        let window: Vec<&str> = tokens[start..start + 3].iter().map(String::as_str).collect();
+        if let Some(bounds) = parse_last_n_unit(&window, now_utc) {
+            return Some((bounds, 3));
+        }
+    }
+    if start + 2 <= tokens.len() {
+        let window: Vec<&str> = tokens[start..start + 2].iter().map(String::as_str).collect();
+        if let Some(bounds) = parse_this_unit(&window, now_utc, tz_offset_minutes) {
+            return Some((bounds, 2));
+        }
+    }
+    let token = &tokens[start];
+    let lower = token.to_lowercase();
+    if lower == "today" {
+        return Some((day_bounds(local_date(now_utc, tz_offset_minutes), tz_offset_minutes), 1));
+    }
+    if lower == "yesterday" {
+        return Some((
+            day_bounds(local_date(now_utc, tz_offset_minutes) - Duration::days(1), tz_offset_minutes),
+            1,
+        ));
+    }
+    if let Some(bounds) = parse_dot_range_token(token, tz_offset_minutes) {
+        return Some((bounds, 1));
+    }
+    if let Some(bounds) = parse_date_bound_token(token, tz_offset_minutes) {
+        return Some((bounds, 1));
+    }
+    None
+}
+
+/// Repeatedly extracts every date clause found in one AND-group's tokens, intersecting them all
+/// together (date clauses always AND within a group, unlike the general OR-across-tokens rule -
+/// "&gt;2026-05-01 &lt;2026-05-05" reads as a range, not "before X OR after Y"). Returns the
+/// combined bounds (`DateBounds::default()` if the group had no date tokens at all) plus the
+/// group's remaining non-date tokens, which still form a normal AND-required text/value group if
+/// non-empty (mirrors `extract_kill_count_clause`'s carve-out: a group left empty after
+/// extraction imposes no further per-event constraint, since the bound alone already covers it).
+pub fn extract_date_clauses(
+    tokens: &[String],
+    now_utc: DateTime<Utc>,
+    tz_offset_minutes: i32,
+) -> (DateBounds, Vec<String>) {
+    let mut bounds = DateBounds::default();
+    let mut rest = tokens.to_vec();
+    let mut i = 0;
+    while i < rest.len() {
+        if let Some((found, consumed)) = try_match_date_clause(&rest, i, now_utc, tz_offset_minutes) {
+            bounds = bounds.intersect(found);
+            rest.drain(i..i + consumed);
+        } else {
+            i += 1;
+        }
+    }
+    (bounds, rest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -441,5 +670,147 @@ mod tests {
         assert!(matches_category_keyword("kills", "kill"));
         assert!(!matches_category_keyword("chest", "kill"));
         assert!(!matches_category_keyword("vorkath", "kill"));
+    }
+
+    use chrono::TimeZone;
+
+    fn dt(y: i32, m: u32, d: u32, h: u32, mi: u32) -> DateTime<Utc> {
+        Utc.with_ymd_and_hms(y, m, d, h, mi, 0).unwrap()
+    }
+
+    // 2026-05-15 is a Friday. `now` is 02:00 UTC, and every test below uses a -300 (EST, UTC-5)
+    // offset, so the viewer's local clock reads 2026-05-14 21:00 - a full calendar day behind
+    // UTC, deliberately exercising the cross-day-boundary math rather than a same-day offset that
+    // would pass even with the timezone conversion silently doing nothing.
+    const NOW: fn() -> DateTime<Utc> = || dt(2026, 5, 15, 2, 0);
+    const EST_OFFSET: i32 = 300;
+
+    #[test]
+    fn today_resolves_to_viewer_local_calendar_day() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["today"]), NOW(), EST_OFFSET);
+        assert!(rest.is_empty());
+        assert_eq!(bounds.after, Some(dt(2026, 5, 14, 5, 0))); // 2026-05-14 00:00 EST = 05:00 UTC
+        assert_eq!(bounds.before, Some(dt(2026, 5, 15, 5, 0))); // 2026-05-15 00:00 EST = 05:00 UTC
+    }
+
+    #[test]
+    fn yesterday_is_one_local_day_before_today() {
+        let (bounds, _) = extract_date_clauses(&strs(&["yesterday"]), NOW(), EST_OFFSET);
+        assert_eq!(bounds.after, Some(dt(2026, 5, 13, 5, 0)));
+        assert_eq!(bounds.before, Some(dt(2026, 5, 14, 5, 0)));
+    }
+
+    #[test]
+    fn bare_iso_date_is_the_whole_local_day() {
+        let (bounds, _) = extract_date_clauses(&strs(&["2026-05-01"]), NOW(), EST_OFFSET);
+        assert_eq!(bounds.after, Some(dt(2026, 5, 1, 5, 0)));
+        assert_eq!(bounds.before, Some(dt(2026, 5, 2, 5, 0)));
+    }
+
+    #[test]
+    fn greater_than_date_is_inclusive_from_that_day() {
+        let (gt, _) = extract_date_clauses(&strs(&[">2026-05-01"]), NOW(), EST_OFFSET);
+        let (gte, _) = extract_date_clauses(&strs(&[">=2026-05-01"]), NOW(), EST_OFFSET);
+        // `>` and `>=` are deliberately equivalent for dates - both mean "from this day onward".
+        assert_eq!(gt.after, Some(dt(2026, 5, 1, 5, 0)));
+        assert_eq!(gt.after, gte.after);
+        assert!(gt.before.is_none());
+    }
+
+    #[test]
+    fn less_than_date_is_inclusive_through_end_of_that_day() {
+        let (lt, _) = extract_date_clauses(&strs(&["<2026-05-05"]), NOW(), EST_OFFSET);
+        let (lte, _) = extract_date_clauses(&strs(&["<=2026-05-05"]), NOW(), EST_OFFSET);
+        assert_eq!(lt.before, Some(dt(2026, 5, 6, 5, 0))); // start of the NEXT day - 05-05 is included
+        assert_eq!(lt.before, lte.before);
+        assert!(lt.after.is_none());
+    }
+
+    #[test]
+    fn dot_range_is_inclusive_on_both_ends() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["2026-05-01..2026-05-05"]), NOW(), EST_OFFSET);
+        assert!(rest.is_empty());
+        assert_eq!(bounds.after, Some(dt(2026, 5, 1, 5, 0)));
+        assert_eq!(bounds.before, Some(dt(2026, 5, 6, 5, 0)));
+    }
+
+    #[test]
+    fn this_hour_starts_at_the_local_top_of_the_hour() {
+        let now = dt(2026, 5, 15, 2, 45); // 21:45 EST
+        let (bounds, _) = extract_date_clauses(&strs(&["this", "hour"]), now, EST_OFFSET);
+        assert_eq!(bounds.after, Some(dt(2026, 5, 15, 2, 0))); // 21:00 EST = 02:00 UTC
+        assert!(bounds.before.is_none());
+    }
+
+    #[test]
+    fn this_week_starts_monday() {
+        // 2026-05-14 (local date for NOW()) is a Thursday - Monday of that week is 2026-05-11.
+        let (bounds, rest) = extract_date_clauses(&strs(&["this", "week"]), NOW(), EST_OFFSET);
+        assert!(rest.is_empty());
+        assert_eq!(bounds.after, Some(dt(2026, 5, 11, 5, 0))); // 2026-05-11 00:00 EST = 05:00 UTC
+        assert!(bounds.before.is_none());
+    }
+
+    #[test]
+    fn this_month_starts_on_the_1st() {
+        let (bounds, _) = extract_date_clauses(&strs(&["this", "month"]), NOW(), EST_OFFSET);
+        assert_eq!(bounds.after, Some(dt(2026, 5, 1, 5, 0))); // 2026-05-01 00:00 EST = 05:00 UTC
+    }
+
+    #[test]
+    fn last_n_days_is_a_rolling_window_ending_now() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["last", "3", "days"]), NOW(), EST_OFFSET);
+        assert!(rest.is_empty());
+        assert_eq!(bounds.after, Some(NOW() - Duration::days(3)));
+        assert!(bounds.before.is_none());
+    }
+
+    #[test]
+    fn last_n_hours_singular_and_plural_both_work() {
+        let (a, _) = extract_date_clauses(&strs(&["last", "24", "hours"]), NOW(), EST_OFFSET);
+        let (b, _) = extract_date_clauses(&strs(&["last", "1", "hour"]), NOW(), EST_OFFSET);
+        assert_eq!(a.after, Some(NOW() - Duration::hours(24)));
+        assert_eq!(b.after, Some(NOW() - Duration::hours(1)));
+    }
+
+    #[test]
+    fn two_date_tokens_in_one_group_and_together_into_a_range_without_a_separator() {
+        // Unlike ordinary same-group tokens (which OR), date tokens always AND - this is the only
+        // way to spell an explicit two-sided range using the >/< prefix form.
+        let (bounds, rest) =
+            extract_date_clauses(&strs(&[">2026-05-01", "<2026-05-05"]), NOW(), EST_OFFSET);
+        assert!(rest.is_empty());
+        assert_eq!(bounds.after, Some(dt(2026, 5, 1, 5, 0)));
+        assert_eq!(bounds.before, Some(dt(2026, 5, 6, 5, 0)));
+    }
+
+    #[test]
+    fn contradictory_date_clauses_intersect_to_an_empty_window() {
+        // "today and yesterday" can never both be true - intersecting collapses to after >= before,
+        // which the caller's scan loop naturally yields zero events for rather than needing a
+        // special case here.
+        let (bounds, _) = extract_date_clauses(&strs(&["today", "yesterday"]), NOW(), EST_OFFSET);
+        assert!(bounds.after.unwrap() >= bounds.before.unwrap());
+    }
+
+    #[test]
+    fn mixed_group_keeps_non_date_tokens_and_extracts_the_date_bound() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["vorkath", "today"]), NOW(), EST_OFFSET);
+        assert_eq!(rest, strs(&["vorkath"]));
+        assert!(bounds.after.is_some());
+    }
+
+    #[test]
+    fn tokens_with_no_date_clause_are_left_entirely_alone() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["vorkath", ">1m"]), NOW(), EST_OFFSET);
+        assert_eq!(bounds, DateBounds::default());
+        assert_eq!(rest, strs(&["vorkath", ">1m"]));
+    }
+
+    #[test]
+    fn plain_number_is_not_mistaken_for_a_last_n_clause_without_a_unit() {
+        let (bounds, rest) = extract_date_clauses(&strs(&["last", "3", "kills"]), NOW(), EST_OFFSET);
+        assert_eq!(bounds, DateBounds::default());
+        assert_eq!(rest, strs(&["last", "3", "kills"]));
     }
 }
