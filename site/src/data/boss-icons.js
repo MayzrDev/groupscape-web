@@ -98,6 +98,7 @@ export const HISCORE_ICON_PLACEHOLDER = "/icons/hiscore/activity-icon-placeholde
 export const HISCORE_BOSS_ICON_OVERRIDES = {
   barrows_chests: "barrows",
   chambers_of_xeric_cm: "chambers_of_xeric",
+  lunar_chests: "moons_of_peril",
   mimic: "the_mimic",
   nex: "the_nex",
   nightmare: "nightmare_of_ashihama",
@@ -112,10 +113,8 @@ export const HISCORE_BOSS_ICON_OVERRIDES = {
 
 // hiscores `key`s ground-truthed as having no matching icon anywhere in this codebase's existing
 // set (as of the 2026-09-07 ground-truthing pass) - rendered with HISCORE_ICON_PLACEHOLDER
-// instead. "Lunar Chests" has no icon in this project's boss set and no icon in wise-old-man's
-// bundled hiscore icon set either (see activity-icons.js's header comment for why that's this
-// project's source for new hiscore-style icons).
-export const HISCORE_BOSS_ICON_GAPS = new Set(["lunar_chests"]);
+// instead.
+export const HISCORE_BOSS_ICON_GAPS = new Set([]);
 
 // Resolves a boss-kc-panel hiscores `key` (boss category only) to its icon URL, applying the
 // override table above and falling back to the shared placeholder for a documented gap.

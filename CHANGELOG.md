@@ -6,6 +6,8 @@ All notable changes to GroupScape web are logged here, newest first.
 
 ### Fixed
 - Collection log Discord/activity feed notifications now show the correct page progress (e.g. "3/5") instead of always undercounting to just the newly obtained item.
+- Legacy Bounty Hunter (Hunter/Rogue) hiscores stats now show an icon instead of a placeholder.
+- Lunar Chests now shows its proper icon instead of a placeholder.
 
 ## [1.0.460] - 2026-09-10
 
